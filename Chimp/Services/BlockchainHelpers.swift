@@ -5,6 +5,10 @@ import stellarsdk
 final class BlockchainHelpers {
     private static let config = AppConfig.shared
     
+    /// Fee buffer to add on top of SDK-computed fees (0.1 XLM = 1,000,000 stroops)
+    /// This helps prevent transaction failures due to network congestion
+    private static let feeBufferStroops: UInt64 = 1_000_000
+    
     /// Convert AppNetwork to stellarsdk Network
     /// - Returns: Network enum value
     static func getNetwork() -> Network {
@@ -77,6 +81,18 @@ final class BlockchainHelpers {
                errorString.contains("account not found") ||
                errorString.contains("does not exist") ||
                errorString.contains("requestfailed")
+    }
+    
+    /// Check if error indicates insufficient fee
+    /// - Parameter error: Error to check
+    /// - Returns: true if error appears to be fee-related
+    static func isInsufficientFeeError(_ error: Error) -> Bool {
+        let errorString = "\(error)".lowercased()
+        return errorString.contains("tx_insufficient_fee") ||
+               errorString.contains("insufficient_fee") ||
+               errorString.contains("insufficient fee") ||
+               errorString.contains("fee too low") ||
+               errorString.contains("low fee")
     }
 
     /// Simulate transaction and decode XDR result
@@ -243,6 +259,9 @@ final class BlockchainHelpers {
         guard let rawTx = assembledTx.raw else {
             throw AppError.blockchain(.transactionFailed)
         }
+        
+        // Add fee buffer to prevent failures due to network congestion
+        rawTx.addResourceFee(resourceFee: feeBufferStroops)
         
         return rawTx
     }
