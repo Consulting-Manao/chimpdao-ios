@@ -163,7 +163,7 @@ struct NFTLoadingView: View {
                     return
                 }
                 await MainActor.run {
-                    errorMessage = (error as? AppError)?.localizedDescription ?? "Failed to load NFT information."
+                    errorMessage = error.userMessage.isEmpty ? "Failed to load NFT information." : error.userMessage
                     isLoading = false
                 }
             }

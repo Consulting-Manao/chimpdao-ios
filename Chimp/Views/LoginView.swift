@@ -120,7 +120,7 @@ struct LoginView: View {
             } catch {
                 await MainActor.run {
                     isLoading = false
-                    errorMessage = error.localizedDescription
+                    errorMessage = error.userMessage
                 }
             }
         }

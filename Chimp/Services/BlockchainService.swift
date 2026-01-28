@@ -92,26 +92,16 @@ final class BlockchainService {
             
             return tokenId
         } catch {
-            // Check for account not found errors
-            let errorString = "\(error)"
-            let errorLowercased = errorString.lowercased()
-            if errorLowercased.contains("could not find account") || 
-               errorLowercased.contains("account not found") ||
-               errorLowercased.contains("does not exist") {
+            if BlockchainHelpers.isAccountNotFoundError(error) {
                 throw AppError.wallet(.noWallet)
             }
-            
-            // Re-throw if already AppError
             if error is AppError {
                 throw error
             }
-            
-            // Check for contract errors
             if let contractError = BlockchainHelpers.extractContractError(from: error) {
                 throw contractError
             }
-            
-            throw AppError.blockchain(.transactionRejected(errorString))
+            throw AppError.blockchain(.transactionRejected("\(error)"))
         }
     }
 
@@ -469,30 +459,29 @@ final class BlockchainService {
             Logger.logError("Transaction has no operations", category: .blockchain)
             throw AppError.blockchain(.transactionFailed)
         }
-        
-        // Compute transaction hash before sending (needed for polling)
         let hashString = try BlockchainHelpers.getTransactionHash(transaction)
-        
         progressCallback?("Sending transaction to blockchain network...")
-        let sentTxResponse = await self.rpcClient.sendTransaction(transaction: transaction)
-        
-        let sentTx: SendTransactionResponse
-        switch sentTxResponse {
-        case .success(let response):
-            sentTx = response
-            
+        let sentTxResponse = await rpcClient.sendTransaction(transaction: transaction)
+        let (hash, alreadyConfirmed) = try handleSendResponse(sentTxResponse, hashString: hashString)
+        if alreadyConfirmed {
+            return hash
+        }
+        return try await pollTransactionStatus(hashString: hash, progressCallback: progressCallback)
+    }
+
+    /// Process send transaction response; returns hash and whether it is already confirmed (no polling needed).
+    private func handleSendResponse(_ result: SendTransactionResponseEnum, hashString: String) throws -> (hash: String, alreadyConfirmed: Bool) {
+        switch result {
+        case .success(let sentTx):
             if sentTx.status == "ERROR" {
                 Logger.logError("Transaction was immediately rejected with status: ERROR", category: .blockchain)
                 if let errorResult = sentTx.errorResult {
                     Logger.logError("Error result code: \(errorResult.code)", category: .blockchain)
-                    
                     let errorString = "\(errorResult)"
                     if let contractError = ContractError.fromErrorString(errorString) {
                         Logger.logError("Contract error detected: \(contractError)", category: .blockchain)
                         throw AppError.blockchain(.contract(contractError))
                     }
-                    
-                    // Handle specific error codes
                     switch errorResult.code {
                     case .malformed:
                         throw AppError.blockchain(.transactionRejected("Transaction was rejected as malformed. Please check your transaction parameters."))
@@ -507,77 +496,60 @@ final class BlockchainService {
                     throw AppError.blockchain(.transactionRejected("Transaction was rejected by the network."))
                 }
             }
-            
-            if sentTx.status != "PENDING" && sentTx.status != "SUCCESS" {
-                if sentTx.status == "SUCCESS" {
-                    return hashString
-                } else {
-                    throw AppError.blockchain(.transactionRejected("Transaction status: \(sentTx.status)"))
-                }
+            if sentTx.status == "SUCCESS" {
+                return (hashString, true)
             }
+            if sentTx.status != "PENDING" {
+                throw AppError.blockchain(.transactionRejected("Transaction status: \(sentTx.status)"))
+            }
+            return (hashString, false)
         case .failure(let error):
             Logger.logError("Failed to send transaction: \(error)", category: .blockchain)
-            
-            let errorString = "\(error)"
-            let errorLowercased = errorString.lowercased()
-            if errorLowercased.contains("could not find account") || 
-               errorLowercased.contains("account not found") ||
-               errorLowercased.contains("does not exist") ||
-               errorLowercased.contains("requestfailed") {
-                throw AppError.wallet(.noWallet) // Account doesn't exist on network
+            if BlockchainHelpers.isAccountNotFoundError(error) {
+                throw AppError.wallet(.noWallet)
             }
-            
-            // Use structured error parsing
-            if let contractError = ContractError.fromErrorString(errorString) {
-                Logger.logError("Contract error detected in send response: \(contractError)", category: .blockchain)
-                throw AppError.blockchain(.contract(contractError))
+            if let appError = BlockchainHelpers.extractContractError(from: error) {
+                Logger.logError("Contract error detected in send response: \(appError)", category: .blockchain)
+                throw appError
             }
-            
             throw AppError.blockchain(.transactionRejected("Failed to send transaction: \(error.localizedDescription)"))
         }
-        
-        progressCallback?("Waiting for blockchain confirmation...")
+    }
+
+    /// Poll for transaction status until success, failure, or timeout.
+    private func pollTransactionStatus(hashString: String, progressCallback: ((String) -> Void)?) async throws -> String {
         let maxAttempts = 30
         let initialDelay: TimeInterval = 2.0
         let pollInterval: TimeInterval = 1.0
         var attempts = 0
-        
+        progressCallback?("Waiting for blockchain confirmation...")
         while attempts < maxAttempts {
             let delay = attempts == 0 ? initialDelay : pollInterval
-            let delayNanoseconds = UInt64(delay * 1_000_000_000)
+            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             progressCallback?("Confirming transaction...")
-            try await Task.sleep(nanoseconds: delayNanoseconds)
-            
-            let txResponseEnum = await self.rpcClient.getTransaction(transactionHash: hashString)
-            
+            let txResponseEnum = await rpcClient.getTransaction(transactionHash: hashString)
             switch txResponseEnum {
             case .success(let txResponse):
                 if txResponse.status == GetTransactionResponse.STATUS_SUCCESS {
                     Logger.logInfo("Transaction confirmed successfully!", category: .blockchain)
                     progressCallback?("Transaction confirmed!")
                     return hashString
-                } else if txResponse.status == GetTransactionResponse.STATUS_FAILED {
+                }
+                if txResponse.status == GetTransactionResponse.STATUS_FAILED {
                     Logger.logError("Transaction failed on network", category: .blockchain)
-                    
                     let responseString = "\(txResponse)"
                     if let contractError = ContractError.fromErrorString(responseString) {
                         Logger.logError("Contract error detected in transaction response: \(contractError)", category: .blockchain)
                         throw AppError.blockchain(.contract(contractError))
                     }
-                    
                     throw AppError.blockchain(.transactionFailed)
-                } else {
-                    // Transaction still pending, continue polling
-                    attempts += 1
-                    continue
                 }
+                attempts += 1
             case .failure(let error):
                 Logger.logWarning("Error getting transaction (attempt \(attempts + 1)/\(maxAttempts)): \(error)", category: .blockchain)
                 attempts += 1
-                continue
             }
         }
-        
         Logger.logWarning("Transaction polling timed out after \(attempts) attempts", category: .blockchain)
         throw AppError.blockchain(.transactionTimeout)
     }

@@ -229,8 +229,8 @@ struct SettingsView: View {
             try walletService.logout()
             walletState.checkWalletState()
         } catch {
-            Logger.logError("Logout error: \(error.localizedDescription)", category: .ui)
-            logoutErrorMessage = error.localizedDescription
+            Logger.logError("Logout error: \(error.userMessage)", category: .ui)
+            logoutErrorMessage = error.userMessage
             showLogoutErrorAlert = true
         }
     }

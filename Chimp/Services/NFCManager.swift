@@ -61,7 +61,7 @@ final class NFCManager {
                     } catch {
                         // Error - update UI on main thread
                         await MainActor.run {
-                            let errorMessage = (error as? AppError)?.localizedDescription ?? "Operation failed"
+                            let errorMessage = error.userMessage.isEmpty ? "Operation failed" : error.userMessage
                             session.invalidate(errorMessage: errorMessage)
                             completion(.failure(error))
                             self.nfcHelper = nil
@@ -122,7 +122,7 @@ final class NFCManager {
             case .success(let (contractId, tokenId)):
                 completion(true, nil, contractId, tokenId)
             case .failure(let error):
-                let errorMessage = (error as? AppError)?.localizedDescription ?? "Failed to load NFT"
+                let errorMessage = error.userMessage.isEmpty ? "Failed to load NFT" : error.userMessage
                 completion(false, errorMessage, nil, nil)
             }
         }
@@ -159,7 +159,7 @@ final class NFCManager {
             case .success(let claimResult):
                 completion(true, nil, claimResult.tokenId, claimResult.contractId)
             case .failure(let error):
-                let errorMessage = (error as? AppError)?.localizedDescription ?? "Claim failed"
+                let errorMessage = error.userMessage.isEmpty ? "Claim failed" : error.userMessage
                 completion(false, errorMessage, nil, nil)
             }
         }
@@ -197,7 +197,7 @@ final class NFCManager {
             case .success(_):
                 completion(true, nil)
             case .failure(let error):
-                let errorMessage = (error as? AppError)?.localizedDescription ?? "Transfer failed"
+                let errorMessage = error.userMessage.isEmpty ? "Transfer failed" : error.userMessage
                 completion(false, errorMessage)
             }
         }
@@ -234,7 +234,7 @@ final class NFCManager {
             case .success(let tokenId):
                 completion(true, tokenId, nil)
             case .failure(let error):
-                let errorMessage = (error as? AppError)?.localizedDescription ?? "Failed to read chip. Please try again."
+                let errorMessage = error.userMessage.isEmpty ? "Failed to read chip. Please try again." : error.userMessage
                 completion(false, nil, errorMessage)
             }
         }
@@ -279,7 +279,7 @@ final class NFCManager {
             case .success(let mintResult):
                 completion(true, nil, mintResult.tokenId)
             case .failure(let error):
-                let errorMessage = (error as? AppError)?.localizedDescription ?? "Mint failed"
+                let errorMessage = error.userMessage.isEmpty ? "Mint failed" : error.userMessage
                 completion(false, errorMessage, nil)
             }
         }
@@ -335,7 +335,7 @@ final class NFCManager {
             case .success(let (globalCounter, keyCounter, derSignatureHex)):
                 completion(true, globalCounter, keyCounter, derSignatureHex, nil)
             case .failure(let error):
-                let errorMessage = (error as? AppError)?.localizedDescription ?? "Failed to generate signature"
+                let errorMessage = error.userMessage.isEmpty ? "Failed to generate signature" : error.userMessage
                 completion(false, nil, nil, nil, errorMessage)
             }
         }

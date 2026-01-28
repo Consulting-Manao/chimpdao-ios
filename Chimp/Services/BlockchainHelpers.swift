@@ -69,7 +69,16 @@ final class BlockchainHelpers {
         }
         return nil
     }
-    
+
+    /// Check if error indicates account not found on network (map to AppError.wallet(.noWallet)).
+    static func isAccountNotFoundError(_ error: Error) -> Bool {
+        let errorString = "\(error)".lowercased()
+        return errorString.contains("could not find account") ||
+               errorString.contains("account not found") ||
+               errorString.contains("does not exist") ||
+               errorString.contains("requestfailed")
+    }
+
     /// Simulate transaction and decode XDR result
     /// - Parameters:
     ///   - transaction: Transaction to simulate
