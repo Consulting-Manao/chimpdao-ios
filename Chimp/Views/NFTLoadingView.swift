@@ -2,7 +2,7 @@ import SwiftUI
 
 struct NFTLoadingView: View {
     let contractId: String
-    let tokenId: UInt64
+    let tokenId: UInt32
     @Binding var isPresented: Bool
     @State private var metadata: NFTMetadata?
     @State private var imageData: Data?

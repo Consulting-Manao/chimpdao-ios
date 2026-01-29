@@ -7,7 +7,7 @@ struct TransferInputView: View {
     @State private var showConfirmation = false
     @FocusState private var isAddressFocused: Bool
     
-    let tokenId: UInt64
+    let tokenId: UInt32
     let onTransfer: (String) -> Void
     
     private var isRecipientValid: Bool {

@@ -11,7 +11,7 @@ import OSLog
 /// Result of a successful claim operation
 struct ClaimResult {
     let transactionHash: String
-    let tokenId: UInt64
+    let tokenId: UInt32
     let contractId: String
 }
 
@@ -23,7 +23,7 @@ struct TransferResult {
 /// Result of a successful mint operation
 struct MintResult {
     let transactionHash: String
-    let tokenId: UInt64
+    let tokenId: UInt32
 }
 
 final class NFTService {
@@ -131,7 +131,7 @@ final class NFTService {
         session: NFCTagReaderSession,
         keyIndex: UInt8 = 0x01,
         recipientAddress: String,
-        tokenId: UInt64,
+        tokenId: UInt32,
         progressCallback: ((String) -> Void)? = nil
     ) async throws -> TransferResult {
         guard let wallet = walletService.getStoredWallet() else {
@@ -402,7 +402,7 @@ final class NFTService {
         contractId: String,
         from: String,
         to: String,
-        tokenId: UInt64,
+        tokenId: UInt32,
         message: Data,
         signature: Data,
         publicKey: Data,
@@ -445,7 +445,7 @@ final class NFTService {
         nonce: UInt32,
         sourceKeyPair: KeyPair,
         progressCallback: ((String) -> Void)?
-    ) async throws -> (Transaction, UInt64) {
+    ) async throws -> (Transaction, UInt32) {
         let recoveryId = try await blockchainService.determineRecoveryId(
             contractId: contractId,
             method: method,

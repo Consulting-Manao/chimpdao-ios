@@ -79,7 +79,7 @@ final class NFCManager {
     }
 
     /// Load NFT - reads NDEF and gets token ID
-    func loadNFT(completion: @escaping (Bool, String?, String?, UInt64?) -> Void) {
+    func loadNFT(completion: @escaping (Bool, String?, String?, UInt32?) -> Void) {
         performNFCOperation(
             guardChecks: {
                 guard walletService.getStoredWallet() != nil else {
@@ -129,7 +129,7 @@ final class NFCManager {
     }
     
     /// Claim NFT
-    func claimNFT(completion: @escaping (Bool, String?, UInt64?, String?) -> Void) {
+    func claimNFT(completion: @escaping (Bool, String?, UInt32?, String?) -> Void) {
         performNFCOperation(
             guardChecks: {
                 guard walletService.getStoredWallet() != nil else {
@@ -166,7 +166,7 @@ final class NFCManager {
     }
     
     /// Transfer NFT
-    func transferNFT(recipientAddress: String, tokenId: UInt64, completion: @escaping (Bool, String?) -> Void) {
+    func transferNFT(recipientAddress: String, tokenId: UInt32, completion: @escaping (Bool, String?) -> Void) {
         performNFCOperation(
             guardChecks: {
                 guard walletService.getStoredWallet() != nil else {
@@ -204,7 +204,7 @@ final class NFCManager {
     }
     
     /// Read NFT for Transfer - reads NDEF to get token ID
-    func readNFTForTransfer(completion: @escaping (Bool, UInt64?, String?) -> Void) {
+    func readNFTForTransfer(completion: @escaping (Bool, UInt32?, String?) -> Void) {
         performNFCOperation(
             guardChecks: {
                 guard walletService.getStoredWallet() != nil else {
@@ -241,7 +241,7 @@ final class NFCManager {
     }
     
     /// Mint NFT
-    func mintNFT(completion: @escaping (Bool, String?, UInt64?) -> Void) {
+    func mintNFT(completion: @escaping (Bool, String?, UInt32?) -> Void) {
         performNFCOperation(
             guardChecks: {
                 guard walletService.getStoredWallet() != nil else {
@@ -343,7 +343,7 @@ final class NFCManager {
     
     // MARK: - Helper Methods
     
-    private func getTokenIdForChip(contractId: String, publicKey: Data) async throws -> UInt64 {
+    private func getTokenIdForChip(contractId: String, publicKey: Data) async throws -> UInt32 {
         guard let wallet = walletService.getStoredWallet() else {
             throw AppError.wallet(.noWallet)
         }

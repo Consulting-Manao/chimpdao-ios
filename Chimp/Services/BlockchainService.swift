@@ -41,8 +41,8 @@ final class BlockchainService {
     ///   - accountId: Public account address for simulation (starts with 'G')
     /// - Returns: Owner address string
     /// - Throws: AppError if call fails
-    func getTokenOwner(contractId: String, tokenId: UInt64, accountId: String) async throws -> String {
-        let args: [SCValXDR] = [SCValXDR.u64(tokenId)]
+    func getTokenOwner(contractId: String, tokenId: UInt32, accountId: String) async throws -> String {
+        let args: [SCValXDR] = [SCValXDR.u32(tokenId)]
         
         let returnValue = try await BlockchainHelpers.buildAndSimulateReadOnly(
             contractId: contractId,
@@ -70,7 +70,7 @@ final class BlockchainService {
     ///   - accountId: Public account address for simulation (starts with 'G')
     /// - Returns: Token ID
     /// - Throws: AppError if call fails
-    func getTokenId(contractId: String, publicKey: Data, accountId: String) async throws -> UInt64 {
+    func getTokenId(contractId: String, publicKey: Data, accountId: String) async throws -> UInt32 {
         guard publicKey.count == 65 else {
             throw AppError.validation("Invalid public key length: \(publicKey.count), expected 65")
         }
@@ -86,7 +86,7 @@ final class BlockchainService {
                 rpcClient: rpcClient
             )
             
-            guard case .u64(let tokenId) = returnValue else {
+            guard case .u32(let tokenId) = returnValue else {
                 throw AppError.blockchain(.invalidResponse)
             }
             
@@ -112,8 +112,8 @@ final class BlockchainService {
     ///   - accountId: Public account address for simulation (starts with 'G')
     /// - Returns: Token URI string (IPFS URL)
     /// - Throws: AppError if call fails
-    func getTokenUri(contractId: String, tokenId: UInt64, accountId: String) async throws -> String {
-        let args: [SCValXDR] = [SCValXDR.u64(tokenId)]
+    func getTokenUri(contractId: String, tokenId: UInt32, accountId: String) async throws -> String {
+        let args: [SCValXDR] = [SCValXDR.u32(tokenId)]
         
         let returnValue = try await BlockchainHelpers.buildAndSimulateReadOnly(
             contractId: contractId,
@@ -194,7 +194,7 @@ final class BlockchainService {
     /// Contract method type for recovery ID determination
     enum ContractMethod {
         case claim(claimant: String)
-        case transfer(from: String, to: String, tokenId: UInt64)
+        case transfer(from: String, to: String, tokenId: UInt32)
         case mint
     }
     
@@ -318,7 +318,7 @@ final class BlockchainService {
         nonce: UInt32,
         sourceAccount: String,
         sourceKeyPair: KeyPair
-    ) async throws -> (transaction: Transaction, tokenId: UInt64) {
+    ) async throws -> (transaction: Transaction, tokenId: UInt32) {
         let claimantAddress = try SCAddressXDR(accountId: claimant)
         
         let args: [SCValXDR] = [
@@ -338,10 +338,10 @@ final class BlockchainService {
         )
         
         // Extract token ID by simulating the transaction
-        var tokenId: UInt64 = 0
+        var tokenId: UInt32 = 0
         do {
             let returnValue = try await BlockchainHelpers.simulateAndDecode(transaction: transaction, rpcClient: rpcClient)
-            if case .u64(let simulatedTokenId) = returnValue {
+            if case .u32(let simulatedTokenId) = returnValue {
                 tokenId = simulatedTokenId
             }
         } catch {
@@ -369,7 +369,7 @@ final class BlockchainService {
         contractId: String,
         from: String,
         to: String,
-        tokenId: UInt64,
+        tokenId: UInt32,
         message: Data,
         signature: Data,
         recoveryId: UInt32,
@@ -383,7 +383,7 @@ final class BlockchainService {
         let args: [SCValXDR] = [
             SCValXDR.address(fromAddress),
             SCValXDR.address(toAddress),
-            SCValXDR.u64(tokenId),
+            SCValXDR.u32(tokenId),
             SCValXDR.bytes(message),
             SCValXDR.bytes(signature),
             SCValXDR.u32(recoveryId),
@@ -418,7 +418,7 @@ final class BlockchainService {
         publicKey: Data,
         nonce: UInt32,
         sourceKeyPair: KeyPair
-    ) async throws -> (transaction: Transaction, tokenId: UInt64) {
+    ) async throws -> (transaction: Transaction, tokenId: UInt32) {
         let args: [SCValXDR] = [
             SCValXDR.bytes(message),
             SCValXDR.bytes(signature),
@@ -435,10 +435,10 @@ final class BlockchainService {
         )
 
         // Extract token ID by simulating the transaction
-        var tokenId: UInt64 = 0
+        var tokenId: UInt32 = 0
         do {
             let returnValue = try await BlockchainHelpers.simulateAndDecode(transaction: transaction, rpcClient: rpcClient)
-            if case .u64(let simulatedTokenId) = returnValue {
+            if case .u32(let simulatedTokenId) = returnValue {
                 tokenId = simulatedTokenId
             }
         } catch {

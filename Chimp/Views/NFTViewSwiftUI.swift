@@ -7,7 +7,7 @@ struct NFTViewSwiftUI: View {
     let ownerAddress: String?
     let isClaimed: Bool
     let contractId: String
-    let tokenId: UInt64
+    let tokenId: UInt32
     
     @State private var showingShareSheet = false
     

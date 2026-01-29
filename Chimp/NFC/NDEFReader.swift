@@ -370,7 +370,7 @@ final class NDEFReader {
     
     /// Parse token ID from NDEF URL
     /// Expected format: https://nft.chimpdao.xyz/{contractId}/{tokenId}
-    nonisolated static func parseTokenIdFromNDEFUrl(_ url: String) -> UInt64? {
+    nonisolated static func parseTokenIdFromNDEFUrl(_ url: String) -> UInt32? {
         // Remove protocol if present
         var urlPath = url
         if urlPath.hasPrefix("http://") {
@@ -386,7 +386,7 @@ final class NDEFReader {
         }
         
         let tokenIdString = String(components[2])
-        return UInt64(tokenIdString)
+        return UInt32(tokenIdString)
     }
 }
 

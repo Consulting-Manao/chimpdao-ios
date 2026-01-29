@@ -19,12 +19,12 @@ class HomeViewModel: ObservableObject {
         }
     }
     @Published var showingTransferAlert = false
-    @Published var transferTokenId: UInt64?
+    @Published var transferTokenId: UInt32?
     @Published var transferRecipient: String?
     @Published var showingSignAlert = false
     @Published var showingNFTView = false
     @Published var loadedNFTContractId: String?
-    @Published var loadedNFTTokenId: UInt64?
+    @Published var loadedNFTTokenId: UInt32?
     
     // Result states for post-operation display
     @Published var showingSignatureView = false

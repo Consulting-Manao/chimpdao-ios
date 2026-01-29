@@ -261,7 +261,7 @@ final class BlockchainHelpers {
         }
         
         // Add fee buffer to prevent failures due to network congestion
-        rawTx.addResourceFee(resourceFee: feeBufferStroops)
+        rawTx.addResourceFee(resourceFee: UInt32(feeBufferStroops))
         
         return rawTx
     }
