@@ -79,11 +79,8 @@ final class IPFSService {
             Logger.logDebug("Successfully parsed NFT metadata", category: .network)
             return metadata
         } catch {
-            Logger.logError("Failed to parse JSON: \(error)", category: .network)
-            if let responseString = String(data: data, encoding: .utf8) {
-                Logger.logDebug("Raw response (first 500 chars): \(responseString.prefix(500))", category: .network)
-            }
-            throw AppError.ipfs(.parseFailed(error.localizedDescription))
+            Logger.logError("Failed to parse NFT metadata", category: .network)
+            throw AppError.ipfs(.parseFailed("Failed to parse NFT metadata"))
         }
     }
 
@@ -131,7 +128,7 @@ final class IPFSService {
         }
 
         // For anything else, try to use it as-is but log a warning
-        Logger.logWarning("Unrecognized URI format: \(ipfsUrl)", category: .network)
+        Logger.logWarning("Unrecognized URI format", category: .network)
         return ipfsUrl
     }
 }

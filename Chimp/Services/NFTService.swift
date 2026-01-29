@@ -110,7 +110,7 @@ final class NFTService {
             let newUrl = "https://nft.chimpdao.xyz/\(contractId)/\(tokenId)"
             try await NDEFReader.writeNDEFUrl(tag: tag, session: session, url: newUrl)
         } catch {
-            Logger.logWarning("Failed to update NDEF data on chip: \(error)", category: .nfc)
+            Logger.logWarning("Failed to update NDEF data on chip", category: .nfc)
         }
 
         return ClaimResult(transactionHash: txHash, tokenId: tokenId, contractId: contractId)
@@ -307,7 +307,7 @@ final class NFTService {
             let newUrl = "https://nft.chimpdao.xyz/\(contractId)/\(tokenId)"
             try await NDEFReader.writeNDEFUrl(tag: tag, session: session, url: newUrl)
         } catch {
-            Logger.logWarning("Failed to update NDEF data on chip: \(error)", category: .nfc)
+            Logger.logWarning("Failed to update NDEF data on chip", category: .nfc)
         }
 
         return MintResult(transactionHash: txHash, tokenId: tokenId)

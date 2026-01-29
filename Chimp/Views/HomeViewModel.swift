@@ -125,7 +125,10 @@ class HomeViewModel: ObservableObject {
         errorTimeoutTimer?.invalidate()
         
         errorTimeoutTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
-            self?.errorMessage = nil
+            guard let viewModel = self else { return }
+            Task { @MainActor in
+                viewModel.errorMessage = nil
+            }
         }
     }
     

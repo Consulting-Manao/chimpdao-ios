@@ -221,7 +221,6 @@ final class BlockchainService {
         sourceKeyPair: KeyPair
     ) async throws -> UInt32 {
         let recoveryIds: [UInt32] = [0, 1, 2, 3]
-        var errors: [String] = []
         
         for recoveryId in recoveryIds {
             
@@ -270,8 +269,6 @@ final class BlockchainService {
                 return recoveryId
             } catch {
                 if case AppError.blockchain(.contract(.invalidSignature)) = error {
-                    let errorMsg = "Recovery ID \(recoveryId): InvalidSignature"
-                    errors.append(errorMsg)
                     continue
                 }
                 
@@ -279,8 +276,6 @@ final class BlockchainService {
                 if errorString.contains("InvalidInput") ||
                    errorString.contains("recovery failed") ||
                    errorString.contains("recover_key_ecdsa") {
-                    let errorMsg = "Recovery ID \(recoveryId): InvalidInput"
-                    errors.append(errorMsg)
                     continue
                 }
                 
@@ -289,9 +284,7 @@ final class BlockchainService {
         }
         
         // If we get here, no recovery ID worked
-        if !errors.isEmpty {
-            Logger.logError("Failed to determine recovery ID. Errors: \(errors.joined(separator: ", "))", category: .blockchain)
-        }
+        Logger.logError("Failed to determine recovery ID", category: .blockchain)
         throw AppError.blockchain(.transactionFailed)
     }
     
@@ -474,11 +467,10 @@ final class BlockchainService {
         switch result {
         case .success(let sentTx):
             if sentTx.status == "ERROR" {
-                Logger.logError("Transaction was immediately rejected with status: ERROR", category: .blockchain)
+                Logger.logError("Transaction rejected", category: .blockchain)
                 if let errorResult = sentTx.errorResult {
                     let errorString = "\(errorResult)"
                     if let contractError = ContractError.fromErrorString(errorString) {
-                        Logger.logError("Contract error detected", category: .blockchain)
                         throw AppError.blockchain(.contract(contractError))
                     }
                     switch errorResult.code {
@@ -503,11 +495,6 @@ final class BlockchainService {
             }
             return (hashString, false)
         case .failure(let error):
-            // Rethrow AppError as-is
-            if error is AppError {
-                throw error
-            }
-            
             // Check for account not found
             if BlockchainHelpers.isAccountNotFoundError(error) {
                 throw AppError.wallet(.noWallet)
@@ -515,17 +502,15 @@ final class BlockchainService {
             
             // Check for insufficient fee errors
             if BlockchainHelpers.isInsufficientFeeError(error) {
-                Logger.logError("Transaction failed due to insufficient fee", category: .blockchain)
                 throw AppError.blockchain(.transactionRejected("Network fee too low. Please try again."))
             }
             
             // Check for contract errors
             if let appError = BlockchainHelpers.extractContractError(from: error) {
-                Logger.logError("Contract error detected in send response", category: .blockchain)
                 throw appError
             }
             
-            // Generic failure - use simple default message
+            // Generic failure
             Logger.logError("Failed to send transaction", category: .blockchain)
             throw AppError.blockchain(.transactionRejected(nil))
         }
@@ -554,13 +539,12 @@ final class BlockchainService {
                     Logger.logError("Transaction failed on network", category: .blockchain)
                     let responseString = "\(txResponse)"
                     if let contractError = ContractError.fromErrorString(responseString) {
-                        Logger.logError("Contract error detected in transaction response", category: .blockchain)
                         throw AppError.blockchain(.contract(contractError))
                     }
                     throw AppError.blockchain(.transactionFailed)
                 }
                 attempts += 1
-            case .failure(let error):
+            case .failure:
                 Logger.logWarning("Error getting transaction (attempt \(attempts + 1)/\(maxAttempts))", category: .blockchain)
                 attempts += 1
             }
