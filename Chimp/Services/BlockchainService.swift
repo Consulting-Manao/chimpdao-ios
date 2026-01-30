@@ -190,6 +190,34 @@ final class BlockchainService {
             throw AppError.blockchain(.invalidResponse)
         }
     }
+
+    /// Returns the next token ID that would be assigned by mint (read-only).
+    func getNextTokenId(contractId: String, accountId: String) async throws -> UInt32 {
+        do {
+            let returnValue = try await BlockchainHelpers.buildAndSimulateReadOnly(
+                contractId: contractId,
+                method: "next_token_id",
+                arguments: [],
+                accountId: accountId,
+                rpcClient: rpcClient
+            )
+            guard case .u32(let tokenId) = returnValue else {
+                throw AppError.blockchain(.invalidResponse)
+            }
+            return tokenId
+        } catch {
+            if BlockchainHelpers.isAccountNotFoundError(error) {
+                throw AppError.wallet(.noWallet)
+            }
+            if error is AppError {
+                throw error
+            }
+            if let contractError = BlockchainHelpers.extractContractError(from: error) {
+                throw contractError
+            }
+            throw AppError.blockchain(.transactionRejected(nil))
+        }
+    }
     
     /// Contract method type for recovery ID determination
     enum ContractMethod {

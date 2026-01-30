@@ -258,6 +258,10 @@ final class NFTService {
 
         let accountId = wallet.address
 
+        let expectedTokenId = try await blockchainService.getNextTokenId(contractId: contractId, accountId: accountId)
+        progressCallback?("Writing chip...")
+        await writeNDEFForToken(tag: tag, session: session, contractId: contractId, tokenId: expectedTokenId)
+
         progressCallback?("Preparing transaction...")
         let nonce = try await getNonce(
             contractId: contractId,
@@ -301,21 +305,26 @@ final class NFTService {
         progressCallback?("Processing on blockchain network...")
         let txHash = try await submitTransaction(transaction, progressCallback: progressCallback)
 
-        // Update NDEF data on chip with token ID
-        progressCallback?("Completing operation...")
-        do {
-            let newUrl = "https://nft.chimpdao.xyz/\(contractId)/\(tokenId)"
-            try await NDEFReader.writeNDEFUrl(tag: tag, session: session, url: newUrl)
-        } catch {
-            Logger.logWarning("Failed to update NDEF data on chip", category: .nfc)
+        if tokenId != expectedTokenId {
+            progressCallback?("Updating chip...")
+            await writeNDEFForToken(tag: tag, session: session, contractId: contractId, tokenId: tokenId)
+            Logger.logWarning("Minted token ID (\(tokenId)) differed from expected (\(expectedTokenId)); NDEF updated", category: .nfc)
         }
 
         return MintResult(transactionHash: txHash, tokenId: tokenId)
     }
     
     // MARK: - Private Helper Methods
+
+    private func writeNDEFForToken(tag: NFCISO7816Tag, session: NFCTagReaderSession, contractId: String, tokenId: UInt32) async {
+        let url = "https://nft.chimpdao.xyz/\(contractId)/\(tokenId)"
+        do {
+            try await NDEFReader.writeNDEFUrl(tag: tag, session: session, url: url)
+        } catch {
+            Logger.logWarning("Failed to update NDEF data on chip", category: .nfc)
+        }
+    }
     
-    /// Read chip NDEF and public key, return contract ID and public key data
     private func readChipAndGetContractId(
         tag: NFCISO7816Tag,
         session: NFCTagReaderSession,
