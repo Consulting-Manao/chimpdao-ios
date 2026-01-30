@@ -26,7 +26,6 @@ final class AppConfig: ObservableObject {
     // Build configuration keys (set in Info.plist via build settings)
     private let buildContractIdTestnetKey = "STELLAR_CONTRACT_ID_TESTNET"
     private let buildContractIdMainnetKey = "STELLAR_CONTRACT_ID_MAINNET"
-    private let buildAdminModeKey = "ADMIN_MODE"
     
     @Published private var _isAdminMode: Bool = false
     @Published var currentNetwork: AppNetwork = .mainnet
