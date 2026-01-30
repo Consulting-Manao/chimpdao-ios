@@ -107,29 +107,37 @@ final class IPFSService {
         return data
     }
 
-    /// Convert IPFS URL to HTTP gateway URL if needed
-    /// - Parameter ipfsUrl: IPFS URL, IPFS hash, or HTTP URL
-    /// - Returns: HTTP gateway URL
-    func convertToHTTPGateway(_ ipfsUrl: String) -> String {
-        // If it's already an HTTP/HTTPS URL, return as-is
-        if ipfsUrl.hasPrefix("http://") || ipfsUrl.hasPrefix("https://") {
-            return ipfsUrl
+    /// Convert token/metadata URI to fetchable HTTPS URL.
+    /// Supports: https:// (pass-through), ipfs:// (gateway), bare IPFS hashes (Qm, bafy, bafk).
+    /// Rejects: http:// and any other scheme.
+    /// - Parameter uri: Token URI or metadata image URI (https://, ipfs://, or bare hash)
+    /// - Returns: HTTPS URL string
+    /// - Throws: AppError.ipfs if scheme is unsupported or result URL is invalid
+    func convertToHTTPGateway(_ uri: String) throws -> String {
+        let trimmed = uri.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            throw AppError.ipfs(.invalidHash)
         }
 
-        // If it's an IPFS URL, convert to gateway
-        if ipfsUrl.hasPrefix("ipfs://") {
-            let hash = ipfsUrl.replacingOccurrences(of: "ipfs://", with: "")
-            return "https://ipfs.io/ipfs/\(hash)"
+        var result: String
+
+        if trimmed.hasPrefix("https://") {
+            result = trimmed
+        } else if trimmed.hasPrefix("http://") {
+            throw AppError.ipfs(.unsupportedUriScheme("http:// is not supported; use https://"))
+        } else if trimmed.hasPrefix("ipfs://") {
+            let path = trimmed.replacingOccurrences(of: "ipfs://", with: "")
+            result = "https://ipfs.io/ipfs/\(path)"
+        } else if trimmed.hasPrefix("Qm") || trimmed.hasPrefix("bafy") || trimmed.hasPrefix("bafk") {
+            result = "https://ipfs.io/ipfs/\(trimmed)"
+        } else {
+            throw AppError.ipfs(.unsupportedUriScheme("Only https://, ipfs://, or bare IPFS hashes are supported"))
         }
 
-        // If it starts with a hash-like pattern (Qm..., bafy...), assume it's just a hash
-        if ipfsUrl.hasPrefix("Qm") || ipfsUrl.hasPrefix("bafy") || ipfsUrl.hasPrefix("bafk") {
-            return "https://ipfs.io/ipfs/\(ipfsUrl)"
+        guard let url = URL(string: result), url.scheme?.lowercased() == "https" else {
+            throw AppError.ipfs(.invalidHash)
         }
-
-        // For anything else, try to use it as-is but log a warning
-        Logger.logWarning("Unrecognized URI format", category: .network)
-        return ipfsUrl
+        return result
     }
 }
 

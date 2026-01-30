@@ -110,7 +110,7 @@ final class BlockchainService {
     ///   - contractId: Contract ID
     ///   - tokenId: Token ID
     ///   - accountId: Public account address for simulation (starts with 'G')
-    /// - Returns: Token URI string (IPFS URL)
+    /// - Returns: Token URI string (https://, ipfs://, or bare IPFS hash)
     /// - Throws: AppError if call fails
     func getTokenUri(contractId: String, tokenId: UInt32, accountId: String) async throws -> String {
         let args: [SCValXDR] = [SCValXDR.u32(tokenId)]

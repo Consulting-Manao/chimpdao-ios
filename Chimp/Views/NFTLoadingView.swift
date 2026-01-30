@@ -127,7 +127,7 @@ struct NFTLoadingView: View {
                 }
                 
                 // Get token URI
-                let ipfsUrl = try await blockchainService.getTokenUri(
+                let tokenUri = try await blockchainService.getTokenUri(
                     contractId: contractId,
                     tokenId: tokenId,
                     accountId: accountId
@@ -135,10 +135,10 @@ struct NFTLoadingView: View {
                 
                 try Task.checkCancellation()
                 
-                // Convert IPFS URL to HTTP gateway URL
-                let httpMetadataUrl = ipfsService.convertToHTTPGateway(ipfsUrl)
+                // Convert to fetchable HTTPS URL (https://, ipfs://, or bare IPFS hash only)
+                let httpMetadataUrl = try ipfsService.convertToHTTPGateway(tokenUri)
                 
-                // Download NFT metadata from IPFS
+                // Download NFT metadata
                 let downloadedMetadata = try await ipfsService.downloadNFTMetadata(from: httpMetadataUrl)
                 
                 try Task.checkCancellation()
@@ -146,7 +146,7 @@ struct NFTLoadingView: View {
                 // Download image if available
                 var downloadedImageData: Data? = nil
                 if let imageUrl = downloadedMetadata.image {
-                    let httpImageUrl = ipfsService.convertToHTTPGateway(imageUrl)
+                    let httpImageUrl = try ipfsService.convertToHTTPGateway(imageUrl)
                     downloadedImageData = try await ipfsService.downloadImageData(from: httpImageUrl)
                 }
                 

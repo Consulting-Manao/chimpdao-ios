@@ -289,6 +289,9 @@ enum IPFSError: LocalizedError {
     /// Invalid IPFS hash or URL
     case invalidHash
 
+    /// Unsupported URI scheme (e.g. http:// or unknown)
+    case unsupportedUriScheme(String)
+
     /// Failed to parse IPFS metadata
     case parseFailed(String)
 
@@ -298,6 +301,8 @@ enum IPFSError: LocalizedError {
             return "Failed to download from IPFS: \(message)"
         case .invalidHash:
             return "Invalid IPFS hash or URL format."
+        case .unsupportedUriScheme(let message):
+            return "Unsupported URI scheme: \(message)"
         case .parseFailed(let message):
             return "Failed to parse IPFS data: \(message)"
         }
