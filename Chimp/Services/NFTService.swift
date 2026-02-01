@@ -72,6 +72,7 @@ final class NFTService {
             contractId: contractId,
             functionName: "claim",
             args: [wallet.address],
+            signer: publicKeyData,
             nonce: nonce,
             networkPassphrase: config.networkPassphrase
         )
@@ -182,6 +183,7 @@ final class NFTService {
             contractId: contractId,
             functionName: "transfer",
             args: [wallet.address, recipientAddress, String(tokenId)],
+            signer: publicKeyData,
             nonce: nonce,
             networkPassphrase: config.networkPassphrase
         )
@@ -273,6 +275,7 @@ final class NFTService {
             contractId: contractId,
             functionName: "mint",
             args: [wallet.address],
+            signer: publicKeyData,
             nonce: nonce,
             networkPassphrase: config.networkPassphrase
         )

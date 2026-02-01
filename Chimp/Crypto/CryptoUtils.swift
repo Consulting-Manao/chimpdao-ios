@@ -17,18 +17,22 @@ struct SignatureComponents {
 // MARK: - Crypto Utilities
 
 final class CryptoUtils {
-    /// Create SEP-53 compliant auth message
+    /// Create SEP-53 compliant auth message.
+    /// The signed payload is (message + signer + nonce); the returned message does not include signer or nonce
+    /// (the contract receives message, nonce, and publicKey separately and reconstructs the payload for verification).
     /// - Parameters:
     ///   - contractId: Contract ID (hex string, 32 bytes)
     ///   - functionName: Function name to call
     ///   - args: Function arguments (will be JSON encoded)
+    ///   - signer: Signer public key (e.g. 65-byte uncompressed SEC1); must match encoding used by contract when reconstructing payload
     ///   - nonce: Nonce value
     ///   - networkPassphrase: Network passphrase
-    /// - Returns: Tuple of (message: Data, messageHash: Data)
+    /// - Returns: Tuple of (message: base message only, messageHash: hash of message + signer + nonce)
     static func createSEP53Message(
         contractId: String,
         functionName: String,
         args: [Any],
+        signer: Data,
         nonce: UInt32,
         networkPassphrase: String
     ) throws -> (message: Data, messageHash: Data) {
@@ -65,29 +69,26 @@ final class CryptoUtils {
         let argsJson = try JSONSerialization.data(withJSONObject: args)
         parts.append(argsJson)
         
-        // Concatenate all parts (without nonce)
+        // Base message (returned as-is to contract; does not include signer or nonce)
         var message = Data()
         for part in parts {
             message.append(part)
         }
         
-        // Append nonce XDR format
-        // ScVal U32: 4 bytes discriminant (3) + 4 bytes value (big-endian)
+        // Nonce XDR format: ScVal U32 (4 bytes discriminant + 4 bytes value big-endian)
         var nonceXdr = Data()
         nonceXdr.append(contentsOf: [0x00, 0x00, 0x00, 0x03]) // U32 discriminant (big-endian uint32: 3)
-        // Append nonce value as big-endian bytes (4 bytes)
         let nonceByte1 = UInt8((nonce >> 24) & 0xFF)
         let nonceByte2 = UInt8((nonce >> 16) & 0xFF)
         let nonceByte3 = UInt8((nonce >> 8) & 0xFF)
         let nonceByte4 = UInt8(nonce & 0xFF)
         nonceXdr.append(contentsOf: [nonceByte1, nonceByte2, nonceByte3, nonceByte4])
         
-        // Message with nonce for hashing
-        var messageWithNonce = message
-        messageWithNonce.append(nonceXdr)
-        
-        // Hash the message with nonce
-        let messageHash = Data(SHA256.hash(data: messageWithNonce))
+        // Payload to hash: message + signer + nonce (contract reconstructs this for verification)
+        var payloadToHash = message
+        payloadToHash.append(signer)
+        payloadToHash.append(nonceXdr)
+        let messageHash = Data(SHA256.hash(data: payloadToHash))
         
         return (message: message, messageHash: messageHash)
     }
