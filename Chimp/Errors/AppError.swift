@@ -112,55 +112,33 @@ enum BlockchainError: LocalizedError {
     }
 }
 
+// MARK: - Contract Errors (NonFungibleTokenError 200–203, 210–212)
+
 enum ContractError: LocalizedError {
-    // Error code 200: NonExistentToken - Indicates a non-existent token_id
-    case nonExistentToken
+    case invalidSignature       // 200
+    case nonExistentToken       // 201
+    case incorrectOwner        // 202
+    case tokenIDsAreDepleted    // 203
+    case tokenAlreadyMinted     // 210
+    case tokenAlreadyClaimed    // 211 (claim: was already claimed)
+    case tokenNotClaimed        // 212
 
-    // Error code 201: IncorrectOwner - Indicates an error related to the ownership over a particular token (used in transfers)
-    case incorrectOwner
-
-    // Error code 205: MathOverflow - Indicates overflow when adding two values
-    case mathOverflow
-
-    // Error code 206: TokenIDsAreDepleted - Indicates all possible token_ids are already in use
-    case tokenIDsAreDepleted
-
-    // Error code 207: InvalidAmount - Indicates an invalid amount to batch mint in consecutive extension
-    case invalidAmount
-
-    // Error code 210: TokenAlreadyMinted - Indicates the token was already minted
-    case tokenAlreadyMinted
-
-    // Error code 212: InvalidRoyaltyAmount - Indicates the royalty amount is higher than 10_000 (100%) basis points
-    case invalidRoyaltyAmount
-
-    // Error code 214: InvalidSignature - Indicates an invalid signature
-    case invalidSignature
-
-    // Error code 215: TokenNotClaimed - Indicates the token exists but has not been claimed yet
-    case tokenNotClaimed
-
-    // Unknown error code from contract
     case unknown(code: UInt32)
 
     var errorDescription: String? {
         switch self {
+        case .invalidSignature:
+            return "Invalid signature detected."
         case .nonExistentToken:
             return "This token does not exist."
         case .incorrectOwner:
             return "You do not own this token."
-        case .mathOverflow:
-            return "Calculation error occurred."
         case .tokenIDsAreDepleted:
             return "No more tokens can be minted."
-        case .invalidAmount:
-            return "Invalid amount specified."
         case .tokenAlreadyMinted:
+            return "Token was already minted."
+        case .tokenAlreadyClaimed:
             return "NFT already claimed."
-        case .invalidRoyaltyAmount:
-            return "Invalid royalty percentage."
-        case .invalidSignature:
-            return "Invalid signature detected."
         case .tokenNotClaimed:
             return "Token exists but has not been claimed yet."
         case .unknown(let code):
@@ -168,43 +146,34 @@ enum ContractError: LocalizedError {
         }
     }
 
-    /// Get the numeric error code for this error
     var code: UInt32 {
         switch self {
-        case .nonExistentToken: return 200
-        case .incorrectOwner: return 201
-        case .mathOverflow: return 205
-        case .tokenIDsAreDepleted: return 206
-        case .invalidAmount: return 207
+        case .invalidSignature: return 200
+        case .nonExistentToken: return 201
+        case .incorrectOwner: return 202
+        case .tokenIDsAreDepleted: return 203
         case .tokenAlreadyMinted: return 210
-        case .invalidRoyaltyAmount: return 212
-        case .invalidSignature: return 214
-        case .tokenNotClaimed: return 215
+        case .tokenAlreadyClaimed: return 211
+        case .tokenNotClaimed: return 212
         case .unknown(let code): return code
         }
     }
 
-    /// Create ContractError from numeric error code
     static func fromCode(_ code: UInt32) -> ContractError {
         switch code {
-        case 200: return .nonExistentToken
-        case 201: return .incorrectOwner
-        case 205: return .mathOverflow
-        case 206: return .tokenIDsAreDepleted
-        case 207: return .invalidAmount
+        case 200: return .invalidSignature
+        case 201: return .nonExistentToken
+        case 202: return .incorrectOwner
+        case 203: return .tokenIDsAreDepleted
         case 210: return .tokenAlreadyMinted
-        case 212: return .invalidRoyaltyAmount
-        case 214: return .invalidSignature
-        case 215: return .tokenNotClaimed
+        case 211: return .tokenAlreadyClaimed
+        case 212: return .tokenNotClaimed
         default: return .unknown(code: code)
         }
     }
 
-    /// Extract contract error from error string representation.
-    /// Tries regex-based code extraction first, then string contains as fallback.
     static func fromErrorString(_ errorString: String) -> ContractError? {
         let range = NSRange(location: 0, length: errorString.utf16.count)
-        // 1. Try regex patterns to extract numeric code (single path via fromCode)
         let patterns = [
             #"Error\(Contract,\s*#?(\d+)\)"#,
             #"\["failing with contract error", (\d+)\]"#,
@@ -221,20 +190,52 @@ enum ContractError: LocalizedError {
             }
             return ContractError.fromCode(code)
         }
-        // 2. Fallback: string contains (for names/codes without regex match)
-        if errorString.contains("200") || errorString.contains("NonExistentToken") { return .nonExistentToken }
-        if errorString.contains("201") || errorString.contains("IncorrectOwner") { return .incorrectOwner }
-        if errorString.contains("205") || errorString.contains("MathOverflow") { return .mathOverflow }
-        if errorString.contains("206") || errorString.contains("TokenIDsAreDepleted") { return .tokenIDsAreDepleted }
-        if errorString.contains("207") || errorString.contains("InvalidAmount") { return .invalidAmount }
-        if errorString.contains("210") || errorString.contains("TokenAlreadyMinted") ||
-            (errorString.contains("already") && errorString.contains("minted")) { return .tokenAlreadyMinted }
-        if errorString.contains("212") || errorString.contains("InvalidRoyaltyAmount") { return .invalidRoyaltyAmount }
-        if errorString.contains("214") || errorString.contains("InvalidSignature") { return .invalidSignature }
-        if errorString.contains("215") || errorString.contains("TokenNotClaimed") { return .tokenNotClaimed }
+        // Fallbacks only when string looks like a contract/Stellar error; match exact codes to avoid false positives (e.g. 2100 → 210)
+        let looksLikeContractError = errorString.contains("Contract") ||
+            errorString.contains("contract") ||
+            errorString.contains("failing") ||
+            errorString.contains("InvalidSignature") ||
+            errorString.contains("NonExistentToken") ||
+            errorString.contains("TokenIDsAreDepleted") ||
+            errorString.contains("TokenAlreadyMinted") ||
+            errorString.contains("TokenAlreadyClaimed") ||
+            errorString.contains("TokenNotClaimed") ||
+            errorString.contains("IncorrectOwner")
+        guard looksLikeContractError else { return nil }
+        if errorString.contains("InvalidSignature") { return .invalidSignature }
+        if errorString.contains("NonExistentToken") { return .nonExistentToken }
+        if errorString.contains("IncorrectOwner") { return .incorrectOwner }
+        if errorString.contains("TokenIDsAreDepleted") { return .tokenIDsAreDepleted }
+        if errorString.contains("TokenAlreadyMinted") { return .tokenAlreadyMinted }
+        if errorString.contains("TokenAlreadyClaimed") { return .tokenAlreadyClaimed }
+        if errorString.contains("TokenNotClaimed") { return .tokenNotClaimed }
+        // Exact code match (whole number, not 2100 or 2030)
+        if ContractError.fromErrorStringMatchesExactCode(errorString, 200) { return .invalidSignature }
+        if ContractError.fromErrorStringMatchesExactCode(errorString, 201) { return .nonExistentToken }
+        if ContractError.fromErrorStringMatchesExactCode(errorString, 202) { return .incorrectOwner }
+        if ContractError.fromErrorStringMatchesExactCode(errorString, 203) { return .tokenIDsAreDepleted }
+        if ContractError.fromErrorStringMatchesExactCode(errorString, 210) { return .tokenAlreadyMinted }
+        if ContractError.fromErrorStringMatchesExactCode(errorString, 211) { return .tokenAlreadyClaimed }
+        if ContractError.fromErrorStringMatchesExactCode(errorString, 212) { return .tokenNotClaimed }
         return nil
     }
 
+    /// Returns true if the string contains the given contract error code as a whole number (not e.g. 210 inside 2100).
+    private static func fromErrorStringMatchesExactCode(_ errorString: String, _ code: UInt32) -> Bool {
+        let codeStr = String(code)
+        guard let range = errorString.range(of: codeStr) else { return false }
+        let after = range.upperBound
+        let before = range.lowerBound
+        if after < errorString.endIndex {
+            let next = errorString[after]
+            if next.isNumber { return false }
+        }
+        if before > errorString.startIndex {
+            let prev = errorString[errorString.index(before: before)]
+            if prev.isNumber { return false }
+        }
+        return true
+    }
 }
 
 // MARK: - NFC Errors
@@ -389,7 +390,7 @@ enum DERSignatureParserError: LocalizedError {
 // MARK: - Error → User Message (display boundary only)
 
 extension Error {
-    /// User-facing message for this error. Use only at the UI boundary (completions, viewModel.errorMessage).
+    /// User-facing message. Use at UI boundary (error banner, NFC completion).
     var userMessage: String {
         (self as? LocalizedError)?.errorDescription ?? localizedDescription
     }

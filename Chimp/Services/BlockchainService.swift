@@ -249,9 +249,9 @@ final class BlockchainService {
         sourceKeyPair: KeyPair
     ) async throws -> UInt32 {
         let recoveryIds: [UInt32] = [0, 1, 2, 3]
-        
+        var lastError: Error?
+
         for recoveryId in recoveryIds {
-            
             do {
                 // Try to build the transaction (this will simulate it)
                 // If simulation succeeds without invalidSignature error, this recovery ID is correct
@@ -293,27 +293,43 @@ final class BlockchainService {
                         sourceKeyPair: sourceKeyPair
                     )
                 }
-                
+
                 return recoveryId
             } catch {
+                lastError = error
+
+                // Invalid signature or recovery failure: try next recovery ID
                 if case AppError.blockchain(.contract(.invalidSignature)) = error {
                     continue
                 }
-                
                 let errorString = "\(error)"
                 if errorString.contains("InvalidInput") ||
                    errorString.contains("recovery failed") ||
                    errorString.contains("recover_key_ecdsa") {
                     continue
                 }
-                
-                return recoveryId
+
+                // Contract error (e.g. 203, 210): rethrow so user sees correct message
+                if case AppError.blockchain(.contract) = error {
+                    throw error
+                }
+
+                // Other AppError: rethrow
+                if error is AppError {
+                    throw error
+                }
+
+                // Unknown error: rethrow so caller gets real cause
+                throw error
             }
         }
-        
-        // If we get here, no recovery ID worked
+
+        // No recovery ID worked: throw last error or signature-related error (not "add funds")
         Logger.logError("Failed to determine recovery ID", category: .blockchain)
-        throw AppError.blockchain(.transactionFailed)
+        if let last = lastError, let appError = last as? AppError {
+            throw appError
+        }
+        throw AppError.blockchain(.contract(.invalidSignature))
     }
     
     /// Build claim transaction
@@ -455,17 +471,12 @@ final class BlockchainService {
             sourceKeyPair: sourceKeyPair
         )
 
-        // Extract token ID by simulating the transaction
+        // Extract token ID by simulating the transaction; rethrow on failure so we don't submit a tx that will fail
         var tokenId: UInt32 = 0
-        do {
-            let returnValue = try await BlockchainHelpers.simulateAndDecode(transaction: transaction, rpcClient: rpcClient)
-            if case .u32(let simulatedTokenId) = returnValue {
-                tokenId = simulatedTokenId
-            }
-        } catch {
-            // If simulation fails, tokenId remains 0
+        let returnValue = try await BlockchainHelpers.simulateAndDecode(transaction: transaction, rpcClient: rpcClient)
+        if case .u32(let simulatedTokenId) = returnValue {
+            tokenId = simulatedTokenId
         }
-
         return (transaction: transaction, tokenId: tokenId)
     }
 
@@ -565,7 +576,16 @@ final class BlockchainService {
                 }
                 if txResponse.status == GetTransactionResponse.STATUS_FAILED {
                     Logger.logError("Transaction failed on network", category: .blockchain)
-                    let responseString = "\(txResponse)"
+                    var responseString = "\(txResponse)"
+                    if let err = txResponse.error {
+                        responseString += " " + err.message
+                        if let data = err.data {
+                            responseString += " " + data
+                        }
+                    }
+                    if let resultXdr = txResponse.resultXdr {
+                        responseString += " " + resultXdr
+                    }
                     if let contractError = ContractError.fromErrorString(responseString) {
                         throw AppError.blockchain(.contract(contractError))
                     }

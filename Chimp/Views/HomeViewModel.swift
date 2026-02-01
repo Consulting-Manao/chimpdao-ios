@@ -169,8 +169,7 @@ class HomeViewModel: ObservableObject {
     func executeClaim() {
         // Contract ID is read from chip NDEF, not Settings
         errorMessage = nil
-        nfcCoordinator.claimNFT { success, error in
-        }
+        nfcCoordinator.claimNFT { _, _ in }
     }
     
     func acknowledgeIPRights() {

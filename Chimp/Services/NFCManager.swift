@@ -87,7 +87,6 @@ final class NFCManager {
                 }
             },
             operation: { tag, session in
-                // SAME loadNFT logic: NDEFReader + getTokenIdForChip
                 await MainActor.run {
                     session.alertMessage = "Reading chip information..."
                 }
@@ -137,7 +136,6 @@ final class NFCManager {
                 }
             },
             operation: { tag, session in
-                // SAME claimNFT logic: nftService.executeClaim
                 await MainActor.run {
                     session.alertMessage = "Preparing to claim NFT..."
                 }
@@ -257,7 +255,6 @@ final class NFCManager {
                 }
             },
             operation: { tag, session in
-                // SAME mintNFT logic: nftService.executeMint
                 await MainActor.run {
                     session.alertMessage = "Preparing to mint NFT..."
                 }

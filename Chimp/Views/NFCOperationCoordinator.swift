@@ -4,12 +4,10 @@ import CoreNFC
 import stellarsdk
 import OSLog
 
-/// Coordinator to bridge SwiftUI to existing UIKit NFC functionality
-/// Refactored to use NFCManager for consolidated session management
+/// Bridges SwiftUI to NFCManager for NFC operations.
 class NFCOperationCoordinator: NSObject {
     private let nfcManager = NFCManager()
-    
-    // Callbacks (preserved for HomeViewModel integration)
+
     var onLoadNFTSuccess: ((String, UInt32) -> Void)?
     var onLoadNFTError: ((String) -> Void)?
     var onClaimSuccess: ((UInt32, String) -> Void)? // tokenId, contractId
@@ -49,7 +47,6 @@ class NFCOperationCoordinator: NSObject {
     func readNFTForTransfer(completion: @escaping (Bool, UInt32?, String?) -> Void) {
         nfcManager.readNFTForTransfer { success, tokenId, error in
             completion(success, tokenId, error)
-            // No specific callbacks for this operation - just direct completion
         }
     }
     
