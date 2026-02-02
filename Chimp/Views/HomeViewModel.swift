@@ -155,15 +155,7 @@ class HomeViewModel: ObservableObject {
             return
         }
         
-        // Check if user has acknowledged IP rights
-        if !hasAcknowledgedIPRights() {
-            // Show acknowledgment sheet first
-            showingIPRightsAcknowledgment = true
-            return
-        }
-        
-        // User has already acknowledged, proceed with claim
-        executeClaim()
+        showingIPRightsAcknowledgment = true
     }
     
     func executeClaim() {
@@ -173,13 +165,7 @@ class HomeViewModel: ObservableObject {
     }
     
     func acknowledgeIPRights() {
-        UserDefaults.standard.set(true, forKey: "hasAcknowledgedIPRights")
-        // After acknowledgment, execute the pending claim
         executeClaim()
-    }
-    
-    private func hasAcknowledgedIPRights() -> Bool {
-        return UserDefaults.standard.bool(forKey: "hasAcknowledgedIPRights")
     }
     
     func transferNFT() {

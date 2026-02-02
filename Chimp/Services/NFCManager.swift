@@ -45,7 +45,7 @@ final class NFCManager {
                 Task { @MainActor in
                     session.alertMessage = "Processing..."
                 }
-                
+
                 // Execute operation on background thread
                 Task.detached {
                     do {
@@ -59,9 +59,9 @@ final class NFCManager {
                             self.nfcHelper = nil
                         }
                     } catch {
-                        Logger.logError("NFC operation failed", error: error, category: .blockchain)
-                        // Error - update UI on main thread
+                        // Error - update UI on main thread (log from main actor for Swift 6)
                         await MainActor.run {
+                            Logger.logError("NFC operation failed", error: error, category: .blockchain)
                             let errorMessage = error.userMessage.isEmpty ? "Operation failed" : error.userMessage
                             session.invalidate(errorMessage: errorMessage)
                             completion(.failure(error))

@@ -3,6 +3,7 @@ import SwiftUI
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @State private var showingTerms = false
     
     var body: some View {
         List {
@@ -57,6 +58,19 @@ struct HelpView: View {
             }
             
             Section {
+                Button(action: { showingTerms = true }) {
+                    HStack {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundColor(.chimpYellow)
+                        Text("Terms of Use")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
                 Button(action: openContactPage) {
                     HStack {
                         Image(systemName: "envelope.fill")
@@ -72,6 +86,9 @@ struct HelpView: View {
             } header: {
                 Text("Need More Help?")
             }
+        }
+        .sheet(isPresented: $showingTerms) {
+            TermsReadOnlyView()
         }
         .navigationTitle("Help & Support")
         .navigationBarTitleDisplayMode(.inline)

@@ -55,6 +55,36 @@ struct IPRightsAcknowledgmentView: View {
     }
 }
 
+// Read-only terms view (no acknowledgment required) – e.g. for Help
+struct TermsReadOnlyView: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    private let ipRightsContent: String = IPRightsContent.text
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    IPRightsContentView(content: ipRightsContent)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .navigationTitle("Terms")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+}
+
 // Helper view to render markdown content
 struct IPRightsContentView: View {
     let content: String

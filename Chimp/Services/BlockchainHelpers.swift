@@ -109,7 +109,6 @@ final class BlockchainHelpers {
         
         switch simulateResponse {
         case .success(let simulateResult):
-            let resultsCount = simulateResult.results?.count ?? 0
             guard let xdrString = simulateResult.results?.first?.xdr else {
                 Logger.logError("simulateAndDecode: no results", category: .blockchain)
                 throw AppError.blockchain(.invalidResponse)

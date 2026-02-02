@@ -248,12 +248,6 @@ final class BlockchainService {
         nonce: UInt32,
         sourceKeyPair: KeyPair
     ) async throws -> UInt32 {
-        let methodLabel: String
-        switch method {
-        case .claim(let c): methodLabel = "claim(\(c.prefix(12))...)"
-        case .transfer(_, let to, let tid): methodLabel = "transfer(...,\(to.prefix(8))...,\(tid))"
-        case .mint: methodLabel = "mint"
-        }
         let recoveryIds: [UInt32] = [0, 1, 2, 3]
         var lastError: Error?
 
