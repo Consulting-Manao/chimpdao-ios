@@ -49,7 +49,7 @@ struct IPRightsAcknowledgmentView: View {
                     .fontWeight(.semibold)
                 }
             }
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
     }
@@ -79,7 +79,7 @@ struct TermsReadOnlyView: View {
                     }
                 }
             }
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
     }
