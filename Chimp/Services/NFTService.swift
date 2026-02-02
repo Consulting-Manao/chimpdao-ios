@@ -60,23 +60,22 @@ final class NFTService {
         )
 
         let accountId = wallet.address
-        
         progressCallback?("Preparing transaction...")
         let nonce = try await getNonce(
             contractId: contractId,
             publicKey: publicKeyData,
             accountId: accountId
         )
-        
+
+        let claimantSigner = try CryptoUtils.encodeAccountIdToAddressXDR(accountId: wallet.address)
         let (message, messageHash) = try CryptoUtils.createSEP53Message(
             contractId: contractId,
             functionName: "claim",
             args: [wallet.address],
-            signer: publicKeyData,
+            signer: claimantSigner,
             nonce: nonce,
             networkPassphrase: config.networkPassphrase
         )
-        
         progressCallback?("Signing transaction...")
         let signature = try await createSignature(
             tag: tag,
@@ -86,7 +85,6 @@ final class NFTService {
         )
 
         let sourceKeyPair = try KeyPair(accountId: wallet.address)
-        
         progressCallback?("Building transaction...")
         let (transaction, tokenId) = try await determineRecoveryIdAndBuildTransaction(
             contractId: contractId,
@@ -140,7 +138,6 @@ final class NFTService {
         }
 
         guard config.validateStellarAddress(recipientAddress) else {
-            Logger.logError("Invalid recipient address: \(recipientAddress)", category: .blockchain)
             throw AppError.validation("Invalid recipient address format. Please enter a valid Stellar address.")
         }
 
@@ -179,11 +176,12 @@ final class NFTService {
             accountId: accountId
         )
 
+        let fromSigner = try CryptoUtils.encodeAccountIdToAddressXDR(accountId: wallet.address)
         let (message, messageHash) = try CryptoUtils.createSEP53Message(
             contractId: contractId,
             functionName: "transfer",
             args: [wallet.address, recipientAddress, String(tokenId)],
-            signer: publicKeyData,
+            signer: fromSigner,
             nonce: nonce,
             networkPassphrase: config.networkPassphrase
         )
@@ -217,8 +215,6 @@ final class NFTService {
 
         progressCallback?("Processing on blockchain network...")
         let txHash = try await submitTransaction(transaction, progressCallback: progressCallback)
-        Logger.logInfo("Transfer transaction submitted successfully: \(txHash)", category: .blockchain)
-
         return TransferResult(transactionHash: txHash)
     }
     
@@ -242,12 +238,10 @@ final class NFTService {
 
         let contractId = config.contractId
         guard !contractId.isEmpty else {
-            Logger.logError("Contract ID is empty", category: .blockchain)
             throw AppError.validation("Contract ID not configured. Please set the contract ID in settings.")
         }
 
         guard config.validateContractId(contractId) else {
-            Logger.logError("Invalid contract ID format: \(contractId)", category: .blockchain)
             throw AppError.validation("Invalid contract ID format. Contract ID must be 56 characters and start with 'C'.")
         }
 
@@ -270,16 +264,15 @@ final class NFTService {
             publicKey: publicKeyData,
             accountId: accountId
         )
-
+        let adminSigner = try CryptoUtils.encodeAccountIdToAddressXDR(accountId: wallet.address)
         let (message, messageHash) = try CryptoUtils.createSEP53Message(
             contractId: contractId,
             functionName: "mint",
             args: [wallet.address],
-            signer: publicKeyData,
+            signer: adminSigner,
             nonce: nonce,
             networkPassphrase: config.networkPassphrase
         )
-
         progressCallback?("Signing transaction...")
         let signature = try await createSignature(
             tag: tag,
@@ -340,7 +333,6 @@ final class NFTService {
         }
 
         guard config.validateContractId(contractId) else {
-            Logger.logError("Invalid contract ID format: \(contractId)", category: .blockchain)
             throw AppError.validation("Invalid contract ID format. Contract ID must be 56 characters and start with 'C'.")
         }
         

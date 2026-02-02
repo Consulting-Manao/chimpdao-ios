@@ -126,7 +126,9 @@ final class NFCHelper: NSObject, NFCTagReaderSessionDelegate {
 
         if tags.count > 1 {
             Logger.logWarning("ReaderSession: Multiple tags found", category: .nfc)
-            session.alertMessage = "Multiple tags found. Please use only one tag."
+            DispatchQueue.main.async {
+                session.alertMessage = "Multiple tags found. Please use only one tag."
+            }
             DispatchQueue.main.async {
                 if let OnTagEvent = self.OnTagEvent {
                     OnTagEvent(false, nil, nil, "Multiple tags found. Please use only one tag.")
@@ -161,7 +163,9 @@ final class NFCHelper: NSObject, NFCTagReaderSessionDelegate {
 
                     // APDU operation - chip detected, user should hold steady
                     if let OnTagEvent = self.OnTagEvent {
-                        session.alertMessage = "Chip detected! Hold steady while processing..."
+                        DispatchQueue.main.async {
+                            session.alertMessage = "Chip detected! Hold steady while processing..."
+                        }
                         DispatchQueue.main.async {
                             OnTagEvent(true, tag, session, nil)
                         }
@@ -170,7 +174,9 @@ final class NFCHelper: NSObject, NFCTagReaderSessionDelegate {
             }
         } else {
             Logger.logWarning("ReaderSession: Tag is not ISO7816 compatible", category: .nfc)
-            session.alertMessage = "Tag is not compatible"
+            DispatchQueue.main.async {
+                session.alertMessage = "Tag is not compatible"
+            }
             DispatchQueue.main.async {
                 if let OnTagEvent = self.OnTagEvent {
                     OnTagEvent(false, nil, nil, "Tag is not ISO7816 compatible")
@@ -208,7 +214,9 @@ final class NFCHelper: NSObject, NFCTagReaderSessionDelegate {
             queue: nfcQueue
         )
         
-        readerSession?.alertMessage = "Hold your device near the NFC chip"
+        DispatchQueue.main.async { [weak self] in
+            self?.readerSession?.alertMessage = "Hold your device near the NFC chip"
+        }
         readerSession?.begin()
         
         Logger.logDebug("ReaderSession: Begin", category: .nfc)

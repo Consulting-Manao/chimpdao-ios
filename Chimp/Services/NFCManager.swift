@@ -59,6 +59,7 @@ final class NFCManager {
                             self.nfcHelper = nil
                         }
                     } catch {
+                        Logger.logError("NFC operation failed", error: error, category: .blockchain)
                         // Error - update UI on main thread
                         await MainActor.run {
                             let errorMessage = error.userMessage.isEmpty ? "Operation failed" : error.userMessage
@@ -146,7 +147,7 @@ final class NFCManager {
                     keyIndex: 0x01
                 ) { progress in
                     Task { @MainActor in
-                        session.alertMessage = progress
+                        session.alertMessage = progress.isEmpty ? "Processing..." : progress
                     }
                 }
                 
@@ -157,6 +158,7 @@ final class NFCManager {
             case .success(let claimResult):
                 completion(true, nil, claimResult.tokenId, claimResult.contractId)
             case .failure(let error):
+                Logger.logError("Claim NFT failed", error: error, category: .blockchain)
                 let errorMessage = error.userMessage.isEmpty ? "Claim failed" : error.userMessage
                 completion(false, errorMessage, nil, nil)
             }
@@ -184,7 +186,7 @@ final class NFCManager {
                     tokenId: tokenId
                 ) { progress in
                     Task { @MainActor in
-                        session.alertMessage = progress
+                        session.alertMessage = progress.isEmpty ? "Processing..." : progress
                     }
                 }
                 
@@ -265,7 +267,7 @@ final class NFCManager {
                     keyIndex: 0x01
                 ) { progress in
                     Task { @MainActor in
-                        session.alertMessage = progress
+                        session.alertMessage = progress.isEmpty ? "Processing..." : progress
                     }
                 }
                 

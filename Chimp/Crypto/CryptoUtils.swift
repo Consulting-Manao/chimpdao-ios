@@ -89,7 +89,6 @@ final class CryptoUtils {
         payloadToHash.append(signer)
         payloadToHash.append(nonceXdr)
         let messageHash = Data(SHA256.hash(data: payloadToHash))
-        
         return (message: message, messageHash: messageHash)
     }
     
@@ -184,6 +183,53 @@ final class CryptoUtils {
             throw AppError.crypto(.invalidKey("Invalid contract ID format"))
         }
         
+        return decoded.subdata(in: 1..<33)
+    }
+    
+    /// Encode Stellar account ID (G...) to XDR bytes for contract payload (signer in message hash).
+    /// Contract uses signer.to_xdr(&e) (e.g. admin.to_xdr, claimant.to_xdr). In Soroban, Address.to_xdr
+    /// returns ScVal::Address(ScAddress), i.e. SCV_ADDRESS discriminant (4 bytes) + ScAddress (40 bytes) = 44 bytes.
+    /// ScAddress for account: SC_ADDRESS_TYPE_ACCOUNT (4) + PUBLIC_KEY_TYPE_ED25519 (4) + 32-byte key = 40 bytes.
+    /// - Parameter accountId: Stellar account ID string (56 chars, starts with 'G')
+    /// - Returns: XDR-encoded ScVal::Address as Data (44 bytes)
+    static func encodeAccountIdToAddressXDR(accountId: String) throws -> Data {
+        guard accountId.hasPrefix("G"), accountId.count == 56 else {
+            throw AppError.crypto(.invalidKey("Invalid account ID format: expected 56-char G... address"))
+        }
+        let key32 = try decodeStellarAccountId(accountId)
+        var scAddress = Data()
+        scAddress.append(contentsOf: [0x00, 0x00, 0x00, 0x00]) // SC_ADDRESS_TYPE_ACCOUNT
+        scAddress.append(contentsOf: [0x00, 0x00, 0x00, 0x00]) // PUBLIC_KEY_TYPE_ED25519
+        scAddress.append(key32)
+        var xdr = Data()
+        xdr.append(contentsOf: [0x00, 0x00, 0x00, 0x12]) // SCV_ADDRESS = 18 (ScVal discriminant)
+        xdr.append(scAddress)
+        return xdr
+    }
+    
+    /// Decode Stellar account ID (G...) from strkey to 32-byte ed25519 public key.
+    /// Same base32 as contract addresses; decoded payload is 1 (version) + 32 (key) + 2 (checksum) = 35 bytes.
+    private static func decodeStellarAccountId(_ accountId: String) throws -> Data {
+        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        var decoded = Data()
+        var buffer: UInt64 = 0
+        var bits = 0
+        
+        for char in accountId.uppercased() {
+            guard let pos = alphabet.firstIndex(of: char) else {
+                throw AppError.crypto(.invalidKey("Invalid account ID format"))
+            }
+            let value = alphabet.distance(from: alphabet.startIndex, to: pos)
+            buffer = (buffer << 5) | UInt64(value)
+            bits += 5
+            while bits >= 8 {
+                decoded.append(UInt8((buffer >> (bits - 8)) & 0xFF))
+                bits -= 8
+            }
+        }
+        guard decoded.count >= 35 else {
+            throw AppError.crypto(.invalidKey("Invalid account ID format"))
+        }
         return decoded.subdata(in: 1..<33)
     }
 }

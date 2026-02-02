@@ -29,6 +29,7 @@ final class BlockchainHelpers {
     static func createClientOptions(contractId: String, sourceKeyPair: KeyPair) throws -> ClientOptions {
         // Validate contract ID format
         guard config.validateContractId(contractId) else {
+            Logger.logError("createClientOptions: invalid contractId format", category: .blockchain)
             throw AppError.blockchain(.invalidResponse)
         }
         
@@ -49,6 +50,7 @@ final class BlockchainHelpers {
     static func createReadOnlyClientOptions(contractId: String, accountId: String) throws -> ClientOptions {
         // Validate contract ID format
         guard config.validateContractId(contractId) else {
+            Logger.logError("createReadOnlyClientOptions: invalid contractId", category: .blockchain)
             throw AppError.blockchain(.invalidResponse)
         }
         
@@ -107,11 +109,14 @@ final class BlockchainHelpers {
         
         switch simulateResponse {
         case .success(let simulateResult):
+            let resultsCount = simulateResult.results?.count ?? 0
             guard let xdrString = simulateResult.results?.first?.xdr else {
+                Logger.logError("simulateAndDecode: no results", category: .blockchain)
                 throw AppError.blockchain(.invalidResponse)
             }
             
             guard let xdrData = Data(base64Encoded: xdrString) else {
+                Logger.logError("simulateAndDecode: base64 decode failed", category: .blockchain)
                 throw AppError.blockchain(.invalidResponse)
             }
             
@@ -119,12 +124,13 @@ final class BlockchainHelpers {
             do {
                 returnValue = try XDRDecoder.decode(SCValXDR.self, data: xdrData)
             } catch {
-                Logger.logError("Failed to decode XDR result", error: error, category: .blockchain)
+                Logger.logError("simulateAndDecode: XDR decode failed", error: error, category: .blockchain)
                 throw AppError.blockchain(.invalidResponse)
             }
             
             return returnValue
         case .failure(let error):
+            Logger.logError("simulateAndDecode: RPC failure", error: error, category: .blockchain)
             // Check if it's a contract error
             if let contractError = extractContractError(from: error) {
                 throw contractError
@@ -162,7 +168,11 @@ final class BlockchainHelpers {
         do {
             assembledTx = try await AssembledTransaction.build(options: assembledOptions)
         } catch {
-            // Check if it's a contract error
+            Logger.logError("buildAndSimulate failed", error: error, category: .blockchain)
+            let errorString = "\(error)"
+            if errorString.contains("InvalidInput") || errorString.contains("recovery failed") || errorString.contains("recover_key_ecdsa") {
+                throw AppError.blockchain(.contract(.invalidSignature))
+            }
             if let contractError = extractContractError(from: error) {
                 throw contractError
             }
@@ -170,6 +180,7 @@ final class BlockchainHelpers {
         }
         
         guard let rawTx = assembledTx.raw else {
+            Logger.logError("buildAndSimulate: no raw transaction", category: .blockchain)
             throw AppError.blockchain(.invalidResponse)
         }
         
@@ -208,7 +219,11 @@ final class BlockchainHelpers {
         do {
             assembledTx = try await AssembledTransaction.build(options: assembledOptions)
         } catch {
-            // Check if it's a contract error
+            Logger.logError("buildAndSimulateReadOnly failed", error: error, category: .blockchain)
+            let errorString = "\(error)"
+            if errorString.contains("InvalidInput") || errorString.contains("recovery failed") || errorString.contains("recover_key_ecdsa") {
+                throw AppError.blockchain(.contract(.invalidSignature))
+            }
             if let contractError = extractContractError(from: error) {
                 throw contractError
             }
@@ -216,6 +231,7 @@ final class BlockchainHelpers {
         }
         
         guard let rawTx = assembledTx.raw else {
+            Logger.logError("buildAndSimulateReadOnly: no raw transaction", category: .blockchain)
             throw AppError.blockchain(.invalidResponse)
         }
         
@@ -249,7 +265,11 @@ final class BlockchainHelpers {
         do {
             assembledTx = try await AssembledTransaction.build(options: assembledOptions)
         } catch {
-            // Check if it's a contract error
+            Logger.logError("buildTransaction failed", error: error, category: .blockchain)
+            let errorString = "\(error)"
+            if errorString.contains("InvalidInput") || errorString.contains("recovery failed") || errorString.contains("recover_key_ecdsa") {
+                throw AppError.blockchain(.contract(.invalidSignature))
+            }
             if let contractError = extractContractError(from: error) {
                 throw contractError
             }
@@ -257,6 +277,7 @@ final class BlockchainHelpers {
         }
         
         guard let rawTx = assembledTx.raw else {
+            Logger.logError("buildTransaction: assembledTx.raw is nil", category: .blockchain)
             throw AppError.blockchain(.transactionFailed)
         }
         

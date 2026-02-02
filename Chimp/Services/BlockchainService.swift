@@ -248,6 +248,12 @@ final class BlockchainService {
         nonce: UInt32,
         sourceKeyPair: KeyPair
     ) async throws -> UInt32 {
+        let methodLabel: String
+        switch method {
+        case .claim(let c): methodLabel = "claim(\(c.prefix(12))...)"
+        case .transfer(_, let to, let tid): methodLabel = "transfer(...,\(to.prefix(8))...,\(tid))"
+        case .mint: methodLabel = "mint"
+        }
         let recoveryIds: [UInt32] = [0, 1, 2, 3]
         var lastError: Error?
 
@@ -324,8 +330,7 @@ final class BlockchainService {
             }
         }
 
-        // No recovery ID worked: throw last error or signature-related error (not "add funds")
-        Logger.logError("Failed to determine recovery ID", category: .blockchain)
+        // No recovery ID worked: throw last error or signature-related error
         if let last = lastError, let appError = last as? AppError {
             throw appError
         }
@@ -374,7 +379,7 @@ final class BlockchainService {
             sourceKeyPair: sourceKeyPair
         )
         
-        // Extract token ID by simulating the transaction
+        // Extract token ID by simulating; if simulation fails, tokenId stays 0 (submission may still succeed)
         var tokenId: UInt32 = 0
         do {
             let returnValue = try await BlockchainHelpers.simulateAndDecode(transaction: transaction, rpcClient: rpcClient)
@@ -382,7 +387,7 @@ final class BlockchainService {
                 tokenId = simulatedTokenId
             }
         } catch {
-            // If simulation fails, tokenId remains 0
+            // Non-fatal: we still return the transaction for submission
         }
         
         return (transaction: transaction, tokenId: tokenId)
