@@ -101,7 +101,7 @@ struct TransferInputView: View {
             } message: {
                 Text("You are about to transfer this NFT. This action cannot be undone.\n\nRecipient: \(recipientAddress)\nToken ID: \(tokenId)")
             }
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
     }
