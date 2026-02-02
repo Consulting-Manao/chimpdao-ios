@@ -5,6 +5,7 @@ struct SignatureDisplayView: View {
     let keyCounter: UInt32
     let derSignature: String
     @Binding var isPresented: Bool
+    @State private var copied = false
     
     var body: some View {
         NavigationStack {
@@ -29,15 +30,16 @@ struct SignatureDisplayView: View {
                         
                         Button(action: copySignature) {
                             HStack {
-                                Image(systemName: "doc.on.doc")
-                                Text("Copy All")
+                                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                Text(copied ? "Copied" : "Copy Signature")
                             }
+                            .foregroundColor(copied ? .green : .black)
                         }
                         .buttonStyle(PrimaryButtonStyle())
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
-                        .accessibilityLabel("Copy signature")
-                        .accessibilityHint("Copies the signature details to your clipboard")
+                        .accessibilityLabel(copied ? "Copied to clipboard" : "Copy signature")
+                        .accessibilityHint("Copies the DER signature to your clipboard")
                     }
                     .padding(.vertical, 20)
                 }
@@ -57,8 +59,17 @@ struct SignatureDisplayView: View {
     }
     
     private func copySignature() {
-        let signatureText = "Global Counter: \(globalCounter)\nKey Counter: \(keyCounter)\nDER Signature: \(derSignature)"
-        UIPasteboard.general.string = signatureText
+        UIPasteboard.general.string = derSignature
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            copied = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                copied = false
+            }
+        }
     }
 }
 
