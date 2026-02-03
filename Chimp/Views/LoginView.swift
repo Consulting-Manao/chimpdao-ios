@@ -15,7 +15,7 @@ struct LoginView: View {
             ZStack {
                 Color.chimpBackgroundBase
                     .ignoresSafeArea()
-                TilingBackground(imageName: "TokenBgPattern", opacity: 0.12, tileWidthPoints: 400)
+                TilingBackground(imageName: "TokenBgPattern", opacity: 0.15, tileWidthPoints: 400)
                     .ignoresSafeArea()
                     .onTapGesture {
                         isSecretKeyFocused = false
