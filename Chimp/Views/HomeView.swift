@@ -1,30 +1,51 @@
 import SwiftUI
 import UIKit
 
-// Helper view for tiling background pattern using UIKit pattern image
+// Tiling background: tile width and proportional height, aspect-fit (no stretch). Smaller tile = more tiles on screen, finer detail.
 struct TilingBackground: UIViewRepresentable {
     let imageName: String
     let opacity: Double
-    
+    var tileWidthPoints: CGFloat = 400
+
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
         view.backgroundColor = .clear
-        
-        // Load the image
+
         guard let image = UIImage(named: imageName) else {
             return view
         }
-        
-        // Create a pattern color from the image
-        let patternColor = UIColor(patternImage: image)
+
+        let imageSize = image.size
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return view
+        }
+
+        let w = tileWidthPoints
+        let tileHeight = w * (imageSize.height / imageSize.width)
+        let tileSize = CGSize(width: w, height: tileHeight)
+
+        let scale = min(w / imageSize.width, tileHeight / imageSize.height)
+        let drawW = imageSize.width * scale
+        let drawH = imageSize.height * scale
+        let x = (w - drawW) / 2
+        let y = (tileHeight - drawH) / 2
+        let drawRect = CGRect(x: x, y: y, width: drawW, height: drawH)
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = UIScreen.main.scale
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: tileSize, format: format)
+        let tileImage = renderer.image { _ in
+            image.draw(in: drawRect)
+        }
+
+        let patternColor = UIColor(patternImage: tileImage)
         view.backgroundColor = patternColor.withAlphaComponent(opacity)
-        
+
         return view
     }
-    
-    func updateUIView(_ uiView: UIView, context: Context) {
-        // Update if needed
-    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
 struct HomeView: View {
@@ -34,10 +55,11 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background image layer - tiling pattern
-                TilingBackground(imageName: "Background", opacity: 0.3)
+                Color.chimpBackgroundBase
                     .ignoresSafeArea()
-                
+                TilingBackground(imageName: "TokenBgPattern", opacity: 0.12, tileWidthPoints: 400)
+                    .ignoresSafeArea()
+
                 // Content
                 ScrollView {
                     VStack(spacing: 0) {

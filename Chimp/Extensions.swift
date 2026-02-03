@@ -41,4 +41,10 @@ extension Color {
     static var chimpBackground: Color {
         Color(.systemBackground)
     }
+
+    /// Warm light background base – soft cream/wheat that pairs with chimpYellow, recedes behind content (HIG)
+    static let chimpBackgroundBase = Color(red: 0.96, green: 0.93, blue: 0.87)
+
+    /// Warm mid-tone for surfaces that need slightly more definition (e.g. tab bar)
+    static let chimpBackgroundSurface = Color(red: 0.92, green: 0.89, blue: 0.82)
 }

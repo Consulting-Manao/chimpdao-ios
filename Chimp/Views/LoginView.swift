@@ -12,13 +12,14 @@ struct LoginView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background pattern
-                TilingBackground(imageName: "Background", opacity: 0.3)
+                Color.chimpBackgroundBase
+                    .ignoresSafeArea()
+                TilingBackground(imageName: "TokenBgPattern", opacity: 0.12, tileWidthPoints: 400)
                     .ignoresSafeArea()
                     .onTapGesture {
                         isSecretKeyFocused = false
                     }
-                
+
                 VStack(spacing: 24) {
                     Spacer()
                     
