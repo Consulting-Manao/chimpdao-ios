@@ -3,6 +3,7 @@ import SwiftUI
 struct LoginView: View {
     @ObservedObject var walletState: WalletState
     @State private var secretKey: String = ""
+    @State private var isSecretKeyVisible = false
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
     @FocusState private var isSecretKeyFocused: Bool
@@ -50,7 +51,14 @@ struct LoginView: View {
                             .fontWeight(.semibold)
                             .foregroundColor(.secondary)
                         
-                        SecureField("Enter your Stellar secret key (S...)", text: $secretKey)
+                        ZStack(alignment: .trailing) {
+                            Group {
+                                if isSecretKeyVisible {
+                                    TextField("Enter your Stellar secret key (S...)", text: $secretKey)
+                                } else {
+                                    SecureField("Enter your Stellar secret key (S...)", text: $secretKey)
+                                }
+                            }
                             .textFieldStyle(.roundedBorder)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
@@ -61,8 +69,18 @@ struct LoginView: View {
                                     login()
                                 }
                             }
+                            .padding(.trailing, 36)
                             .accessibilityLabel("Secret key input")
                             .accessibilityHint("Enter your 56-character Stellar secret key starting with S")
+
+                            Button {
+                                isSecretKeyVisible.toggle()
+                            } label: {
+                                Image(systemName: isSecretKeyVisible ? "eye.slash" : "eye")
+                                    .foregroundColor(.secondary)
+                            }
+                            .accessibilityLabel(isSecretKeyVisible ? "Hide secret key" : "Show secret key")
+                        }
                     }
                     .padding(.horizontal, 20)
                     
