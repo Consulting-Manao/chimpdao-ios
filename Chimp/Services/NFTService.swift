@@ -73,8 +73,7 @@ final class NFTService {
             functionName: "claim",
             args: [wallet.address],
             signer: claimantSigner,
-            nonce: nonce,
-            networkPassphrase: config.networkPassphrase
+            nonce: nonce
         )
         progressCallback?("Signing transaction...")
         let signature = try await createSignature(
@@ -182,8 +181,7 @@ final class NFTService {
             functionName: "transfer",
             args: [wallet.address, recipientAddress, String(tokenId)],
             signer: fromSigner,
-            nonce: nonce,
-            networkPassphrase: config.networkPassphrase
+            nonce: nonce
         )
 
         progressCallback?("Signing transaction...")
@@ -270,8 +268,7 @@ final class NFTService {
             functionName: "mint",
             args: [wallet.address],
             signer: adminSigner,
-            nonce: nonce,
-            networkPassphrase: config.networkPassphrase
+            nonce: nonce
         )
         progressCallback?("Signing transaction...")
         let signature = try await createSignature(

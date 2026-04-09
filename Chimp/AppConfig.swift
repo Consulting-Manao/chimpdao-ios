@@ -126,16 +126,6 @@ final class AppConfig: ObservableObject {
         }
     }
     
-    /// Network passphrase based on current network
-    var networkPassphrase: String {
-        switch currentNetwork {
-        case .testnet:
-            return "Test SDF Network ; September 2015"
-        case .mainnet:
-            return "Public Global Stellar Network ; September 2015"
-        }
-    }
-    
     /// Get contract ID from build configuration (without UserDefaults override)
     func getBuildConfigContractId() -> String {
         let buildKey = currentNetwork == .testnet ? buildContractIdTestnetKey : buildContractIdMainnetKey

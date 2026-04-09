@@ -26,22 +26,20 @@ final class CryptoUtils {
     ///   - args: Function arguments (will be JSON encoded)
     ///   - signer: Signer public key (e.g. 65-byte uncompressed SEC1); must match encoding used by contract when reconstructing payload
     ///   - nonce: Nonce value
-    ///   - networkPassphrase: Network passphrase
     /// - Returns: Tuple of (message: base message only, messageHash: hash of message + signer + nonce)
     static func createSEP53Message(
         contractId: String,
         functionName: String,
         args: [Any],
         signer: Data,
-        nonce: UInt32,
-        networkPassphrase: String
+        nonce: UInt32
     ) throws -> (message: Data, messageHash: Data) {
         var parts: [Data] = []
         
-        // Network passphrase hash (32 bytes)
-        let networkData = networkPassphrase.data(using: .utf8) ?? Data()
-        let networkHash = Data(SHA256.hash(data: networkData))
-        parts.append(networkHash)
+        // SEP-53 Prefix
+        if let prefixData = "Stellar Signed Message:\n".data(using: .utf8) {
+            parts.append(prefixData)
+        }
         
         // Contract ID (32 bytes)
         // Stellar contract IDs are base32 encoded addresses (56 chars starting with 'C')
