@@ -3,3 +3,6 @@
 
 .idea
 .cursor
+
+# Xcode per-user state
+xcuserdata/

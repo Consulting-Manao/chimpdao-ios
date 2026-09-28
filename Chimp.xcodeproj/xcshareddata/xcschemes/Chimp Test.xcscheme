@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "276DCDF82EEB0063009A1DA5"
-               BuildableName = "Chimp.app"
-               BlueprintName = "Chimp"
+               BuildableName = "ChimpDAO.app"
+               BlueprintName = "ChimpDAO"
                ReferencedContainer = "container:Chimp.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -45,8 +45,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "276DCDF82EEB0063009A1DA5"
-            BuildableName = "Chimp.app"
-            BlueprintName = "Chimp"
+            BuildableName = "ChimpDAO.app"
+            BlueprintName = "ChimpDAO"
             ReferencedContainer = "container:Chimp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "276DCDF82EEB0063009A1DA5"
-            BuildableName = "Chimp.app"
-            BlueprintName = "Chimp"
+            BuildableName = "ChimpDAO.app"
+            BlueprintName = "ChimpDAO"
             ReferencedContainer = "container:Chimp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
