@@ -25,6 +25,9 @@ struct DesignSystemCatalogView: View {
                     link("Header", systemImage: "rectangle.topthird.inset.filled") { CatalogHeaderPage(settings: settings) }
                     link("Tab bar", systemImage: "dock.rectangle") { CatalogTabBarPage(settings: settings) }
                     link("Card", systemImage: "creditcard.fill") { CatalogCardPage(settings: settings) }
+                    link("Keypad and PIN", systemImage: "circle.grid.3x3.fill") { CatalogPinPage(settings: settings) }
+                    link("Chimpy and motion", systemImage: "bubble.left.fill") { CatalogChimpyPage(settings: settings) }
+                    link("Sheets", systemImage: "rectangle.bottomhalf.inset.filled") { CatalogSheetsPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))
             }

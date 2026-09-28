@@ -25,6 +25,11 @@ struct CatalogMotionPage: View {
             ("unripeHueRotation", "\(ChimpMotion.Ripen.unripeHueRotation.degrees)°"),
             ("unripeSaturation", "\(ChimpMotion.Ripen.unripeSaturation)"),
         ]),
+        ("ChimpMotion.Shake", [
+            ("duration", "\(ChimpMotion.Shake.duration) s"),
+            ("amplitude", "\(ChimpMotion.Shake.amplitude) pt"),
+            ("errorDisplay", "\(ChimpMotion.Shake.errorDisplay) s"),
+        ]),
         ("ChimpMotion.Press", [
             ("duration", "\(ChimpMotion.Press.duration) s"),
         ]),

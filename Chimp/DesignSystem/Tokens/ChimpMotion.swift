@@ -41,6 +41,14 @@ enum ChimpMotion {
         static let unripeSaturation: Double = 0.8
     }
 
+    /// Erreur de PIN (validé le 2026-09-28) : secousse horizontale et points en rouge.
+    enum Shake {
+        static let duration: Double = 0.4
+        static let amplitude: CGFloat = 10
+        /// Durée pendant laquelle les points restent rouges avant d'être vidés.
+        static let errorDisplay: Double = 0.6
+    }
+
     /// Appui sur un bouton (non spécifié par la maquette, validé le 2026-09-28) :
     /// le bouton descend de la hauteur de son ombre, qui disparaît.
     enum Press {

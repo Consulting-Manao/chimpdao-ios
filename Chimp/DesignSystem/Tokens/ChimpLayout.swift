@@ -104,12 +104,31 @@ enum ChimpSize {
     static let stepSegmentHeight: CGFloat = 11
     /// Chimpy dans sa bulle.
     static let chimpyThumbnail: CGFloat = 68
-    /// Point du code PIN.
-    static let pinDot: CGFloat = 22
+    /// Point du code PIN, contour compris (22 + 3 × 2 dans la maquette).
+    static let pinDot: CGFloat = 28
+    /// Écart entre deux points du PIN.
+    static let pinDotSpacing: CGFloat = 16
+    /// Écart entre les touches du pavé numérique.
+    static let keypadSpacing: CGFloat = 9
+    /// Rembourrage vertical d'une touche du pavé, hors contour.
+    static let keyVerticalPadding: CGFloat = 11
     /// Vignette de couleur (A5, G1b).
     static let colorSwatch: CGFloat = 52
-    /// Hauteur de la feuille « approchez la carte ».
-    static let cardTapSheetHeight: CGFloat = 560
+    /// Hauteur d'une feuille (PIN, choix d'un tiroir…).
+    static let sheetHeight: CGFloat = 560
+    /// Hauteur de la feuille « approchez la carte » : plus haute que la maquette (560) pour
+    /// l'instruction, la ligne PIN et le bouton « Scan my card » ajoutés à l'étape C.
+    static let cardTapSheetHeight: CGFloat = 660
+    /// Zone des anneaux NFC autour de la carte (feuille).
+    static let nfcRingArea: CGFloat = 180
+    /// Vignette de carte au centre des anneaux, contour compris (118 × 76 + 4 × 2).
+    static let cardThumbnail = CGSize(width: 126, height: 84)
+    /// Logo dans la vignette de carte.
+    static let cardThumbnailLogo: CGFloat = 40
+    /// Pastille de couleur du bandeau « qui peut signer », contour compris (14 + 2 × 2).
+    static let signerSwatch: CGFloat = 18
+    /// Hauteur maximale de Chimpy dans sa bulle.
+    static let chimpyThumbnailMaxHeight: CGFloat = 80
     /// Poignée des feuilles.
     static let sheetHandle = CGSize(width: 52, height: 5)
     /// Largeur d'une tuile du motif de fond, et sur les cartes.
