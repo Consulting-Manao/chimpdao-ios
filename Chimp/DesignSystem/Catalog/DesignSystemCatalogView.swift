@@ -29,6 +29,7 @@ struct DesignSystemCatalogView: View {
                     link("Chimpy and motion", systemImage: "bubble.left.fill") { CatalogChimpyPage(settings: settings) }
                     link("Sheets", systemImage: "rectangle.bottomhalf.inset.filled") { CatalogSheetsPage(settings: settings) }
                     link("Wallet parts", systemImage: "square.grid.2x2.fill") { CatalogWalletPartsPage(settings: settings) }
+                    link("Receive parts", systemImage: "qrcode") { CatalogReceivePartsPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))
 

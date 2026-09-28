@@ -32,6 +32,8 @@ import SwiftUI
 //                                             bouton secondaire sur l'en-tête (noir 22 %, fusion du 20 % du bouton)
 //   chimpHeaderBannerBorder                   bord haut du bandeau bas des écrans pleins
 //   chimpIllustrationShadow                   ombre des illustrations de Chimpy
+//   chimpQRBackground / chimpQRModule         fond blanc et modules sombres du QR code, dans les deux thèmes
+//                                             (un QR clair sur fond sombre se scanne mal)
 //   chimpCard* / chimpOnCard*                 couleurs des cartes et leur texte
 //   chimpActivity*                            fonds d'icônes de l'activité (I1)
 //   chimpRisk*                                niveaux de risque (F2, F3)

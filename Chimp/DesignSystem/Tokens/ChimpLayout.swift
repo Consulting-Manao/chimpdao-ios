@@ -77,6 +77,10 @@ enum ChimpRadius {
     static let panel: CGFloat = 22
     /// Haut des feuilles (bottom sheets).
     static let sheet: CGFloat = 34
+    /// Carte blanche du QR code (D1).
+    static let qrCard: CGFloat = 24
+    /// Carré jaune au centre du QR code.
+    static let qrBadge: CGFloat = 8
     // Pilules (chips, « + Add », interrupteur) : utiliser `Capsule()`.
 }
 
@@ -107,6 +111,8 @@ struct ChimpShadow: Equatable {
     static let tile = ChimpShadow(x: 3, y: 3)
     /// Grandes cartes, Chimp Card, carte NFC.
     static let card = ChimpShadow(x: 4, y: 4)
+    /// Carte du QR code (D1).
+    static let qrCard = ChimpShadow(x: 5, y: 5)
 
     /// Ombre floue des illustrations de Chimpy (couleur `chimpIllustrationShadow`).
     static let illustrationOffset = CGSize(width: 5, height: 6)
@@ -164,6 +170,16 @@ enum ChimpSize {
     static let patternTileOnCard: CGFloat = 260
     /// Rapport largeur / hauteur d'une carte bancaire.
     static let cardAspectRatio: CGFloat = 1.58
+    /// Côté du QR code (D1), hors carte blanche.
+    static let qrCode: CGFloat = 200
+    /// Part du côté du QR code couverte par la tête de Chimpy (5 modules sur 25 dans la maquette).
+    static let qrBadgeFraction: CGFloat = 0.2
+    /// Icône d'un tiroir dans le sélecteur « INTO » (D1).
+    static let drawerPickerIcon: CGFloat = 22
+    /// Icône d'un tiroir dans une ligne de choix (C3), contour compris.
+    static let drawerOptionIcon = CGSize(width: 38, height: 26)
+    /// Bouton radio d'une ligne de choix, contour compris.
+    static let radio: CGFloat = 24
 }
 
 /// Opacités (0 à 1).

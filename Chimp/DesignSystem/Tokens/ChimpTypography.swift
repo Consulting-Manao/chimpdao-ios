@@ -77,6 +77,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     // Nunito
     case bodyL         // texte des écrans pleins
     case rowTitle      // titre d'une ligne
+    case optionTitle   // titre d'une ligne de choix dans une feuille (C3, D1)
     case body          // texte courant
     case bodyS         // texte de la bulle de Chimpy
     case caption       // méta-infos, sous-titres
@@ -88,7 +89,8 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case labelS        // « CHIMPY »
     case cardNumber    // « N°0421 » sur une Chimp Card
     case monoValue     // montants des lignes d'actifs
-    case mono          // XDR, adresses
+    case mono          // XDR
+    case address       // adresse raccourcie dans sa pilule (D1)
 
     var id: String { rawValue }
 
@@ -100,8 +102,8 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
             .luckiestGuy
         case .bodyL, .captionS: .nunito(weight: 700)
         case .body, .bodyS, .caption, .captionStrong: .nunito(weight: 800)
-        case .rowTitle: .nunito(weight: 900)
-        case .labelWide, .label, .labelS, .cardNumber, .monoValue: .spaceMono(bold: true)
+        case .rowTitle, .optionTitle: .nunito(weight: 900)
+        case .labelWide, .label, .labelS, .cardNumber, .monoValue, .address: .spaceMono(bold: true)
         case .mono: .spaceMono(bold: false)
         }
     }
@@ -126,10 +128,10 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .buttonSmall: 14
         case .pill: 13
         case .tile: 12
-        case .bodyL: 16
+        case .bodyL, .optionTitle: 16
         case .rowTitle, .body: 15
         case .bodyS: 14
-        case .caption: 13
+        case .caption, .address: 13
         case .captionS, .captionStrong: 12
         case .labelWide, .label: 11
         case .labelS, .cardNumber: 10
@@ -147,9 +149,9 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .amountS, .greeting: .title3
         case .displayS, .buttonLarge, .button: .headline
         case .cardName: .callout
-        case .bodyL: .callout
+        case .bodyL, .optionTitle: .callout
         case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .bodyS, .monoValue: .subheadline
-        case .caption, .pill: .footnote
+        case .caption, .pill, .address: .footnote
         case .tile, .captionS, .captionStrong, .mono: .caption1
         case .labelWide, .label, .labelS, .cardNumber: .caption2
         }

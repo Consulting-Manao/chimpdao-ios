@@ -85,6 +85,7 @@ private struct CatalogTypographyRow: View {
         case .tile: Text("Receive")
         case .bodyL: Text("Nothing is moved yet. I'm just saying hello.")
         case .rowTitle: Text("Main account")
+        case .optionTitle: Text("Jungle's wallet")
         case .body, .bodyS: Text("Looking is free. Moving money takes a tap.")
         case .caption: Text("$820 ready · $500 growing")
         case .captionS: Text("12:15 · into Main")
@@ -95,6 +96,7 @@ private struct CatalogTypographyRow: View {
         case .cardNumber: Text(verbatim: "N°0421")
         case .monoValue: Text(verbatim: "820.00 USDC")
         case .mono: Text(verbatim: "AAAAAgAAAACHm2nUx0FH")
+        case .address: Text(verbatim: "CAIO2SJ6…AZVOX2")
         }
     }
 }

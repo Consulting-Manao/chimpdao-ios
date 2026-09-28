@@ -54,4 +54,10 @@ enum ChimpMotion {
     enum Press {
         static let duration: Double = 0.1
     }
+
+    /// Confirmation « Copied! » (D1, non spécifiée par la maquette) : durée d'affichage, puis retour à « Copy ».
+    enum Copied {
+        static let display: Duration = .seconds(2)
+        static let transition: Double = 0.2
+    }
 }

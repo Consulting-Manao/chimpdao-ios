@@ -39,6 +39,8 @@ enum CatalogColors {
         .init(name: "chimpHeaderShade", resource: .chimpHeaderShade, backdrop: .chimpHeader),
         .init(name: "chimpHeaderBannerBorder", resource: .chimpHeaderBannerBorder, backdrop: .chimpHeader),
         .init(name: "chimpIllustrationShadow", resource: .chimpIllustrationShadow, backdrop: .chimpHeader),
+        .init(name: "chimpQRBackground", resource: .chimpQRBackground),
+        .init(name: "chimpQRModule", resource: .chimpQRModule),
     ]
 
     static let cards: [CatalogColorToken] = [
