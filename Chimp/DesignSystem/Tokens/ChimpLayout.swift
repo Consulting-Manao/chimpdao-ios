@@ -28,6 +28,15 @@ enum ChimpSpacing {
     /// Zone du bouton principal en bas d'écran. Dans la maquette, 42 pt sous le bouton
     /// incluent la barre d'accueil (34 pt) : il reste 8 pt au-dessus de la zone sûre.
     static let bottomBar = EdgeInsets(top: 14, leading: 22, bottom: 8, trailing: 22)
+
+    /// L'en-tête et la barre d'onglets empiètent de 4 pt sur les zones sûres :
+    /// dans la maquette, le contenu de l'en-tête commence à 58 pt du haut (barre d'état : 62 pt)
+    /// et celui de la barre d'onglets s'arrête à 30 pt du bas (barre d'accueil : 34 pt).
+    static let chromeSafeAreaOverlap: CGFloat = 4
+    /// Marges de l'en-tête (Chimp Top), en haut sous la zone sûre.
+    static let header = EdgeInsets(top: -chromeSafeAreaOverlap, leading: 20, bottom: 18, trailing: 20)
+    /// Marges de la barre d'onglets (Chimp Nav), en bas au-dessus de la zone sûre.
+    static let tabBar = EdgeInsets(top: 10, leading: 16, bottom: -chromeSafeAreaOverlap, trailing: 16)
 }
 
 /// Rayons des coins (points).
@@ -52,6 +61,10 @@ enum ChimpRadius {
 }
 
 /// Épaisseurs des contours (points), couleur `chimpOutline`.
+///
+/// Attention : dans la maquette (CSS), un contour s'ajoute *autour* du rembourrage et de la taille
+/// indiquée, sauf mention `box-sizing:border-box`. En SwiftUI, `strokeBorder` dessine *à l'intérieur*
+/// du cadre : il faut donc ajouter l'épaisseur du contour au rembourrage pour retrouver les mêmes tailles.
 enum ChimpBorder {
     /// Pastilles, segments, petites vignettes, séparateurs de liste.
     static let thin: CGFloat = 2
@@ -87,8 +100,8 @@ enum ChimpSize {
     static let headerButton: CGFloat = 40
     /// Bouton rond de l'en-tête (réglages).
     static let headerGearButton: CGFloat = 42
-    /// Hauteur d'un segment de la barre d'étapes.
-    static let stepSegmentHeight: CGFloat = 7
+    /// Hauteur d'un segment de la barre d'étapes, contour de 2 pt compris (7 + 2 × 2 dans la maquette).
+    static let stepSegmentHeight: CGFloat = 11
     /// Chimpy dans sa bulle.
     static let chimpyThumbnail: CGFloat = 68
     /// Point du code PIN.
@@ -114,9 +127,20 @@ enum ChimpOpacity {
     static let patternOnCard: Double = 0.16
     /// Élément désactivé ou indisponible.
     static let disabled: Double = 0.45
+    /// Appui sur un élément sans ombre (bouton secondaire, lien, onglet) : non spécifié par la maquette.
+    static let pressed: Double = 0.7
 }
 
 extension View {
+    /// Agrandit la zone tactile à 44 pt sans changer la place occupée à l'écran
+    /// (ex. : bouton rond de 40 pt de la maquette).
+    func expandedTouchTarget(visualSize: CGFloat) -> some View {
+        let inset = max(0, (ChimpSize.minimumTouchTarget - visualSize) / 2)
+        return frame(width: visualSize + inset * 2, height: visualSize + inset * 2)
+            .contentShape(Rectangle())
+            .padding(-inset)
+    }
+
     /// Style « cartoon » : fond, contour épais et ombre dure décalée, sans flou.
     func cartoonSurface<S: InsettableShape>(
         _ shape: S,

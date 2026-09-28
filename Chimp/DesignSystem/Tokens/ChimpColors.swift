@@ -24,9 +24,13 @@ import SwiftUI
 //   chimpOnHeaderPrimary / …Secondary         titres et sous-titres sur l'en-tête
 //   chimpOnHeaderAccent                       libellé « STEP 2 OF 3 » (#FFD42B au lieu de #FFD11E, contraste)
 //   chimpHeaderButtonFill                     boutons ronds de l'en-tête
+//   chimpOutlineOnHeader                      contours posés sur l'en-tête : segments d'étape, onglet actif
+//                                             (#201C1A dans les deux thèmes, comme la maquette)
 //   chimpStepSegmentInactive                  segments d'étape non atteints
 //   chimpScrim                                voile derrière une feuille
-//   chimpHeaderBannerFill / …Border           bandeau bas des écrans pleins
+//   chimpHeaderShade                          voile sombre posé sur l'en-tête : bandeau bas des écrans pleins,
+//                                             bouton secondaire sur l'en-tête (noir 22 %, fusion du 20 % du bouton)
+//   chimpHeaderBannerBorder                   bord haut du bandeau bas des écrans pleins
 //   chimpIllustrationShadow                   ombre des illustrations de Chimpy
 //   chimpCard* / chimpOnCard*                 couleurs des cartes et leur texte
 //   chimpActivity*                            fonds d'icônes de l'activité (I1)

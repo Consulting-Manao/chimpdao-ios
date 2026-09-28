@@ -6,7 +6,6 @@ import SwiftUI
 /// Compilé uniquement en Debug et Testing (drapeau `DESIGN_CATALOG`), jamais en Release.
 struct DesignSystemCatalogView: View {
     @State private var settings = CatalogSettings()
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         CatalogPage("Design System", settings: settings, scrolls: false) {
@@ -20,6 +19,14 @@ struct DesignSystemCatalogView: View {
                     link("Images", systemImage: "photo.fill") { CatalogImagesPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))
+
+                Section("Components") {
+                    link("Buttons", systemImage: "button.horizontal.fill") { CatalogButtonsPage(settings: settings) }
+                    link("Header", systemImage: "rectangle.topthird.inset.filled") { CatalogHeaderPage(settings: settings) }
+                    link("Tab bar", systemImage: "dock.rectangle") { CatalogTabBarPage(settings: settings) }
+                    link("Card", systemImage: "creditcard.fill") { CatalogCardPage(settings: settings) }
+                }
+                .listRowBackground(Color(.chimpSurface))
             }
             .scrollContentBackground(.hidden)
         }
@@ -31,15 +38,26 @@ struct DesignSystemCatalogView: View {
         @ViewBuilder destination: @escaping () -> some View
     ) -> some View {
         NavigationLink(destination: destination) {
-            Label {
-                Text(title).chimpFont(.rowTitle)
-            } icon: {
-                Image(systemName: systemImage).fontWeight(.heavy)
-            }
-            .foregroundStyle(.chimpTextPrimary)
-            // Aux tailles d'accessibilité, l'icône prendrait trop de place : on garde le texte seul.
-            .labelStyle(dynamicTypeSize.isAccessibilitySize ? AnyLabelStyle(.titleOnly) : AnyLabelStyle(.titleAndIcon))
+            CatalogLinkLabel(title: title, systemImage: systemImage)
         }
+    }
+}
+
+/// Ligne du sommaire. Lit la taille de texte à l'intérieur de la page, pour suivre aussi celle forcée par le catalogue.
+private struct CatalogLinkLabel: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Label {
+            Text(title).chimpFont(.rowTitle)
+        } icon: {
+            Image(systemName: systemImage).fontWeight(.heavy)
+        }
+        .foregroundStyle(.chimpTextPrimary)
+        // Aux tailles d'accessibilité, l'icône prendrait trop de place : on garde le texte seul.
+        .labelStyle(dynamicTypeSize.isAccessibilitySize ? AnyLabelStyle(.titleOnly) : AnyLabelStyle(.titleAndIcon))
     }
 }
 
@@ -186,10 +204,17 @@ struct CatalogPage<Content: View>: View {
                 .accessibilityLabel(Text("Catalog settings"))
             }
         }
-        .preferredColorScheme(settings.appearance.colorScheme)
-        .transformEnvironment(\.dynamicTypeSize) { size in
-            if let forced = settings.textSize.dynamicTypeSize { size = forced }
-        }
+        .catalogOverrides(settings)
+    }
+}
+
+extension View {
+    /// Applique le thème et la taille de texte forcés dans le catalogue.
+    func catalogOverrides(_ settings: CatalogSettings) -> some View {
+        preferredColorScheme(settings.appearance.colorScheme)
+            .transformEnvironment(\.dynamicTypeSize) { size in
+                if let forced = settings.textSize.dynamicTypeSize { size = forced }
+            }
     }
 }
 

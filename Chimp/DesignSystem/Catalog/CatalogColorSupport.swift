@@ -32,10 +32,11 @@ enum CatalogColors {
         .init(name: "chimpOnHeaderPrimary", resource: .chimpOnHeaderPrimary),
         .init(name: "chimpOnHeaderSecondary", resource: .chimpOnHeaderSecondary),
         .init(name: "chimpOnHeaderAccent", resource: .chimpOnHeaderAccent),
+        .init(name: "chimpOutlineOnHeader", resource: .chimpOutlineOnHeader),
         .init(name: "chimpHeaderButtonFill", resource: .chimpHeaderButtonFill, backdrop: .chimpHeader),
         .init(name: "chimpStepSegmentInactive", resource: .chimpStepSegmentInactive, backdrop: .chimpHeader),
         .init(name: "chimpScrim", resource: .chimpScrim, backdrop: .chimpBackground),
-        .init(name: "chimpHeaderBannerFill", resource: .chimpHeaderBannerFill, backdrop: .chimpHeader),
+        .init(name: "chimpHeaderShade", resource: .chimpHeaderShade, backdrop: .chimpHeader),
         .init(name: "chimpHeaderBannerBorder", resource: .chimpHeaderBannerBorder, backdrop: .chimpHeader),
         .init(name: "chimpIllustrationShadow", resource: .chimpIllustrationShadow, backdrop: .chimpHeader),
     ]

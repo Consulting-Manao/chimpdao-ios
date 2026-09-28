@@ -63,10 +63,13 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case displayM      // titre de l'en-tête
     case amountS       // montant sur une carte
     case displayS      // titres de section
+    case buttonLarge   // bouton principal des écrans d'accueil (« Let's start », « Next »)
     case button        // bouton principal
+    case buttonSecondary // bouton secondaire
     case tab           // onglets
     case link          // liens texte (« Cancel », « Skip »)
     case buttonSmall   // petits boutons
+    case cardName      // nom sur une Chimp Card
     case tile          // libellés des tuiles d'action
     // Nunito
     case bodyL         // texte des écrans pleins
@@ -74,11 +77,13 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case body          // texte courant
     case bodyS         // texte de la bulle de Chimpy
     case caption       // méta-infos, sous-titres
+    case captionStrong // petites méta-infos appuyées, texte sous le montant d'une carte
     case captionS      // petites méta-infos
     // Space Mono
     case labelWide     // « STEP 2 OF 3 », étape d'une feuille
     case label         // libellés de section (« READY TO SPEND »)
-    case labelS        // « CHIMPY », numéro de carte
+    case labelS        // « CHIMPY »
+    case cardNumber    // « N°0421 » sur une Chimp Card
     case monoValue     // montants des lignes d'actifs
     case mono          // XDR, adresses
 
@@ -87,12 +92,13 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     var family: ChimpFontFamily {
         switch self {
         case .celebration, .displayXL, .amountL, .displayL, .sheetTitle, .key, .displayM,
-             .amountS, .displayS, .button, .tab, .link, .buttonSmall, .tile:
+             .amountS, .displayS, .buttonLarge, .button, .buttonSecondary, .tab, .link, .buttonSmall,
+             .cardName, .tile:
             .luckiestGuy
         case .bodyL, .captionS: .nunito(weight: 700)
-        case .body, .bodyS, .caption: .nunito(weight: 800)
+        case .body, .bodyS, .caption, .captionStrong: .nunito(weight: 800)
         case .rowTitle: .nunito(weight: 900)
-        case .labelWide, .label, .labelS, .monoValue: .spaceMono(bold: true)
+        case .labelWide, .label, .labelS, .cardNumber, .monoValue: .spaceMono(bold: true)
         case .mono: .spaceMono(bold: false)
         }
     }
@@ -108,18 +114,19 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .key: 24
         case .displayM: 23
         case .amountS: 21
-        case .displayS: 18
+        case .displayS, .buttonLarge: 18
         case .button: 17
-        case .tab, .link: 15
+        case .cardName: 16
+        case .tab, .link, .buttonSecondary: 15
         case .buttonSmall: 14
         case .tile: 12
         case .bodyL: 16
         case .rowTitle, .body: 15
         case .bodyS: 14
         case .caption: 13
-        case .captionS: 12
+        case .captionS, .captionStrong: 12
         case .labelWide, .label: 11
-        case .labelS: 10
+        case .labelS, .cardNumber: 10
         case .monoValue: 14
         case .mono: 12
         }
@@ -132,12 +139,13 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .displayL: .title1
         case .sheetTitle, .key, .displayM: .title2
         case .amountS: .title3
-        case .displayS, .button: .headline
+        case .displayS, .buttonLarge, .button: .headline
+        case .cardName: .callout
         case .bodyL: .callout
-        case .tab, .link, .buttonSmall, .rowTitle, .body, .bodyS, .monoValue: .subheadline
+        case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .bodyS, .monoValue: .subheadline
         case .caption: .footnote
-        case .tile, .captionS, .mono: .caption1
-        case .labelWide, .label, .labelS: .caption2
+        case .tile, .captionS, .captionStrong, .mono: .caption1
+        case .labelWide, .label, .labelS, .cardNumber: .caption2
         }
     }
 
@@ -147,6 +155,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .tab: 0.3
         case .labelWide: 2
         case .label, .labelS: 1.6
+        case .cardNumber: 1.2
         default: 0
         }
     }
