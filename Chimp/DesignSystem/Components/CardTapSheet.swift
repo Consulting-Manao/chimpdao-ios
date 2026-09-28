@@ -132,7 +132,7 @@ private struct CardTapSheetPreview: View {
                     cardColor: .jungle,
                     stepLabel: "Last step",
                     what: "Paying Maya $25.00",
-                    who: "The money is in your Jungle card's wallet, so only that card can sign.",
+                    who: "It's from Jungle's wallet, so only that card works.",
                     pinStatus: pinStatus,
                     onScan: {},
                     onCancel: { isPresented = false }

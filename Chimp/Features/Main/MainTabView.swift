@@ -8,6 +8,8 @@ struct MainTabView: View {
     @State private var selection = ChimpTab.wallet
     /// Gardé ici pour que les soldes restent chargés quand on change d'onglet.
     @State private var walletModel = WalletViewModel(dataSource: MockWalletDataSource())
+    /// Écrans poussés dans l'onglet Wallet.
+    @State private var walletPath: [WalletRoute] = []
     #if DESIGN_CATALOG
     @State private var isShowingCatalog = false
     #endif
@@ -15,10 +17,16 @@ struct MainTabView: View {
     var body: some View {
         switch selection {
         case .wallet:
-            NavigationStack {
-                WalletView(model: walletModel, onSettings: settingsAction)
+            NavigationStack(path: $walletPath) {
+                WalletView(model: walletModel, onSettings: settingsAction, onAction: openWalletAction)
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
+                    .navigationDestination(for: WalletRoute.self) { route in
+                        switch route {
+                        case .receive:
+                            ReceiveDestination()
+                        }
+                    }
                 #if DESIGN_CATALOG
                     .navigationDestination(isPresented: $isShowingCatalog) {
                         DesignSystemCatalogView()
@@ -34,6 +42,16 @@ struct MainTabView: View {
         }
     }
 
+    private func openWalletAction(_ action: WalletAction) {
+        switch action {
+        case .receive:
+            walletPath.append(.receive)
+        case .send, .move, .swap:
+            // TODO(jalon 4) : Send (C1), Move (E1), Swap (E3).
+            break
+        }
+    }
+
     /// Roue dentée : en attendant les réglages (I2), elle ouvre le catalogue en Debug et Testing,
     /// et n'est pas affichée en Release.
     private var settingsAction: (() -> Void)? {
@@ -42,6 +60,22 @@ struct MainTabView: View {
         #else
         return nil
         #endif
+    }
+}
+
+/// Écrans qu'on peut pousser depuis le Wallet.
+enum WalletRoute: Hashable {
+    case receive
+}
+
+/// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
+private struct ReceiveDestination: View {
+    @State private var model = ReceiveViewModel(dataSource: MockReceiveDataSource())
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ReceiveView(model: model, onBack: { dismiss() })
+            .toolbar(.hidden, for: .navigationBar)
     }
 }
 

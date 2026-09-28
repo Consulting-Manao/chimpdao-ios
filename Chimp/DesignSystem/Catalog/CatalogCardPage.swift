@@ -14,7 +14,7 @@ struct CatalogCardPage: View {
                         color: color,
                         number: "0421",
                         amount: "$62.50",
-                        subtitle: "pocket"
+                        subtitle: "on card"
                     )
                 }
             }

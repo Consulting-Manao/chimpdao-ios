@@ -172,6 +172,11 @@ enum ChimpSize {
     static let cardAspectRatio: CGFloat = 1.58
     /// Côté du QR code (D1), hors carte blanche.
     static let qrCode: CGFloat = 200
+    /// Côté du QR code sur un petit écran (iPhone SE), pour que l'avertissement de Chimpy reste visible
+    /// sans défiler. 150 pt = 4 pt par module sur un écran @2x (code de 37 modules) : net, sans perte de place.
+    static let qrCodeCompact: CGFloat = 150
+    /// En dessous de cette hauteur utile (sous l'en-tête), l'écran est considéré comme petit (iPhone SE : ~570 pt).
+    static let compactContentHeight: CGFloat = 620
     /// Part du côté du QR code couverte par la tête de Chimpy (5 modules sur 25 dans la maquette).
     static let qrBadgeFraction: CGFloat = 0.2
     /// Icône d'un tiroir dans le sélecteur « INTO » (D1).

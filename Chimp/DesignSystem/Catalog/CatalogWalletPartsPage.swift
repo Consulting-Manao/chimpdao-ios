@@ -60,7 +60,7 @@ struct CatalogWalletPartsPage: View {
                 ChimpNoticeBanner(text: "Couldn't refresh. Balances from 10:42.", marker: .error) {
                     ChimpPillButton("Retry") {}
                 }
-                ChimpNoticeBanner(text: "The money is in your Jungle card's wallet, so only that card can sign.", marker: .card(.jungle))
+                ChimpNoticeBanner(text: "It's from Jungle's wallet, so only that card works.", marker: .card(.jungle))
                 ChimpNoticeBanner(text: "Looking is free. Moving money takes a tap.")
             }
         }

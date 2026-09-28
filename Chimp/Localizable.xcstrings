@@ -41,6 +41,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Addresses can't be loaded." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "All text pairs · dark" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -92,6 +96,10 @@
       "extractionState" : "manual"
     },
     "Card sheet" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Card's wallet chosen" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -241,6 +249,11 @@
       "extractionState" : "manual"
     },
     "Into" : {},
+    "Into Main, Testnet badge, tap Copy for the copied state." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "It's from Jungle's wallet, so only that card works." : {},
     "Jungle's PIN" : {},
     "Keypad and PIN" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -287,6 +300,14 @@
     },
     "Main account" : {},
     "Main is the easy pick. Money sent to a card's wallet can only be spent with that exact card." : {},
+    "Main only" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Mainnet" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Minimum for text: 4.5:1 (WCAG AA). Left: mockup. Right: proposed value, now used by the token." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -319,8 +340,16 @@
       "extractionState" : "manual"
     },
     "No PIN needed. Just hold your card." : {},
+    "No Testnet badge, warning says Stellar." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "No card here yet" : {},
     "No cards" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "No choice: no arrow on the picker." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -359,6 +388,10 @@
     },
     "Only this card can spend it" : {},
     "Only your %@ card can spend money sent here. Lose the card, lose the money." : {},
+    "Opens on Jungle's wallet, with the only-this-card notice." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "PIN" : {},
     "PIN length: %lld" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -420,6 +453,10 @@
     },
     "Receive" : {},
     "Receive parts" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Receive states" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -571,7 +608,6 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "The money is in your Jungle card's wallet, so only that card can sign." : {},
     "Theme (light · dark)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -678,7 +714,6 @@
       "extractionState" : "manual"
     },
     "on card" : {},
-    "pocket" : {},
     "this week" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"

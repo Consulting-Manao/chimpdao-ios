@@ -8,6 +8,8 @@ struct WalletView: View {
     let model: WalletViewModel
     /// Roue dentée affichée seulement si une action est fournie.
     var onSettings: (() -> Void)?
+    /// Tuile d'action touchée (Send, Receive…) : la navigation est décidée par la coque (`MainTabView`).
+    var onAction: (WalletAction) -> Void = { _ in }
 
     var body: some View {
         // Le défilement passe sous la barre d'état : l'en-tête comble lui-même la zone sûre du haut,
@@ -87,7 +89,7 @@ struct WalletView: View {
                         systemImage: action.systemImage,
                         isPrimary: action == .send
                     ) {
-                        model.perform(action)
+                        onAction(action)
                     }
                     .disabled(!model.isEnabled(action))
                 }

@@ -89,7 +89,7 @@ private struct CatalogTypographyRow: View {
         case .body, .bodyS: Text("Looking is free. Moving money takes a tap.")
         case .caption: Text("$820 ready · $500 growing")
         case .captionS: Text("12:15 · into Main")
-        case .captionStrong: Text("pocket")
+        case .captionStrong: Text("on card")
         case .labelWide: Text("Step 2 of 3").textCase(.uppercase)
         case .label: Text("Ready to spend").textCase(.uppercase)
         case .labelS: Text(verbatim: "CHIMPY")

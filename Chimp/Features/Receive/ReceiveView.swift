@@ -35,10 +35,14 @@ struct ReceiveView: View {
 
     // MARK: Contenu
 
+    /// Tout défile d'un bloc. Sur un grand écran, le contenu remplit la hauteur et les boutons restent collés
+    /// en bas comme dans la maquette ; sur un petit écran (iPhone SE), l'avertissement de Chimpy passe avant
+    /// les boutons : ce sont eux qu'il faut aller chercher en défilant, jamais l'avertissement.
     private var content: some View {
         let drawer = model.selectedDrawer
         let isLoading = model.phase == .loading
         return GeometryReader { proxy in
+            let isCompact = proxy.size.height < ChimpSize.compactContentHeight
             ScrollView {
                 VStack(spacing: 0) {
                     drawerPicker(drawer)
@@ -52,9 +56,9 @@ struct ReceiveView: View {
                         .padding(.top, ChimpSpacing.sm)
                     }
 
-                    Spacer(minLength: ChimpSpacing.xxxl)
+                    Spacer(minLength: isCompact ? ChimpSpacing.m : ChimpSpacing.xl)
 
-                    qrCode(drawer, isLoading: isLoading)
+                    qrCode(drawer, isLoading: isLoading, side: isCompact ? ChimpSize.qrCodeCompact : ChimpSize.qrCode)
 
                     ChimpAddressPill(address: drawer?.shortAddress ?? "CAAAAAAA…AAAAAA", isCopied: model.isCopied) {
                         model.copyAddress()
@@ -63,25 +67,25 @@ struct ReceiveView: View {
                     .redacted(reason: isLoading ? .placeholder : [])
                     .padding(.top, ChimpSpacing.l)
 
-                    Spacer(minLength: ChimpSpacing.xl)
-
                     if !isLoading {
                         // Le réseau d'abord : c'est l'erreur la plus coûteuse (DESIGN_NOTES §12, décisions).
                         ChimpySays(
                             text: "\(model.networkName) only! Money sent from any other network is lost for good. Some apps and exchanges can't send here yet.",
                             pose: .stand
                         )
+                        .padding(.top, ChimpSpacing.xl)
                     }
+
+                    Spacer(minLength: ChimpSpacing.xl)
+
+                    bottomActions(drawer, isLoading: isLoading)
                 }
                 .padding(.horizontal, ChimpSpacing.xxl)
                 .padding(.top, ChimpSpacing.l)
-                .padding(.bottom, ChimpSpacing.l)
+                .padding(.bottom, screenInsets.hasHomeIndicator ? ChimpSpacing.bottomBar.bottom : ChimpSpacing.xl)
                 .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .top)
             }
             .scrollBounceBehavior(.basedOnSize)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottomBar(drawer, isLoading: isLoading)
         }
     }
 
@@ -95,19 +99,23 @@ struct ReceiveView: View {
         )
     }
 
-    private func qrCode(_ drawer: ReceiveViewModel.DrawerContent?, isLoading: Bool) -> some View {
-        ChimpQRCode(message: isLoading ? nil : drawer?.address)
+    private func qrCode(_ drawer: ReceiveViewModel.DrawerContent?, isLoading: Bool, side: CGFloat) -> some View {
+        ChimpQRCode(message: isLoading ? nil : drawer?.address, side: side)
             .accessibilityLabel(Text("QR code of this address"))
             .overlay(alignment: .top) {
                 if model.showsTestnetBadge && !isLoading {
                     ChimpTagBadge(text: "Testnet", systemImage: "exclamationmark.triangle.fill")
+                        // Taille plafonnée : plus grand, le badge mordrait sur les motifs de repérage du QR
+                        // et le code ne se scannerait plus (vérifié en XXXL). Le réseau reste écrit en entier
+                        // dans la bulle de Chimpy, qui, elle, suit la taille de texte.
+                        .dynamicTypeSize(...DynamicTypeSize.large)
                         .alignmentGuide(.top) { $0.height / 2 }
                 }
             }
             .frame(maxWidth: .infinity)
     }
 
-    private func bottomBar(_ drawer: ReceiveViewModel.DrawerContent?, isLoading: Bool) -> some View {
+    private func bottomActions(_ drawer: ReceiveViewModel.DrawerContent?, isLoading: Bool) -> some View {
         VStack(spacing: 11) {
             ShareLink(item: drawer?.address ?? "") {
                 Text("Share my address")
@@ -119,17 +127,13 @@ struct ReceiveView: View {
                 model.takePaymentInPerson()
             }
         }
-        .padding(.top, ChimpSpacing.bottomBar.top)
-        .padding(.horizontal, ChimpSpacing.bottomBar.leading)
-        .padding(.bottom, screenInsets.hasHomeIndicator ? ChimpSpacing.bottomBar.bottom : ChimpSpacing.xl)
-        .background(Color(.chimpBackground))
     }
 
     // MARK: Feuille de choix du tiroir
 
     private var pickerSheetHeight: CGFloat {
-        // Titre, une ligne par tiroir, bulle de Chimpy (maquette C3 : 3 tiroirs).
-        CGFloat(300 + 80 * model.drawers.count)
+        // Poignée et titre, une ligne par tiroir, bulle de Chimpy (maquette C3 : 3 tiroirs).
+        CGFloat(250 + 76 * model.drawers.count)
     }
 
     private var pickerSheet: some View {

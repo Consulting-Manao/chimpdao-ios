@@ -35,6 +35,7 @@ struct DesignSystemCatalogView: View {
 
                 Section("Screens") {
                     link("Wallet states", systemImage: "wallet.pass.fill") { WalletStatesCatalogPage(settings: settings) }
+                    link("Receive states", systemImage: "qrcode") { ReceiveStatesCatalogPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))
             }

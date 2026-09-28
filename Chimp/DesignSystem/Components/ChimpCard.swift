@@ -86,12 +86,12 @@ private struct ChimpCardPreview: View {
     var body: some View {
         ScrollView {
             VStack(spacing: ChimpSpacing.xl) {
-                ChimpCard(name: "Jungle", color: .jungle, number: "0421", amount: "$62.50", subtitle: "pocket")
+                ChimpCard(name: "Jungle", color: .jungle, number: "0421", amount: "$62.50", subtitle: "on card")
                 HStack(spacing: ChimpSpacing.m) {
                     ChimpCard(name: "Banana", color: .banana, number: "0588", amount: "$12.00")
                     ChimpCard(name: "Leaf", color: .leaf, number: "0913")
                 }
-                ChimpCard(name: "Pinky", color: .pink, number: "0077", amount: "$4.20", subtitle: "pocket")
+                ChimpCard(name: "Pinky", color: .pink, number: "0077", amount: "$4.20", subtitle: "on card")
             }
             .padding(ChimpSpacing.screenMargin)
         }

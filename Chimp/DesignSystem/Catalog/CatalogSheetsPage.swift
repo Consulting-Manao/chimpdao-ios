@@ -55,7 +55,7 @@ struct CatalogSheetsPage: View {
                 cardColor: .jungle,
                 stepLabel: tapStatus == .afterTap ? "Step 1 of 2" : "Last step",
                 what: "Paying Maya $25.00",
-                who: "The money is in your Jungle card's wallet, so only that card can sign.",
+                who: "It's from Jungle's wallet, so only that card works.",
                 pinStatus: tapStatus,
                 isScanning: isScanning,
                 onScan: simulateScan,

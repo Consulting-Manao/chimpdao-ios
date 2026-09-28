@@ -108,10 +108,7 @@ final class WalletViewModel {
     }
 
     // MARK: Actions (écrans des lots suivants du jalon 4)
-
-    func perform(_ action: WalletAction) {
-        // TODO(jalon 4) : ouvrir Send (C1), Receive (D1), Move (E1) ou Swap (E3).
-    }
+    // Les tuiles (Send, Receive, Move, Swap) sont routées par `MainTabView`.
 
     func openMain() {
         // TODO(jalon 4) : ouvrir Main (B2).
