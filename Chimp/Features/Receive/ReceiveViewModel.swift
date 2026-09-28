@@ -25,9 +25,6 @@ final class ReceiveViewModel {
         let address: String
         /// Adresse raccourcie pour la pilule (8 premiers caractères…6 derniers, comme `AddrCopy` du terminal).
         let shortAddress: String
-        /// Nom de la carte si le tiroir est le wallet d'une carte (`nil` pour Main).
-        let cardName: String?
-        let cardColor: ChimpCardColor?
     }
 
     private(set) var phase: Phase = .loading
@@ -71,14 +68,6 @@ final class ReceiveViewModel {
 
     /// Badge « Testnet » : tant qu'on n'est pas sur mainnet, de l'argent réel envoyé ici serait perdu.
     var showsTestnetBadge: Bool { network != .mainnet }
-
-    /// Nom du réseau pour l'avertissement de Chimpy (« Stellar Testnet only! … »). Nom propre, non traduit.
-    var networkName: String {
-        switch network {
-        case .testnet: "Stellar Testnet"
-        case .mainnet: "Stellar"
-        }
-    }
 
     // MARK: Actions
 
@@ -157,9 +146,7 @@ final class ReceiveViewModel {
                 title: String(localized: "Main account"),
                 spendRule: String(localized: "Any of your cards can spend it"),
                 address: address,
-                shortAddress: shortAddress,
-                cardName: nil,
-                cardColor: nil
+                shortAddress: shortAddress
             )
         case let .card(name, color):
             return DrawerContent(
@@ -168,9 +155,7 @@ final class ReceiveViewModel {
                 title: String(localized: "\(name)'s wallet"),
                 spendRule: String(localized: "Only this card can spend it"),
                 address: address,
-                shortAddress: shortAddress,
-                cardName: name,
-                cardColor: color
+                shortAddress: shortAddress
             )
         }
     }

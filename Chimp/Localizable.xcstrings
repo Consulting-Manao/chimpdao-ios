@@ -7,7 +7,6 @@
     },
     "%@ card, number %@" : {},
     "%@ growing" : {},
-    "%@ only! Money sent from any other network is lost for good. Some apps and exchanges can't send here yet." : {},
     "%@ ready" : {},
     "%@ this week" : {},
     "%@'s wallet" : {},
@@ -340,7 +339,7 @@
       "extractionState" : "manual"
     },
     "No PIN needed. Just hold your card." : {},
-    "No Testnet badge, warning says Stellar." : {
+    "No Testnet badge." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -387,8 +386,7 @@
       "extractionState" : "manual"
     },
     "Only this card can spend it" : {},
-    "Only your %@ card can spend money sent here. Lose the card, lose the money." : {},
-    "Opens on Jungle's wallet, with the only-this-card notice." : {
+    "Opens on Jungle's wallet." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },

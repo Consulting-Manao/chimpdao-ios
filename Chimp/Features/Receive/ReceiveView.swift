@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Écran Recevoir (D1) : choix du tiroir, QR code de son adresse, pilule « Copy », avertissement de Chimpy,
-/// partage de l'adresse. Uniquement des composants du design system. Recevoir ne demande jamais la carte.
+/// Écran Recevoir (D1) : choix du tiroir, QR code de son adresse, pilule « Copy », partage de l'adresse.
+/// Uniquement des composants du design system. Recevoir ne demande jamais la carte.
 ///
-/// États : chargement, erreur réseau (« Try again »), Main, wallet d'une carte (bandeau « seule cette carte… »),
-/// un seul tiroir (pas de choix), adresse copiée (« Copied! », retour haptique, annonce VoiceOver).
+/// États : chargement, erreur réseau (« Try again »), Main, wallet d'une carte, un seul tiroir (pas de choix),
+/// adresse copiée (« Copied! », retour haptique, annonce VoiceOver).
+/// Bulle d'avertissement et bandeau « seule cette carte… » retirés à la demande de Barth (DESIGN_NOTES §12, décisions).
 struct ReceiveView: View {
     @Bindable var model: ReceiveViewModel
     /// Bouton retour affiché seulement si une action est fournie.
@@ -35,30 +36,20 @@ struct ReceiveView: View {
 
     // MARK: Contenu
 
-    /// Tout défile d'un bloc. Sur un grand écran, le contenu remplit la hauteur et les boutons restent collés
-    /// en bas comme dans la maquette ; sur un petit écran (iPhone SE), l'avertissement de Chimpy passe avant
-    /// les boutons : ce sont eux qu'il faut aller chercher en défilant, jamais l'avertissement.
+    /// Comme dans la maquette : le QR et la pilule au centre de l'espace libre, les boutons en bas.
+    /// Si la place manque (grandes tailles de texte), tout défile d'un bloc.
     private var content: some View {
         let drawer = model.selectedDrawer
         let isLoading = model.phase == .loading
         return GeometryReader { proxy in
-            let isCompact = proxy.size.height < ChimpSize.compactContentHeight
             ScrollView {
                 VStack(spacing: 0) {
                     drawerPicker(drawer)
                         .redacted(reason: isLoading ? .placeholder : [])
 
-                    if let name = drawer?.cardName, let color = drawer?.cardColor, !isLoading {
-                        ChimpNoticeBanner(
-                            text: "Only your \(name) card can spend money sent here. Lose the card, lose the money.",
-                            marker: .card(color)
-                        )
-                        .padding(.top, ChimpSpacing.sm)
-                    }
+                    Spacer(minLength: ChimpSpacing.xl)
 
-                    Spacer(minLength: isCompact ? ChimpSpacing.m : ChimpSpacing.xl)
-
-                    qrCode(drawer, isLoading: isLoading, side: isCompact ? ChimpSize.qrCodeCompact : ChimpSize.qrCode)
+                    qrCode(drawer, isLoading: isLoading)
 
                     ChimpAddressPill(address: drawer?.shortAddress ?? "CAAAAAAA…AAAAAA", isCopied: model.isCopied) {
                         model.copyAddress()
@@ -66,15 +57,6 @@ struct ReceiveView: View {
                     .disabled(isLoading)
                     .redacted(reason: isLoading ? .placeholder : [])
                     .padding(.top, ChimpSpacing.l)
-
-                    if !isLoading {
-                        // Le réseau d'abord : c'est l'erreur la plus coûteuse (DESIGN_NOTES §12, décisions).
-                        ChimpySays(
-                            text: "\(model.networkName) only! Money sent from any other network is lost for good. Some apps and exchanges can't send here yet.",
-                            pose: .stand
-                        )
-                        .padding(.top, ChimpSpacing.xl)
-                    }
 
                     Spacer(minLength: ChimpSpacing.xl)
 
@@ -99,17 +81,18 @@ struct ReceiveView: View {
         )
     }
 
-    private func qrCode(_ drawer: ReceiveViewModel.DrawerContent?, isLoading: Bool, side: CGFloat) -> some View {
-        ChimpQRCode(message: isLoading ? nil : drawer?.address, side: side)
+    private func qrCode(_ drawer: ReceiveViewModel.DrawerContent?, isLoading: Bool) -> some View {
+        ChimpQRCode(message: isLoading ? nil : drawer?.address)
             .accessibilityLabel(Text("QR code of this address"))
             .overlay(alignment: .top) {
                 if model.showsTestnetBadge && !isLoading {
                     ChimpTagBadge(text: "Testnet", systemImage: "exclamationmark.triangle.fill")
                         // Taille plafonnée : plus grand, le badge mordrait sur les motifs de repérage du QR
-                        // et le code ne se scannerait plus (vérifié en XXXL). Le réseau reste écrit en entier
-                        // dans la bulle de Chimpy, qui, elle, suit la taille de texte.
+                        // et le code ne se scannerait plus (vérifié en XXXL).
                         .dynamicTypeSize(...DynamicTypeSize.large)
-                        .alignmentGuide(.top) { $0.height / 2 }
+                        // À cheval sur le bord haut de la carte : décalé de la moitié de sa hauteur (≈ 28 pt).
+                        // Un décalage ne bouge rien d'autre dans la mise en page (pas de saut sans badge).
+                        .offset(y: -ChimpSpacing.ml)
                 }
             }
             .frame(maxWidth: .infinity)

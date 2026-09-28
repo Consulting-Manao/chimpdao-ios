@@ -58,9 +58,9 @@ private enum ReceiveStateDemo: String, CaseIterable, Identifiable {
     var detail: LocalizedStringKey {
         switch self {
         case .standard: "Into Main, Testnet badge, tap Copy for the copied state."
-        case .cardSelected: "Opens on Jungle's wallet, with the only-this-card notice."
+        case .cardSelected: "Opens on Jungle's wallet."
         case .mainOnly: "No choice: no arrow on the picker."
-        case .mainnet: "No Testnet badge, warning says Stellar."
+        case .mainnet: "No Testnet badge."
         case .loading: "Skeleton that never finishes."
         case .networkError: "Addresses can't be loaded."
         }
