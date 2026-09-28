@@ -7,8 +7,10 @@
     },
     "%@ card, number %@" : {},
     "%@ growing" : {},
+    "%@ only! Money sent from any other network is lost for good. Some apps and exchanges can't send here yet." : {},
     "%@ ready" : {},
     "%@ this week" : {},
+    "%@'s wallet" : {},
     "%lld of %lld digits entered" : {},
     "+ Add" : {},
     "+$6.20 this week" : {},
@@ -47,10 +49,8 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Any of your cards can spend it" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
+    "Any of your cards can spend it" : {},
+    "Anyone can pay you" : {},
     "Appearance" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -240,10 +240,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Into" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
+    "Into" : {},
     "Jungle's PIN" : {},
     "Keypad and PIN" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -288,10 +285,8 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Main account" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
+    "Main account" : {},
+    "Main is the easy pick. Money sent to a card's wallet can only be spent with that exact card." : {},
     "Minimum for text: 4.5:1 (WCAG AA). Left: mockup. Right: proposed value, now used by the token." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -362,10 +357,8 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Only this card can spend it" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
+    "Only this card can spend it" : {},
+    "Only your %@ card can spend money sent here. Lose the card, lose the money." : {},
     "PIN" : {},
     "PIN length: %lld" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -415,6 +408,7 @@
       "extractionState" : "manual"
     },
     "QR code" : {},
+    "QR code of this address" : {},
     "QR code unavailable" : {},
     "Radii" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -478,6 +472,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Share my address" : {},
     "Sheets" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -546,10 +541,7 @@
       "extractionState" : "manual"
     },
     "Tab bar" : {},
-    "Take a payment in person" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
+    "Take a payment in person" : {},
     "Tap a tab. Each tab is at least 44 pt tall." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -558,10 +550,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Testnet" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
+    "Testnet" : {},
     "Text size" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -587,10 +576,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "They tap their Chimp card on your phone" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
+    "They tap their Chimp card on your phone" : {},
     "This card is blocked." : {},
     "Tiled every 420 pt, opacity 0.14, on chimpHeader" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -626,6 +612,7 @@
       "extractionState" : "manual"
     },
     "Where do I get a real one?" : {},
+    "Where should it land?" : {},
     "Without amount (A5, G1b)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"

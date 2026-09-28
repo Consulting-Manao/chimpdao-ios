@@ -92,8 +92,8 @@ struct ChimpDrawerPicker: View {
 struct ChimpDrawerOptionRow: View {
     let icon: ChimpDrawerIcon
     let title: String
-    /// Solde (C3) ou explication (D1). Masqué si `nil`.
-    var subtitle: LocalizedStringKey?
+    /// Solde (C3) ou règle de dépense (D1), déjà formaté. Masqué si `nil`.
+    var subtitle: String?
     let isSelected: Bool
     let action: () -> Void
 
@@ -111,7 +111,7 @@ struct ChimpDrawerOptionRow: View {
                     Text(verbatim: title)
                         .chimpFont(.optionTitle)
                     if let subtitle {
-                        Text(subtitle)
+                        Text(verbatim: subtitle)
                             .chimpFont(.captionS)
                             .foregroundStyle(isSelected ? Color(.chimpOnAccent) : Color(.chimpTextSecondary))
                     }
