@@ -28,6 +28,12 @@ struct DesignSystemCatalogView: View {
                     link("Keypad and PIN", systemImage: "circle.grid.3x3.fill") { CatalogPinPage(settings: settings) }
                     link("Chimpy and motion", systemImage: "bubble.left.fill") { CatalogChimpyPage(settings: settings) }
                     link("Sheets", systemImage: "rectangle.bottomhalf.inset.filled") { CatalogSheetsPage(settings: settings) }
+                    link("Wallet parts", systemImage: "square.grid.2x2.fill") { CatalogWalletPartsPage(settings: settings) }
+                }
+                .listRowBackground(Color(.chimpSurface))
+
+                Section("Screens") {
+                    link("Wallet states", systemImage: "wallet.pass.fill") { WalletStatesCatalogPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))
             }

@@ -21,6 +21,7 @@ enum ChimpTab: String, CaseIterable, Identifiable {
 /// onglet actif en pilule jaune. À placer tout en bas de l'écran : son fond passe sous la barre d'accueil.
 struct ChimpTabBar: View {
     @Binding var selection: ChimpTab
+    @Environment(\.chimpScreenInsets) private var screenInsets
 
     var body: some View {
         HStack(spacing: ChimpSpacing.sm) {
@@ -30,7 +31,7 @@ struct ChimpTabBar: View {
                 }
             }
         }
-        .padding(ChimpSpacing.tabBar)
+        .padding(ChimpSpacing.tabBar(for: screenInsets))
         .frame(maxWidth: .infinity)
         .background {
             Color(.chimpHeader)

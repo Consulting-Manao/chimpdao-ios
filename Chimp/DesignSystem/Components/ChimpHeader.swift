@@ -15,6 +15,8 @@ struct ChimpHeader: View {
     /// Bouton réglages (roue dentée) affiché seulement si une action est fournie.
     var onSettings: (() -> Void)?
 
+    @Environment(\.chimpScreenInsets) private var screenInsets
+
     private var hasSteps: Bool { step > 0 && steps > 0 }
 
     var body: some View {
@@ -49,12 +51,7 @@ struct ChimpHeader: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let onSettings {
-                    ChimpHeaderRoundButton(size: ChimpSize.headerGearButton, action: onSettings) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 22, weight: .heavy))
-                            .foregroundStyle(.chimpOnHeaderPrimary)
-                    }
-                    .accessibilityLabel(Text("Settings"))
+                    ChimpHeaderSettingsButton(action: onSettings)
                 }
             }
 
@@ -71,7 +68,7 @@ struct ChimpHeader: View {
                 .accessibilityHidden(true)
             }
         }
-        .padding(ChimpSpacing.header)
+        .padding(ChimpSpacing.header(for: screenInsets))
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             Color(.chimpHeader)
@@ -81,8 +78,22 @@ struct ChimpHeader: View {
     }
 }
 
+/// Bouton réglages (roue dentée) de l'en-tête : rond de 42 pt, zone tactile de 44 pt.
+struct ChimpHeaderSettingsButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        ChimpHeaderRoundButton(size: ChimpSize.headerGearButton, action: action) {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 22, weight: .heavy))
+                .foregroundStyle(.chimpOnHeaderPrimary)
+        }
+        .accessibilityLabel(Text("Settings"))
+    }
+}
+
 /// Bouton rond de l'en-tête (retour, réglages) : visuel de 40–42 pt, zone tactile de 44 pt.
-private struct ChimpHeaderRoundButton<Content: View>: View {
+struct ChimpHeaderRoundButton<Content: View>: View {
     let size: CGFloat
     let action: () -> Void
     @ViewBuilder let content: Content

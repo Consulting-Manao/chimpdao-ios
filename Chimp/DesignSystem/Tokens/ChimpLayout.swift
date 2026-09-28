@@ -32,11 +32,29 @@ enum ChimpSpacing {
     /// L'en-tête et la barre d'onglets empiètent de 4 pt sur les zones sûres :
     /// dans la maquette, le contenu de l'en-tête commence à 58 pt du haut (barre d'état : 62 pt)
     /// et celui de la barre d'onglets s'arrête à 30 pt du bas (barre d'accueil : 34 pt).
+    /// Seulement sur les iPhone à encoche ou Dynamic Island : sur l'iPhone SE, la barre d'état
+    /// occupe toute sa zone sûre et il n'y a pas de barre d'accueil.
     static let chromeSafeAreaOverlap: CGFloat = 4
-    /// Marges de l'en-tête (Chimp Top), en haut sous la zone sûre.
-    static let header = EdgeInsets(top: -chromeSafeAreaOverlap, leading: 20, bottom: 18, trailing: 20)
-    /// Marges de la barre d'onglets (Chimp Nav), en bas au-dessus de la zone sûre.
-    static let tabBar = EdgeInsets(top: 10, leading: 16, bottom: -chromeSafeAreaOverlap, trailing: 16)
+    /// Sans barre d'état haute (iPhone SE) : écart entre la barre d'état et le contenu de l'en-tête,
+    /// repris de la maquette (texte de la barre d'état jusqu'à 43 pt, contenu à 58 pt).
+    static let statusBarGap: CGFloat = 15
+    /// Sans barre d'accueil (iPhone SE) : marge sous les onglets.
+    static let tabBarBottomWithoutHomeIndicator: CGFloat = 16
+
+    /// Marges de l'en-tête (Chimp Top), mesurées depuis le bas de la zone sûre du haut.
+    static func header(for screen: EdgeInsets, bottom: CGFloat = 18) -> EdgeInsets {
+        EdgeInsets(top: screen.hasTallStatusBar ? -chromeSafeAreaOverlap : statusBarGap, leading: 20, bottom: bottom, trailing: 20)
+    }
+
+    /// Marges de la barre d'onglets (Chimp Nav), mesurées depuis le haut de la zone sûre du bas.
+    static func tabBar(for screen: EdgeInsets) -> EdgeInsets {
+        EdgeInsets(
+            top: 10,
+            leading: 16,
+            bottom: screen.hasHomeIndicator ? -chromeSafeAreaOverlap : tabBarBottomWithoutHomeIndicator,
+            trailing: 16
+        )
+    }
 }
 
 /// Rayons des coins (points).
@@ -53,6 +71,8 @@ enum ChimpRadius {
     static let control: CGFloat = 18
     /// Composant Chimp Card.
     static let chimpCard: CGFloat = 20
+    /// Icône carrée d'une carte « tiroir » (Main).
+    static let drawerIcon: CGFloat = 15
     /// Grandes cartes (carte Main du Wallet, carte de revue).
     static let panel: CGFloat = 22
     /// Haut des feuilles (bottom sheets).
@@ -127,6 +147,14 @@ enum ChimpSize {
     static let cardThumbnailLogo: CGFloat = 40
     /// Pastille de couleur du bandeau « qui peut signer », contour compris (14 + 2 × 2).
     static let signerSwatch: CGFloat = 18
+    /// Icône carrée d'une carte « tiroir », contour compris (48 + 3 × 2).
+    static let drawerIcon: CGFloat = 54
+    /// Logo dans l'icône d'une carte « tiroir ».
+    static let drawerIconLogo: CGFloat = 32
+    /// Symbole d'une tuile d'action (Send, Receive…).
+    static let actionTileGlyph: CGFloat = 21
+    /// Avatar de l'en-tête du Wallet (tête de Chimpy).
+    static let headerAvatar: CGFloat = 40
     /// Hauteur maximale de Chimpy dans sa bulle.
     static let chimpyThumbnailMaxHeight: CGFloat = 80
     /// Poignée des feuilles.

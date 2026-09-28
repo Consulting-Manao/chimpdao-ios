@@ -57,11 +57,13 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case celebration   // Swoosh!, Planted!, easter eggs (60–68)
     case displayXL     // solde du Wallet
     case amountL       // solde de Main, montant saisi
+    case amountM       // montant d'une carte « tiroir » (Main, B1)
     case displayL      // titres des écrans pleins
     case sheetTitle    // titre d'une feuille
     case key           // touches du pavé numérique
     case displayM      // titre de l'en-tête
     case amountS       // montant sur une carte
+    case greeting      // accroche de l'en-tête du Wallet (« Hey Léo »)
     case displayS      // titres de section
     case buttonLarge   // bouton principal des écrans d'accueil (« Let's start », « Next »)
     case button        // bouton principal
@@ -69,6 +71,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case tab           // onglets
     case link          // liens texte (« Cancel », « Skip »)
     case buttonSmall   // petits boutons
+    case pill          // pilule « + Add »
     case cardName      // nom sur une Chimp Card
     case tile          // libellés des tuiles d'action
     // Nunito
@@ -91,8 +94,8 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
 
     var family: ChimpFontFamily {
         switch self {
-        case .celebration, .displayXL, .amountL, .displayL, .sheetTitle, .key, .displayM,
-             .amountS, .displayS, .buttonLarge, .button, .buttonSecondary, .tab, .link, .buttonSmall,
+        case .celebration, .displayXL, .amountL, .amountM, .displayL, .sheetTitle, .key, .displayM,
+             .amountS, .greeting, .displayS, .pill, .buttonLarge, .button, .buttonSecondary, .tab, .link, .buttonSmall,
              .cardName, .tile:
             .luckiestGuy
         case .bodyL, .captionS: .nunito(weight: 700)
@@ -111,14 +114,17 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .amountL: 44
         case .displayL: 32
         case .sheetTitle: 27
+        case .amountM: 26
         case .key: 24
         case .displayM: 23
         case .amountS: 21
+        case .greeting: 20
         case .displayS, .buttonLarge: 18
         case .button: 17
         case .cardName: 16
         case .tab, .link, .buttonSecondary: 15
         case .buttonSmall: 14
+        case .pill: 13
         case .tile: 12
         case .bodyL: 16
         case .rowTitle, .body: 15
@@ -137,13 +143,13 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         switch self {
         case .celebration, .displayXL, .amountL: .largeTitle
         case .displayL: .title1
-        case .sheetTitle, .key, .displayM: .title2
-        case .amountS: .title3
+        case .sheetTitle, .key, .displayM, .amountM: .title2
+        case .amountS, .greeting: .title3
         case .displayS, .buttonLarge, .button: .headline
         case .cardName: .callout
         case .bodyL: .callout
         case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .bodyS, .monoValue: .subheadline
-        case .caption: .footnote
+        case .caption, .pill: .footnote
         case .tile, .captionS, .captionStrong, .mono: .caption1
         case .labelWide, .label, .labelS, .cardNumber: .caption2
         }

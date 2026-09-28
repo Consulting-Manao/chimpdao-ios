@@ -70,22 +70,8 @@ struct CardTapSheet: View {
                 .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.control), fill: Color(.chimpSurface))
 
             if let who {
-                HStack(spacing: ChimpSpacing.sm) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(cardColor.fill)
-                        .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.thin) }
-                        .frame(width: ChimpSize.signerSwatch, height: ChimpSize.signerSwatch)
-                        .accessibilityHidden(true)
-                    Text(who)
-                        .chimpFont(.caption)
-                        .lineSpacing(2)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.vertical, ChimpSpacing.sm + ChimpBorder.regular)
-                .padding(.horizontal, 13 + ChimpBorder.regular)
-                .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.key), fill: Color(.chimpSurfaceSecondary))
-                .padding(.top, ChimpSpacing.sm)
+                ChimpNoticeBanner(text: who, marker: .card(cardColor))
+                    .padding(.top, ChimpSpacing.sm)
             }
 
             pinLine

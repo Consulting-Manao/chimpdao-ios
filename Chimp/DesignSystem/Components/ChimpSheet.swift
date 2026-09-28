@@ -6,6 +6,8 @@ extension View {
     ///
     /// - `isDismissDisabled` : empêche la fermeture par glissement (ex. : pendant l'envoi d'une transaction).
     /// - Aux tailles de texte d'accessibilité, la feuille prend toute la hauteur et son contenu défile.
+    /// - Si `height` dépasse l'écran (feuille de scan de 660 pt sur iPhone SE), iOS la ramène
+    ///   à la hauteur maximale et son contenu défile (vérifié sur SE le 2026-09-28).
     func chimpSheet<Content: View>(
         isPresented: Binding<Bool>,
         height: CGFloat = ChimpSize.sheetHeight,
@@ -28,6 +30,7 @@ struct ChimpSheetContainer<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.chimpScreenInsets) private var screenInsets
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,7 +45,8 @@ struct ChimpSheetContainer<Content: View>: View {
                 ScrollView {
                     content()
                         // Dans la maquette, 42 pt sous le contenu incluent la barre d'accueil (34 pt).
-                        .padding(.bottom, ChimpSpacing.bottomBar.bottom)
+                        // Sans barre d'accueil (iPhone SE) : 20 pt, pour ne pas coller au bord de l'écran.
+                        .padding(.bottom, screenInsets.hasHomeIndicator ? ChimpSpacing.bottomBar.bottom : ChimpSpacing.xl)
                         .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .top)
                 }
                 .scrollBounceBehavior(.basedOnSize)

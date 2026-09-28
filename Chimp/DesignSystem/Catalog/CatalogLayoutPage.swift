@@ -85,7 +85,7 @@ struct CatalogLayoutPage: View {
                             .frame(height: 72)
                             .cartoonSurface(Capsule(), fill: Color(.chimpSurface))
                         Text(verbatim: "Capsule()").chimpFont(.captionS)
-                        Text("pill").chimpFont(.mono).foregroundStyle(.chimpTextSecondary)
+                        Text(verbatim: "pill").chimpFont(.mono).foregroundStyle(.chimpTextSecondary)
                     }
                     .accessibilityElement(children: .combine)
                 }
