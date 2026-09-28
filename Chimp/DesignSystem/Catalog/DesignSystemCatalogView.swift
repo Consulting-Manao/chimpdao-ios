@@ -30,12 +30,14 @@ struct DesignSystemCatalogView: View {
                     link("Sheets", systemImage: "rectangle.bottomhalf.inset.filled") { CatalogSheetsPage(settings: settings) }
                     link("Wallet parts", systemImage: "square.grid.2x2.fill") { CatalogWalletPartsPage(settings: settings) }
                     link("Receive parts", systemImage: "qrcode") { CatalogReceivePartsPage(settings: settings) }
+                    link("Send parts", systemImage: "paperplane.fill") { CatalogSendPartsPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))
 
                 Section("Screens") {
                     link("Wallet states", systemImage: "wallet.pass.fill") { WalletStatesCatalogPage(settings: settings) }
                     link("Receive states", systemImage: "qrcode") { ReceiveStatesCatalogPage(settings: settings) }
+                    link("Send", systemImage: "paperplane.fill") { SendCatalogPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))
             }

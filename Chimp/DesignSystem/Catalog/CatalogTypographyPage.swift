@@ -64,6 +64,7 @@ private struct CatalogTypographyRow: View {
     private var sample: some View {
         switch style {
         case .celebration: Text("Swoosh!")
+        case .amountEntry: Text(verbatim: "25")
         case .displayXL: Text(verbatim: "$1,284.50")
         case .amountL: Text(verbatim: "$820.00")
         case .amountM: Text(verbatim: "$1,320.00")

@@ -55,6 +55,7 @@ enum ChimpFontFamily: Equatable {
 enum ChimpTextStyle: String, CaseIterable, Identifiable {
     // Luckiest Guy
     case celebration   // Swoosh!, Planted!, easter eggs (60–68)
+    case amountEntry   // montant en cours de saisie (C2)
     case displayXL     // solde du Wallet
     case amountL       // solde de Main, montant saisi
     case amountM       // montant d'une carte « tiroir » (Main, B1)
@@ -96,7 +97,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
 
     var family: ChimpFontFamily {
         switch self {
-        case .celebration, .displayXL, .amountL, .amountM, .displayL, .sheetTitle, .key, .displayM,
+        case .celebration, .amountEntry, .displayXL, .amountL, .amountM, .displayL, .sheetTitle, .key, .displayM,
              .amountS, .greeting, .displayS, .pill, .buttonLarge, .button, .buttonSecondary, .tab, .link, .buttonSmall,
              .cardName, .tile:
             .luckiestGuy
@@ -111,7 +112,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     /// Taille de la maquette, en points.
     var size: CGFloat {
         switch self {
-        case .celebration: 64
+        case .celebration, .amountEntry: 64
         case .displayXL: 50
         case .amountL: 44
         case .displayL: 32
@@ -143,7 +144,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     /// Style système dont on suit la courbe de grossissement.
     var relativeTo: UIFont.TextStyle {
         switch self {
-        case .celebration, .displayXL, .amountL: .largeTitle
+        case .celebration, .amountEntry, .displayXL, .amountL: .largeTitle
         case .displayL: .title1
         case .sheetTitle, .key, .displayM, .amountM: .title2
         case .amountS, .greeting: .title3

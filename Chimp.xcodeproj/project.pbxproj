@@ -11,16 +11,32 @@
 		27D11A3F2EEB4B2300A495AC /* stellarsdk in Frameworks */ = {isa = PBXBuildFile; productRef = 27D11A3E2EEB4B2300A495AC /* stellarsdk */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		2C7E5A062F20000000000006 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 276DCDF12EEB0063009A1DA5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 276DCDF82EEB0063009A1DA5;
+			remoteInfo = ChimpDAO;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		276DCDF92EEB0063009A1DA5 /* ChimpDAO.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChimpDAO.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		276DCE0D2EEB0593009A1DA5 /* CoreNFC.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreNFC.framework; path = System/Library/Frameworks/CoreNFC.framework; sourceTree = SDKROOT; };
 		276DCE0F2EEB0600009A1DA5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		2C7E5A002F20000000000000 /* ChimpTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ChimpTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		276DCDFB2EEB0063009A1DA5 /* Chimp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Chimp;
+			sourceTree = "<group>";
+		};
+		2C7E5A012F20000000000001 /* ChimpTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ChimpTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -35,6 +51,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		2C7E5A042F20000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -42,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				276DCDFB2EEB0063009A1DA5 /* Chimp */,
+				2C7E5A012F20000000000001 /* ChimpTests */,
 				276DCE0C2EEB0592009A1DA5 /* Frameworks */,
 				276DCDFA2EEB0063009A1DA5 /* Products */,
 				276DCE0F2EEB0600009A1DA5 /* Info.plist */,
@@ -52,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				276DCDF92EEB0063009A1DA5 /* ChimpDAO.app */,
+				2C7E5A002F20000000000000 /* ChimpTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -90,6 +115,29 @@
 			productReference = 276DCDF92EEB0063009A1DA5 /* ChimpDAO.app */;
 			productType = "com.apple.product-type.application";
 		};
+		2C7E5A022F20000000000002 /* ChimpTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2C7E5A0B2F2000000000000B /* Build configuration list for PBXNativeTarget "ChimpTests" */;
+			buildPhases = (
+				2C7E5A032F20000000000003 /* Sources */,
+				2C7E5A042F20000000000004 /* Frameworks */,
+				2C7E5A052F20000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2C7E5A072F20000000000007 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				2C7E5A012F20000000000001 /* ChimpTests */,
+			);
+			name = ChimpTests;
+			packageProductDependencies = (
+			);
+			productName = ChimpTests;
+			productReference = 2C7E5A002F20000000000000 /* ChimpTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -102,6 +150,10 @@
 				TargetAttributes = {
 					276DCDF82EEB0063009A1DA5 = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					2C7E5A022F20000000000002 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 276DCDF82EEB0063009A1DA5;
 					};
 				};
 			};
@@ -123,12 +175,20 @@
 			projectRoot = "";
 			targets = (
 				276DCDF82EEB0063009A1DA5 /* ChimpDAO */,
+				2C7E5A022F20000000000002 /* ChimpTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		276DCDF72EEB0063009A1DA5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2C7E5A052F20000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -145,7 +205,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		2C7E5A032F20000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2C7E5A072F20000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 276DCDF82EEB0063009A1DA5 /* ChimpDAO */;
+			targetProxy = 2C7E5A062F20000000000006 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		275B8EE82F112521000C039C /* Testing */ = {
@@ -456,6 +531,78 @@
 			};
 			name = Release;
 		};
+		2C7E5A082F20000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PNT7K5H3H3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.consulting-manao.chimp.unittests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChimpDAO.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ChimpDAO";
+			};
+			name = Debug;
+		};
+		2C7E5A092F20000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PNT7K5H3H3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.consulting-manao.chimp.unittests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChimpDAO.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ChimpDAO";
+			};
+			name = Release;
+		};
+		2C7E5A0A2F2000000000000A /* Testing */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PNT7K5H3H3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.consulting-manao.chimp.unittests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChimpDAO.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ChimpDAO";
+			};
+			name = Testing;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -475,6 +622,16 @@
 				276DCE052EEB0065009A1DA5 /* Debug */,
 				276DCE062EEB0065009A1DA5 /* Release */,
 				275B8EE92F112521000C039C /* Testing */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2C7E5A0B2F2000000000000B /* Build configuration list for PBXNativeTarget "ChimpTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2C7E5A082F20000000000008 /* Debug */,
+				2C7E5A092F20000000000009 /* Release */,
+				2C7E5A0A2F2000000000000A /* Testing */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

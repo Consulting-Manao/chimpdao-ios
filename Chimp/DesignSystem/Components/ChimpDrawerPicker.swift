@@ -33,21 +33,27 @@ struct ChimpDrawerIconView: View {
     }
 }
 
-/// Sélecteur de tiroir en haut d'un écran (« INTO Main account ▾ », D1) : fond `chimpSurfaceSecondary`,
-/// contour 3, rayon 16. Sans action (un seul tiroir possible), la flèche disparaît et la ligne n'est plus un bouton.
+/// Sélecteur de tiroir en haut d'un écran (« INTO Main account ▾ », D1 ; « FROM Main account $820 → $770 ▾ », C2) :
+/// fond `chimpSurfaceSecondary`, contour 3, rayon 16. Sans action (un seul tiroir possible), la flèche disparaît
+/// et la ligne n'est plus un bouton. Si le solde ne tient pas sur la ligne, il passe dessous.
 struct ChimpDrawerPicker: View {
-    /// Libellé court en majuscules (« Into »).
+    /// Libellé court en majuscules (« Into », « From »).
     let label: LocalizedStringKey
     let icon: ChimpDrawerIcon
     /// Nom du tiroir (« Main account », « Jungle's wallet »).
     let title: String
+    /// Solde actuel, déjà formaté (C2). Masqué si `nil`.
+    var balance: String?
+    /// Solde après l'opération, déjà formaté, affiché après une flèche (« → 695 USDC »).
+    var balanceAfter: String?
+    var accessibilityHint: LocalizedStringKey = "Choose where the money lands"
     var action: (() -> Void)?
 
     var body: some View {
         if let action {
             Button(action: action) { row(showsChevron: true) }
                 .buttonStyle(ChimpPressableStyle())
-                .accessibilityHint(Text("Choose where the money lands"))
+                .accessibilityHint(Text(accessibilityHint))
         } else {
             row(showsChevron: false)
         }
@@ -67,10 +73,20 @@ struct ChimpDrawerPicker: View {
                 border: ChimpBorder.thin,
                 cornerRadius: 4
             )
-            Text(verbatim: title)
-                .chimpFont(.rowTitle)
-                .foregroundStyle(.chimpTextPrimary)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: ChimpSpacing.sm) {
+                    titleText
+                        .fixedSize()
+                    Spacer(minLength: 0)
+                    balanceText
+                        .fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    titleText
+                    balanceText
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if showsChevron {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 13, weight: .black))
@@ -85,10 +101,36 @@ struct ChimpDrawerPicker: View {
         .contentShape(RoundedRectangle(cornerRadius: ChimpRadius.key))
         .accessibilityElement(children: .combine)
     }
+
+    private var titleText: some View {
+        Text(verbatim: title)
+            .chimpFont(.rowTitle)
+            .foregroundStyle(.chimpTextPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var balanceText: some View {
+        if let balance {
+            HStack(spacing: ChimpSpacing.xxs) {
+                Text(verbatim: balance)
+                    .foregroundStyle(.chimpTextSecondary)
+                if let balanceAfter {
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundStyle(.chimpTextSecondary)
+                        .accessibilityLabel(Text("then"))
+                    Text(verbatim: balanceAfter)
+                        .foregroundStyle(.chimpTextPrimary)
+                }
+            }
+            .chimpFont(.caption)
+        }
+    }
 }
 
 /// Ligne de choix d'un tiroir dans une feuille (C3 « Where should it come from? », D1) :
-/// icône, nom, sous-titre, bouton radio. La ligne choisie est jaune, avec une ombre.
+/// icône du tiroir, nom, sous-titre, bouton radio.
 struct ChimpDrawerOptionRow: View {
     let icon: ChimpDrawerIcon
     let title: String
@@ -98,15 +140,32 @@ struct ChimpDrawerOptionRow: View {
     let action: () -> Void
 
     var body: some View {
+        ChimpOptionRow(title: title, subtitle: subtitle, isSelected: isSelected, action: action) {
+            ChimpDrawerIconView(
+                icon: icon,
+                size: icon == .main
+                    ? CGSize(width: ChimpSize.drawerOptionIcon.width, height: ChimpSize.drawerOptionIcon.width)
+                    : ChimpSize.drawerOptionIcon
+            )
+        }
+    }
+}
+
+/// Ligne de choix dans une feuille (tiroir, actif…) : icône, titre, sous-titre, bouton radio.
+/// La ligne choisie est jaune, avec une ombre.
+struct ChimpOptionRow<Icon: View>: View {
+    let title: String
+    /// Sous-titre déjà formaté. Masqué si `nil`.
+    var subtitle: String?
+    let isSelected: Bool
+    let action: () -> Void
+    @ViewBuilder let icon: Icon
+
+    var body: some View {
         let shape = RoundedRectangle(cornerRadius: ChimpRadius.control)
         Button(action: action) {
             HStack(spacing: ChimpSpacing.m) {
-                ChimpDrawerIconView(
-                    icon: icon,
-                    size: icon == .main
-                        ? CGSize(width: ChimpSize.drawerOptionIcon.width, height: ChimpSize.drawerOptionIcon.width)
-                        : ChimpSize.drawerOptionIcon
-                )
+                icon
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: title)
                         .chimpFont(.optionTitle)

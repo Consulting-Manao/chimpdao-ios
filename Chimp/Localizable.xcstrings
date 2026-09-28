@@ -7,6 +7,7 @@
     },
     "%@ card, number %@" : {},
     "%@ growing" : {},
+    "%@ in %@" : {},
     "%@ ready" : {},
     "%@ this week" : {},
     "%@'s wallet" : {},
@@ -35,6 +36,7 @@
       "extractionState" : "manual"
     },
     "Activity" : {},
+    "Address" : {},
     "Address copied" : {},
     "Address pill" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -44,11 +46,26 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Addresses to paste" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "All text pairs · dark" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "All text pairs · light" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Also used by the Send tile of the Wallet." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Amount" : {},
+    "Amount (shown)" : {},
+    "Amount (value sent)" : {},
+    "Amount, asset, quick amounts" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -69,6 +86,18 @@
       "extractionState" : "manual"
     },
     "Balance header" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Balances and recents" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Balances can't be loaded (Try again on C2)." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Balances never arrive." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -110,6 +139,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Check it over" : {},
     "Chimpy" : {},
     "Chimpy and motion" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -119,7 +149,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Choose what to send" : {},
+    "Choose where the money comes from" : {},
     "Choose where the money lands" : {},
+    "Clear address" : {},
     "Close" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -157,6 +190,10 @@
     "Copy address" : {},
     "Couldn't refresh. Balances from %@." : {},
     "Couldn't refresh. Balances from 10:42." : {},
+    "Cut short" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "DUOX · no PIN" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -187,6 +224,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Disabled: more than the balance." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Disconnect this phone" : {},
     "Drawer card" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -200,11 +241,29 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Empty balances" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Everything at zero: Max and quick amounts are disabled." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Exchanges often ask for one. Numbers only." : {},
+    "Federation" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "First load fails." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "Fixed" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "From" : {},
+    "From picker with balance" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -225,6 +284,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Here's what happens" : {},
     "Hey %@" : {},
     "Hey there" : {},
     "Hold your %@ card to your phone" : {},
@@ -232,18 +292,26 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "How much for %@?" : {},
+    "How much to send?" : {},
     "How much, from where" : {},
+    "I can't reach the jungle right now, so I can't see your balances. Check your connection." : {},
     "I can't reach the jungle right now. Check your connection." : {},
     "I don't have a card yet" : {},
     "Images" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Includes memo ID 1234567890" : {},
     "Infineon · PIN after the tap" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "Infineon · PIN already typed" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Input field and messages" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -254,6 +322,10 @@
     },
     "It's from Jungle's wallet, so only that card works." : {},
     "Jungle's PIN" : {},
+    "Jungle's wallet" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Keypad and PIN" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -285,6 +357,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Long balance: it moves under the name." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Long title" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -297,8 +373,13 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Main 720 USDC + 400 XLM, Jungle 62.50 USDC, Banana 72.50 USDC + 120 XLM. Three recents." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Main account" : {},
     "Main is the easy pick. Money sent to a card's wallet can only be spent with that exact card." : {},
+    "Main is the easy pick. Paying from a card's wallet means that exact card has to be in your hand." : {},
     "Main only" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -307,7 +388,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Max" : {},
+    "Memo ID" : {},
+    "Memo ID · optional" : {},
+    "Memo ID, optional" : {},
     "Minimum for text: 4.5:1 (WCAG AA). Left: mockup. Right: proposed value, now used by the token." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Mock data" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -320,6 +409,10 @@
       "extractionState" : "manual"
     },
     "Move" : {},
+    "My Main account" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "My banana stash" : {},
     "My cards" : {},
     "NFC rings · full screen" : {
@@ -330,6 +423,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Name*domain addresses aren't supported yet. Ask for their Stellar address: it starts with G, C or M." : {},
     "Navigation row and tag" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -338,12 +432,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Next" : {},
+    "No %@ in %@. Pick another drawer or asset." : {},
     "No PIN needed. Just hold your card." : {},
     "No Testnet badge." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "No card here yet" : {},
+    "No card needed yet. I'll only ask for it at the very end." : {},
     "No cards" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -352,7 +449,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "No drawer to choose: no arrow on From." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "No first name, no weekly change" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "No recents" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -361,6 +466,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Not enough in %@. %@ available." : {},
     "Nothing is moved yet. I'm just saying hello." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -369,6 +475,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Numbers only. A word memo can't be sent from ChimpDAO." : {},
     "Off" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -381,12 +488,23 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "One character is off in this address. Copy it again from where you found it." : {},
+    "One character is off. Copy the address again." : {},
     "Only Receive is available." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Only if they gave you one" : {},
     "Only this card can spend it" : {},
+    "Open Send (C1)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Opens on Jungle's wallet." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Option rows (asset sheet)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -404,6 +522,12 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Paste" : {},
+    "Paste it from the app or exchange you're paying." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Paste it from the app or exchange you're paying. Check the first and last characters." : {},
     "Paying Maya $25.00" : {},
     "Pick where your bananas grow" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -458,6 +582,12 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Recent" : {},
+    "Recent contacts" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Recipient's Stellar address" : {},
     "Reduce Motion" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -497,11 +627,20 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Secret key (fake)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Selection ring: 4 pt, chimpAccent" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "Send" : {},
+    "Send parts" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Sends everything in this drawer" : {},
     "Settings" : {},
     "Shadows" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -544,6 +683,11 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Stellar address" : {},
+    "Stellar address (G…, C… or M…)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Step %lld of %lld" : {},
     "Step 1 of 2" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -581,12 +725,26 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Tap one to copy it, then use Paste on C1." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Tap to load for 2 seconds" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Temporary screen (step A). The real review, PIN and tap come in step B." : {},
     "Testnet" : {},
     "Text size" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "That's %@. Use Move instead." : {},
+    "That's a secret key, not an address! Never share it with anyone. Delete it and ask for their address." : {},
+    "That's an Ethereum-style address. ChimpDAO only sends on Stellar." : {},
+    "That's an XRP Ledger address. ChimpDAO only sends on Stellar." : {},
+    "That's your Main account. Use Move instead." : {},
+    "The Recent section is hidden." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -606,27 +764,60 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "The memo ID travels inside the address." : {},
+    "Their Stellar address" : {},
     "Theme (light · dark)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "They tap their Chimp card on your phone" : {},
+    "This address is incomplete. A Stellar address has 56 characters (69 with a memo ID). Copy it again." : {},
     "This card is blocked." : {},
+    "This isn't a Stellar address. It should start with G, C or M." : {},
+    "This number is too big for a memo ID." : {},
     "Tiled every 420 pt, opacity 0.14, on chimpHeader" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "To" : {},
     "Tokens" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "Try again" : {},
+    "Try it" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Typo (last character changed)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Typography" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "Unlocking a card isn't available yet." : {
       "comment" : "TODO : texte provisoire. Que faire quand une carte est bloquée (PUK ?) : à décider avec Pamphile."
+    },
+    "Valid G (Maya)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Valid G (exchange, add a memo ID)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Valid M (memo ID 1234567890)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Valid Stellar address" : {},
+    "Valid Stellar address (smart wallet)" : {},
+    "Valid Stellar address. Includes memo ID %@" : {},
+    "Valid Stellar address. Includes memo ID 1234567890" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
     },
     "Variant" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -645,8 +836,11 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "What do you want to send?" : {},
     "Where do I get a real one?" : {},
+    "Where should it come from?" : {},
     "Where should it land?" : {},
+    "Who's it for?" : {},
     "Without amount (A5, G1b)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -688,6 +882,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "XRP Ledger" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "XXXL" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -712,10 +910,12 @@
       "extractionState" : "manual"
     },
     "on card" : {},
+    "then" : {},
     "this week" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
-    }
+    },
+    "≈ %@" : {}
   },
   "version" : "1.0"
 }

@@ -138,6 +138,8 @@ enum ChimpSize {
     static let keypadSpacing: CGFloat = 9
     /// Rembourrage vertical d'une touche du pavé, hors contour.
     static let keyVerticalPadding: CGFloat = 11
+    /// Même rembourrage sur petit écran (iPhone SE) : 8 pt de moins par touche, toujours au-dessus de 44 pt.
+    static let keyVerticalPaddingCompact: CGFloat = 7
     /// Vignette de couleur (A5, G1b).
     static let colorSwatch: CGFloat = 52
     /// Hauteur d'une feuille (PIN, choix d'un tiroir…).
@@ -170,6 +172,9 @@ enum ChimpSize {
     static let patternTileOnCard: CGFloat = 260
     /// Rapport largeur / hauteur d'une carte bancaire.
     static let cardAspectRatio: CGFloat = 1.58
+    /// Hauteur utile (entre l'en-tête et le bouton du bas) sous laquelle l'écran de montant (C2) resserre
+    /// son pavé : iPhone SE ≈ 460 pt, iPhone 16 ≈ 620 pt.
+    static let compactAmountScreenHeight: CGFloat = 540
     /// Côté du QR code (D1), hors carte blanche.
     static let qrCode: CGFloat = 200
     /// Part du côté du QR code couverte par la tête de Chimpy (5 modules sur 25 dans la maquette).

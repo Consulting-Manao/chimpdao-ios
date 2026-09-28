@@ -22,6 +22,8 @@ enum ChimpKeypadKey: Hashable {
 /// de la langue du téléphone (voir ROADMAP, points ouverts, jalon 5).
 struct ChimpKeypad: View {
     var mode: ChimpKeypadMode = .pin
+    /// Touches moins hautes (environ 48 pt au lieu de 56), pour les petits écrans (iPhone SE).
+    var isCompact = false
     let onKey: (ChimpKeypadKey) -> Void
 
     @Environment(\.locale) private var locale
@@ -46,14 +48,14 @@ struct ChimpKeypad: View {
                         .gridCellUnsizedAxes([.horizontal, .vertical])
                         .accessibilityHidden(true)
                 case .amount:
-                    ChimpKeyButton(accessibilityLabel: Text("Decimal separator")) {
+                    ChimpKeyButton(accessibilityLabel: Text("Decimal separator"), isCompact: isCompact) {
                         onKey(.decimal)
                     } label: {
                         Text(verbatim: decimalSeparator)
                     }
                 }
                 digit(0)
-                ChimpKeyButton(accessibilityLabel: Text("Delete")) {
+                ChimpKeyButton(accessibilityLabel: Text("Delete"), isCompact: isCompact) {
                     onKey(.delete)
                 } label: {
                     Image(systemName: "delete.left.fill")
@@ -64,7 +66,7 @@ struct ChimpKeypad: View {
     }
 
     private func digit(_ value: Int) -> some View {
-        ChimpKeyButton(accessibilityLabel: Text(verbatim: "\(value)")) {
+        ChimpKeyButton(accessibilityLabel: Text(verbatim: "\(value)"), isCompact: isCompact) {
             onKey(.digit(value))
         } label: {
             Text(verbatim: "\(value)")
@@ -75,6 +77,7 @@ struct ChimpKeypad: View {
 /// Une touche : fond `chimpSurface`, contour 3, rayon 16, Luckiest Guy 24. Pâlit à l'appui.
 private struct ChimpKeyButton<Label: View>: View {
     let accessibilityLabel: Text
+    var isCompact = false
     let action: () -> Void
     @ViewBuilder let label: Label
 
@@ -84,7 +87,7 @@ private struct ChimpKeyButton<Label: View>: View {
             label
                 .chimpFont(.key)
                 .foregroundStyle(.chimpTextPrimary)
-                .padding(.vertical, ChimpSize.keyVerticalPadding + ChimpBorder.regular)
+                .padding(.vertical, (isCompact ? ChimpSize.keyVerticalPaddingCompact : ChimpSize.keyVerticalPadding) + ChimpBorder.regular)
                 .frame(maxWidth: .infinity, minHeight: ChimpSize.minimumTouchTarget)
                 .cartoonSurface(shape, fill: Color(.chimpSurface))
                 .contentShape(shape)

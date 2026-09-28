@@ -25,6 +25,8 @@ struct MainTabView: View {
                         switch route {
                         case .receive:
                             ReceiveDestination()
+                        case .send:
+                            SendFlowRoot { walletPath.removeAll() }
                         }
                     }
                 #if DESIGN_CATALOG
@@ -46,8 +48,10 @@ struct MainTabView: View {
         switch action {
         case .receive:
             walletPath.append(.receive)
-        case .send, .move, .swap:
-            // TODO(jalon 4) : Send (C1), Move (E1), Swap (E3).
+        case .send:
+            walletPath.append(.send)
+        case .move, .swap:
+            // TODO(jalon 4b) : Move (E1), Swap (E3).
             break
         }
     }
@@ -66,6 +70,7 @@ struct MainTabView: View {
 /// Écrans qu'on peut pousser depuis le Wallet.
 enum WalletRoute: Hashable {
     case receive
+    case send
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
