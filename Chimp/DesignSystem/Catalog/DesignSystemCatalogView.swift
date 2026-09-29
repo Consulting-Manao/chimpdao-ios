@@ -10,6 +10,16 @@ struct DesignSystemCatalogView: View {
     var body: some View {
         CatalogPage("Design System", settings: settings, scrolls: false) {
             List {
+                #if CHIMP_ADMIN
+                // Textes du mode admin hors String Catalog (voir `AdminView`).
+                Section {
+                    link(untranslated("Admin mode (testnet)"), systemImage: "wrench.and.screwdriver.fill") { AdminView() }
+                } header: {
+                    Text(verbatim: "Admin")
+                }
+                .listRowBackground(Color(.chimpSurface))
+                #endif
+
                 Section("Tokens") {
                     link("Colors", systemImage: "paintpalette.fill") { CatalogColorsPage(settings: settings) }
                     link("Contrast", systemImage: "circle.lefthalf.filled") { CatalogContrastPage(settings: settings) }
