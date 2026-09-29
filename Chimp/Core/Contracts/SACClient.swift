@@ -33,14 +33,89 @@ struct SACClient {
     /// `transfer(from, to, amount)` d'un SAC (`new Contract(token).call("transfer", from, to, i128)` du terminal).
     /// `amount` en unités on-chain (stroops pour XLM), entier positif.
     static func transferOperation(token: String, from: String, to: String, units: UInt64) throws -> InvokeHostFunctionOperation {
-        func address(_ strkey: String) throws -> SCAddressXDR {
-            strkey.hasPrefix("C") ? try SCAddressXDR(contractId: strkey) : try SCAddressXDR(accountId: strkey)
-        }
-        return try InvokeHostFunctionOperation.forInvokingContract(
+        try InvokeHostFunctionOperation.forInvokingContract(
             contractId: token,
             functionName: "transfer",
-            functionArguments: [.address(try address(from)), .address(try address(to)), .i128(Int128PartsXDR(hi: 0, lo: units))]
+            functionArguments: try transferArguments(from: from, to: to, units: units)
         )
+    }
+
+    /// Arguments de `transfer` (`transferArgs` de `payFromChipAccount`) : `Address.fromString(…).toScVal()` pour `from`
+    /// et `to` (G, M ou C), puis le montant en `i128`.
+    static func transferArguments(from: String, to: String, units: UInt64) throws -> [SCValXDR] {
+        [.address(try address(from)), .address(try address(to)), .i128(Int128PartsXDR(hi: 0, lo: units))]
+    }
+
+    /// `Address.fromString` : contrat (C), compte (G) ou compte multiplexé (M, memo ID plié dedans, que le SDK
+    /// encode en `SC_ADDRESS_TYPE_MUXED_ACCOUNT`).
+    static func address(_ strkey: String) throws -> SCAddressXDR {
+        strkey.hasPrefix("C") ? try SCAddressXDR(contractId: strkey) : try SCAddressXDR(accountId: strkey)
+    }
+
+    // MARK: Paiement depuis une Pocket (ordre 1)
+
+    /// Avant le tap : l'entrée `transfer` que la Pocket autorise (`payFromChipAccount` → `purseSignedCallOn`).
+    /// Le SAC est le contrat appelé, la Pocket l'autorisateur (`from`), sans sous-appel : « a SAC transfer is the one
+    /// node it authorizes ». Expiration = ledger actuel + 120, nonce aléatoire. Le `digest` est ce que la puce signera.
+    static func declareTransfer(
+        token: String,
+        pocket: String,
+        to: String,
+        units: UInt64,
+        passphrase: String,
+        currentLedger: UInt32,
+        nonce: Int64
+    ) throws -> DeclaredAuthorization {
+        try DeclaredAuthorization(
+            authorizer: pocket,
+            invocation: try SorobanAuth.contractInvocation(
+                contract: token, function: "transfer", arguments: try transferArguments(from: pocket, to: to, units: units)
+            ),
+            passphrase: passphrase,
+            expirationLedger: currentLedger + SorobanAuth.expirationLedgers,
+            nonce: nonce
+        )
+    }
+
+    // MARK: Montants
+
+    enum AmountError: Error, Equatable, LocalizedError {
+        /// Montant nul ou négatif (`amount must be positive`).
+        case notPositive
+        /// Plus de décimales que l'actif n'en permet : on refuse au lieu de tronquer, pour que le montant signé
+        /// soit exactement celui affiché (règle 8).
+        case tooManyDecimals(allowed: Int)
+        /// Au-delà de ce qu'un entier de 64 bits peut porter (~1,8 milliard d'unités de l'actif).
+        case tooLarge
+
+        var errorDescription: String? {
+            switch self {
+            case .notPositive: "The amount must be positive."
+            case .tooManyDecimals(let allowed): "The amount has more than \(allowed) decimals."
+            case .tooLarge: "The amount is too large."
+            }
+        }
+    }
+
+    /// Montant de l'actif → unités on-chain (`toUnits(amount, keypadDecimals, chainDecimals)` de `lib/amount.ts`).
+    /// Calcul exact en base 10 (`Decimal`), jamais par un `Double`, indépendant de la langue du téléphone.
+    /// Écart volontaire : `toUnits` tronque les décimales en trop ; ici elles sont refusées.
+    static func units(of amount: Decimal, keypadDecimals: Int) throws(AmountError) -> UInt64 {
+        guard amount > 0 else { throw .notPositive }
+        let keypadScaled = amount * pow(Decimal(10), keypadDecimals)
+        guard isWhole(keypadScaled) else { throw .tooManyDecimals(allowed: keypadDecimals) }
+        let scaled = amount * pow(Decimal(10), decimals)
+        guard isWhole(scaled), scaled <= Decimal(UInt64.max) else { throw .tooLarge }
+        // `Decimal` → texte (toujours avec « . » et sans séparateur) → entier : aucune perte possible.
+        guard let units = UInt64(NSDecimalNumber(decimal: scaled).stringValue) else { throw .tooLarge }
+        return units
+    }
+
+    private static func isWhole(_ value: Decimal) -> Bool {
+        var input = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &input, 0, .down)
+        return rounded == value
     }
 
     /// `i128` → entier décimal exact (`hi · 2⁶⁴ + lo`), sans passer par un `Double`.

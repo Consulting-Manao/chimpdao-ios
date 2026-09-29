@@ -21,11 +21,17 @@ enum SorobanAuth {
         case notAddressCredentials(String)
         /// Le générateur aléatoire du système a échoué.
         case randomUnavailable
+        /// La transaction demande la signature d'une autre adresse que celle qui paie : on ne signe rien.
+        case unexpectedSigner(String)
+        /// Aucune entrée à signer (`No authorization entries to sign`).
+        case nothingToSign
 
         var errorDescription: String? {
             switch self {
             case .notAddressCredentials(let kind): "Expected address credentials, got \(kind)."
             case .randomUnavailable: "The system random generator failed."
+            case .unexpectedSigner(let address): "This transaction needs a signature from \(address)"
+            case .nothingToSign: "No authorization entries to sign"
             }
         }
     }
@@ -91,6 +97,52 @@ enum SorobanAuth {
         return Data(SHA256.hash(data: Data(try XDREncoder.encode(preimage))))
     }
 
+    // MARK: Ordre 2 : simuler, puis signer
+
+    /// Une entrée reçue de la simulation, prête pour la puce : sa position dans l'opération, l'entrée avec son
+    /// expiration posée (toujours sans signature) et le digest à signer.
+    struct PendingEntry {
+        let index: Int
+        let entry: SorobanAuthorizationEntryXDR
+        let digest: Data
+    }
+
+    /// Première passe de `signAuthEntries` (`chip-auth.ts`), avant toute signature : pour chaque entrée à credentials
+    /// d'adresse, poser l'expiration (elle fait partie du préimage signé) puis calculer le digest, **dans la variante
+    /// reçue** (règle 4). Les entrées « compte source » sont laissées au payeur de frais, comme dans le terminal.
+    ///
+    /// Refus avant toute signature si une entrée nomme une autre adresse que `signer` : « signing it blind is how a batch
+    /// smuggles an extra spend past the holder ». Plus strict que le terminal sur un point : une entrée « avec délégués »
+    /// (Protocol 28) est refusée au lieu d'être ignorée, parce qu'on ne sait pas la signer.
+    static func pendingEntries(
+        _ entries: [SorobanAuthorizationEntryXDR],
+        signer: String,
+        passphrase: String,
+        expirationLedger: UInt32
+    ) throws -> [PendingEntry] {
+        var pending: [PendingEntry] = []
+        for (index, entry) in entries.enumerated() {
+            switch entry.credentials {
+            case .sourceAccount:
+                continue
+            case .addressWithDelegates:
+                throw AuthError.notAddressCredentials("address with delegates")
+            case .address, .addressV2:
+                break
+            }
+            let who = try addressCredentials(entry).address.toStrKey()
+            guard who == signer else { throw AuthError.unexpectedSigner(who) }
+            let stamped = try restamped(entry, expirationLedger: expirationLedger)
+            pending.append(PendingEntry(
+                index: index,
+                entry: stamped,
+                digest: try payloadHash(stamped, passphrase: passphrase, expirationLedger: expirationLedger)
+            ))
+        }
+        guard !pending.isEmpty else { throw AuthError.nothingToSign }
+        return pending
+    }
+
     // MARK: Ordre 1 : déclarer, signer, puis simuler
 
     /// Appel d'une fonction de contrat, tel qu'il figure dans une entrée d'autorisation (`SorobanAuthorizedInvocation`).
@@ -128,6 +180,12 @@ enum SorobanAuth {
             )),
             rootInvocation: invocation
         )
+    }
+
+    /// `expiration - now < EXPIRATION_MARGIN_LEDGERS` (`preSignedAuthEntries`) : moins de 20 ledgers (~2 min) devant
+    /// l'autorisation, trop peu pour signer puis envoyer. Il faut la reconstruire (nouveau digest) avant le tap.
+    static func needsRefresh(expirationLedger: UInt32, currentLedger: UInt32) -> Bool {
+        expirationLedger < currentLedger || expirationLedger - currentLedger < expirationMarginLedgers
     }
 
     /// Nonce aléatoire sur 8 octets lus en grand-boutiste signé (`getBigInt64(0, false)` du terminal).
@@ -173,7 +231,7 @@ struct DeclaredAuthorization {
 
     /// `true` s'il reste moins de 20 ledgers avant l'expiration : il faut reconstruire (nouveau digest) avant le tap.
     func needsRefresh(currentLedger: UInt32) -> Bool {
-        expirationLedger < currentLedger || expirationLedger - currentLedger < SorobanAuth.expirationMarginLedgers
+        SorobanAuth.needsRefresh(expirationLedger: expirationLedger, currentLedger: currentLedger)
     }
 
     /// L'entrée avec la signature de la puce (`ChipAuth` pour une Pocket, `AccountAuth` pour un compte).

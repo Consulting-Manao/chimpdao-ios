@@ -40,6 +40,13 @@ enum ChipAuthEncoding {
         ])
     }
 
+    /// `AccountAuth { auth, key }` : signature d'une entrée du Main account (`accountChipSignature` de `chip-auth.ts`).
+    /// La clé ne fait que *désigner* la carte qui a signé : le compte vérifie la signature contre sa propre copie
+    /// de cette clé (erreur `#300` si la carte n'est pas dans le compte, `#301` si la signature ne correspond pas).
+    static func accountAuth(publicKey: ChipPublicKey, chipAuth: SCValXDR) -> SCValXDR {
+        map([("auth", chipAuth), ("key", .bytes(publicKey.bytes))])
+    }
+
     /// `CardSigner { curve, key }` : une carte dans un Chimp account.
     static func cardSigner(publicKey: ChipPublicKey, curve: ChipCurve) -> SCValXDR {
         map([("curve", self.curve(curve)), ("key", .bytes(publicKey.bytes))])

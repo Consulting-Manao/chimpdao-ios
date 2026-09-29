@@ -361,6 +361,12 @@ final class RecordingSigner: ChipSigner, @unchecked Sendable {
         return digests.map { _ in .secp256k1(signature: Data(repeating: 0x11, count: 64)) }
     }
 
+    func sign(digests: [Data], acceptedKeys: [ChipPublicKey], pin: String?) async throws -> CardSignatures {
+        guard let key = acceptedKeys.first else { throw ChipError.malformedResponse("no accepted card") }
+        let signatures = try await sign(digests: digests, expectedKey: key, pin: pin)
+        return CardSignatures(card: ChipKeyInfo(kind: .infineon2Go, publicKey: key, pinActive: pin != nil), signatures: signatures)
+    }
+
     func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {
         newPINs.append(newPIN)
         if let setPINError { throw setPINError }
@@ -374,6 +380,10 @@ private struct TransportSigner: ChipSigner {
 
     func sign(digests: [Data], expectedKey: ChipPublicKey, pin: String?) async throws -> [ChipSignedDigest] {
         try await ChipSigning.sign(card, digests: digests, expectedKey: expectedKey, pin: pin)
+    }
+
+    func sign(digests: [Data], acceptedKeys: [ChipPublicKey], pin: String?) async throws -> CardSignatures {
+        try await ChipSigning.sign(card, digests: digests, acceptedKeys: acceptedKeys, pin: pin)
     }
 
     func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {

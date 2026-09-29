@@ -33,7 +33,7 @@ struct CreationProblem: Equatable {
         switch error {
         case AccountCreationError.signatureExpired:
             return .init(kind: .signatureExpired, technicalDetails: details)
-        case AccountCreationError.notConfirmedOnChain, StellarError.notConfirmed:
+        case AccountCreationError.notConfirmedOnChain, StellarError.notConfirmed, StellarError.sendUnanswered:
             return .init(kind: .notConfirmed, technicalDetails: details)
         case FeeSignerError.busy, FeeSignerError.unavailable:
             return .init(kind: .feeHelperBusy, technicalDetails: details)

@@ -15,6 +15,9 @@ enum StellarError: Error, Equatable {
     case transactionFailed(hash: String, detail: String)
     /// Envoyée, mais pas confirmée dans le délai : **ne pas renvoyer**, vérifier d'abord dans l'explorateur.
     case notConfirmed(hash: String)
+    /// `sendTransaction` n'a pas répondu (réseau coupé, délai) : la transaction est peut-être arrivée. Comme
+    /// `notConfirmed` : **ne pas renvoyer**, vérifier d'abord. Le hash est calculé avant l'envoi.
+    case sendUnanswered(hash: String, detail: String)
     /// Réponse inattendue.
     case invalidResponse(String)
     /// Aucun `recovery_id` n'est accepté : le contrat refuse la signature de la carte.
@@ -48,6 +51,7 @@ extension StellarError: LocalizedError {
         case .submitFailed(let detail): "Submission refused: \(detail)"
         case .transactionFailed(let hash, let detail): "Transaction failed (\(hash)): \(detail)"
         case .notConfirmed(let hash): "Sent, but the network did not confirm it in time. Check the receipt before retrying: \(hash)"
+        case .sendUnanswered(let hash, let detail): "Sent, but Stellar didn't answer (\(detail)). Check the receipt before retrying: \(hash)"
         case .invalidResponse(let detail): "Unexpected answer from Stellar: \(detail)"
         case .signatureRejected(let detail): "The contract rejected the card's signature: \(detail)"
         }
@@ -239,17 +243,21 @@ struct SorobanClient {
     /// Envoie une transaction déjà signée et attend son résultat (`submit` : 1ʳᵉ vérification à ~3 s,
     /// puis toutes les ~1 s, dans un budget total de 60 s). Renvoie le hash.
     func submitAndWait(_ transaction: Transaction) async throws -> String {
+        // Hash calculé **avant** l'envoi : si `sendTransaction` ne répond pas, la transaction est peut-être partie,
+        // et c'est ce hash qui permettra de vérifier, jamais un renvoi.
+        let hash = try transaction.getTransactionHash(network: network)
         let sent: SendTransactionResponse
         switch await server.sendTransaction(transaction: transaction) {
         case .success(let response): sent = response
-        case .failure(let error): throw StellarError.rpc(Self.describe(error))
+        case .failure(let error): throw StellarError.sendUnanswered(hash: hash, detail: Self.describe(error))
         }
         if sent.status == SendTransactionResponse.STATUS_ERROR {
             let diagnostics = Self.diagnosticText(sent.diagnosticEvents ?? [])
             let detail = sent.errorResultXdr ?? sent.error?.message ?? sent.status
             throw StellarError.submitFailed(diagnostics.isEmpty ? detail : "\(detail) — \(diagnostics)")
         }
-        let hash = sent.transactionId
+        // Au-delà de ce point, la transaction est acceptée : plus aucune erreur ne doit laisser croire qu'elle n'est pas
+        // partie. On suit le hash calculé ici (identique à `transactionId` quand la passphrase est la bonne).
 
         let clock = ContinuousClock()
         let deadline = clock.now + Self.confirmationBudget
@@ -274,6 +282,132 @@ struct SorobanClient {
         }
         throw StellarError.notConfirmed(hash: hash)
     }
+
+    // MARK: Vérifications après un envoi (« Check again »)
+
+    /// État d'une transaction envoyée, et jusqu'où le RPC a lu la chaîne au moment de la réponse.
+    struct TransactionLookup: Equatable {
+        enum Status: Equatable {
+            case success
+            /// Incluse mais échouée : rien n'a bougé (une transaction échoue en bloc).
+            case failed(String)
+            /// Inconnue du RPC : pas (encore) incluse, ou jamais arrivée.
+            case notFound
+        }
+
+        let status: Status
+        let latestLedger: UInt32
+        /// Heure de fermeture de `latestLedger` (secondes depuis 1970, comme les bornes de temps d'une transaction).
+        let latestLedgerCloseTime: UInt64
+    }
+
+    /// `getTransaction` une fois, sans attendre.
+    func lookUpTransaction(_ hash: String) async throws -> TransactionLookup {
+        switch await server.getTransaction(transactionHash: hash) {
+        case .success(let response):
+            guard let closeTime = UInt64(response.latestLedgerCloseTime), response.latestLedger >= 0 else {
+                throw StellarError.invalidResponse("getTransaction latest ledger \(response.latestLedger) closed at \(response.latestLedgerCloseTime)")
+            }
+            let status: TransactionLookup.Status = switch response.status {
+            case GetTransactionResponse.STATUS_SUCCESS: .success
+            case GetTransactionResponse.STATUS_FAILED: .failed(response.resultXdr ?? "no result")
+            default: .notFound
+            }
+            return TransactionLookup(status: status, latestLedger: UInt32(response.latestLedger), latestLedgerCloseTime: closeTime)
+        case .failure(let error):
+            throw StellarError.rpc(Self.describe(error))
+        }
+    }
+
+    /// Enveloppe (base64) d'une transaction incluse, `nil` si le RPC ne la connaît pas.
+    func transactionEnvelope(_ hash: String) async throws -> String? {
+        switch await server.getTransaction(transactionHash: hash) {
+        case .success(let response):
+            return response.status == GetTransactionResponse.STATUS_NOT_FOUND ? nil : response.envelopeXdr
+        case .failure(let error):
+            throw StellarError.rpc(Self.describe(error))
+        }
+    }
+
+    /// Dernier ledger fermé et son heure de fermeture (secondes depuis 1970).
+    func latestLedgerInfo() async throws -> (sequence: UInt32, closeTime: UInt64) {
+        switch await server.getLatestLedger() {
+        case .success(let response):
+            guard let text = response.closeTime, let closeTime = UInt64(text) else {
+                throw StellarError.invalidResponse("getLatestLedger returned no close time")
+            }
+            return (response.sequence, closeTime)
+        case .failure(let error):
+            throw StellarError.rpc(Self.describe(error))
+        }
+    }
+
+    /// Résultat d'une recherche d'événements : les transactions qui les ont émis, et la fenêtre que le RPC garde en
+    /// mémoire (pour savoir si la recherche a vraiment tout couvert).
+    struct EventScan: Equatable {
+        let transactionHashes: [String]
+        let oldestLedger: UInt32?
+        let latestLedger: UInt32
+    }
+
+    /// Transactions qui ont émis un événement de `contract` dont les sujets correspondent à `topics` (XDR base64 ou `*`),
+    /// des ledgers `startLedger` à `endLedger` inclus (`getEvents`, comme `backfillChainHistory`).
+    ///
+    /// Le RPC ne parcourt qu'une tranche de ledgers par requête (~10 000 sur testnet) : une page peut revenir **vide avec
+    /// un curseur** au milieu de la fenêtre. On suit donc le curseur jusqu'à ce qu'il atteigne `endLedger` ; une page vide
+    /// ne veut jamais dire « rien » tant que la fenêtre n'est pas couverte. Vérifié sur testnet le 2026-09-29 : première
+    /// requête avec `startLedger` et `endLedger` (exclusif), les suivantes avec le curseur seul (« ledger ranges and cursor
+    /// cannot both be set ») ; fenêtre couverte = curseur sur son dernier ledger.
+    func eventTransactions(
+        contract: String,
+        topics: [String],
+        startLedger: UInt32,
+        endLedger: UInt32
+    ) async throws -> EventScan {
+        let filter = EventFilter(type: "contract", contractIds: [contract], topics: [TopicFilter(segmentMatchers: topics)])
+        let pageLimit = 100
+        var hashes: [String] = []
+        var cursor: String?
+        var latest: UInt32 = 0
+        var oldest: UInt32?
+        for _ in 0..<Self.maxEventPages {
+            let response: GetEventsResponse
+            switch await server.getEvents(
+                startLedger: cursor == nil ? Int(startLedger) : nil,
+                endLedger: cursor == nil ? Int(endLedger) + 1 : nil,
+                eventFilters: [filter],
+                paginationOptions: PaginationOptions(cursor: cursor, limit: pageLimit)
+            ) {
+            case .success(let page): response = page
+            case .failure(let error): throw StellarError.rpc(Self.describe(error))
+            }
+            latest = UInt32(clamping: response.latestLedger)
+            oldest = response.oldestLedger.map { UInt32(clamping: $0) }
+            // Avec le curseur seul, le RPC peut dépasser la fenêtre : on ne garde que ce qui est dedans.
+            for event in response.events where event.ledger <= Int(endLedger) && !hashes.contains(event.txHash) {
+                hashes.append(event.txHash)
+            }
+            let passedWindow = response.events.contains { $0.ledger > Int(endLedger) }
+            guard let next = response.cursor, let reached = Self.cursorLedger(next) else {
+                throw StellarError.invalidResponse("getEvents returned no usable cursor")
+            }
+            if passedWindow || (response.events.count < pageLimit && reached >= endLedger) {
+                return EventScan(transactionHashes: hashes, oldestLedger: oldest, latestLedger: latest)
+            }
+            cursor = next
+        }
+        throw StellarError.invalidResponse("getEvents didn't cover ledgers \(startLedger) to \(endLedger)")
+    }
+
+    /// Ledger atteint par un curseur de `getEvents` (« TOID-index » : le TOID porte le numéro de ledger dans ses 32 bits
+    /// de poids fort, comme les identifiants d'Horizon).
+    static func cursorLedger(_ cursor: String) -> UInt32? {
+        guard let toid = cursor.split(separator: "-").first.flatMap({ UInt64($0) }) else { return nil }
+        return UInt32(exactly: toid >> 32)
+    }
+
+    /// Plafond de requêtes de `eventTransactions` (100 événements ou ~10 000 ledgers chacune).
+    static let maxEventPages = 30
 
     /// `diagnosticText` : les données des événements de diagnostic dont un sujet est `error`, lisibles.
     static func diagnosticText(_ events: [DiagnosticEventXDR]) -> String {

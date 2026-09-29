@@ -12,6 +12,8 @@ enum RecoveryIDSearch {
         static let nfcNft = 200
         /// `pocket` : `PocketError::InvalidSignature` = 201 (`pocket/src/errors.rs`).
         static let pocket = 201
+        /// `account` : `AccountError::InvalidSignature` = 301 (`account/src/errors.rs`).
+        static let account = 301
     }
 
     /// Essaie `attempt` avec les `recovery_id` 0 à 3 et renvoie le premier résultat accepté.

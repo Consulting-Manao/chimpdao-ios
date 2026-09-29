@@ -83,6 +83,10 @@ enum ChipError: Error, Equatable, Sendable {
     case sessionFailed(String)
     /// La carte présentée n'est pas celle qui a été lue avant (sa clé publique diffère).
     case wrongCard
+    /// La carte présentée n'est pas une de celles qui peuvent signer (paiement : la carte de ce wallet, ou une carte
+    /// du compte). Sa clé est rapportée pour dire à l'utilisateur quelle carte il a tapée (C7). Rien n'a été envoyé
+    /// à la carte après la lecture de sa clé : ni PIN, ni signature.
+    case cardNotAccepted(tapped: ChipPublicKey)
     /// Infineon : le PIN doit faire 4 à 62 octets (`pinBytes` du bridge).
     case invalidPINLength
     /// Infineon : mauvais PIN (`63 Cx`, x = essais restants).
@@ -122,6 +126,7 @@ extension ChipError: LocalizedError {
         case .transport(let detail): "The connection to the card was lost: \(detail)"
         case .sessionFailed(let detail): "NFC session failed: \(detail)"
         case .wrongCard: "This is not the card that was read before."
+        case .cardNotAccepted(let tapped): "This card can't sign this (\(tapped.hex.prefix(12))…)."
         case .invalidPINLength: "The PIN must be 4 to 62 characters."
         case .wrongPIN(let retries): "Wrong PIN, \(retries) tries left."
         case .pinLocked: "The PIN is locked."
