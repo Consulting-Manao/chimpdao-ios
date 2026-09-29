@@ -6,6 +6,8 @@ import SwiftUI
 struct SendCatalogPage: View {
     let settings: CatalogSettings
     @AppStorage(SendMockSettings.dataScenarioKey) private var dataScenario = MockSendService.DataScenario.standard
+    @AppStorage(SendMockSettings.signingOrderKey) private var signingOrder = SigningOrder.pinThenTap
+    @AppStorage(SendMockSettings.cardSetupKey) private var cardSetup = MockSendService.CardSetup.allWithPin
 
     var body: some View {
         CatalogPage("Send", settings: settings, scrolls: false) {
@@ -25,6 +27,34 @@ struct SendCatalogPage: View {
                     Text("Mock data")
                 } footer: {
                     Text("Also used by the Send tile of the Wallet.")
+                }
+                .listRowBackground(Color(.chimpSurface))
+
+                Section {
+                    Picker(selection: $signingOrder) {
+                        ForEach(SigningOrder.allCases) { order in
+                            Text(order.title).tag(order)
+                        }
+                    } label: {
+                        Text("Order").chimpFont(.rowTitle)
+                    }
+                    Text(signingOrder.detail)
+                        .chimpFont(.caption)
+                        .foregroundStyle(.chimpTextSecondary)
+                    Picker(selection: $cardSetup) {
+                        ForEach(MockSendService.CardSetup.allCases) { setup in
+                            Text(setup.title).tag(setup)
+                        }
+                    } label: {
+                        Text("Cards").chimpFont(.rowTitle)
+                    }
+                    Text(cardSetup.detail)
+                        .chimpFont(.caption)
+                        .foregroundStyle(.chimpTextSecondary)
+                } header: {
+                    Text("PIN and tap")
+                } footer: {
+                    Text("Release always uses PIN then tap until the order is decided.")
                 }
                 .listRowBackground(Color(.chimpSurface))
 
@@ -87,6 +117,40 @@ private struct SendCatalogDemo: View {
     var body: some View {
         SendFlowRoot { dismiss() }
             .catalogOverrides(settings)
+    }
+}
+
+private extension SigningOrder {
+    var title: LocalizedStringKey {
+        switch self {
+        case .pinThenTap: "PIN then tap"
+        case .tapThenPin: "Tap then PIN"
+        }
+    }
+
+    var detail: LocalizedStringKey {
+        switch self {
+        case .pinThenTap: "Review, PIN, then one tap that checks the card, sends the PIN and signs."
+        case .tapThenPin: "Review, a first tap to read the card, PIN, then a second tap to sign."
+        }
+    }
+}
+
+private extension MockSendService.CardSetup {
+    var title: LocalizedStringKey {
+        switch self {
+        case .allWithPin: "All with PIN"
+        case .noPin: "No PIN (DUOX)"
+        case .mixed: "Mixed"
+        }
+    }
+
+    var detail: LocalizedStringKey {
+        switch self {
+        case .allWithPin: "Jungle and Banana are Infineon cards with a PIN."
+        case .noPin: "Jungle and Banana are DUOX cards: one tap, never a PIN."
+        case .mixed: "Jungle has a PIN, Banana has none. From Main, Jungle is the card tapped."
+        }
     }
 }
 

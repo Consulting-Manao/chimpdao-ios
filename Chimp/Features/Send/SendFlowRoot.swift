@@ -8,8 +8,14 @@ struct SendFlowRoot: View {
     @State private var model: SendFlowModel
     let onExit: () -> Void
 
-    init(service: SendService = SendMockSettings.makeService(), onExit: @escaping () -> Void) {
-        _model = State(initialValue: SendFlowModel(service: service))
+    init(
+        service: SendService = SendMockSettings.makeService(),
+        signingOrder: SigningOrder = SendMockSettings.signingOrder,
+        onExit: @escaping () -> Void
+    ) {
+        let model = SendFlowModel(service: service, signingOrder: signingOrder)
+        model.onExit = onExit
+        _model = State(initialValue: model)
         self.onExit = onExit
     }
 
@@ -19,23 +25,44 @@ struct SendFlowRoot: View {
     }
 }
 
-/// Réglages du service factice, choisis dans le catalogue (page « Send », Debug et Testing).
-/// En Release, le parcours utilise les données de la maquette.
+/// Réglages du parcours factice, choisis dans le catalogue (page « Send », Debug et Testing).
+/// En Release : données de la maquette, cartes avec PIN, ordre « PIN puis tap ».
 enum SendMockSettings {
     static let dataScenarioKey = "sendMockDataScenario"
+    static let cardSetupKey = "sendMockCardSetup"
+    static let signingOrderKey = "sendSigningOrder"
 
     static var dataScenario: MockSendService.DataScenario {
-        get {
-            #if DESIGN_CATALOG
-            UserDefaults.standard.string(forKey: dataScenarioKey).flatMap(MockSendService.DataScenario.init(rawValue:)) ?? .standard
-            #else
-            .standard
-            #endif
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: dataScenarioKey) }
+        #if DESIGN_CATALOG
+        stored(dataScenarioKey) ?? .standard
+        #else
+        .standard
+        #endif
+    }
+
+    static var cardSetup: MockSendService.CardSetup {
+        #if DESIGN_CATALOG
+        stored(cardSetupKey) ?? .allWithPin
+        #else
+        .allWithPin
+        #endif
+    }
+
+    /// Ordre PIN / tap. TODO(ordre PIN / tap) : figé en Release sur « PIN puis tap » tant que Barth n'a pas
+    /// tranché après le test avec une vraie carte (DESIGN_NOTES §12, question 1).
+    static var signingOrder: SigningOrder {
+        #if DESIGN_CATALOG
+        stored(signingOrderKey) ?? .pinThenTap
+        #else
+        .pinThenTap
+        #endif
     }
 
     static func makeService() -> SendService {
-        MockSendService(dataScenario: dataScenario)
+        MockSendService(dataScenario: dataScenario, cardSetup: cardSetup)
+    }
+
+    private static func stored<Value: RawRepresentable>(_ key: String) -> Value? where Value.RawValue == String {
+        UserDefaults.standard.string(forKey: key).flatMap(Value.init(rawValue:))
     }
 }

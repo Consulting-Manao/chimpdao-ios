@@ -32,7 +32,7 @@ struct SendAmountView: View {
             assetSheet
         }
         .navigationDestination(isPresented: $model.isReviewPresented) {
-            SendReviewPlaceholderView(model: model)
+            SendReviewView(model: model)
                 .toolbar(.hidden, for: .navigationBar)
         }
     }

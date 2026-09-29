@@ -79,6 +79,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case bodyL         // texte des écrans pleins
     case rowTitle      // titre d'une ligne
     case optionTitle   // titre d'une ligne de choix dans une feuille (C3, D1)
+    case reviewStep    // étape de la carte « What happens » (C4)
     case body          // texte courant
     case bodyS         // texte de la bulle de Chimpy
     case caption       // méta-infos, sous-titres
@@ -102,7 +103,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
              .cardName, .tile:
             .luckiestGuy
         case .bodyL, .captionS: .nunito(weight: 700)
-        case .body, .bodyS, .caption, .captionStrong: .nunito(weight: 800)
+        case .body, .bodyS, .caption, .captionStrong, .reviewStep: .nunito(weight: 800)
         case .rowTitle, .optionTitle: .nunito(weight: 900)
         case .labelWide, .label, .labelS, .cardNumber, .monoValue, .address: .spaceMono(bold: true)
         case .mono: .spaceMono(bold: false)
@@ -129,7 +130,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .buttonSmall: 14
         case .pill: 13
         case .tile: 12
-        case .bodyL, .optionTitle: 16
+        case .bodyL, .optionTitle, .reviewStep: 16
         case .rowTitle, .body: 15
         case .bodyS: 14
         case .caption, .address: 13
@@ -150,7 +151,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .amountS, .greeting: .title3
         case .displayS, .buttonLarge, .button: .headline
         case .cardName: .callout
-        case .bodyL, .optionTitle: .callout
+        case .bodyL, .optionTitle, .reviewStep: .callout
         case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .bodyS, .monoValue: .subheadline
         case .caption, .pill, .address: .footnote
         case .tile, .captionS, .captionStrong, .mono: .caption1

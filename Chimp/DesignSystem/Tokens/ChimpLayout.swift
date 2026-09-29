@@ -183,6 +183,8 @@ enum ChimpSize {
     static let drawerPickerIcon: CGFloat = 22
     /// Icône d'un tiroir dans une ligne de choix (C3), contour compris.
     static let drawerOptionIcon = CGSize(width: 38, height: 26)
+    /// Pastille numérotée de la carte « What happens » (C4), contour compris (30 + 3 × 2).
+    static let reviewStepBadge: CGFloat = 36
     /// Bouton radio d'une ligne de choix, contour compris.
     static let radio: CGFloat = 24
 }

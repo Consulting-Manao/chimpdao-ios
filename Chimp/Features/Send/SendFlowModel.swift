@@ -27,17 +27,6 @@ final class SendFlowModel {
         case insufficient(drawer: String, available: String)
     }
 
-    /// Ce qui sera envoyé, figé au passage à la vérification (C4).
-    struct Draft: Equatable {
-        let recipient: StellarRecipient
-        /// Nom du destinataire s'il vient des récents.
-        let recipientName: String?
-        let drawer: SendDrawer
-        let asset: SendAsset
-        /// Montant exact, indépendant de la langue du téléphone.
-        let amount: Decimal
-    }
-
     // MARK: État
 
     private(set) var loadPhase: LoadPhase = .loading
@@ -64,14 +53,33 @@ final class SendFlowModel {
     var isDrawerSheetPresented = false
     var isAssetSheetPresented = false
 
-    /// Montant et destinataire figés pour la vérification (étape B).
-    private(set) var draft: Draft?
+    /// Montant et destinataire figés pour la vérification (C4).
+    private(set) var draft: SendDraft?
+
+    // Signature (C4 → C5 / C6).
+    let signingOrder: SigningOrder
+    private(set) var signingStage: SigningStage = .idle
+    /// PIN tapé : gardé en mémoire le temps de la signature seulement, jamais enregistré ni journalisé.
+    var pin = ""
+    var pinState: ChimpPinState = .entering
+    /// Carte lue au premier tap (ordre « tap puis PIN »).
+    private(set) var cardCheck: CardCheck?
+    private var prepared: PreparedSend?
+    private(set) var signed: SignedSend?
+    /// Message si la préparation a échoué (rien n'a été envoyé). Les erreurs détaillées viennent à l'étape C.
+    private(set) var signingErrorMessage: String?
+    /// Longueur du PIN des cartes : ⚠️ à confirmer avec Pamphile (le VERIFY PIN Infineon accepte 4 à 62 octets).
+    let pinLength = 4
 
     private let service: SendService
     private var hasLoaded = false
 
-    init(service: SendService) {
+    /// Appelé par « Done » à la fin du parcours (retour au Wallet).
+    var onExit: (() -> Void)?
+
+    init(service: SendService, signingOrder: SigningOrder = .pinThenTap) {
         self.service = service
+        self.signingOrder = signingOrder
     }
 
     // MARK: Chargement
@@ -197,8 +205,17 @@ final class SendFlowModel {
 
     /// Équivalent en dollars pour un actif à prix variable (« ≈ $6.25 »), si un prix est connu.
     var usdEquivalent: String? {
+        usdEquivalent(of: amount.value, asset: asset)
+    }
+
+    /// Équivalent en dollars du montant figé pour la vérification (C4).
+    func usdEquivalent(of draft: SendDraft) -> String? {
+        usdEquivalent(of: draft.amount, asset: draft.asset)
+    }
+
+    private func usdEquivalent(of value: Decimal, asset: SendAsset) -> String? {
         guard asset.hasVariablePrice, let price = context?.usdPrices[asset] else { return nil }
-        let usd = (amount.value * price).truncated(to: 2)
+        let usd = (value * price).truncated(to: 2)
         return usd.formatted(.currency(code: "USD").presentation(.narrow))
     }
 
@@ -244,8 +261,182 @@ final class SendFlowModel {
 
     /// Fige le brouillon et ouvre la vérification (C4).
     func continueToReview() {
-        guard canReview, let recipient = resolvedRecipient, let drawer = selectedDrawer else { return }
-        draft = Draft(recipient: recipient, recipientName: recipientName, drawer: drawer, asset: asset, amount: amount.value)
+        guard canReview, let recipient = resolvedRecipient, let drawer = selectedDrawer, let network = context?.network else { return }
+        draft = SendDraft(
+            recipient: recipient, recipientName: recipientName, drawer: drawer,
+            asset: asset, amount: amount.value, network: network
+        )
         isReviewPresented = true
     }
+
+    // MARK: C4 → C5 / C6 · Signature
+
+    /// Rien ne doit interrompre ces étapes : retour par glissement, fermeture des feuilles et bouton retour bloqués.
+    var isSigningLocked: Bool {
+        switch signingStage {
+        case .preparing, .scanning, .signed: true
+        case .idle, .enteringPin, .waitingForTap: false
+        }
+    }
+
+    /// Feuille de signature (PIN ou tap) affichée.
+    var isSigningSheetPresented: Bool {
+        switch signingStage {
+        case .enteringPin, .waitingForTap, .scanning: true
+        case .idle, .preparing, .signed: false
+        }
+    }
+
+    /// Les étapes de la signature, dans l'ordre choisi. Sert aux libellés « Step 1 of 2 · PIN ».
+    var signingSteps: [SigningStep] {
+        guard let drawer = draft?.drawer else { return [] }
+        if let cardCheck, !cardCheck.usesPin {
+            // Ordre « tap puis PIN » : la carte lue n'a pas de PIN, le premier tap signe directement.
+            return [.tapToSign]
+        }
+        switch (signingOrder, drawer.usesPin) {
+        case (_, false): return [.tapToSign]
+        case (.pinThenTap, true): return [.pin, .tapToSign]
+        case (.tapThenPin, true): return [.tapToRead, .pin, .tapToSign]
+        }
+    }
+
+    /// Étape affichée dans la feuille.
+    var currentSigningStep: SigningStep? {
+        switch signingStage {
+        case .enteringPin: .pin
+        case .waitingForTap(let step), .scanning(let step): step
+        case .idle, .preparing, .signed: nil
+        }
+    }
+
+    /// « Looks good » : prépare l'envoi (réseau, avant toute session NFC), puis ouvre la première feuille.
+    /// Ignoré si une signature est déjà en cours : impossible d'envoyer deux fois.
+    func confirmReview() {
+        guard signingStage == .idle, let draft else { return }
+        signingErrorMessage = nil
+        signingStage = .preparing
+        Task {
+            do {
+                prepared = try await service.prepare(draft)
+                beginSigning()
+            } catch {
+                signingStage = .idle
+                signingErrorMessage = String(localized: "Couldn't get ready to send. Nothing was sent. Check your connection and try again.")
+            }
+        }
+    }
+
+    private func beginSigning() {
+        pin = ""
+        pinState = .entering
+        cardCheck = nil
+        switch signingSteps.first {
+        case .pin: signingStage = .enteringPin
+        case .tapToRead: signingStage = .waitingForTap(.tapToRead)
+        case .tapToSign, nil: signingStage = .waitingForTap(.tapToSign)
+        }
+    }
+
+    /// PIN complet : on passe au tap qui signe. Le PIN n'est envoyé à la carte que pendant ce tap.
+    func pinEntered(_ value: String) {
+        guard signingStage == .enteringPin, value.count == pinLength else { return }
+        pin = value
+        signingStage = .waitingForTap(.tapToSign)
+    }
+
+    /// « Scan my card » : ouvre la session NFC (factice ici).
+    func scanCard() {
+        guard case .waitingForTap(let step) = signingStage, let prepared else { return }
+        signingStage = .scanning(step)
+        Task {
+            do {
+                switch step {
+                case .tapToRead:
+                    let check = try await service.readCard(for: prepared)
+                    cardCheck = check
+                    if check.usesPin {
+                        signingStage = .enteringPin
+                    } else {
+                        // Carte sans PIN : au jalon 5, la même session NFC signera directement (un seul tap).
+                        signed = try await service.sign(prepared, pin: nil)
+                        finishSigning()
+                    }
+                case .tapToSign, .pin:
+                    signed = try await service.sign(prepared, pin: pinForSigning)
+                    finishSigning()
+                }
+            } catch {
+                // TODO(étape C) : mauvais PIN, carte bloquée, carte retirée, mauvaise carte, délai dépassé.
+                pin = ""
+                signingStage = .waitingForTap(step)
+            }
+        }
+    }
+
+    /// PIN à envoyer : seulement si la carte en a un.
+    private var pinForSigning: String? {
+        let cardUsesPin = cardCheck?.usesPin ?? draft?.drawer.usesPin ?? false
+        return cardUsesPin && !pin.isEmpty ? pin : nil
+    }
+
+    private func finishSigning() {
+        pin = ""
+        signingStage = .signed
+    }
+
+    /// « Cancel » ou feuille fermée : retour à la vérification, rien n'a été signé. Impossible pendant un scan.
+    func cancelSigning() {
+        switch signingStage {
+        case .enteringPin, .waitingForTap:
+            pin = ""
+            pinState = .entering
+            cardCheck = nil
+            prepared = nil
+            signingStage = .idle
+        case .idle, .preparing, .scanning, .signed:
+            break
+        }
+    }
+
+    /// Fin du parcours (provisoire, étape B) : retour au Wallet.
+    func finish() {
+        onExit?()
+    }
+}
+
+/// Ordre du PIN et du tap (DESIGN_NOTES §12, question 1 : à trancher après un test avec une vraie carte).
+enum SigningOrder: String, CaseIterable, Identifiable {
+    /// Vérification → PIN → un tap qui vérifie la carte, envoie le PIN et signe.
+    case pinThenTap
+    /// Vérification → tap (lecture de la carte) → PIN → second tap qui signe. iOS ne permet pas de taper
+    /// le PIN pendant que sa fenêtre NFC est ouverte : d'où le second tap.
+    case tapThenPin
+
+    var id: String { rawValue }
+}
+
+/// Une étape de la signature, telle que l'utilisateur la voit.
+enum SigningStep: Equatable {
+    case pin
+    /// Premier tap de l'ordre « tap puis PIN » : lecture seule, rien n'est signé.
+    case tapToRead
+    /// Le tap qui signe.
+    case tapToSign
+}
+
+/// Où en est la signature.
+enum SigningStage: Equatable {
+    /// Sur la vérification (C4).
+    case idle
+    /// Appels réseau avant la session NFC.
+    case preparing
+    /// Feuille du PIN.
+    case enteringPin
+    /// Feuille « approchez la carte », en attente de « Scan my card ».
+    case waitingForTap(SigningStep)
+    /// Session NFC en cours : rien ne doit l'interrompre.
+    case scanning(SigningStep)
+    /// Signé par la carte (l'envoi vient à l'étape C).
+    case signed
 }

@@ -1,12 +1,5 @@
 import Foundation
 
-/// Réseau Stellar sur lequel vivent les adresses affichées.
-/// Au jalon 5, il viendra de `Config/` (Testing → testnet, Release → mainnet, DESIGN_NOTES §12).
-enum ReceiveNetwork: Equatable {
-    case testnet
-    case mainnet
-}
-
 /// Un tiroir dans lequel on peut recevoir : Main (le compte partagé) ou le wallet d'une carte (sa Pocket).
 struct ReceiveDrawer: Equatable, Identifiable {
     enum Kind: Equatable {
@@ -25,7 +18,7 @@ struct ReceiveDrawer: Equatable, Identifiable {
 
 /// Ce que l'écran Recevoir a besoin de savoir : le réseau et les tiroirs, Main en premier.
 struct ReceiveOptions: Equatable {
-    var network: ReceiveNetwork
+    var network: StellarNetwork
     var drawers: [ReceiveDrawer]
 }
 

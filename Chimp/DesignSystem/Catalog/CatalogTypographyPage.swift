@@ -87,6 +87,7 @@ private struct CatalogTypographyRow: View {
         case .bodyL: Text("Nothing is moved yet. I'm just saying hello.")
         case .rowTitle: Text("Main account")
         case .optionTitle: Text("Jungle's wallet")
+        case .reviewStep: Text("Maya gets it in about 5 seconds")
         case .body, .bodyS: Text("Looking is free. Moving money takes a tap.")
         case .caption: Text("$820 ready · $500 growing")
         case .captionS: Text("12:15 · into Main")

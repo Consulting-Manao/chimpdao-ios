@@ -5,11 +5,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "%@" : {},
     "%@ card, number %@" : {},
+    "%@ gets it in about 5 seconds" : {},
     "%@ growing" : {},
     "%@ in %@" : {},
+    "%@ leaves %@" : {},
     "%@ ready" : {},
     "%@ this week" : {},
+    "%@'s PIN" : {},
     "%@'s wallet" : {},
     "%lld of %lld digits entered" : {},
     "+ Add" : {},
@@ -19,6 +23,7 @@
       "extractionState" : "manual"
     },
     "2 cards · Main + 2 wallets" : {},
+    "25 USDC leaves Jungle's wallet" : {},
     "Accessibility 1" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -58,13 +63,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "All with PIN" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Also used by the Send tile of the Wallet." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "Amount" : {},
-    "Amount (shown)" : {},
-    "Amount (value sent)" : {},
     "Amount, asset, quick amounts" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -188,6 +195,7 @@
     "Copied!" : {},
     "Copy" : {},
     "Copy address" : {},
+    "Couldn't get ready to send. Nothing was sent. Check your connection and try again." : {},
     "Couldn't refresh. Balances from %@." : {},
     "Couldn't refresh. Balances from 10:42." : {},
     "Cut short" : {
@@ -229,6 +237,7 @@
       "extractionState" : "manual"
     },
     "Disconnect this phone" : {},
+    "Done" : {},
     "Drawer card" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -271,6 +280,8 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Grab any of your cards. The money is in Main, so any of them can sign." : {},
+    "Grab your %@ card. The money is in its own wallet, so no other card can sign." : {},
     "Greeting adapts, weekly line hidden." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -320,7 +331,21 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "It's from %@, so only that card works." : {},
     "It's from Jungle's wallet, so only that card works." : {},
+    "It's from Main, so any of your cards works." : {},
+    "Jungle and Banana are DUOX cards: one tap, never a PIN." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Jungle and Banana are Infineon cards with a PIN." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Jungle has a PIN, Banana has none. From Main, Jungle is the card tapped." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Jungle's PIN" : {},
     "Jungle's wallet" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -335,6 +360,8 @@
       "extractionState" : "manual"
     },
     "Last step" : {},
+    "Last step · PIN" : {},
+    "Last step · Tap" : {},
     "Let's start" : {},
     "Light" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -389,10 +416,15 @@
       "extractionState" : "manual"
     },
     "Max" : {},
+    "Maya gets it in about 5 seconds" : {},
     "Memo ID" : {},
     "Memo ID · optional" : {},
     "Memo ID, optional" : {},
     "Minimum for text: 4.5:1 (WCAG AA). Left: mockup. Right: proposed value, now used by the token." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Mixed" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -428,12 +460,18 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Network" : {},
     "Network error" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Network fees paid by ChimpDAO" : {},
     "Next" : {},
     "No %@ in %@. Pick another drawer or asset." : {},
+    "No PIN (DUOX)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "No PIN needed. Just hold your card." : {},
     "No Testnet badge." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -508,7 +546,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Order" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "PIN" : {},
+    "PIN and tap" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "PIN length: %lld" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -522,13 +568,19 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "PIN then tap" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Paste" : {},
     "Paste it from the app or exchange you're paying." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "Paste it from the app or exchange you're paying. Check the first and last characters." : {},
+    "Paying %@ %@" : {},
     "Paying Maya $25.00" : {},
+    "Payments can't be undone once signed." : {},
     "Pick where your bananas grow" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -596,8 +648,20 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Release always uses PIN then tap until the order is decided." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Reset" : {},
     "Retry" : {},
+    "Review, PIN, then one tap that checks the card, sends the PIN and signs." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Review, a first tap to read the card, PIN, then a second tap to sign." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Risk" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -655,6 +719,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Signed by your card (practice run). Nothing was sent: sending comes in step C." : {},
     "Single drawer: no arrow, not a button." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -689,6 +754,8 @@
       "extractionState" : "manual"
     },
     "Step %lld of %lld" : {},
+    "Step %lld of %lld · PIN" : {},
+    "Step %lld of %lld · Tap" : {},
     "Step 1 of 2" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -725,7 +792,12 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Tap any of your cards" : {},
     "Tap one to copy it, then use Paste on C1." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Tap then PIN" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -733,7 +805,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Temporary screen (step A). The real review, PIN and tap come in step B." : {},
+    "Tap your %@ card again" : {},
     "Testnet" : {},
     "Text size" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -800,6 +872,7 @@
     "Unlocking a card isn't available yet." : {
       "comment" : "TODO : texte provisoire. Que faire quand une carte est bloquée (PUK ?) : à décider avec Pamphile."
     },
+    "Use the same card: your PIN is for %@." : {},
     "Valid G (Maya)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -837,6 +910,7 @@
       "extractionState" : "manual"
     },
     "What do you want to send?" : {},
+    "What your card signs" : {},
     "Where do I get a real one?" : {},
     "Where should it come from?" : {},
     "Where should it land?" : {},
@@ -895,6 +969,7 @@
       "extractionState" : "manual"
     },
     "You'll type your PIN right after." : {},
+    "Your card's PIN" : {},
     "Your cards" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"

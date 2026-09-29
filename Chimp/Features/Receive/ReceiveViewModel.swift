@@ -29,7 +29,7 @@ final class ReceiveViewModel {
 
     private(set) var phase: Phase = .loading
     private(set) var drawers: [DrawerContent] = []
-    private(set) var network: ReceiveNetwork = .testnet
+    private(set) var network: StellarNetwork = .testnet
     private(set) var selectedDrawerID: String?
     /// Vrai pendant quelques secondes après une copie (pilule « Copied! »).
     private(set) var isCopied = false
