@@ -18,7 +18,6 @@ struct WalletContent: Equatable {
         let amount: String
     }
 
-    var firstName: String?
     var total: String
     /// Variation hebdomadaire signée (« +$6.20 »), `nil` si la donnée n'existe pas.
     var weeklyChange: String?
@@ -34,7 +33,6 @@ struct WalletContent: Equatable {
 
     /// Valeurs de remplacement pour le squelette de chargement (jamais montrées lisibles).
     static let placeholder = WalletContent(
-        firstName: "Léo",
         total: "$0,000.00",
         weeklyChange: nil,
         mainAmount: "$0,000.00",
@@ -73,6 +71,9 @@ final class WalletViewModel {
 
     private let dataSource: WalletDataSource
     private var hasLoaded = false
+
+    /// Prénom du téléphone, indépendant du réseau (« Hey Barth » même si le premier chargement échoue).
+    var firstName: String? { dataSource.firstName }
 
     init(dataSource: WalletDataSource) {
         self.dataSource = dataSource
@@ -150,7 +151,6 @@ final class WalletViewModel {
         let total = usd(snapshot.allAssets)
         let isZero = snapshot.allAssets.allSatisfy { $0.amount == 0 } && growing == 0
         return WalletContent(
-            firstName: snapshot.firstName,
             total: total.map { ($0 + growing).formatted(currency) } ?? assetText(snapshot.allAssets),
             weeklyChange: total == nil ? nil : snapshot.weeklyChange?.formatted(currency.sign(strategy: .always())),
             mainAmount: amount(main.assets, plus: growing),

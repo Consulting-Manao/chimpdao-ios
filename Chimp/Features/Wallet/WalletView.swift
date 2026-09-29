@@ -56,7 +56,7 @@ struct WalletView: View {
     private func header(topSafeArea: CGFloat) -> some View {
         let content = model.content
         return ChimpBalanceHeader(
-            firstName: content?.firstName,
+            firstName: model.firstName,
             label: "Your whole banana pile",
             total: content?.total ?? "—",
             change: content?.weeklyChange.map { "\($0) this week" },

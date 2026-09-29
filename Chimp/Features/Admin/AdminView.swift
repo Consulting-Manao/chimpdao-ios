@@ -8,6 +8,7 @@ import UIKit
 /// Étape A : lecture d'une carte, et génération de la clé d'une Infineon vierge (slot 1 vide, avec confirmation).
 /// Étape B : clé admin (trousseau) et enregistrement (mint) de la carte lue sur testnet.
 /// Onboarding, étape 1 : « Resolve this card », diagnostic en lecture seule de la carte lue.
+/// Étape 5B : « Testnet money », 1000 XLM de testnet vers le Main account et chaque wallet de carte (`FundBlock` du terminal).
 ///
 /// Textes en anglais et **non traduits** : ils restent hors du String Catalog (`Text(verbatim:)`, `untranslated`),
 /// sinon Xcode les y ajouterait en Debug puis les supprimerait en Release, où ils n'existent pas.
@@ -20,6 +21,9 @@ struct AdminView: View {
     @State private var enrolModel: AdminEnrolModel?
     /// Diagnostic en lecture seule de la carte lue (onboarding, arrêt 1) ; recréé à chaque lecture.
     @State private var diagnosticsModel: AdminDiagnosticsModel?
+    /// Argent de test (étape 5B) : créé à l'affichage, avec le compte ouvert sur ce téléphone.
+    @State private var fundModel: AdminFundModel?
+    @Environment(AppSession.self) private var session
 
     var body: some View {
         ScrollView {
@@ -44,11 +48,15 @@ struct AdminView: View {
                 if let card = model.cardForEnrolment, let enrolModel {
                     AdminEnrolPanel(card: card, model: enrolModel, hasAdminKey: keyModel.hasKey || isMock)
                 }
+                if session.hasAccount, let fundModel {
+                    AdminFundPanel(model: fundModel, hasAdminKey: keyModel.hasKey || isSimulator, usdcFaucet: ChimpNetworkConfig.testnet.usdcFaucet)
+                }
             }
             .padding(ChimpSpacing.screenMargin)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(.chimpBackground))
+        .onAppear { if fundModel == nil { fundModel = makeFundModel() } }
         .navigationTitle(Text(verbatim: "Admin"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -73,6 +81,26 @@ struct AdminView: View {
             Text(verbatim: "Irreversible. The card creates its private key in slot 1: it can never be read, erased or replaced. "
                 + "Only for a blank Infineon card whose slot 1 is empty (6A88); the app checks again on the card before generating.")
         }
+    }
+
+    /// Sur simulateur (catalogue), faux financement : aucune requête. Sur iPhone : vrai testnet, clé admin du trousseau.
+    private var isSimulator: Bool {
+        #if targetEnvironment(simulator)
+        true
+        #else
+        false
+        #endif
+    }
+
+    private func makeFundModel() -> AdminFundModel? {
+        let funder: TestnetFunding
+        if isSimulator {
+            funder = MockTestnetFunding()
+        } else {
+            guard let network = try? ChainFundingNetwork(config: .testnet) else { return nil }
+            funder = TestnetFunder(keyStore: KeychainAdminKeyStore(network: .testnet), network: network)
+        }
+        return AdminFundModel(session: session, chain: ChainWalletReader(config: .testnet), funder: funder)
     }
 
     private var isMock: Bool {

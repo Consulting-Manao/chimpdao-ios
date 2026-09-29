@@ -126,19 +126,19 @@ struct EnrolmentTests {
         let mainnetPassphrase = ChimpNetworkConfig(
             network: .testnet, passphrase: "Public Global Stellar Network ; September 2015",
             endpoints: testnet.endpoints, contracts: testnet.contracts, feeSignerURL: testnet.feeSignerURL,
-            feePayer: testnet.feePayer, usdcIssuer: testnet.usdcIssuer
+            feePayer: testnet.feePayer, usdcIssuer: testnet.usdcIssuer, usdcFaucet: nil
         )
         let mainnetNetwork = ChimpNetworkConfig(
             network: .mainnet, passphrase: testnet.passphrase,
             endpoints: testnet.endpoints, contracts: testnet.contracts, feeSignerURL: testnet.feeSignerURL,
-            feePayer: testnet.feePayer, usdcIssuer: testnet.usdcIssuer
+            feePayer: testnet.feePayer, usdcIssuer: testnet.usdcIssuer, usdcFaucet: nil
         )
         let otherRPC = ChimpNetworkConfig(
             network: .testnet, passphrase: testnet.passphrase,
             endpoints: .init(rpc: URL(string: "https://rpc.lightsail.network")!, horizon: testnet.endpoints.horizon,
                              explorer: testnet.endpoints.explorer, friendbot: nil),
             contracts: testnet.contracts, feeSignerURL: testnet.feeSignerURL,
-            feePayer: testnet.feePayer, usdcIssuer: testnet.usdcIssuer
+            feePayer: testnet.feePayer, usdcIssuer: testnet.usdcIssuer, usdcFaucet: nil
         )
         for config in [mainnetPassphrase, mainnetNetwork, otherRPC] {
             #expect(throws: CardEnrolmentError.notTestnet) { try CardEnrolment.requireTestnet(config) }

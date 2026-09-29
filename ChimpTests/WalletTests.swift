@@ -130,7 +130,7 @@ struct WalletTests {
         let source = ChainWalletDataSource(session: session(cards: [Self.savedCard]), chain: chain, oracle: oracle)
 
         let snapshot = try await source.fetchWallet()
-        #expect(snapshot.firstName == "Léo")
+        #expect(source.firstName == "Léo")
         #expect(snapshot.main.assets == [AssetAmount(code: "XLM", amount: 100), AssetAmount(code: "USDC", amount: 0)])
         #expect(snapshot.cards.map(\.id) == [Self.cardKey.hex, Self.otherKey.hex])
         #expect(snapshot.cards[0].name == "Banana")
@@ -198,11 +198,25 @@ struct WalletTests {
         await #expect(throws: ChainWalletDataSource.ReadError.self) { try await source.fetchWallet() }
     }
 
+    @Test("Prénom : lu sur le téléphone, affiché même si le premier chargement échoue")
+    @MainActor func firstNameWithoutNetwork() async {
+        let chain = FakeWalletChain()
+        chain.members = [Self.cardKey]
+        // Aucun solde : la lecture échoue.
+        let model = WalletViewModel(dataSource: ChainWalletDataSource(
+            session: session(cards: [Self.savedCard], firstName: "Barth"), chain: chain, oracle: FakeOracle(prices: [:])
+        ))
+        #expect(model.firstName == "Barth")
+        await model.refresh()
+        #expect(model.phase == .failed)
+        #expect(model.firstName == "Barth")
+    }
+
     // MARK: Affichage
 
     private func snapshot(prices: [String: Decimal]) -> WalletSnapshot {
         WalletSnapshot(
-            firstName: "Léo", currencyCode: "USD",
+            currencyCode: "USD",
             main: DrawerBalance(assets: [AssetAmount(code: "XLM", amount: 1000), AssetAmount(code: "USDC", amount: 20)]),
             cards: [CardBalance(id: "k", number: "0007", name: "Banana", color: .banana, assets: [AssetAmount(code: "USDC", amount: 25)])],
             weeklyChange: 1, usdPrices: prices, fetchedAt: .distantPast

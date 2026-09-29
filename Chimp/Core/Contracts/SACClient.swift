@@ -30,6 +30,19 @@ struct SACClient {
         return Self.decimal(parts)
     }
 
+    /// `transfer(from, to, amount)` d'un SAC (`new Contract(token).call("transfer", from, to, i128)` du terminal).
+    /// `amount` en unités on-chain (stroops pour XLM), entier positif.
+    static func transferOperation(token: String, from: String, to: String, units: UInt64) throws -> InvokeHostFunctionOperation {
+        func address(_ strkey: String) throws -> SCAddressXDR {
+            strkey.hasPrefix("C") ? try SCAddressXDR(contractId: strkey) : try SCAddressXDR(accountId: strkey)
+        }
+        return try InvokeHostFunctionOperation.forInvokingContract(
+            contractId: token,
+            functionName: "transfer",
+            functionArguments: [.address(try address(from)), .address(try address(to)), .i128(Int128PartsXDR(hi: 0, lo: units))]
+        )
+    }
+
     /// `i128` → entier décimal exact (`hi · 2⁶⁴ + lo`), sans passer par un `Double`.
     static func decimal(_ parts: Int128PartsXDR) -> Decimal {
         Decimal(parts.hi) * Decimal(string: "18446744073709551616")! + Decimal(parts.lo)

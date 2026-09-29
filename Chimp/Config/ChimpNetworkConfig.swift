@@ -16,6 +16,9 @@ struct ChimpNetworkConfig: Equatable, Sendable {
     let feePayer: String
     /// Émetteur de l'USDC du réseau (`USDC_ISSUER` de `chain/assets.ts`, ARCHITECTURE §2.4).
     let usdcIssuer: String
+    /// Testnet seulement : où obtenir de l'USDC de test à la main (`faucet` de l'USDC dans `chain/assets.ts`).
+    /// `nil` sur mainnet (« mainnet: USDC must not carry a faucet »).
+    let usdcFaucet: URL?
 
     struct Endpoints: Equatable, Sendable {
         let rpc: URL
@@ -64,7 +67,8 @@ struct ChimpNetworkConfig: Equatable, Sendable {
         ),
         feeSignerURL: URL(string: "https://chimpdao-signer.tansu-964.workers.dev/")!,
         feePayer: "GDZE7UWGO3PS6R6RI6F3XIJLX7WGIEFD3X4YQO4AJH4LS3KDY6LLFXG2",
-        usdcIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+        usdcIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+        usdcFaucet: URL(string: "https://faucet.circle.com/")!
     )
 }
 

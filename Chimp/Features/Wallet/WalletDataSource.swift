@@ -8,11 +8,9 @@ struct AssetAmount: Equatable {
 
 /// Soldes du Wallet : montants par actif de chaque tiroir, et prix en dollars lus au même moment.
 ///
-/// Données locales ou encore sans source décidée (DESIGN_NOTES §12, questions 7 et 8) :
-/// `firstName` et `weeklyChange` sont facultatifs et masqués quand ils manquent.
+/// Donnée encore sans source décidée (DESIGN_NOTES §12, question 8) : `weeklyChange`, facultatif et masqué s'il manque.
+/// Le prénom n'en fait pas partie : il vient du téléphone (`WalletDataSource.firstName`), même si la lecture échoue.
 struct WalletSnapshot: Equatable {
-    /// Prénom saisi à l'onboarding (A4), stocké sur l'appareil.
-    var firstName: String?
     /// Devise d'affichage (code ISO 4217, ex. « USD »).
     var currencyCode: String
     /// Main : le compte partagé par toutes les cartes.
@@ -52,6 +50,8 @@ struct CardBalance: Equatable, Identifiable {
 
 /// Source des soldes du Wallet : `ChainWalletDataSource` (testnet) dans l'app, `MockWalletDataSource` dans le catalogue.
 protocol WalletDataSource {
+    /// Prénom saisi à l'onboarding (A4), lu sur le téléphone : l'en-tête l'affiche même si les soldes n'arrivent pas.
+    var firstName: String? { get }
     func fetchWallet() async throws -> WalletSnapshot
 }
 
@@ -85,6 +85,8 @@ final class MockWalletDataSource: WalletDataSource {
     var delay: Duration
     private var callCount = 0
 
+    var firstName: String? { scenario == .minimal ? nil : "Léo" }
+
     init(scenario: Scenario = .standard, delay: Duration = .milliseconds(800)) {
         self.scenario = scenario
         self.delay = delay
@@ -112,7 +114,6 @@ final class MockWalletDataSource: WalletDataSource {
         let jungle = CardBalance(id: "jungle", number: "0421", name: "Jungle", color: .jungle, assets: [usdc("62.50")])
         let banana = CardBalance(id: "banana", number: "0688", name: "Banana", color: .banana, assets: [xlm("12.50"), usdc("100")])
         var snapshot = WalletSnapshot(
-            firstName: "Léo",
             currencyCode: "USD",
             main: DrawerBalance(assets: [xlm("3000"), usdc("220")], growing: 500),
             cards: [jungle, banana],
@@ -125,7 +126,6 @@ final class MockWalletDataSource: WalletDataSource {
             snapshot.main.growing = nil
             snapshot.main.assets = [xlm("3000"), usdc("720")]
         case .minimal:
-            snapshot.firstName = nil
             snapshot.weeklyChange = nil
         case .zeroBalance:
             snapshot.main = DrawerBalance(assets: [xlm("0"), usdc("0")])

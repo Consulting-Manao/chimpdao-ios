@@ -24,6 +24,8 @@ struct ChainWalletDataSource: WalletDataSource {
     let oracle: PriceOracle
     var now: () -> Date = { .now }
 
+    var firstName: String? { session.wallet.firstName }
+
     enum ReadError: LocalizedError {
         case noAccount
 
@@ -54,7 +56,6 @@ struct ChainWalletDataSource: WalletDataSource {
         session.rememberCards(members.map(\.hex), account: account.address)
 
         let snapshot = WalletSnapshot(
-            firstName: local.firstName,
             currencyCode: "USD",
             main: DrawerBalance(assets: mainAssets),
             cards: cards,
