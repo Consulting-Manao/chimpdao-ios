@@ -156,10 +156,53 @@ enum Duox {
     }
 
     @discardableResult
-    private static func expectOK(_ result: (data: Data, statusWord: UInt16), command: String) throws(ChipError) -> Data {
+    static func expectOK(_ result: (data: Data, statusWord: UInt16), command: String) throws(ChipError) -> Data {
         guard result.statusWord == nativeOK else {
             throw .status(command: command, statusWord: result.statusWord)
         }
         return result.data
+    }
+}
+
+// MARK: - Signature
+
+/// Signature par ISO Internal Authenticate (`signDigest` et `intAuth` de `duox.js`) : la puce ne signe que
+/// les **16 premiers octets** du digest (le « challenge »), précédés de `F0F0 ‖ 8000 ‖ RndB`.
+extension Duox {
+    /// Slot de la clé PICC préchargée (`PICC_KEY_SLOT`).
+    static let piccKeySlot: UInt8 = 1
+
+    /// Internal Authenticate : `00 88 00 <slot> 16 80 00 7C 12 81 10 <challenge 16 o> 00`.
+    static func internalAuthenticateAPDU(challenge: Data, keySlot: UInt8 = piccKeySlot) -> Data {
+        let body = Data([0x80, 0x00, 0x7C, 0x12, 0x81, 0x10]) + challenge
+        return Data([0x00, 0x88, 0x00, keySlot, UInt8(body.count)]) + body + [0x00]
+    }
+
+    /// Réponse (`parseIntAuth`) : cherche les TLV `81 10 <RndB 16 o>` et `82 40 <r ‖ s 64 o>`, statut `90 00`.
+    static func parseInternalAuthenticate(_ response: APDUResponse) throws(ChipError) -> (rndB: Data, signature: Data) {
+        guard response.statusWord == 0x9000 else {
+            throw .status(command: "Internal Authenticate", statusWord: response.statusWord)
+        }
+        let data = [UInt8](response.data)
+        var rndB: Data?
+        var signature: Data?
+        var i = 0
+        while i + 2 <= data.count {
+            if data[i] == 0x81, data[i + 1] == 0x10, i + 18 <= data.count { rndB = Data(data[(i + 2)..<(i + 18)]) }
+            if data[i] == 0x82, data[i + 1] == 0x40, i + 66 <= data.count { signature = Data(data[(i + 2)..<(i + 66)]) }
+            i += 1
+        }
+        guard let rndB, let signature else {
+            throw .malformedResponse("Internal Authenticate: parse failed (\(response.data.hexString))")
+        }
+        return (rndB, signature)
+    }
+
+    static func sign(_ transport: some APDUTransport, digest: Data) async throws -> ChipSignedDigest {
+        try await expectOK(native(transport, selectPICCAPDU), command: "SelectApplication")
+        let challenge = digest.prefix(16)
+        let (rndB, raw) = try parseInternalAuthenticate(try await transport.send(internalAuthenticateAPDU(challenge: Data(challenge))))
+        // Le terminal compte sur le bridge pour le low-S P-256 (ARCHITECTURE §3.1) : on l'applique ici.
+        return .p256(signature: try SignatureEncoding.lowS(raw, curve: .p256), rndB: rndB)
     }
 }

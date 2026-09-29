@@ -6,7 +6,7 @@ import UIKit
 /// Mode admin (testnet) : outil de développement, sans maquette, construit avec le design system.
 /// Compilé uniquement en Debug et Testing (drapeau `CHIMP_ADMIN`), jamais en Release.
 /// Étape A : lecture d'une carte, et génération de la clé d'une Infineon vierge (slot 1 vide, avec confirmation).
-/// L'enregistrement (mint) arrive à l'étape B.
+/// Étape B : clé admin (trousseau) et enregistrement (mint) de la carte lue sur testnet.
 ///
 /// Textes en anglais et **non traduits** : ils restent hors du String Catalog (`Text(verbatim:)`, `untranslated`),
 /// sinon Xcode les y ajouterait en Debug puis les supprimerait en Release, où ils n'existent pas.
@@ -14,18 +14,29 @@ struct AdminView: View {
     @State private var model = AdminCardReadModel(nfcAvailable: NFCTagReaderSession.readingAvailable)
     @State private var copied = false
     @State private var isConfirmingKeyGeneration = false
+    @State private var keyModel = AdminKeyModel(store: KeychainAdminKeyStore(network: .testnet))
+    /// Enregistrement de la carte lue ; recréé à chaque lecture.
+    @State private var enrolModel: AdminEnrolModel?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ChimpSpacing.sectionGap) {
                 ChimpNoticeBanner(text: untranslated("Admin mode · Stellar Testnet · Debug and Testing builds only"))
+                AdminKeyPanel(model: keyModel)
                 readerPicker
                 ChimpButton(untranslated("Read a card"), isLoading: model.state == .reading) {
                     copied = false
-                    Task { await model.read() }
+                    enrolModel = nil
+                    Task {
+                        await model.read()
+                        prepareEnrolment()
+                    }
                 }
-                .disabled(model.isBusy)
+                .disabled(model.isBusy || (enrolModel?.isBusy ?? false))
                 result
+                if let card = model.cardForEnrolment, let enrolModel {
+                    AdminEnrolPanel(card: card, model: enrolModel, hasAdminKey: keyModel.hasKey || isMock)
+                }
             }
             .padding(ChimpSpacing.screenMargin)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -41,7 +52,11 @@ struct AdminView: View {
         ) {
             Button(role: .destructive) {
                 copied = false
-                Task { await model.generateKey() }
+                enrolModel = nil
+                Task {
+                    await model.generateKey()
+                    prepareEnrolment()
+                }
             } label: {
                 Text(verbatim: "Generate key (irreversible)")
             }
@@ -49,6 +64,27 @@ struct AdminView: View {
         } message: {
             Text(verbatim: "Irreversible. The card creates its private key in slot 1: it can never be read, erased or replaced. "
                 + "Only for a blank Infineon card whose slot 1 is empty (6A88); the app checks again on the card before generating.")
+        }
+    }
+
+    private var isMock: Bool {
+        if case .mock = model.readerChoice { return true }
+        return false
+    }
+
+    /// Carte lue (ou clé générée) : prépare l'enregistrement, avec les vrais services en NFC et des faux en mode factice.
+    private func prepareEnrolment() {
+        guard let card = model.cardForEnrolment else { return }
+        if isMock {
+            let signed: ChipSignedDigest = card.curve == .p256
+                ? .p256(signature: Data(repeating: 0x11, count: 64), rndB: Data(repeating: 0xAB, count: 16))
+                : .secp256k1(signature: Data(repeating: 0x11, count: 64))
+            enrolModel = AdminEnrolModel(makeService: { MockCardEnrolmentService() }, signer: MockChipSigner(outcome: .success(signed)))
+        } else {
+            enrolModel = AdminEnrolModel(
+                makeService: { try CardEnrolment(config: .testnet, keyStore: KeychainAdminKeyStore(network: .testnet)) },
+                signer: NFCChipSigner()
+            )
         }
     }
 
@@ -65,7 +101,7 @@ struct AdminView: View {
                 Text(verbatim: "Reader")
             }
             .pickerStyle(.menu)
-            .disabled(model.isBusy)
+            .disabled(model.isBusy || (enrolModel?.isBusy ?? false))
         }
         .foregroundStyle(.chimpTextPrimary)
     }

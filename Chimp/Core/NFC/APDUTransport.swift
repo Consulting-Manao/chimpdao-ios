@@ -12,6 +12,6 @@ struct APDUResponse: Equatable, Sendable {
 
 /// Envoie des APDU à la carte présente. Implémenté par la session Core NFC (`NFCChipReader`)
 /// et par de faux transports dans les tests. Toute erreur radio est levée, jamais transformée en statut.
-protocol APDUTransport: Sendable {
+protocol APDUTransport {
     func send(_ apdu: Data) async throws -> APDUResponse
 }

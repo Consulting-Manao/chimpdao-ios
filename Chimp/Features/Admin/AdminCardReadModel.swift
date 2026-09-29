@@ -46,6 +46,14 @@ final class AdminCardReadModel {
 
     var isBusy: Bool { state == .reading || state == .generating }
 
+    /// Carte qui peut être enregistrée : lue avec une clé, ou dont la clé vient d'être générée.
+    var cardForEnrolment: ChipKeyInfo? {
+        switch state {
+        case .read(let info), .generated(let info): info
+        default: nil
+        }
+    }
+
     /// La génération n'est proposée qu'après une lecture qui a trouvé le slot 1 vide (`6A88`) ;
     /// les autres statuts « pas de clé » du bridge (`6A82`, `6985`) ne l'autorisent pas.
     var canGenerateKey: Bool { state == .noKey(statusWord: Infineon2Go.emptyKeySlotStatusWord) }

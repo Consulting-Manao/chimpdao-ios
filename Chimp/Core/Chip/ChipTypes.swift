@@ -81,6 +81,16 @@ enum ChipError: Error, Equatable, Sendable {
     case transport(String)
     /// La session NFC s'est terminée pour une autre raison. Le texte vient d'iOS.
     case sessionFailed(String)
+    /// La carte présentée n'est pas celle qui a été lue avant (sa clé publique diffère).
+    case wrongCard
+    /// Infineon : le PIN doit faire 4 à 62 octets (`pinBytes` du bridge).
+    case invalidPINLength
+    /// Infineon : mauvais PIN (`63 Cx`, x = essais restants).
+    case wrongPIN(retriesLeft: Int)
+    /// Infineon : PIN bloqué (`69 83`).
+    case pinLocked
+    /// Infineon : la carte a un PIN et il n'a pas été donné (`69 85` au SIGN).
+    case pinRequired
     #if CHIMP_ADMIN
     /// Mode admin : génération refusée, la carte a déjà une clé n°1.
     case keyAlreadyPresent
@@ -107,6 +117,11 @@ extension ChipError: LocalizedError {
         case .invalidPublicKey(let length): "The card's public key is not a 65-byte SEC1 key (\(length) bytes)."
         case .transport(let detail): "The connection to the card was lost: \(detail)"
         case .sessionFailed(let detail): "NFC session failed: \(detail)"
+        case .wrongCard: "This is not the card that was read before."
+        case .invalidPINLength: "The PIN must be 4 to 62 characters."
+        case .wrongPIN(let retries): "Wrong PIN, \(retries) tries left."
+        case .pinLocked: "The PIN is locked."
+        case .pinRequired: "This card needs its PIN to sign."
         #if CHIMP_ADMIN
         case .keyAlreadyPresent: "This card already has a key in slot 1. Nothing was generated."
         case .keyGenerationUnsupported(let chip): "\(chip) can't generate a key. Nothing was generated."
