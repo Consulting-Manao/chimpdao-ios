@@ -6,6 +6,8 @@ private struct ChimpBobModifier: ViewModifier {
     let duration: Double
     let amplitude: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// L'horloge ne tourne que si la vue est à l'écran.
+    @State private var isOnScreen = false
 
     func body(content: Content) -> some View {
         if reduceMotion {
@@ -13,9 +15,19 @@ private struct ChimpBobModifier: ViewModifier {
         } else {
             // Horloge plutôt qu'animation SwiftUI : seul le décalage vertical bouge. Une animation en boucle
             // (`phaseAnimator`) animait aussi les changements de taille au premier affichage (Chimpy qui « grandit »).
-            TimelineView(.animation) { context in
-                content.offset(y: -amplitude * Self.height(at: context.date.timeIntervalSinceReferenceDate, duration: duration))
+            //
+            // Deux précautions (jalon 7) : l'horloge est **arrêtée** quand la vue n'est plus à l'écran (un écran
+            // recouvert dans une pile de navigation reste vivant), et le décalage passe par `visualEffect`, qui ne
+            // touche qu'au rendu. Avec `offset`, chaque image relançait la mise en page de toute la pile : sous C2
+            // (`GeometryReader` + `ViewThatFits`), l'app tournait à 100 % du processeur et ne répondait plus.
+            TimelineView(.animation(paused: !isOnScreen)) { context in
+                let height = Self.height(at: context.date.timeIntervalSinceReferenceDate, duration: duration)
+                content.visualEffect { effect, _ in
+                    effect.offset(y: -amplitude * height)
+                }
             }
+            .onAppear { isOnScreen = true }
+            .onDisappear { isOnScreen = false }
         }
     }
 

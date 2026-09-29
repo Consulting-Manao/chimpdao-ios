@@ -32,6 +32,10 @@ struct CardTapSheet: View {
     let pinStatus: CardTapPinStatus
     /// Session NFC en cours d'ouverture : le bouton affiche une roue et ne réagit plus.
     var isScanning = false
+    /// Tap précédent raté, avant toute signature (carte refusée, carte retirée…) : message au-dessus du bouton.
+    var problem: LocalizedStringKey?
+    /// Texte technique de ce problème, repliable (« Technical details »).
+    var problemDetails: String?
     let onScan: () -> Void
     /// Lien « Cancel » affiché seulement si une action est fournie.
     var onCancel: (() -> Void)?
@@ -76,6 +80,17 @@ struct CardTapSheet: View {
 
             pinLine
                 .padding(.top, ChimpSpacing.m)
+
+            if let problem {
+                VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
+                    ChimpFieldMessage(text: problem, kind: .error)
+                    if let problemDetails {
+                        ChimpTechnicalDetails(details: problemDetails)
+                    }
+                }
+                .multilineTextAlignment(.leading)
+                .padding(.top, ChimpSpacing.s)
+            }
 
             ChimpButton("Scan my card", isLoading: isScanning, action: onScan)
                 .padding(.top, ChimpSpacing.ml)

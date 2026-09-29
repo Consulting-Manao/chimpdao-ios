@@ -118,8 +118,14 @@ struct PaymentClient {
     ///
     /// Toute erreur est rendue dans un `PaymentFailure` qui porte la trace de l'envoi : l'entrée signée est sortie du
     /// téléphone (simulation, serveur de frais), il faudra `check` pour savoir ce qu'il est devenu.
-    func submit(_ prepared: PreparedPayment, signed: CardSignatures, feeSigner: FeeSigner) async throws -> String {
+    func submit(
+        _ prepared: PreparedPayment,
+        signed: CardSignatures,
+        feeSigner: FeeSigner,
+        onProgress: ((PaymentProgress) -> Void)? = nil
+    ) async throws -> String {
         var trace = prepared.trace
+        onProgress?(.checking)
         do {
             guard prepared.acceptedKeys.contains(signed.card.publicKey) else {
                 throw ChipError.cardNotAccepted(tapped: signed.card.publicKey)
@@ -151,7 +157,8 @@ struct PaymentClient {
                 throw ChipError.malformedResponse("the signature doesn't match the card's curve")
             }
             trace.transactionMaxTime = transaction.preconditions?.timeBounds?.maxTime
-            return try await client.refitAndSubmit(transaction, feeSigner: feeSigner)
+            onProgress?(.sending)
+            return try await client.refitAndSubmit(transaction, feeSigner: feeSigner) { onProgress?(.confirming) }
         } catch {
             trace.transactionHash = Self.sentHash(in: error)
             throw PaymentFailure(trace: trace, underlying: error)
@@ -324,9 +331,19 @@ struct PreparedPayment {
     }
 }
 
+/// Où en est l'envoi après le tap (écran « Sending… »).
+enum PaymentProgress: Equatable, Sendable {
+    /// Simulation avec la signature de la carte (et recherche du `recovery_id`).
+    case checking
+    /// Frais signés par le serveur de frais, puis envoi.
+    case sending
+    /// Accepté par le réseau, en attente de confirmation.
+    case confirming
+}
+
 /// Ce qu'il faut garder d'un paiement après le tap pour « Check again » : rien de secret (des adresses, un montant,
-/// un nonce public et des numéros de ledger).
-struct PaymentTrace: Equatable, Sendable {
+/// un nonce public et des numéros de ledger). Enregistrable sur le téléphone tant que l'issue est incertaine.
+struct PaymentTrace: Equatable, Sendable, Codable {
     let token: String
     let from: String
     let destination: String

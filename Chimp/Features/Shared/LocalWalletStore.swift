@@ -15,11 +15,31 @@ struct LocalWallet: Codable, Equatable {
     var account: SavedAccount?
     /// Dernier compte **vérifié** de chaque carte vue sur ce téléphone (`cardHint` du terminal), le plus récent d'abord.
     var cardHints: [CardHint] = []
+    /// Paiement signé dont l'issue n'est pas encore certaine (envoyé sans confirmation, ou autorisation encore valable).
+    /// Tant qu'il est là, Envoyer rouvre son écran d'état au lieu d'un nouvel envoi : jamais de double paiement, même
+    /// après un redémarrage de l'app (décision de Barth, DESIGN_NOTES §12 et question 16).
+    var pendingSend: PendingSend?
 
     /// Compte mémorisé pour cette carte, vérifié en premier par la résolution (jamais cru sans `has_card`).
     func hint(for publicKey: ChipPublicKey) -> String? {
         cardHints.first { $0.key == publicKey.hex }?.account
     }
+}
+
+/// Un paiement signé à l'issue incertaine. Rien de secret : la trace publique (adresses, montant, nonce, ledgers) et
+/// de quoi réafficher ce qui a été signé.
+struct PendingSend: Codable, Equatable {
+    var trace: PaymentTrace
+    /// Adresse exacte payée (G, M ou C) et nom local du destinataire.
+    var recipient: String
+    var recipientName: String?
+    /// Tiroir source tel qu'affiché (« Main account », « Jungle's wallet »).
+    var drawerTitle: String
+    /// `SendAsset.rawValue`.
+    var asset: String
+    /// Montant dans l'unité de l'actif.
+    var amount: Decimal
+    var signedAt: Date
 }
 
 /// Un Main account et ses cartes connues sur ce téléphone.

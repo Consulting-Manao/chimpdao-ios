@@ -84,6 +84,15 @@ final class AppSession {
         try? persist(next)
     }
 
+    /// Paiement à l'issue incertaine (`nil` : aucun). Enregistré **avant** d'afficher l'état, effacé quand l'issue est
+    /// certaine (envoyé, ou rien n'est parti). Lève une erreur si le téléphone n'a pas pu l'écrire.
+    func setPendingSend(_ pending: PendingSend?) throws {
+        guard wallet.pendingSend != pending else { return }
+        var next = wallet
+        next.pendingSend = pending
+        try persist(next)
+    }
+
     /// Compte créé **et confirmé sur la chaîne** (étape 4) : on l'enregistre sur le téléphone, avec le prénom, le nom
     /// et la couleur de la carte (données locales), puis A7 s'affiche avant le Wallet.
     func completeOnboarding(account: String, card: SavedCard, firstName: String, at date: Date = .now) throws {

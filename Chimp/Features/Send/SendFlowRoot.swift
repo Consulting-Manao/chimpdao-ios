@@ -20,17 +20,26 @@ struct SendFlowRoot: View {
     }
 
     var body: some View {
-        SendRecipientView(model: model, onBack: onExit)
-            .toolbar(.hidden, for: .navigationBar)
+        Group {
+            if model.resumedPending {
+                // Un paiement signé attend encore son issue : son état, jamais un nouvel envoi.
+                SendStatusView(model: model)
+            } else {
+                SendRecipientView(model: model, onBack: onExit)
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
-/// Réglages du parcours factice, choisis dans le catalogue (page « Send », Debug et Testing).
-/// En Release : données de la maquette, cartes avec PIN, ordre « PIN puis tap ».
+/// Réglages du parcours, choisis dans le catalogue (page « Send », Debug et Testing) : l'ordre PIN / tap vaut aussi pour
+/// le vrai envoi ; les données, les cartes et l'issue seulement pour le parcours factice du catalogue.
+/// En Release : ordre « PIN puis tap ».
 enum SendMockSettings {
     static let dataScenarioKey = "sendMockDataScenario"
     static let cardSetupKey = "sendMockCardSetup"
     static let signingOrderKey = "sendSigningOrder"
+    static let resultScenarioKey = "sendMockResultScenario"
 
     static var dataScenario: MockSendService.DataScenario {
         #if DESIGN_CATALOG
@@ -58,8 +67,17 @@ enum SendMockSettings {
         #endif
     }
 
+    static var resultScenario: MockSendService.ResultScenario {
+        #if DESIGN_CATALOG
+        stored(resultScenarioKey) ?? .sent
+        #else
+        .sent
+        #endif
+    }
+
+    /// Parcours factice du catalogue (données, cartes et issue choisies dans la page « Send »).
     static func makeService() -> SendService {
-        MockSendService(dataScenario: dataScenario, cardSetup: cardSetup)
+        MockSendService(dataScenario: dataScenario, cardSetup: cardSetup, resultScenario: resultScenario)
     }
 
     private static func stored<Value: RawRepresentable>(_ key: String) -> Value? where Value.RawValue == String {

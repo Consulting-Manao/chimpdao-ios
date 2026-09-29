@@ -18,6 +18,8 @@ struct PinSheet: View {
     @Binding var pin: String
     let length: Int
     @Binding var state: ChimpPinState
+    /// Paiement : « … Nothing was sent. » après un PIN faux.
+    var saysNothingWasSent = false
     var onComplete: (String) -> Void = { _ in }
 
     var body: some View {
@@ -38,7 +40,7 @@ struct PinSheet: View {
                     .foregroundStyle(.chimpTextSecondary)
                     .padding(.top, ChimpSpacing.xxs)
             }
-            ChimpPinPad(pin: $pin, length: length, state: $state, onComplete: onComplete)
+            ChimpPinPad(pin: $pin, length: length, state: $state, saysNothingWasSent: saysNothingWasSent, onComplete: onComplete)
         }
         .multilineTextAlignment(.center)
         .padding(.horizontal, ChimpSpacing.xxl)

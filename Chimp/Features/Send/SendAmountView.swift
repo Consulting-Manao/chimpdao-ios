@@ -5,17 +5,20 @@ import SwiftUI
 /// C3 : feuille « Where should it come from? ». Feuille de choix de l'actif (non dessinée).
 ///
 /// Le montant est gardé comme des touches (`AmountEntry`) : sa valeur ne dépend jamais de la langue du téléphone.
+///
+/// Retour par le drapeau du ViewModel, jamais par `@Environment(\.dismiss)` : lu par C2 et C4, poussés l'un sur l'autre
+/// par `navigationDestination(isPresented:)`, `dismiss` changeait à chaque rendu de l'autre écran, en boucle
+/// (app figée sur « Check it over », 100 % du processeur ; corrigé au jalon 7).
 struct SendAmountView: View {
     @Bindable var model: SendFlowModel
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.chimpScreenInsets) private var screenInsets
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(title: title, step: 2, steps: 3, onBack: { dismiss() })
+            ChimpHeader(title: title, step: 2, steps: 3, onBack: { model.isAmountPresented = false })
             switch model.loadPhase {
             case .failed:
                 failure

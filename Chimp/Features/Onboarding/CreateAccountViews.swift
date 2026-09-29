@@ -109,14 +109,9 @@ struct CreatingAccountView: View {
             ChimpHeader(title: title, subtitle: subtitle)
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.l) {
-                    VStack(alignment: .leading, spacing: ChimpSpacing.m) {
-                        ForEach(CreationStep.allCases, id: \.self) { step in
-                            row(step)
-                        }
-                    }
-                    .padding(ChimpSpacing.lg + ChimpBorder.regular)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.panel), fill: Color(.chimpSurface), shadow: .card)
+                    ChimpProgressSteps(steps: CreationStep.allCases.enumerated().map { index, step in
+                        ChimpProgressStep(id: index, label: Text(label(step)), state: state(of: step))
+                    })
 
                     if case .failed(let problem) = model.phase {
                         VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
@@ -173,35 +168,6 @@ struct CreatingAccountView: View {
         }
     }
 
-    private func row(_ step: CreationStep) -> some View {
-        let state = state(of: step)
-        return HStack(spacing: ChimpSpacing.m) {
-            ZStack {
-                switch state {
-                case .done:
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.chimpPositive)
-                case .current:
-                    ProgressView()
-                case .failed:
-                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.chimpNegative)
-                case .todo:
-                    Image(systemName: "circle").foregroundStyle(.chimpTextSecondary)
-                }
-            }
-            .font(.system(size: 22, weight: .heavy))
-            .frame(width: 28, height: 28)
-            .accessibilityHidden(true)
-            Text(label(step))
-                .chimpFont(.reviewStep)
-                .foregroundStyle(state == .todo ? Color(.chimpTextSecondary) : Color(.chimpTextPrimary))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(Text(stateLabel(state)))
-    }
-
-    private enum RowState { case done, current, failed, todo }
-
     /// Étape où l'on en est (la dernière atteinte, même en cas d'échec).
     private var reached: CreationStep? {
         switch model.phase {
@@ -214,7 +180,7 @@ struct CreatingAccountView: View {
     /// Mémorise la dernière étape atteinte pour l'affichage de l'échec.
     private var lastStep: CreationStep? { model.lastReachedStep }
 
-    private func state(of step: CreationStep) -> RowState {
+    private func state(of step: CreationStep) -> ChimpProgressStep.State {
         if model.createdResult != nil { return .done }
         guard let reached else { return .todo }
         if step < reached { return .done }
@@ -231,15 +197,6 @@ struct CreatingAccountView: View {
         case .creatingAccount: "Creating your Main account"
         case .linkingCard: "Linking \(model.displayCardName) to it"
         case .confirming: "Confirming on Stellar"
-        }
-    }
-
-    private func stateLabel(_ state: RowState) -> LocalizedStringKey {
-        switch state {
-        case .done: "Done"
-        case .current: "In progress"
-        case .failed: "Failed"
-        case .todo: "Not started"
         }
     }
 

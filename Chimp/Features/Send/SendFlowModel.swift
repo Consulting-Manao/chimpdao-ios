@@ -66,8 +66,25 @@ final class SendFlowModel {
     private(set) var cardCheck: CardCheck?
     private var prepared: PreparedSend?
     private(set) var signed: SignedSend?
-    /// Message si la préparation a échoué (rien n'a été envoyé). Les erreurs détaillées viennent à l'étape C.
+    /// Message si la préparation a échoué (rien n'a été envoyé), sous « Looks good ».
     private(set) var signingErrorMessage: String?
+    /// Problème dans la feuille du tap après un échec **avant** toute signature (carte refusée, NFC, réseau) :
+    /// rien n'a été signé, on peut retaper.
+    private(set) var tapProblem: TapProblem?
+    /// Texte technique du dernier problème (« Technical details », pour le support).
+    private(set) var technicalDetails: String?
+
+    /// Paiement signé dont l'issue n'est pas certaine : gardé sur le téléphone jusqu'à ce qu'elle le soit.
+    private(set) var pending: PendingSend?
+    /// Ce qui a été signé, pour les écrans d'après (envoi, C9, reçu, issue incertaine).
+    private(set) var summary: SendSummary?
+    /// Le parcours s'est ouvert sur un paiement en attente (Envoyer rouvert, ou app relancée) : l'écran d'état
+    /// remplace C1, et « Try again » n'existe pas (il n'y a plus de brouillon).
+    private(set) var resumedPending = false
+    /// Le téléphone n'a pas pu enregistrer le paiement en attente (rare) : l'écran le dit.
+    private(set) var pendingSaveFailed = false
+    var isReceiptPresented = false
+    private var waitTask: Task<Void, Never>?
     /// Longueur du PIN des cartes : ⚠️ à confirmer avec Pamphile (le VERIFY PIN Infineon accepte 4 à 62 octets).
     let pinLength = 4
 
@@ -87,6 +104,14 @@ final class SendFlowModel {
     func loadIfNeeded() async {
         guard !hasLoaded else { return }
         hasLoaded = true
+        if let waiting = service.pendingSend {
+            // Un paiement signé attend encore son issue : on la vérifie au lieu de proposer un nouvel envoi.
+            pending = waiting
+            summary = SendSummary(waiting, network: context?.network ?? .testnet)
+            resumedPending = true
+            await check()
+            return
+        }
         await load()
     }
 
@@ -274,7 +299,7 @@ final class SendFlowModel {
     /// Rien ne doit interrompre ces étapes : retour par glissement, fermeture des feuilles et bouton retour bloqués.
     var isSigningLocked: Bool {
         switch signingStage {
-        case .preparing, .scanning, .signed: true
+        case .preparing, .scanning, .sending, .checking, .finished: true
         case .idle, .enteringPin, .waitingForTap: false
         }
     }
@@ -283,7 +308,15 @@ final class SendFlowModel {
     var isSigningSheetPresented: Bool {
         switch signingStage {
         case .enteringPin, .waitingForTap, .scanning: true
-        case .idle, .preparing, .signed: false
+        case .idle, .preparing, .sending, .checking, .finished: false
+        }
+    }
+
+    /// Écran d'état (envoi en cours, C9, issue incertaine) à la place de la vérification.
+    var showsStatus: Bool {
+        switch signingStage {
+        case .sending, .checking, .finished: true
+        case .idle, .preparing, .enteringPin, .waitingForTap, .scanning: false
         }
     }
 
@@ -306,7 +339,7 @@ final class SendFlowModel {
         switch signingStage {
         case .enteringPin: .pin
         case .waitingForTap(let step), .scanning(let step): step
-        case .idle, .preparing, .signed: nil
+        case .idle, .preparing, .sending, .checking, .finished: nil
         }
     }
 
@@ -315,6 +348,7 @@ final class SendFlowModel {
     func confirmReview() {
         guard signingStage == .idle, let draft else { return }
         signingErrorMessage = nil
+        technicalDetails = nil
         signingStage = .preparing
         Task {
             do {
@@ -322,7 +356,8 @@ final class SendFlowModel {
                 beginSigning()
             } catch {
                 signingStage = .idle
-                signingErrorMessage = String(localized: "Couldn't get ready to send. Nothing was sent. Check your connection and try again.")
+                signingErrorMessage = Self.preparationMessage(for: error, drawer: draft.drawer)
+                technicalDetails = Self.details(error)
             }
         }
     }
@@ -331,6 +366,7 @@ final class SendFlowModel {
         pin = ""
         pinState = .entering
         cardCheck = nil
+        tapProblem = nil
         switch signingSteps.first {
         case .pin: signingStage = .enteringPin
         case .tapToRead: signingStage = .waitingForTap(.tapToRead)
@@ -342,35 +378,69 @@ final class SendFlowModel {
     func pinEntered(_ value: String) {
         guard signingStage == .enteringPin, value.count == pinLength else { return }
         pin = value
+        tapProblem = nil
         signingStage = .waitingForTap(.tapToSign)
     }
 
-    /// « Scan my card » : ouvre la session NFC (factice ici).
+    /// « Scan my card » : ouvre la session NFC. Avant le tap qui signe, l'autorisation est refaite si elle arrive à
+    /// expiration (réseau, avant la session NFC).
     func scanCard() {
-        guard case .waitingForTap(let step) = signingStage, let prepared else { return }
+        guard case .waitingForTap(let step) = signingStage, let current = prepared else { return }
         signingStage = .scanning(step)
+        tapProblem = nil
         Task {
             do {
                 switch step {
                 case .tapToRead:
-                    let check = try await service.readCard(for: prepared)
+                    let check = try await service.readCard(for: current)
                     cardCheck = check
                     if check.usesPin {
                         signingStage = .enteringPin
                     } else {
-                        // Carte sans PIN : au jalon 5, la même session NFC signera directement (un seul tap).
-                        signed = try await service.sign(prepared, pin: nil)
-                        finishSigning()
+                        try await signAndSend(current, pin: nil)
                     }
                 case .tapToSign, .pin:
-                    signed = try await service.sign(prepared, pin: pinForSigning)
-                    finishSigning()
+                    try await signAndSend(current, pin: pinForSigning)
                 }
             } catch {
-                // TODO(étape C) : mauvais PIN, carte bloquée, carte retirée, mauvaise carte, délai dépassé.
-                pin = ""
-                signingStage = .waitingForTap(step)
+                handleTapError(error, step: step)
             }
+        }
+    }
+
+    private func signAndSend(_ current: PreparedSend, pin: String?) async throws {
+        let fresh = try await service.refreshedIfNeeded(current)
+        prepared = fresh
+        let signed = try await service.sign(fresh, pin: pin)
+        self.pin = ""
+        self.signed = signed
+        await send(signed)
+    }
+
+    /// Échec **avant** toute signature : rien n'est parti. Annulation : retour à la feuille, sans message.
+    /// Le PIN n'est effacé que s'il est en cause ; sinon il reste en mémoire pour retaper (« PIN ready »), et il sera
+    /// effacé à la signature ou à l'annulation.
+    private func handleTapError(_ error: Error, step: SigningStep) {
+        switch error {
+        case ChipError.cancelled:
+            signingStage = .waitingForTap(step)
+        case ChipError.wrongPIN(let retriesLeft):
+            pin = ""
+            pinState = .wrong(triesLeft: retriesLeft)
+            signingStage = .enteringPin
+        case ChipError.pinLocked:
+            pin = ""
+            pinState = .blocked
+            signingStage = .enteringPin
+        case ChipError.pinRequired:
+            // La carte a un PIN que l'app ne pensait pas nécessaire : on le demande, puis on retape.
+            pin = ""
+            pinState = .entering
+            signingStage = .enteringPin
+        default:
+            tapProblem = Self.tapProblem(for: error)
+            technicalDetails = Self.details(error)
+            signingStage = .waitingForTap(step == .tapToRead ? .tapToRead : .tapToSign)
         }
     }
 
@@ -378,11 +448,6 @@ final class SendFlowModel {
     private var pinForSigning: String? {
         let cardUsesPin = cardCheck?.usesPin ?? draft?.drawer.usesPin ?? false
         return cardUsesPin && !pin.isEmpty ? pin : nil
-    }
-
-    private func finishSigning() {
-        pin = ""
-        signingStage = .signed
     }
 
     /// « Cancel » ou feuille fermée : retour à la vérification, rien n'a été signé. Impossible pendant un scan.
@@ -393,16 +458,183 @@ final class SendFlowModel {
             pinState = .entering
             cardCheck = nil
             prepared = nil
+            tapProblem = nil
             signingStage = .idle
-        case .idle, .preparing, .scanning, .signed:
+        case .idle, .preparing, .scanning, .sending, .checking, .finished:
             break
         }
     }
 
-    /// Fin du parcours (provisoire, étape B) : retour au Wallet.
+    // MARK: Envoi et issue (étape C)
+
+    /// Après la signature : envoi, puis C9 ; sinon l'issue est vérifiée (`check`), jamais devinée.
+    private func send(_ signed: SignedSend) async {
+        let draft = signed.prepared.draft
+        summary = SendSummary(draft)
+        signingStage = .sending(.checking)
+        do {
+            let receipt = try await service.submit(signed) { [weak self] progress in
+                self?.signingStage = .sending(progress)
+            }
+            finish(with: .sent(receipt))
+        } catch {
+            technicalDetails = Self.details(error)
+            guard let failure = error as? PaymentFailure else {
+                // Ne devrait pas arriver (le service rend toujours une trace) : on ne conclut rien.
+                signingStage = .finished(.undetermined)
+                return
+            }
+            let waiting = PendingSend(
+                trace: failure.trace, recipient: draft.recipient.address, recipientName: draft.recipientName,
+                drawerTitle: draft.drawer.title, asset: draft.asset.rawValue, amount: draft.amount, signedAt: .now
+            )
+            pending = waiting
+            do {
+                try service.setPendingSend(waiting)
+            } catch {
+                pendingSaveFailed = true
+            }
+            await check()
+        }
+    }
+
+    /// « Check again ».
+    func checkAgain() {
+        switch signingStage {
+        case .finished(.notConfirmed), .finished(.undetermined):
+            Task { await check() }
+        default:
+            break
+        }
+    }
+
+    private func check() async {
+        guard let pending else { return }
+        waitTask?.cancel()
+        signingStage = .checking
+        do {
+            switch try await service.check(pending.trace) {
+            case .sent(let hash):
+                let receipt = SendReceipt(
+                    summary: summary ?? SendSummary(pending, network: context?.network ?? .testnet),
+                    transactionHash: hash, sentAt: pending.signedAt, explorerURL: service.explorerURL(transactionHash: hash)
+                )
+                finish(with: .sent(receipt))
+            case .pending:
+                signingStage = .finished(.notConfirmed)
+            case .waiting(_, let end):
+                signingStage = .finished(.waiting(until: end))
+                scheduleCheck(at: end)
+            case .nothingSent:
+                finish(with: .nothingSent)
+            case .undetermined(let reason):
+                technicalDetails = [technicalDetails, reason].compactMap { $0 }.joined(separator: "\n")
+                signingStage = .finished(.undetermined)
+            }
+        } catch {
+            // La vérification elle-même a échoué (réseau) : on ne conclut rien.
+            technicalDetails = Self.details(error)
+            signingStage = .finished(.undetermined)
+        }
+    }
+
+    /// Revérifie tout seul quand l'autorisation a expiré. L'heure affichée est une estimation : si le ledger n'est
+    /// pas encore fermé, la vérification redonne une nouvelle heure.
+    private func scheduleCheck(at end: Date) {
+        waitTask?.cancel()
+        waitTask = Task { [weak self] in
+            let delay = max(0, end.timeIntervalSinceNow) + 1
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self else { return }
+            // Ne pas se laisser annuler par `check`, qui annule l'attente en cours : c'est elle qui l'appelle.
+            waitTask = nil
+            await check()
+        }
+    }
+
+    /// Issue certaine : le paiement en attente est effacé du téléphone.
+    private func finish(with outcome: SendOutcome) {
+        waitTask?.cancel()
+        pending = nil
+        try? service.setPendingSend(nil)
+        signingStage = .finished(outcome)
+    }
+
+    /// Page de la transaction dans l'explorateur (reçu, issue incertaine), si un hash est connu.
+    var explorerURL: URL? {
+        if case .finished(.sent(let receipt)) = signingStage { return receipt.explorerURL }
+        return pending?.trace.transactionHash.flatMap(service.explorerURL(transactionHash:))
+    }
+
+    /// « Try again » après « Nothing was sent » (certain) : retour à la vérification, avec le même brouillon.
+    var canTryAgain: Bool {
+        signingStage == .finished(.nothingSent) && draft != nil && !resumedPending
+    }
+
+    func tryAgain() {
+        guard canTryAgain else { return }
+        prepared = nil
+        signed = nil
+        technicalDetails = nil
+        summary = nil
+        signingStage = .idle
+    }
+
+    /// Fin du parcours : retour au Wallet. Un paiement en attente reste enregistré (Envoyer le rouvrira).
     func finish() {
+        waitTask?.cancel()
         onExit?()
     }
+
+    // MARK: Messages
+
+    static func details(_ error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? "\(error)"
+    }
+
+    /// Préparation ratée (avant la carte) : rien n'a été signé.
+    static func preparationMessage(for error: Error, drawer: SendDrawer) -> String {
+        switch error {
+        case PaymentClient.PaymentError.insufficientBalance:
+            String(localized: "Not enough in \(drawer.title). Nothing was sent.")
+        default:
+            String(localized: "Couldn't get ready to send. Nothing was sent. Check your connection and try again.")
+        }
+    }
+
+    /// Tap raté, avant toute signature : le genre de problème (le texte est choisi par la vue).
+    static func tapProblem(for error: Error) -> TapProblem {
+        switch error {
+        case ChipError.cardNotAccepted: .cardNotAccepted
+        case let chip as ChipError: .card(AccountSetupModel.problemKind(for: chip))
+        default: .network
+        }
+    }
+}
+
+/// Échec d'un tap, avant toute signature : rien n'est parti.
+enum TapProblem: Equatable {
+    /// La carte tapée ne peut pas signer ce paiement (C7 complet à l'étape 4).
+    case cardNotAccepted
+    /// Erreur NFC ou de la carte : messages de Chimpy de l'onboarding (DESIGN_NOTES §11.2).
+    case card(OnboardingProblem.Kind)
+    /// Préparation refaite juste avant le tap, ratée (réseau).
+    case network
+}
+
+/// Issue d'un envoi, une fois la carte passée.
+enum SendOutcome: Equatable {
+    /// Confirmé sur la chaîne (C9).
+    case sent(SendReceipt)
+    /// Envoyé, pas encore confirmé : « Check again », jamais « Send again ».
+    case notConfirmed
+    /// Pas parti, mais l'autorisation signée peut encore servir jusqu'à l'heure dite : « Not sent. Please wait until
+    /// {heure} before trying again », sans bouton pour renvoyer ; revérifié tout seul à la fin.
+    case waiting(until: Date)
+    /// Certain : rien n'est parti (l'autorisation a expiré sans servir).
+    case nothingSent
+    /// Impossible de trancher pour l'instant.
+    case undetermined
 }
 
 /// Ordre du PIN et du tap (DESIGN_NOTES §12, question 1 : à trancher après un test avec une vraie carte).
@@ -437,6 +669,10 @@ enum SigningStage: Equatable {
     case waitingForTap(SigningStep)
     /// Session NFC en cours : rien ne doit l'interrompre.
     case scanning(SigningStep)
-    /// Signé par la carte (l'envoi vient à l'étape C).
-    case signed
+    /// Signé par la carte, envoi en cours (« Sending… »).
+    case sending(PaymentProgress)
+    /// Vérification de l'issue (« Check again »).
+    case checking
+    /// Issue connue ou affichée (C9, incertaine, rien n'est parti).
+    case finished(SendOutcome)
 }

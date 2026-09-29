@@ -21,6 +21,11 @@ struct SendSigningTests {
         return (model, service)
     }
 
+    private func isSent(_ model: SendFlowModel) -> Bool {
+        if case .finished(.sent) = model.signingStage { return true }
+        return false
+    }
+
     /// Attend qu'une tâche lancée par le ViewModel ait fait son effet (2 s au plus).
     private func waitUntil(_ condition: () -> Bool) async {
         for _ in 0..<200 where !condition() {
@@ -43,8 +48,8 @@ struct SendSigningTests {
         #expect(model.signingStage == .waitingForTap(.tapToSign))
 
         model.scanCard()
-        await waitUntil { model.signingStage == .signed }
-        #expect(model.signingStage == .signed)
+        await waitUntil { isSent(model) }
+        #expect(isSent(model))
         #expect(service.readCount == 0)
         #expect(service.signCount == 1)
         #expect(service.lastPin == "1234")
@@ -71,7 +76,7 @@ struct SendSigningTests {
         model.pinEntered("4321")
         #expect(model.signingStage == .waitingForTap(.tapToSign))
         model.scanCard()
-        await waitUntil { model.signingStage == .signed }
+        await waitUntil { isSent(model) }
         #expect(service.readCount == 1)
         #expect(service.signCount == 1)
         #expect(service.lastPin == "4321")
@@ -87,7 +92,7 @@ struct SendSigningTests {
         #expect(model.cardCheck == CardCheck(cardName: "Jungle", cardColor: .jungle, usesPin: true))
         model.pinEntered("1111")
         model.scanCard()
-        await waitUntil { model.signingStage == .signed }
+        await waitUntil { isSent(model) }
         #expect(service.lastPin == "1111")
     }
 
@@ -102,7 +107,7 @@ struct SendSigningTests {
         await waitUntil { model.signingStage == .waitingForTap(.tapToSign) }
         #expect(model.signingStage == .waitingForTap(.tapToSign))
         model.scanCard()
-        await waitUntil { model.signingStage == .signed }
+        await waitUntil { isSent(model) }
         #expect(service.readCount == 0)
         #expect(service.signCount == 1)
         #expect(service.lastPin == nil)
@@ -127,7 +132,7 @@ struct SendSigningTests {
         model.pinEntered("1234")
         model.scanCard()
         model.scanCard()
-        await waitUntil { model.signingStage == .signed }
+        await waitUntil { isSent(model) }
         #expect(service.signCount == 1)
 
         model.confirmReview()
@@ -146,8 +151,8 @@ struct SendSigningTests {
         #expect(!model.isSigningLocked)
         model.scanCard()
         #expect(model.isSigningLocked, "Scan")
-        await waitUntil { model.signingStage == .signed }
-        #expect(model.isSigningLocked, "Signé")
+        await waitUntil { isSent(model) }
+        #expect(model.isSigningLocked, "Signé puis envoyé")
         #expect(!model.isSigningSheetPresented)
     }
 
@@ -168,8 +173,8 @@ struct SendSigningTests {
         model.scanCard()
         model.cancelSigning()
         #expect(model.signingStage == .scanning(.tapToSign), "Un scan en cours ne s'annule pas")
-        await waitUntil { model.signingStage == .signed }
-        #expect(model.signingStage == .signed)
+        await waitUntil { isSent(model) }
+        #expect(isSent(model))
     }
 
     @Test("PIN incomplet ignoré")

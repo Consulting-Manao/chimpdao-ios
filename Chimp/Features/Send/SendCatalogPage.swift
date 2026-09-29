@@ -8,6 +8,10 @@ struct SendCatalogPage: View {
     @AppStorage(SendMockSettings.dataScenarioKey) private var dataScenario = MockSendService.DataScenario.standard
     @AppStorage(SendMockSettings.signingOrderKey) private var signingOrder = SigningOrder.pinThenTap
     @AppStorage(SendMockSettings.cardSetupKey) private var cardSetup = MockSendService.CardSetup.allWithPin
+    @AppStorage(SendMockSettings.resultScenarioKey) private var resultScenario = MockSendService.ResultScenario.sent
+    /// Parcours ouvert. Un drapeau et non `@Environment(\.dismiss)` : lu au-dessus du parcours, `dismiss` changeait à
+    /// chaque écran poussé et faisait tourner l'app en boucle (même piège que C2 / C4, corrigé au jalon 7).
+    @State private var isShowingDemo = false
 
     var body: some View {
         CatalogPage("Send", settings: settings, scrolls: false) {
@@ -23,10 +27,20 @@ struct SendCatalogPage: View {
                     Text(dataScenario.detail)
                         .chimpFont(.caption)
                         .foregroundStyle(.chimpTextSecondary)
+                    Picker(selection: $resultScenario) {
+                        ForEach(MockSendService.ResultScenario.allCases) { scenario in
+                            Text(scenario.title).tag(scenario)
+                        }
+                    } label: {
+                        Text("Result").chimpFont(.rowTitle)
+                    }
+                    Text(resultScenario.detail)
+                        .chimpFont(.caption)
+                        .foregroundStyle(.chimpTextSecondary)
                 } header: {
                     Text("Mock data")
                 } footer: {
-                    Text("Also used by the Send tile of the Wallet.")
+                    Text("Only for the flow opened here. The Send tile of the Wallet sends for real on testnet.")
                 }
                 .listRowBackground(Color(.chimpSurface))
 
@@ -59,8 +73,8 @@ struct SendCatalogPage: View {
                 .listRowBackground(Color(.chimpSurface))
 
                 Section("Try it") {
-                    NavigationLink {
-                        SendCatalogDemo(settings: settings)
+                    Button {
+                        isShowingDemo = true
                     } label: {
                         Text("Open Send (C1)").chimpFont(.rowTitle)
                     }
@@ -92,6 +106,9 @@ struct SendCatalogPage: View {
             }
             .scrollContentBackground(.hidden)
         }
+        .navigationDestination(isPresented: $isShowingDemo) {
+            SendCatalogDemo(settings: settings) { isShowingDemo = false }
+        }
     }
 
     /// Exemples à copier (tap = copié), pour tester chaque message du champ d'adresse.
@@ -112,10 +129,10 @@ struct SendCatalogPage: View {
 /// Le parcours en plein écran, dans la pile du catalogue.
 private struct SendCatalogDemo: View {
     let settings: CatalogSettings
-    @Environment(\.dismiss) private var dismiss
+    let onExit: () -> Void
 
     var body: some View {
-        SendFlowRoot { dismiss() }
+        SendFlowRoot(onExit: onExit)
             .catalogOverrides(settings)
     }
 }
@@ -132,6 +149,26 @@ private extension SigningOrder {
         switch self {
         case .pinThenTap: "Review, PIN, then one tap that checks the card, sends the PIN and signs."
         case .tapThenPin: "Review, a first tap to read the card, PIN, then a second tap to sign."
+        }
+    }
+}
+
+private extension MockSendService.ResultScenario {
+    var title: LocalizedStringKey {
+        switch self {
+        case .sent: "Sent"
+        case .notConfirmedThenSent: "Not confirmed, then sent"
+        case .rejectedThenNothingSent: "Not sent, wait, nothing sent"
+        case .undetermined: "Can't tell"
+        }
+    }
+
+    var detail: LocalizedStringKey {
+        switch self {
+        case .sent: "Confirmed at once: Swoosh! and the receipt."
+        case .notConfirmedThenSent: "Not confirmed yet; Check again finds it confirmed."
+        case .rejectedThenNothingSent: "Refused after signing: a 15-second wait, then Nothing was sent."
+        case .undetermined: "Stellar can't tell: Check again and Stellar Expert."
         }
     }
 }

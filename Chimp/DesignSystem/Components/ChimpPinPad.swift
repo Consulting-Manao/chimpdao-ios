@@ -56,6 +56,8 @@ struct ChimpPinPad<Middle: View>: View {
     @Binding var state: ChimpPinState
     /// Ligne d'aide sous « carte bloquée ».
     var blockedHelp: LocalizedStringKey = Self.defaultBlockedHelp
+    /// Paiement : le message d'un PIN faux précise que rien n'est parti (« Wrong PIN. 2 tries left. Nothing was sent. »).
+    var saysNothingWasSent = false
     /// Appelé quand le PIN atteint sa longueur.
     var onComplete: (String) -> Void = { _ in }
     /// Contenu optionnel entre les points et le pavé (ex. : bulle de Chimpy en A6).
@@ -147,6 +149,12 @@ struct ChimpPinPad<Middle: View>: View {
     private var wrongMessage: String? {
         if state == .mismatch { return String(localized: "The PINs don't match. Start again.") }
         guard case .wrong(let triesLeft) = state else { return nil }
+        if saysNothingWasSent {
+            if let triesLeft {
+                return String(localized: "Wrong PIN. \(triesLeft) tries left. Nothing was sent.")
+            }
+            return String(localized: "Wrong PIN. Nothing was sent.")
+        }
         if let triesLeft {
             return String(localized: "Wrong PIN. \(triesLeft) tries left.")
         }
@@ -190,9 +198,13 @@ extension ChimpPinPad where Middle == EmptyView {
         length: Int,
         state: Binding<ChimpPinState>,
         blockedHelp: LocalizedStringKey = Self.defaultBlockedHelp,
+        saysNothingWasSent: Bool = false,
         onComplete: @escaping (String) -> Void = { _ in }
     ) {
-        self.init(pin: pin, length: length, state: state, blockedHelp: blockedHelp, onComplete: onComplete) {
+        self.init(
+            pin: pin, length: length, state: state, blockedHelp: blockedHelp,
+            saysNothingWasSent: saysNothingWasSent, onComplete: onComplete
+        ) {
             EmptyView()
         }
     }

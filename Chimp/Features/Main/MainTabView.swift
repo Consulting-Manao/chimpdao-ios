@@ -35,7 +35,11 @@ struct MainTabView: View {
                         case .receive:
                             ReceiveDestination(session: session)
                         case .send:
-                            SendFlowRoot { walletPath.removeAll() }
+                            // Le vrai envoi (testnet) ; au retour, les soldes du Wallet sont relus.
+                            SendFlowRoot(service: ChainSendService(session: session)) {
+                                walletPath.removeAll()
+                                Task { await walletModel.refresh() }
+                            }
                         }
                     }
                 #if DESIGN_CATALOG

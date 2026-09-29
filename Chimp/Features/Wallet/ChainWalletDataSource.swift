@@ -88,7 +88,8 @@ struct ChainWalletDataSource: WalletDataSource {
             number: tokenID.map { String(format: "%04u", $0) } ?? "····",
             name: saved?.name ?? String(localized: "Card"),
             color: saved?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? .jungle,
-            assets: assets
+            assets: assets,
+            pocket: pocket
         )
     }
 }
@@ -108,12 +109,7 @@ final class ChainWalletReader: WalletChain {
 
     /// XLM puis USDC (`assetsOf(network, "stellar")` du terminal).
     private func assets() throws -> [(code: String, contract: String)] {
-        let network = client.network
-        let usdc = Asset(type: AssetType.ASSET_TYPE_CREDIT_ALPHANUM4, code: "USDC", issuer: try KeyPair(accountId: config.usdcIssuer))!
-        return [
-            ("XLM", try SACClient.contractID(for: Asset(type: AssetType.ASSET_TYPE_NATIVE)!, network: network)),
-            ("USDC", try SACClient.contractID(for: usdc, network: network)),
-        ]
+        try SACClient.stellarAssets(config: config)
     }
 
     private func source() async throws -> Account {

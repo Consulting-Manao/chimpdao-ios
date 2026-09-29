@@ -219,13 +219,13 @@ struct SorobanClient {
     /// `refitAndSubmit` : `refit`, frais signés par le serveur de frais, envoi et attente. Une seule nouvelle tentative
     /// si l'empreinte déclarée est devenue trop petite entre la simulation et l'envoi (« exceeds amount specified »).
     /// Renvoie le hash de la transaction.
-    func refitAndSubmit(_ transaction: Transaction, feeSigner: FeeSigner) async throws -> String {
+    func refitAndSubmit(_ transaction: Transaction, feeSigner: FeeSigner, onSent: (() -> Void)? = nil) async throws -> String {
         var attempt = 0
         while true {
             try await refit(transaction)
             do {
                 let signed = try await feeSigner.signFees(transaction, network: network, passphrase: config.passphrase)
-                return try await submitAndWait(signed)
+                return try await submitAndWait(signed, onSent: onSent)
             } catch let error as StellarError where attempt == 0 && error.isStaleFootprint {
                 attempt += 1
             }
@@ -242,7 +242,8 @@ struct SorobanClient {
 
     /// Envoie une transaction déjà signée et attend son résultat (`submit` : 1ʳᵉ vérification à ~3 s,
     /// puis toutes les ~1 s, dans un budget total de 60 s). Renvoie le hash.
-    func submitAndWait(_ transaction: Transaction) async throws -> String {
+    /// `onSent` : appelé dès que le réseau a accepté la transaction, avant l'attente de la confirmation (affichage).
+    func submitAndWait(_ transaction: Transaction, onSent: (() -> Void)? = nil) async throws -> String {
         // Hash calculé **avant** l'envoi : si `sendTransaction` ne répond pas, la transaction est peut-être partie,
         // et c'est ce hash qui permettra de vérifier, jamais un renvoi.
         let hash = try transaction.getTransactionHash(network: network)
@@ -258,6 +259,7 @@ struct SorobanClient {
         }
         // Au-delà de ce point, la transaction est acceptée : plus aucune erreur ne doit laisser croire qu'elle n'est pas
         // partie. On suit le hash calculé ici (identique à `transactionId` quand la passphrase est la bonne).
+        onSent?()
 
         let clock = ContinuousClock()
         let deadline = clock.now + Self.confirmationBudget

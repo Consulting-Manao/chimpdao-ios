@@ -19,6 +19,16 @@ struct SACClient {
         return try Data(SHA256.hash(data: Data(try XDREncoder.encode(preimage)))).encodeContractId()
     }
 
+    /// Actifs Stellar de l'app, XLM puis USDC (`assetsOf(network, "stellar")` du terminal), avec l'adresse de leur SAC.
+    static func stellarAssets(config: ChimpNetworkConfig) throws -> [(code: String, contract: String)] {
+        let network = Network.custom(passphrase: config.passphrase)
+        let usdc = Asset(type: AssetType.ASSET_TYPE_CREDIT_ALPHANUM4, code: "USDC", issuer: try KeyPair(accountId: config.usdcIssuer))!
+        return [
+            ("XLM", try contractID(for: Asset(type: AssetType.ASSET_TYPE_NATIVE)!, network: network)),
+            ("USDC", try contractID(for: usdc, network: network)),
+        ]
+    }
+
     /// `balance(holder)` en unités on-chain (entier, 7 décimales). `nil` si la simulation n'a rendu aucune valeur :
     /// solde inconnu, sur lequel on ne dépense jamais. Les pannes réseau remontent.
     func balance(token: String, holder: String, source: Account) async throws -> Decimal? {

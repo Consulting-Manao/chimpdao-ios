@@ -46,6 +46,8 @@ struct CardBalance: Equatable, Identifiable {
     var name: String
     var color: ChimpCardColor
     var assets: [AssetAmount]
+    /// Adresse C du wallet de la carte (sa Pocket), `nil` si elle n'en a pas (ou dans les données factices).
+    var pocket: String? = nil
 }
 
 /// Source des soldes du Wallet : `ChainWalletDataSource` (testnet) dans l'app, `MockWalletDataSource` dans le catalogue.

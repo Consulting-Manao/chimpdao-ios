@@ -10,17 +10,25 @@ import SwiftUI
 struct SendReviewView: View {
     @Bindable var model: SendFlowModel
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.chimpScreenInsets) private var screenInsets
 
     var body: some View {
+        if model.showsStatus {
+            SendStatusView(model: model)
+                .toolbar(.hidden, for: .navigationBar)
+        } else {
+            review
+        }
+    }
+
+    private var review: some View {
         VStack(spacing: 0) {
             ChimpHeader(
                 title: "Here's what happens",
                 step: 3,
                 steps: 3,
-                onBack: model.isSigningLocked ? nil : { dismiss() }
+                onBack: model.isSigningLocked ? nil : { model.isReviewPresented = false }
             )
             if let draft = model.draft {
                 ScrollView {
@@ -34,13 +42,12 @@ struct SendReviewView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // L'avertissement reste visible au-dessus du bouton, même si le reste défile.
             VStack(spacing: ChimpSpacing.sm) {
-                if model.signingStage != .signed {
-                    Text("Payments can't be undone once signed.")
-                        .chimpFont(.caption)
-                        .foregroundStyle(.chimpTextSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                bottomButton
+                Text("Payments can't be undone once signed.")
+                    .chimpFont(.caption)
+                    .foregroundStyle(.chimpTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                ChimpButton("Looks good", isLoading: model.signingStage == .preparing) { model.confirmReview() }
+                    .disabled(model.signingStage != .idle && model.signingStage != .preparing)
             }
             .padding(.horizontal, ChimpSpacing.bottomBar.leading)
             .padding(.top, ChimpSpacing.sm)
@@ -83,14 +90,13 @@ struct SendReviewView: View {
                 .padding(.top, ChimpSpacing.sm)
 
             if let message = model.signingErrorMessage {
-                ChimpFieldMessage(text: "\(message)", kind: .error)
-                    .padding(.top, ChimpSpacing.m)
-            }
-
-            if model.signingStage == .signed {
-                // ⚠️ Provisoire (étape B) : l'envoi, le succès et les erreurs arrivent à l'étape C.
-                ChimpNoticeBanner(text: "Signed by your card (practice run). Nothing was sent: sending comes in step C.")
-                    .padding(.top, ChimpSpacing.l)
+                VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
+                    ChimpFieldMessage(text: "\(message)", kind: .error)
+                    if let details = model.technicalDetails {
+                        ChimpTechnicalDetails(details: details)
+                    }
+                }
+                .padding(.top, ChimpSpacing.m)
             }
         }
     }
@@ -146,16 +152,6 @@ struct SendReviewView: View {
         }
     }
 
-    @ViewBuilder
-    private var bottomButton: some View {
-        if model.signingStage == .signed {
-            ChimpButton("Done") { model.finish() }
-        } else {
-            ChimpButton("Looks good", isLoading: model.signingStage == .preparing) { model.confirmReview() }
-                .disabled(model.signingStage != .idle && model.signingStage != .preparing)
-        }
-    }
-
     // MARK: Feuilles de signature (C5, C6)
 
     @ViewBuilder
@@ -170,6 +166,7 @@ struct SendReviewView: View {
                     pin: $model.pin,
                     length: model.pinLength,
                     state: $model.pinState,
+                    saysNothingWasSent: true,
                     onComplete: model.pinEntered
                 )
             case .tapToRead, .tapToSign:
@@ -183,6 +180,8 @@ struct SendReviewView: View {
                     who: tapWho(draft),
                     pinStatus: pinStatus(for: step),
                     isScanning: model.isSigningLocked,
+                    problem: model.tapProblem.map(Self.message(for:)),
+                    problemDetails: model.tapProblem == nil ? nil : model.technicalDetails,
                     onScan: model.scanCard,
                     onCancel: model.isSigningLocked ? nil : { model.cancelSigning() }
                 )
@@ -236,6 +235,15 @@ struct SendReviewView: View {
             return "It's from \(draft.drawer.title), so only that card works."
         case .main:
             return "It's from Main, so any of your cards works."
+        }
+    }
+
+    /// Tap raté, avant toute signature (textes validés ; NFC : messages de Chimpy de l'onboarding).
+    static func message(for problem: TapProblem) -> LocalizedStringKey {
+        switch problem {
+        case .cardNotAccepted: "That card isn't one of yours. Nothing was sent."
+        case .card(let kind): CardReadingView.message(for: kind)
+        case .network: "Couldn't get ready to send. Nothing was sent. Check your connection and try again."
         }
     }
 

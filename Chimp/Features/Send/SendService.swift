@@ -73,10 +73,21 @@ struct SendDraft: Equatable {
     let network: StellarNetwork
 }
 
-/// Envoi préparé **avant** la session NFC (règle 9). Au jalon 5 : dernier ledger, puis auth entry déclarée
-/// (ordre 1, wallet d'une carte) ou transaction simulée (ordre 2, Main). Ici, seulement le brouillon.
+/// Envoi préparé **avant** la session NFC (règle 9) : solde relu, cartes qui peuvent signer, et l'autorisation que la
+/// carte signera (`PreparedPayment`, ordre 1 ou 2). Le service factice n'a que le brouillon.
 struct PreparedSend: Equatable {
     let draft: SendDraft
+    /// Ce que la carte signera (vrai service) ; `nil` dans le service factice.
+    let payment: PreparedPayment?
+
+    init(draft: SendDraft, payment: PreparedPayment? = nil) {
+        self.draft = draft
+        self.payment = payment
+    }
+
+    static func == (lhs: PreparedSend, rhs: PreparedSend) -> Bool {
+        lhs.draft == rhs.draft && lhs.payment?.digest == rhs.payment?.digest
+    }
 }
 
 /// Ce qu'apprend une première lecture de la carte, sans signer (ordre « tap puis PIN ») : quelle carte,
@@ -88,24 +99,101 @@ struct CardCheck: Equatable {
     let usesPin: Bool
 }
 
-/// Envoi signé par la carte, prêt à partir (frais par le Worker, soumission : étape C).
+/// Envoi signé par la carte, prêt à partir (frais par le serveur de frais, envoi : `SendService.submit`).
 struct SignedSend: Equatable {
     let prepared: PreparedSend
+    /// Nom local de la carte qui a signé (« Signed by Banana »).
+    let cardName: String
+    /// Carte et signature (vrai service) ; `nil` dans le service factice.
+    let card: CardSignatures?
+
+    init(prepared: PreparedSend, cardName: String, card: CardSignatures? = nil) {
+        self.prepared = prepared
+        self.cardName = cardName
+        self.card = card
+    }
 }
 
-/// Service d'envoi. Au jalon 5, une implémentation branchée sur `Core/` (soldes SAC, contacts locaux,
-/// construction, signature par la carte, frais par le Worker, soumission) remplacera `MockSendService`,
-/// sans toucher aux vues ni au ViewModel.
+/// Paiement confirmé sur la chaîne (C9, reçu).
+struct SendReceipt: Equatable {
+    let summary: SendSummary
+    let transactionHash: String
+    let sentAt: Date
+    /// Page de la transaction dans l'explorateur (Stellar Expert).
+    let explorerURL: URL?
+}
+
+/// Ce qui a été signé, tel qu'on le réaffiche après coup (envoi en cours, C9, reçu, issue incertaine), y compris
+/// après un redémarrage de l'app (depuis un `PendingSend`).
+struct SendSummary: Equatable {
+    /// Adresse exacte payée (G, M ou C).
+    let recipientAddress: String
+    let recipientName: String?
+    let drawerTitle: String
+    let asset: SendAsset
+    let amount: Decimal
+    let network: StellarNetwork
+
+    init(recipientAddress: String, recipientName: String?, drawerTitle: String, asset: SendAsset, amount: Decimal, network: StellarNetwork) {
+        self.recipientAddress = recipientAddress
+        self.recipientName = recipientName
+        self.drawerTitle = drawerTitle
+        self.asset = asset
+        self.amount = amount
+        self.network = network
+    }
+
+    init(_ draft: SendDraft) {
+        self.init(
+            recipientAddress: draft.recipient.address, recipientName: draft.recipientName, drawerTitle: draft.drawer.title,
+            asset: draft.asset, amount: draft.amount, network: draft.network
+        )
+    }
+
+    init(_ pending: PendingSend, network: StellarNetwork) {
+        self.init(
+            recipientAddress: pending.recipient, recipientName: pending.recipientName, drawerTitle: pending.drawerTitle,
+            asset: SendAsset(rawValue: pending.asset) ?? .xlm, amount: pending.amount, network: network
+        )
+    }
+
+    /// Nom du destinataire, ou son adresse raccourcie (« GBLW…EZ6M »).
+    var recipientLabel: String {
+        recipientName ?? StellarAddressParser.short(recipientAddress)
+    }
+
+    /// Memo ID plié dans une adresse M, pour le reçu.
+    var memoID: UInt64? {
+        if case .success(let recipient) = StellarAddressParser.parse(recipientAddress) { return recipient.memoID }
+        return nil
+    }
+}
+
+/// Service d'envoi. `ChainSendService` (testnet, `Core/`) dans l'app, `MockSendService` dans le catalogue et les tests.
 protocol SendService {
     /// Soldes, tiroirs et destinataires récents.
     func fetchContext() async throws -> SendContext
-    /// Appels réseau à faire avant la session NFC (limite Apple de 60 s, règle 9).
+    /// Appels réseau à faire avant la session NFC (limite Apple de 60 s, règle 9) : rien n'est signé.
     func prepare(_ draft: SendDraft) async throws -> PreparedSend
-    /// Session NFC de lecture seule (ordre « tap puis PIN ») : quelle carte, avec ou sans PIN.
+    /// Juste avant le tap qui signe (réseau, avant la session NFC) : refait la préparation si l'autorisation n'a plus
+    /// 20 ledgers devant elle (`EXPIRATION_MARGIN_LEDGERS`). Sinon, la renvoie telle quelle.
+    func refreshedIfNeeded(_ prepared: PreparedSend) async throws -> PreparedSend
+    /// Session NFC de lecture seule (ordre « tap puis PIN ») : quelle carte, avec ou sans PIN. Une carte qui ne peut
+    /// pas signer est refusée (`ChipError.cardNotAccepted`).
     func readCard(for prepared: PreparedSend) async throws -> CardCheck
-    /// Session NFC de signature : vérifier la carte, puis VERIFY PIN si `pin` est fourni, puis SIGN.
+    /// Session NFC de signature : clé de la carte vérifiée, puis VERIFY PIN si la carte en a un, puis SIGN.
     /// Le PIN n'est jamais gardé par le service.
     func sign(_ prepared: PreparedSend, pin: String?) async throws -> SignedSend
+    /// Après le tap : frais par le serveur de frais, envoi, attente de la confirmation. Toute erreur est un
+    /// `PaymentFailure` : l'autorisation signée a pu sortir du téléphone, l'issue se vérifie avec `check`.
+    func submit(_ signed: SignedSend, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SendReceipt
+    /// « Check again » (question 16) : envoyé, peut encore passer, attendre, rien n'est parti, ou impossible à dire.
+    func check(_ trace: PaymentTrace) async throws -> PaymentCheck
+    /// Paiement à l'issue incertaine gardé sur le téléphone (Envoyer rouvre son état au lieu d'un nouvel envoi).
+    var pendingSend: PendingSend? { get }
+    func setPendingSend(_ pending: PendingSend?) throws
+    /// Page d'une transaction dans l'explorateur.
+    func explorerURL(transactionHash: String) -> URL?
 }
 
 /// Données et signature factices (noms de la maquette), avec des scénarios pour tester chaque état.
@@ -149,8 +237,30 @@ final class MockSendService: SendService {
     static let exchangeAddress = "GB53FJ3TWAR2IFCHTD4Y2MWYMMOZ7PDCW4DU5OXPZMULLJQQ4PL452DN"
     static let exchangeMuxedAddress = "MB53FJ3TWAR2IFCHTD4Y2MWYMMOZ7PDCW4DU5OXPZMULLJQQ4PL44AAAAAAETFQC2J5EQ"
 
+    /// Issue de l'envoi après le tap.
+    enum ResultScenario: String, CaseIterable, Identifiable {
+        /// Confirmé du premier coup (C9).
+        case sent
+        /// Envoyé, pas confirmé dans le délai ; « Check again » le trouve confirmé.
+        case notConfirmedThenSent
+        /// Refusé après la signature : attendre l'expiration de l'autorisation (compte à rebours de 15 s ici), puis
+        /// « Nothing was sent ».
+        case rejectedThenNothingSent
+        /// Le RPC ne peut pas trancher.
+        case undetermined
+
+        var id: String { rawValue }
+    }
+
     let dataScenario: DataScenario
     let cardSetup: CardSetup
+    var resultScenario: ResultScenario
+    /// Attente factice de l'expiration de l'autorisation.
+    var authorizationWait: Duration = .seconds(15)
+    /// Paiement à l'issue incertaine (tests : réglable pour simuler un Envoyer rouvert).
+    var pendingSend: PendingSend?
+    /// Erreur de la prochaine signature (tests : PIN faux, carte refusée…), consommée une fois.
+    var nextSignError: Error?
     /// Délai simulé du réseau.
     var delay: Duration
     /// Délai simulé d'une session NFC (le temps de poser la carte et de la lire).
@@ -160,17 +270,22 @@ final class MockSendService: SendService {
     private(set) var prepareCount = 0
     private(set) var readCount = 0
     private(set) var signCount = 0
+    private(set) var submitCount = 0
+    private(set) var checkCount = 0
+    private(set) var refreshCount = 0
     /// PIN reçu par la dernière signature (tests uniquement : le vrai service ne le garde jamais).
     private(set) var lastPin: String?
 
     init(
         dataScenario: DataScenario = .standard,
         cardSetup: CardSetup = .allWithPin,
+        resultScenario: ResultScenario = .sent,
         delay: Duration = .milliseconds(600),
         nfcDelay: Duration = .milliseconds(1500)
     ) {
         self.dataScenario = dataScenario
         self.cardSetup = cardSetup
+        self.resultScenario = resultScenario
         self.delay = delay
         self.nfcDelay = nfcDelay
     }
@@ -192,6 +307,11 @@ final class MockSendService: SendService {
         return PreparedSend(draft: draft)
     }
 
+    func refreshedIfNeeded(_ prepared: PreparedSend) async throws -> PreparedSend {
+        refreshCount += 1
+        return prepared
+    }
+
     func readCard(for prepared: PreparedSend) async throws -> CardCheck {
         readCount += 1
         try await Task.sleep(for: nfcDelay)
@@ -202,7 +322,64 @@ final class MockSendService: SendService {
         signCount += 1
         lastPin = pin
         try await Task.sleep(for: nfcDelay)
-        return SignedSend(prepared: prepared)
+        if let error = nextSignError {
+            nextSignError = nil
+            throw error
+        }
+        return SignedSend(prepared: prepared, cardName: tappedCard(for: prepared.draft.drawer).cardName)
+    }
+
+    /// Hash factice, visiblement faux.
+    static let fakeHash = String(repeating: "ab", count: 32)
+
+    func submit(_ signed: SignedSend, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SendReceipt {
+        submitCount += 1
+        let draft = signed.prepared.draft
+        for step: PaymentProgress in [.checking, .sending, .confirming] {
+            onProgress(step)
+            try await Task.sleep(for: delay)
+        }
+        var trace = PaymentTrace(
+            token: "mock", from: draft.drawer.address, destination: draft.recipient.address, units: 0, nonce: 1,
+            preparedAtLedger: 1, expirationLedger: 121
+        )
+        switch resultScenario {
+        case .sent:
+            return SendReceipt(summary: SendSummary(draft), transactionHash: Self.fakeHash, sentAt: .now, explorerURL: nil)
+        case .notConfirmedThenSent, .undetermined:
+            trace.transactionHash = Self.fakeHash
+            throw PaymentFailure(trace: trace, underlying: StellarError.notConfirmed(hash: Self.fakeHash))
+        case .rejectedThenNothingSent:
+            throw PaymentFailure(trace: trace, underlying: StellarError.submitFailed("txBadAuth (mock)"))
+        }
+    }
+
+    private var waitingUntil: Date?
+
+    func check(_ trace: PaymentTrace) async throws -> PaymentCheck {
+        checkCount += 1
+        try await Task.sleep(for: delay)
+        switch resultScenario {
+        case .sent:
+            return .sent(hash: Self.fakeHash)
+        case .notConfirmedThenSent:
+            // Première vérification (juste après l'envoi) : toujours pas confirmé ; la suivante le trouve.
+            return checkCount == 1 ? .pending : .sent(hash: Self.fakeHash)
+        case .undetermined:
+            return .undetermined("mock: Stellar RPC no longer keeps these ledgers")
+        case .rejectedThenNothingSent:
+            let end = waitingUntil ?? .now.addingTimeInterval(TimeInterval(authorizationWait.components.seconds))
+            waitingUntil = end
+            return end > .now ? .waiting(untilLedger: 121, estimatedEnd: end) : .nothingSent
+        }
+    }
+
+    func setPendingSend(_ pending: PendingSend?) throws {
+        pendingSend = pending
+    }
+
+    func explorerURL(transactionHash: String) -> URL? {
+        ChimpNetworkConfig.testnet.explorerURL(transactionHash: transactionHash)
     }
 
     /// Carte posée sur le téléphone : celle du tiroir, ou Jungle pour un envoi depuis Main.
