@@ -17,6 +17,17 @@ enum StellarError: Error, Equatable {
     case notConfirmed(hash: String)
     /// Réponse inattendue.
     case invalidResponse(String)
+    /// Aucun `recovery_id` n'est accepté : le contrat refuse la signature de la carte.
+    case signatureRejected(String)
+
+    /// `isStaleFootprint` du terminal : l'écriture réelle a dépassé l'empreinte déclarée (un ledger s'est fermé entre
+    /// la simulation et l'envoi). Une nouvelle simulation suffit.
+    var isStaleFootprint: Bool {
+        switch self {
+        case .transactionFailed(_, let detail), .submitFailed(let detail): detail.contains("exceeds amount specified")
+        default: false
+        }
+    }
 
     /// `isContractTrap` du terminal (`lib/errors.ts`) : le contrat a refusé, par opposition à une panne réseau.
     var isContractTrap: Bool {
@@ -38,6 +49,7 @@ extension StellarError: LocalizedError {
         case .transactionFailed(let hash, let detail): "Transaction failed (\(hash)): \(detail)"
         case .notConfirmed(let hash): "Sent, but the network did not confirm it in time. Check the receipt before retrying: \(hash)"
         case .invalidResponse(let detail): "Unexpected answer from Stellar: \(detail)"
+        case .signatureRejected(let detail): "The contract rejected the card's signature: \(detail)"
         }
     }
 }
@@ -77,13 +89,50 @@ struct SorobanClient {
         }
     }
 
+    /// Numéro du dernier ledger fermé (`getLatestLedger`), pour l'expiration des autorisations.
+    func latestLedger() async throws -> UInt32 {
+        switch await server.getLatestLedger() {
+        case .success(let response): return response.sequence
+        case .failure(let error): throw StellarError.rpc(Self.describe(error))
+        }
+    }
+
+    /// Le contrat existe-t-il déjà ? Lit l'entrée « instance » du contrat (`getContractData(address,
+    /// scvLedgerKeyContractInstance)` dans `deployAccount`). Écart minimal : le terminal traite **toute** erreur
+    /// comme « pas encore déployé » ; ici seule une réponse vide l'est, une panne réseau remonte.
+    func isDeployed(_ contract: String) async throws -> Bool {
+        let key = LedgerKeyXDR.contractData(LedgerKeyContractDataXDR(
+            contract: try SCAddressXDR(contractId: contract),
+            key: .ledgerKeyContractInstance,
+            durability: .persistent
+        ))
+        guard let encoded = key.xdrEncoded else { throw StellarError.invalidResponse("could not encode ledger key") }
+        switch await server.getLedgerEntries(base64EncodedKeys: [encoded]) {
+        case .success(let response): return !response.entries.isEmpty
+        case .failure(let error): throw StellarError.rpc(Self.describe(error))
+        }
+    }
+
     /// Transaction à une seule opération d'appel de contrat, valable `transactionTimeout` secondes.
-    func contractCall(source: Account, contract: String, function: String, arguments: [SCValXDR]) throws -> Transaction {
+    func contractCall(
+        source: Account,
+        contract: String,
+        function: String,
+        arguments: [SCValXDR],
+        auth: [SorobanAuthorizationEntryXDR] = []
+    ) throws -> Transaction {
         let operation = try InvokeHostFunctionOperation.forInvokingContract(
             contractId: contract,
             functionName: function,
             functionArguments: arguments
         )
+        operation.auth = auth
+        return try singleOperation(source: source, operation: operation)
+    }
+
+    /// Transaction à une seule opération, frais de base 100 stroops, valable `transactionTimeout` secondes
+    /// (`setTimeout(60)` du terminal).
+    func singleOperation(source: Account, operation: InvokeHostFunctionOperation) throws -> Transaction {
         let now = UInt64(Date().timeIntervalSince1970)
         return try Transaction(
             sourceAccount: source,
@@ -96,8 +145,10 @@ struct SorobanClient {
     // MARK: Simulation
 
     /// Simule ; lève `simulationFailed` avec le texte du RPC si l'appel échoue (`simulateOutcome`).
-    func simulate(_ transaction: Transaction) async throws -> SimulateTransactionResponse {
-        switch await server.simulateTransaction(simulateTxRequest: SimulateTransactionRequest(transaction: transaction)) {
+    /// `authMode` : `nil` = défaut du RPC (`enforce` dès qu'une entrée d'autorisation est jointe, `record` sinon).
+    func simulate(_ transaction: Transaction, authMode: String? = nil) async throws -> SimulateTransactionResponse {
+        let request = SimulateTransactionRequest(transaction: transaction, authMode: authMode)
+        switch await server.simulateTransaction(simulateTxRequest: request) {
         case .success(let response):
             if let error = response.error { throw StellarError.simulationFailed(error) }
             return response
@@ -138,6 +189,53 @@ struct SorobanClient {
         }
     }
 
+    /// `refitAuth` : re-simule en mode `enforce` une fois les signatures en place, pour que les ressources couvrent
+    /// `__check_auth`, puis recalcule les frais : part classique inchangée + nouveaux frais de ressources.
+    func refit(_ transaction: Transaction) async throws {
+        let simulation: SimulateTransactionResponse
+        do {
+            simulation = try await simulate(transaction, authMode: "enforce")
+        } catch StellarError.simulationFailed(let detail) {
+            throw StellarError.simulationFailed("auth re-sim failed: \(detail)")
+        }
+        guard let data = simulation.transactionData else {
+            throw StellarError.invalidResponse("auth re-sim returned no transaction data")
+        }
+        var previousResourceFee: Int64 = 0
+        if case .sorobanTransactionData(let previous) = transaction.transactionXDR.ext {
+            previousResourceFee = previous.resourceFee
+        }
+        let classicFee = Int64(transaction.fee) - previousResourceFee
+        let total = classicFee + data.resourceFee
+        guard total >= 0, total <= Int64(UInt32.max) else { throw StellarError.invalidResponse("fee out of range: \(total)") }
+        transaction.setSorobanTransactionData(data: data)
+        transaction.setFee(fee: UInt32(total))
+    }
+
+    /// `refitAndSubmit` : `refit`, frais signés par le serveur de frais, envoi et attente. Une seule nouvelle tentative
+    /// si l'empreinte déclarée est devenue trop petite entre la simulation et l'envoi (« exceeds amount specified »).
+    /// Renvoie le hash de la transaction.
+    func refitAndSubmit(_ transaction: Transaction, feeSigner: FeeSigner) async throws -> String {
+        var attempt = 0
+        while true {
+            try await refit(transaction)
+            do {
+                let signed = try await feeSigner.signFees(transaction, network: network, passphrase: config.passphrase)
+                return try await submitAndWait(signed)
+            } catch let error as StellarError where attempt == 0 && error.isStaleFootprint {
+                attempt += 1
+            }
+        }
+    }
+
+    /// Pour les transactions sans signature de puce (déploiement d'un compte) : `prepareTransaction` puis envoi
+    /// (`sendSoroban` du terminal). Simulation, assemblage, frais signés par le serveur de frais, envoi et attente.
+    func prepareAndSubmit(_ transaction: Transaction, feeSigner: FeeSigner) async throws -> String {
+        try assemble(transaction, with: try await simulate(transaction))
+        let signed = try await feeSigner.signFees(transaction, network: network, passphrase: config.passphrase)
+        return try await submitAndWait(signed)
+    }
+
     /// Envoie une transaction déjà signée et attend son résultat (`submit` : 1ʳᵉ vérification à ~3 s,
     /// puis toutes les ~1 s, dans un budget total de 60 s). Renvoie le hash.
     func submitAndWait(_ transaction: Transaction) async throws -> String {
@@ -147,7 +245,9 @@ struct SorobanClient {
         case .failure(let error): throw StellarError.rpc(Self.describe(error))
         }
         if sent.status == SendTransactionResponse.STATUS_ERROR {
-            throw StellarError.submitFailed(sent.errorResultXdr ?? sent.error?.message ?? sent.status)
+            let diagnostics = Self.diagnosticText(sent.diagnosticEvents ?? [])
+            let detail = sent.errorResultXdr ?? sent.error?.message ?? sent.status
+            throw StellarError.submitFailed(diagnostics.isEmpty ? detail : "\(detail) — \(diagnostics)")
         }
         let hash = sent.transactionId
 
@@ -161,7 +261,10 @@ struct SorobanClient {
             case .success(let response):
                 if response.status == GetTransactionResponse.STATUS_SUCCESS { return hash }
                 if response.status == GetTransactionResponse.STATUS_FAILED {
-                    throw StellarError.transactionFailed(hash: hash, detail: response.resultXdr ?? "no result")
+                    // Le diagnostic est la seule chose qui dise *pourquoi* (et qui révèle une empreinte trop petite).
+                    let events = (response.events?.diagnosticEventsXdr ?? []).compactMap { try? DiagnosticEventXDR(xdr: $0) }
+                    let diagnostics = Self.diagnosticText(events)
+                    throw StellarError.transactionFailed(hash: hash, detail: diagnostics.isEmpty ? (response.resultXdr ?? "no result") : diagnostics)
                 }
             case .failure:
                 // Une vérification ratée n'est pas un échec de la transaction : on réessaie jusqu'au délai.
@@ -170,6 +273,26 @@ struct SorobanClient {
             wait = max(.zero, .seconds(1) - (clock.now - polledAt))
         }
         throw StellarError.notConfirmed(hash: hash)
+    }
+
+    /// `diagnosticText` : les données des événements de diagnostic dont un sujet est `error`, lisibles.
+    static func diagnosticText(_ events: [DiagnosticEventXDR]) -> String {
+        events.compactMap { event -> String? in
+            guard case .v0(let body) = event.event.body else { return nil }
+            guard body.topics.contains(where: { $0.symbol == "error" }) else { return nil }
+            return readable(body.data)
+        }.joined(separator: "; ")
+    }
+
+    private static func readable(_ value: SCValXDR) -> String {
+        switch value {
+        case .symbol(let text), .string(let text): return text
+        case .vec(let items): return "[" + (items ?? []).map(readable).joined(separator: ", ") + "]"
+        case .u32(let number): return String(number)
+        case .i32(let number): return String(number)
+        case .error(let error): return "\(error)"
+        default: return value.xdrEncoded ?? "?"
+        }
     }
 
     static func describe(_ error: SorobanRpcRequestError) -> String {

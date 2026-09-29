@@ -1,5 +1,4 @@
 #if CHIMP_ADMIN
-import CryptoKit
 import Foundation
 import stellarsdk
 
@@ -152,38 +151,27 @@ struct CardEnrolment: CardEnrolmentService {
         )
     }
 
-    /// Recherche du `recovery_id` par simulation — portage de `determineRecoveryId` de
-    /// `reference/ios-app-tupui/Chimp/Services/BlockchainService.swift` (choix de Pamphile, sans bibliothèque secp256k1) :
-    /// on simule le même `mint` avec 0, 1, 2 puis 3 ; le premier accepté est le bon. Une signature refusée
-    /// (`InvalidSignature` #200, échec de récupération) fait passer au suivant ; toute autre erreur remonte.
-    /// La simulation réussie sert directement à assembler la transaction envoyée.
+    /// Recherche du `recovery_id` par simulation (`RecoveryIDSearch`, choix de Pamphile, sans bibliothèque secp256k1) :
+    /// on simule le même `mint` avec 0, 1, 2 puis 3 ; le premier accepté est le bon et sa simulation sert directement
+    /// à assembler la transaction envoyée. Refus du contrat `nfc-nft` : `#200`.
     private func mintWithRecoveryID(_ plan: EnrolmentPlan, signature: Data, source: Account) async throws -> (transaction: Transaction, recoveryID: UInt32) {
-        var lastError: Error?
         let maxTime = Self.maxTime()
-        for recoveryID: UInt32 in 0...3 {
-            let auth = try ChipAuthEncoding.chipAuthSecp256k1(signature: signature, recoveryID: recoveryID)
-            let candidate = try Self.mintTransaction(source: Self.copy(source), plan: plan, auth: auth, maxTime: maxTime)
-            do {
-                let simulation = try await client.simulate(candidate)
-                try client.assemble(candidate, with: simulation)
-                return (candidate, recoveryID)
-            } catch {
-                lastError = error
-                if Self.isRejectedSignature(error) { continue }
-                throw error
+        do {
+            let found = try await RecoveryIDSearch.first(rejectionCode: RecoveryIDSearch.RejectionCode.nfcNft) { recoveryID in
+                let auth = try ChipAuthEncoding.chipAuthSecp256k1(signature: signature, recoveryID: recoveryID)
+                let candidate = try Self.mintTransaction(source: Self.copy(source), plan: plan, auth: auth, maxTime: maxTime)
+                try client.assemble(candidate, with: try await client.simulate(candidate))
+                return candidate
             }
+            return (found.result, found.recoveryID)
+        } catch StellarError.signatureRejected(let detail) {
+            throw CardEnrolmentError.signatureRejected(detail)
         }
-        throw CardEnrolmentError.signatureRejected((lastError as? LocalizedError)?.errorDescription ?? "no recovery id accepted")
     }
 
-    /// Erreurs qui veulent dire « mauvais `recovery_id` » (ancienne app : `ContractError.invalidSignature`,
-    /// `InvalidInput`, `recovery failed`, `recover_key_ecdsa`). Seuls les deux motifs explicites du code #200 sont
-    /// repris, pas le motif « n'importe quel nombre de 3 chiffres entre 200 et 220 » de l'ancienne app.
+    /// Signature refusée par `nfc-nft` (`#200`) ou récupération de clé impossible.
     static func isRejectedSignature(_ error: Error) -> Bool {
-        guard case StellarError.simulationFailed(let message) = error else { return false }
-        if message.range(of: #"Error\(Contract,\s*#?200\)"#, options: .regularExpression) != nil { return true }
-        if message.range(of: #"\["failing with contract error", 200\]"#, options: .regularExpression) != nil { return true }
-        return message.contains("InvalidInput") || message.contains("recovery failed") || message.contains("recover_key_ecdsa")
+        RecoveryIDSearch.isRejectedSignature(error, contractCode: RecoveryIDSearch.RejectionCode.nfcNft)
     }
 
     // MARK: Transaction
@@ -214,70 +202,22 @@ struct CardEnrolment: CardEnrolmentService {
         try Account(accountId: account.accountId, sequenceNumber: account.sequenceNumber)
     }
 
-    /// Adresse de la Pocket hors ligne (`predictPocket`) : déployeur = factory, sel = `sha256(clé publique)`.
+    /// Adresse de la Pocket hors ligne (`predictPocket`).
     static func predictPocket(factory: String, publicKey: ChipPublicKey, network: Network) throws -> String {
-        try ContractIdUtils.deriveContractId(
-            deployer: try SCAddressXDR(contractId: factory),
-            salt: Data(SHA256.hash(data: publicKey.bytes)),
-            network: network
-        )
+        try PocketFactoryClient.predictedPocket(factory: factory, publicKey: publicKey, network: network)
     }
 
     // MARK: État de la carte
 
-    struct CardState: Equatable {
-        /// Pocket déployée, ou `nil` si la carte n'a jamais été enregistrée.
-        let pocket: String?
-        /// Numéro du NFT, ou `nil`.
-        let tokenID: UInt32?
-    }
-
-    /// `readCardState`, limité à ce que l'enregistrement utilise (Pocket et numéro de NFT ; `owner` et `owner_of`
-    /// ne servent pas ici). `token_id` qui refuse = carte jamais enregistrée ; une panne réseau remonte.
+    /// `readCardState` partagé avec l'onboarding (`ChainCardResolver`), la clé admin servant de source aux simulations.
     func readCardState(_ publicKey: ChipPublicKey, source: Account) async throws -> CardState {
-        let pocket = try await lookupPocket(publicKey, source: source)
-        var tokenID: UInt32?
-        do {
-            tokenID = try await nftTokenID(publicKey, source: source)
-        } catch let error as StellarError where error.isContractTrap {
-            tokenID = nil
-        }
-        return CardState(pocket: pocket, tokenID: tokenID)
-    }
-
-    /// `pocket-factory.get_account(clé)` → `Option<Address>` (`lookupPocket`). `None` est une vraie réponse ;
-    /// une simulation sans valeur est une erreur.
-    private func lookupPocket(_ publicKey: ChipPublicKey, source: Account) async throws -> String? {
-        let value = try await client.readValue(source: source, contract: config.contracts.factory, function: "get_account", arguments: [.bytes(publicKey.bytes)])
-        if case .void = value { return nil }
-        guard let address = value.address?.contractId else { throw StellarError.invalidResponse("get_account returned \(value)") }
-        return try address.encodeContractIdHex()
-    }
-
-    /// `nftContractFor` : le contrat par défaut d'abord, puis chaque campagne du registre `collection.collections()`.
-    /// Lève l'erreur du contrat par défaut si aucun ne connaît la carte.
-    private func nftTokenID(_ publicKey: ChipPublicKey, source: Account) async throws -> UInt32 {
-        var candidates = [config.contracts.nfcNft]
-        if let registry = try? await client.read(source: source, contract: config.contracts.collection, function: "collections"),
-           let entries = registry.vec {
-            for entry in entries {
-                if let id = entry.address?.contractId, let strkey = try? id.encodeContractIdHex(), !candidates.contains(strkey) {
-                    candidates.append(strkey)
-                }
-            }
-        }
-        var firstError: Error?
-        for contract in candidates {
-            do {
-                let value = try await client.readValue(source: source, contract: contract, function: "token_id", arguments: [.bytes(publicKey.bytes)])
-                // `Number(null)` vaut 0 et 0 est un vrai numéro : sans valeur, c'est « pas de réponse », pas zéro.
-                guard let tokenID = value.u32 else { throw StellarError.invalidResponse("token_id returned \(value)") }
-                return tokenID
-            } catch {
-                if firstError == nil { firstError = error }
-            }
-        }
-        throw firstError ?? StellarError.invalidResponse("no collection knows this card")
+        try await ChainCardResolver.readCardState(
+            publicKey,
+            source: source,
+            factory: PocketFactoryClient(client: client, contract: config.contracts.factory),
+            nfcNft: NfcNftClient(client: client, defaultContract: config.contracts.nfcNft, collection: config.contracts.collection),
+            pocketClient: PocketClient(client: client)
+        )
     }
 
     private func adminKeyPair() throws -> KeyPair {

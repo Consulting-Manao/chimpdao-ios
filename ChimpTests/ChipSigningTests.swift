@@ -96,6 +96,30 @@ struct ChipSigningTests {
         ])
     }
 
+    @Test("Deux digests en un tap (possession + set_owner) : une lecture, puis SELECT → VERIFY PIN → SIGN pour chacun, dans l'ordre")
+    func infineonTwoDigests() async throws {
+        let card = SigningInfineon(key: MockChipReader.secp256k1Key)
+        let second = Data((0..<32).map { UInt8(255 - $0) })
+        let signed = try await ChipSigning.sign(card, digests: [digest, second], expectedKey: MockChipReader.secp256k1Key, pin: "1234")
+        #expect(signed.count == 2)
+        #expect(card.sent.suffix(6).map(\.hexString) == [
+            Infineon2Go.selectAPDU.hexString, "004400000431323334", "0018010020" + digest.hexString + "00",
+            Infineon2Go.selectAPDU.hexString, "004400000431323334", "0018010020" + second.hexString + "00",
+        ])
+    }
+
+    @Test("Plusieurs digests : un digest de mauvaise taille ou une liste vide sont refusés avant tout envoi à la carte")
+    func invalidDigestList() async {
+        let card = SigningInfineon(key: MockChipReader.secp256k1Key)
+        await #expect(throws: ChipError.self) {
+            try await ChipSigning.sign(card, digests: [digest, Data(count: 31)], expectedKey: MockChipReader.secp256k1Key, pin: nil)
+        }
+        await #expect(throws: ChipError.self) {
+            try await ChipSigning.sign(card, digests: [], expectedKey: MockChipReader.secp256k1Key, pin: nil)
+        }
+        #expect(card.sent.isEmpty)
+    }
+
     @Test("Autre carte que celle lue au tap 1 : refus, rien n'est signé")
     func wrongCard() async {
         let card = SigningInfineon(key: MockChipReader.secp256k1Key)

@@ -14,10 +14,25 @@ enum ChipSignedDigest: Equatable, Sendable {
     }
 }
 
-/// Fait signer un digest par la carte présente, après avoir vérifié que c'est bien la carte attendue.
-/// Implémenté par `NFCChipSigner` (Core NFC) et `MockChipSigner` (tests, simulateur).
+/// Fait signer un ou plusieurs digests par la carte présente, **en un seul tap**, après avoir vérifié que
+/// c'est bien la carte attendue. Implémenté par `NFCChipSigner` (Core NFC) et `MockChipSigner` (tests, simulateur).
+///
+/// Plusieurs digests : adaptation à l'iPhone (DESIGN_NOTES §12). Le terminal garde la carte posée sur le lecteur
+/// entre deux signatures ; sur iPhone, chaque signature demanderait un nouveau tap. L'onboarding fait donc signer
+/// la preuve de possession et `set_owner` dans la même session NFC. Les signatures sont renvoyées dans l'ordre des digests.
 protocol ChipSigner {
-    func sign(digest: Data, expectedKey: ChipPublicKey, pin: String?) async throws -> ChipSignedDigest
+    func sign(digests: [Data], expectedKey: ChipPublicKey, pin: String?) async throws -> [ChipSignedDigest]
+}
+
+extension ChipSigner {
+    /// Un seul digest.
+    func sign(digest: Data, expectedKey: ChipPublicKey, pin: String?) async throws -> ChipSignedDigest {
+        let signed = try await sign(digests: [digest], expectedKey: expectedKey, pin: pin)
+        guard signed.count == 1, let first = signed.first else {
+            throw ChipError.malformedResponse("expected 1 signature, got \(signed.count)")
+        }
+        return first
+    }
 }
 
 /// Signature sur une carte déjà connectée : même détection que la lecture, relecture de la clé, puis signature.
@@ -28,38 +43,58 @@ enum ChipSigning {
         expectedKey: ChipPublicKey,
         pin: String?
     ) async throws -> ChipSignedDigest {
-        guard digest.count == 32 else { throw ChipError.malformedResponse("digest must be 32 bytes, got \(digest.count)") }
+        try await sign(transport, digests: [digest], expectedKey: expectedKey, pin: pin)[0]
+    }
+
+    /// Plusieurs digests sur la même carte, dans la même session. Chaque signature refait la séquence complète
+    /// du bridge (Infineon : SELECT → VERIFY PIN → SIGN ; DUOX : Select PICC → Internal Authenticate),
+    /// comme `signDigest` qui refait SELECT avant chaque opération. La première erreur arrête tout.
+    static func sign(
+        _ transport: some APDUTransport,
+        digests: [Data],
+        expectedKey: ChipPublicKey,
+        pin: String?
+    ) async throws -> [ChipSignedDigest] {
+        guard !digests.isEmpty else { throw ChipError.malformedResponse("nothing to sign") }
+        for digest in digests where digest.count != 32 {
+            throw ChipError.malformedResponse("digest must be 32 bytes, got \(digest.count)")
+        }
         let card = try await ChipDetector.readKey(transport)
         // Deux taps (lecture, puis signature) : on vérifie que c'est la même carte avant de lui faire signer quoi que ce soit.
         guard card.publicKey == expectedKey else { throw ChipError.wrongCard }
-        switch card.kind {
-        case .infineon2Go:
-            return try await Infineon2Go.sign(transport, digest: digest, pin: pin)
-        case .duox:
-            return try await Duox.sign(transport, digest: digest)
+        var signatures: [ChipSignedDigest] = []
+        for digest in digests {
+            switch card.kind {
+            case .infineon2Go:
+                signatures.append(try await Infineon2Go.sign(transport, digest: digest, pin: pin))
+            case .duox:
+                signatures.append(try await Duox.sign(transport, digest: digest))
+            }
         }
+        return signatures
     }
 }
 
 /// Signature par Core NFC : une feuille NFC, une carte.
 struct NFCChipSigner: ChipSigner {
-    func sign(digest: Data, expectedKey: ChipPublicKey, pin: String?) async throws -> ChipSignedDigest {
+    func sign(digests: [Data], expectedKey: ChipPublicKey, pin: String?) async throws -> [ChipSignedDigest] {
         try await NFCTagSession.run(
             alertMessage: String(localized: "Hold your card near the top of your iPhone."),
             successMessage: String(localized: "Card read.")
         ) { transport in
-            try await ChipSigning.sign(transport, digest: digest, expectedKey: expectedKey, pin: pin)
+            try await ChipSigning.sign(transport, digests: digests, expectedKey: expectedKey, pin: pin)
         }
     }
 }
 
-/// Faux signataire : renvoie une signature fixe (invalide sur le réseau), pour faire tourner l'interface.
+/// Faux signataire : renvoie une signature fixe (invalide sur le réseau) pour chaque digest, pour faire tourner l'interface.
 struct MockChipSigner: ChipSigner {
     var outcome: Result<ChipSignedDigest, ChipError> = .success(.secp256k1(signature: Data(repeating: 0x11, count: 32) + Data(repeating: 0x22, count: 32)))
     var delay: Duration = .milliseconds(700)
 
-    func sign(digest: Data, expectedKey: ChipPublicKey, pin: String?) async throws -> ChipSignedDigest {
+    func sign(digests: [Data], expectedKey: ChipPublicKey, pin: String?) async throws -> [ChipSignedDigest] {
         try await Task.sleep(for: delay)
-        return try outcome.get()
+        let signed = try outcome.get()
+        return digests.map { _ in signed }
     }
 }

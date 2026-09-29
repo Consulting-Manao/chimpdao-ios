@@ -10,6 +10,12 @@ struct ChimpNetworkConfig: Equatable, Sendable {
     /// Serveur qui signe les frais (Cloudflare Worker, ARCHITECTURE §3.3). Pour l'onboarding :
     /// l'enregistrement (mint) ne l'utilise pas, c'est l'admin qui paie.
     let feeSignerURL: URL
+    /// Compte G du payeur de frais (clé **publique** seulement, `VITE_STELLAR_FEE_PUBLIC` du terminal) :
+    /// source de toutes les transactions payées par le serveur de frais, et déployeur des Main accounts
+    /// (l'adresse d'un Main account en dépend, ARCHITECTURE §3.5). Transmis par Pamphile le 2026-09-29.
+    let feePayer: String
+    /// Émetteur de l'USDC du réseau (`USDC_ISSUER` de `chain/assets.ts`, ARCHITECTURE §2.4).
+    let usdcIssuer: String
 
     struct Endpoints: Equatable, Sendable {
         let rpc: URL
@@ -56,6 +62,8 @@ struct ChimpNetworkConfig: Equatable, Sendable {
             router: "CAOL3K7VQTDZELQMKTAJB3WUQGL5JLXJKZ2Y44F77NH4CZNLW5I755XI",
             admin: "GBLWPGXVH47YGMODIUHZJ7FETRISFU3TB7JGADTRIMU36OLWJ7PYEZ6M"
         ),
-        feeSignerURL: URL(string: "https://chimpdao-signer.tansu-964.workers.dev/")!
+        feeSignerURL: URL(string: "https://chimpdao-signer.tansu-964.workers.dev/")!,
+        feePayer: "GDZE7UWGO3PS6R6RI6F3XIJLX7WGIEFD3X4YQO4AJH4LS3KDY6LLFXG2",
+        usdcIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
     )
 }

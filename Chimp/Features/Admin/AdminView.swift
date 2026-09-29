@@ -7,6 +7,7 @@ import UIKit
 /// Compilé uniquement en Debug et Testing (drapeau `CHIMP_ADMIN`), jamais en Release.
 /// Étape A : lecture d'une carte, et génération de la clé d'une Infineon vierge (slot 1 vide, avec confirmation).
 /// Étape B : clé admin (trousseau) et enregistrement (mint) de la carte lue sur testnet.
+/// Onboarding, étape 1 : « Resolve this card », diagnostic en lecture seule de la carte lue.
 ///
 /// Textes en anglais et **non traduits** : ils restent hors du String Catalog (`Text(verbatim:)`, `untranslated`),
 /// sinon Xcode les y ajouterait en Debug puis les supprimerait en Release, où ils n'existent pas.
@@ -17,6 +18,8 @@ struct AdminView: View {
     @State private var keyModel = AdminKeyModel(store: KeychainAdminKeyStore(network: .testnet))
     /// Enregistrement de la carte lue ; recréé à chaque lecture.
     @State private var enrolModel: AdminEnrolModel?
+    /// Diagnostic en lecture seule de la carte lue (onboarding, arrêt 1) ; recréé à chaque lecture.
+    @State private var diagnosticsModel: AdminDiagnosticsModel?
 
     var body: some View {
         ScrollView {
@@ -27,6 +30,7 @@ struct AdminView: View {
                 ChimpButton(untranslated("Read a card"), isLoading: model.state == .reading) {
                     copied = false
                     enrolModel = nil
+                    diagnosticsModel = nil
                     Task {
                         await model.read()
                         prepareEnrolment()
@@ -34,6 +38,9 @@ struct AdminView: View {
                 }
                 .disabled(model.isBusy || (enrolModel?.isBusy ?? false))
                 result
+                if let card = model.cardForEnrolment, let diagnosticsModel {
+                    AdminDiagnosticsPanel(card: card, model: diagnosticsModel)
+                }
                 if let card = model.cardForEnrolment, let enrolModel {
                     AdminEnrolPanel(card: card, model: enrolModel, hasAdminKey: keyModel.hasKey || isMock)
                 }
@@ -53,6 +60,7 @@ struct AdminView: View {
             Button(role: .destructive) {
                 copied = false
                 enrolModel = nil
+                diagnosticsModel = nil
                 Task {
                     await model.generateKey()
                     prepareEnrolment()
@@ -75,6 +83,7 @@ struct AdminView: View {
     /// Carte lue (ou clé générée) : prépare l'enregistrement, avec les vrais services en NFC et des faux en mode factice.
     private func prepareEnrolment() {
         guard let card = model.cardForEnrolment else { return }
+        diagnosticsModel = AdminDiagnosticsModel(service: isMock ? MockCardDiagnostics() : ChainCardDiagnostics(config: .testnet))
         if isMock {
             let signed: ChipSignedDigest = card.curve == .p256
                 ? .p256(signature: Data(repeating: 0x11, count: 64), rndB: Data(repeating: 0xAB, count: 16))
