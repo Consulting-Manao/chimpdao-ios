@@ -10,6 +10,7 @@ struct OnboardingCatalogPage: View {
     @State private var serviceScenario = MockOnboardingService.Scenario.fresh
     @State private var tourSeen = false
     @State private var setupScenario = MockAccountSetupService.Scenario.success
+    @State private var creationScenario = MockAccountCreationChain.Scenario.success
     @State private var runningFlow: OnboardingModel?
     @State private var runningSession: AppSession?
 
@@ -32,16 +33,29 @@ struct OnboardingCatalogPage: View {
                     } label: {
                         Text(verbatim: "Practice run checks")
                     }
+                    Picker(selection: $creationScenario) {
+                        ForEach(MockAccountCreationChain.Scenario.allCases) { Text(verbatim: $0.rawValue).tag($0) }
+                    } label: {
+                        Text(verbatim: "Real creation (fake chain)")
+                    }
                     Toggle(isOn: $tourSeen) { Text(verbatim: "Tour already seen") }
                     Button {
                         let session = AppSession(store: InMemoryLocalWalletStore(LocalWallet(tourSeen: tourSeen)), network: .testnet)
                         runningSession = session
                         let setupScenario = self.setupScenario
+                        let creationScenario = self.creationScenario
                         runningFlow = OnboardingModel(
                             session: session,
                             reader: MockChipReader(scenario: readerScenario),
                             service: MockOnboardingService(scenario: serviceScenario),
-                            makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(scenario: setupScenario), signer: MockChipSigner()) }
+                            makeSetup: { choice in
+                                try AccountSetupModel(
+                                    choice: choice, service: MockAccountSetupService(scenario: setupScenario),
+                                    creator: AccountCreator(chain: MockAccountCreationChain(scenario: creationScenario)),
+                                    signer: MockChipSigner(), session: session,
+                                    rehearsal: MockAccountSetupService(scenario: setupScenario)
+                                )
+                            }
                         )
                     } label: {
                         Text(verbatim: "Start at A1 · Welcome")
@@ -88,8 +102,8 @@ struct OnboardingCatalogPage: View {
                     .accessibilityLabel(Text(verbatim: "Close"))
                 }
                 .catalogOverrides(settings)
-                // Carte déjà dans un compte : l'app ouvrirait le Wallet ; ici, on referme le parcours.
-                .onChange(of: runningSession?.hasAccount ?? false) { _, opened in
+                // Compte ouvert (connexion, ou création après A7) : l'app afficherait le Wallet ; ici, on referme le parcours.
+                .onChange(of: runningSession.map { !$0.showsOnboarding } ?? false) { _, opened in
                     if opened { runningFlow = nil }
                 }
         }

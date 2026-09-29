@@ -37,6 +37,13 @@ final class AppSession {
 
     var hasAccount: Bool { wallet.account != nil }
 
+    /// Compte tout juste créé, mais A7 (« How your Jungle works ») est encore à l'écran : l'onboarding reste affiché
+    /// jusqu'à « Let's swing ». Pas enregistré : au prochain lancement, le compte ouvre directement le Wallet.
+    private(set) var isFinishingOnboarding = false
+
+    /// Écran de départ : l'onboarding tant qu'il n'y a pas de compte, ou tant qu'A7 n'est pas passé.
+    var showsOnboarding: Bool { !hasAccount || isFinishingOnboarding }
+
     /// La visite guidée a été vue ou passée. Si l'écriture échoue, elle sera simplement proposée à nouveau.
     func markTourSeen() {
         guard !wallet.tourSeen else { return }
@@ -63,6 +70,27 @@ final class AppSession {
         next.account = SavedAccount(address: account, cards: cards)
         next.cardHints = CardHint.adding(CardHint(key: card.publicKey, account: account, at: date), to: next.cardHints)
         try persist(next)
+    }
+
+    /// Compte créé **et confirmé sur la chaîne** (étape 4) : on l'enregistre sur le téléphone, avec le prénom, le nom
+    /// et la couleur de la carte (données locales), puis A7 s'affiche avant le Wallet.
+    func completeOnboarding(account: String, card: SavedCard, firstName: String, at date: Date = .now) throws {
+        var next = wallet
+        next.firstName = firstName
+        next.account = SavedAccount(address: account, cards: [card])
+        next.cardHints = CardHint.adding(CardHint(key: card.publicKey, account: account, at: date), to: next.cardHints)
+        isFinishingOnboarding = true
+        do {
+            try persist(next)
+        } catch {
+            isFinishingOnboarding = false
+            throw error
+        }
+    }
+
+    /// « Let's swing » (A7) : le Wallet remplace l'onboarding.
+    func finishOnboarding() {
+        isFinishingOnboarding = false
     }
 
     #if DESIGN_CATALOG

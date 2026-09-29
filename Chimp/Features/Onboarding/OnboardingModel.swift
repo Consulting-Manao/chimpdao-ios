@@ -11,13 +11,19 @@ enum OnboardingRoute: Hashable {
     case choice(CardChoice)
     /// H3 : pas une vraie carte ChimpDAO.
     case notAChimpCard
-    /// Création du compte (état dans `OnboardingModel.setup`) : A4, A5, A6, code de déblocage, vérifications, A7.
+    /// Création du compte (état dans `OnboardingModel.setup`) : A4, A5, A6, confirmation, code de déblocage,
+    /// création en cours, A7.
     case yourName
     case nameYourCard
     case pickPIN
+    case confirmCreate
     case unlockCode
-    case setupCheck
+    case creating
     case welcome
+    #if CHIMP_ADMIN
+    /// Répétition à blanc : vérifications (Debug et Testing).
+    case setupCheck
+    #endif
 }
 
 /// Ce qu'A3 montre de la carte lue.
@@ -231,7 +237,7 @@ final class OnboardingModel {
 
     // MARK: A3
 
-    // MARK: A4 à A7 (étape 3 : répétition à blanc)
+    // MARK: A4 à A7
 
     /// « Start a new account » : une nouvelle cérémonie pour la carte lue en A2.
     func startNewAccount(with choice: CardChoice) {
@@ -250,23 +256,86 @@ final class OnboardingModel {
         path.append(.pickPIN)
     }
 
-    /// « Scan my card » (feuille d'A6) : après le tap, le code de déblocage (nouveau PIN) ou directement les vérifications.
-    func scanForSetup() {
+    /// A6 « Hold your … card to finish » : d'abord l'écran de confirmation (création et PIN pour toujours).
+    func continueFromPIN() {
+        guard setup?.canFinish == true else { return }
+        path.append(.confirmCreate)
+    }
+
+    /// « Scan my card » (feuille de l'écran de confirmation).
+    func scanForSetup() async {
         guard let setup else { return }
-        Task {
-            if await setup.scan() {
-                path.append(setup.pinMode == .choose ? .unlockCode : .setupCheck)
+        do {
+            switch await setup.scan() {
+            case .signed:
+                if setup.isRehearsal {
+                    #if CHIMP_ADMIN
+                    path.append(setup.pinMode == .choose ? .unlockCode : .setupCheck)
+                    #endif
+                } else {
+                    path.append(setup.unlockCode != nil || setup.unlockCodeLost ? .unlockCode : .creating)
+                    // Création lancée tout de suite, même pendant l'écran du code : la signature ne vaut que ~10 min.
+                    Task { await setup.create() }
+                }
+            case .pinSetOnly:
+                // Le PIN est sur la carte : le PUK d'abord, puis retour à la confirmation pour un nouveau tap.
+                path.append(.unlockCode)
+            case .wrongPIN:
+                popTo(.pickPIN)
+            case .failed:
+                break
             }
         }
     }
 
+    /// « I wrote it down » : le code est effacé, puis on continue selon ce qui s'est passé au tap.
     func acknowledgeUnlockCode() {
-        path.append(.setupCheck)
+        guard let setup else { return }
+        setup.acknowledgeUnlockCode()
+        guard path.last == .unlockCode else { return }
+        path.removeLast()
+        #if CHIMP_ADMIN
+        if setup.isRehearsal {
+            path.append(.setupCheck)
+            return
+        }
+        #endif
+        switch setup.phase {
+        case .editing:
+            // PIN défini mais signature ratée : on reste sur la confirmation pour refaire le tap.
+            break
+        default:
+            path.append(.creating)
+        }
     }
 
-    func continueAfterCheck() {
-        guard setup?.report != nil else { return }
+    /// Compte créé et enregistré : A7.
+    func continueAfterCreation() {
+        guard setup?.createdResult != nil, path.last == .creating else { return }
         path.append(.welcome)
+    }
+
+    /// Échec qui demande un nouveau tap : retour à A6 si le PIN doit être ressaisi, sinon à la confirmation.
+    func newTapAfterFailure() {
+        guard let setup else { return }
+        setup.prepareNewTap()
+        popTo(setup.pinStep == .done ? .confirmCreate : .pickPIN)
+    }
+
+    /// Tout reprendre depuis A1 (un nouveau tap relira la carte ; les étapes déjà faites sur la chaîne seront sautées).
+    func startOver() {
+        setup = nil
+        readingState = .idle
+        path = []
+    }
+
+    /// A7 « Let's swing » : vraie création → le Wallet ; répétition → retour à A1, rien n'est enregistré.
+    func finishSetup() {
+        if setup?.isRehearsal == true {
+            finishRehearsal()
+        } else {
+            session.finishOnboarding()
+        }
     }
 
     /// Fin de la répétition : rien n'a été créé, retour à A1. Rien n'est enregistré sur le téléphone.
@@ -276,10 +345,22 @@ final class OnboardingModel {
         path = []
     }
 
+    #if CHIMP_ADMIN
+    func continueAfterCheck() {
+        guard setup?.report != nil else { return }
+        path.append(.welcome)
+    }
+    #endif
+
     /// Retour d'un écran de la création.
     func back() {
         guard !path.isEmpty else { return }
         path.removeLast()
+    }
+
+    private func popTo(_ route: OnboardingRoute) {
+        guard let index = path.lastIndex(of: route) else { return }
+        path = Array(path[...index])
     }
 
     static func details(_ error: Error) -> String {

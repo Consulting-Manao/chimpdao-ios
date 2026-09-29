@@ -6,7 +6,7 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if session.hasAccount {
+            if !session.showsOnboarding {
                 MainTabView()
                     .transition(.opacity)
             } else {
@@ -14,7 +14,7 @@ struct RootView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: session.hasAccount)
+        .animation(.easeInOut(duration: 0.3), value: session.showsOnboarding)
         .environment(session)
     }
 }

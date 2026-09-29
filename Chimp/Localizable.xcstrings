@@ -4,6 +4,9 @@
     "%@" : {
 
     },
+    "%@ becomes its first card." : {
+
+    },
     "%@ card, number %@" : {
 
     },
@@ -103,7 +106,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "All checks passed. Nothing was sent, nothing was created." : {
+    "All set!" : {
 
     },
     "All set. Now the card." : {
@@ -120,9 +123,6 @@
     "All with PIN" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
-    },
-    "Already exists, nothing to create" : {
-
     },
     "Also used by the Send tile of the Wallet." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -202,9 +202,6 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Card check (recovery_id)" : {
-
-    },
     "Card N°%@" : {
 
     },
@@ -234,19 +231,25 @@
     "Change the PIN" : {
 
     },
+    "Check again" : {
+
+    },
     "Check it over" : {
 
     },
-    "Check that the card is really yours" : {
-
-    },
-    "Checking everything on Stellar Testnet…" : {
+    "Checking it's really your card" : {
 
     },
     "Checking your card…" : {
 
     },
     "CHIMP CARD" : {
+
+    },
+    "ChimpDAO's fee helper is busy right now. Try again in a moment." : {
+
+    },
+    "ChimpDAO's fee helper said no. Please send the technical details to support." : {
 
     },
     "Chimpy" : {
@@ -301,6 +304,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Confirming on Stellar" : {
+
+    },
     "Continue" : {
 
     },
@@ -337,7 +343,13 @@
     "Couldn't refresh. Balances from 10:42." : {
 
     },
-    "Creating it" : {
+    "Create my account" : {
+
+    },
+    "Create your account?" : {
+
+    },
+    "Creating your Main account" : {
 
     },
     "Cut short" : {
@@ -420,6 +432,9 @@
     "Exchanges often ask for one. Numbers only." : {
 
     },
+    "Failed" : {
+
+    },
     "Federation" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -468,6 +483,9 @@
     "Grow more bananas with a very long title" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Hang on, I'm setting everything up. It takes a few seconds." : {
+
     },
     "has money on it" : {
 
@@ -533,6 +551,9 @@
     "I can't reach the jungle right now. Check your connection." : {
 
     },
+    "I couldn't reach Stellar. Check your connection and try again: I'll pick up where I stopped." : {
+
+    },
     "I don't have a card yet" : {
 
     },
@@ -554,6 +575,9 @@
     "Images" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "In progress" : {
+
     },
     "Includes memo ID 1234567890" : {
 
@@ -578,6 +602,9 @@
       "extractionState" : "manual"
     },
     "is a card." : {
+
+    },
+    "It was sent, but Stellar hasn't confirmed it yet. Check again in a moment. Don't worry, nothing is sent twice." : {
 
     },
     "It's from %@, so only that card works." : {
@@ -618,6 +645,9 @@
 
     },
     "Keep it somewhere safe, away from the card. ChimpDAO can't show it again." : {
+
+    },
+    "Keep the app open" : {
 
     },
     "Keep the big money in Main, pocket money on the cards." : {
@@ -663,17 +693,11 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Link %@ to it" : {
-
-    },
     "Link on header" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Link signature (recovery_id)" : {
-
-    },
-    "Linking the card" : {
+    "Linking %@ to it" : {
 
     },
     "Loading" : {
@@ -722,9 +746,6 @@
       "extractionState" : "manual"
     },
     "Main account" : {
-
-    },
-    "Main account address" : {
 
     },
     "Main is shared by all your cards. Each card also has its own wallet that only it can spend." : {
@@ -876,7 +897,7 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "No code in a practice run" : {
+    "No code to show" : {
 
     },
     "No drawer to choose: no arrow on From." : {
@@ -912,15 +933,21 @@
     "Not enough in %@. %@ available." : {
 
     },
+    "Not quite there" : {
+
+    },
+    "Not started" : {
+
+    },
+    "Nothing is lost" : {
+
+    },
     "Nothing is moved yet. I'm just saying hello to the card." : {
 
     },
     "Nothing is moved yet. I'm just saying hello." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
-    },
-    "Nothing is sent" : {
-
     },
     "Nothing moves between drawers on its own. You do it with Move." : {
 
@@ -1080,18 +1107,6 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Practice run" : {
-
-    },
-    "Practice run: nothing is sent, and the PIN isn't set on the card yet." : {
-
-    },
-    "Practice run: nothing was created. Let's swing takes you back to the start." : {
-
-    },
-    "Practice run: the card creates this code during the real setup. Nothing was sent to it." : {
-
-    },
     "Pressed" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1228,6 +1243,9 @@
     "Sends everything in this drawer" : {
 
     },
+    "Setting up your account" : {
+
+    },
     "Settings" : {
 
     },
@@ -1284,6 +1302,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Something went wrong on Stellar. Try again, or send the technical details to support." : {
+
+    },
     "Something went wrong reading the card. Let's try again." : {
 
     },
@@ -1296,6 +1317,9 @@
       "extractionState" : "manual"
     },
     "Start a new account" : {
+
+    },
+    "Start over" : {
 
     },
     "Stellar address" : {
@@ -1382,6 +1406,9 @@
     "Tap your card\nto move money" : {
 
     },
+    "Tap your card again" : {
+
+    },
     "Technical details" : {
 
     },
@@ -1420,7 +1447,13 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "The card checks its PIN when you tap." : {
+
+    },
     "The card moved away too soon. Hold it still at the top of your phone." : {
+
+    },
+    "The card receives your PIN, then signs." : {
 
     },
     "The card sheet is shown before the scan. \"Scan my card\" simulates a 2-second scan here: no NFC in the design system." : {
@@ -1428,6 +1461,12 @@
       "extractionState" : "manual"
     },
     "The card took too long to answer. Let's try again." : {
+
+    },
+    "The card's signature didn't check out. Tap the same card again." : {
+
+    },
+    "The card's signature is too old now. Tap your card once more to finish." : {
 
     },
     "The decimal key follows the phone's language." : {
@@ -1494,6 +1533,12 @@
     "this week" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "This will create your account and set your PIN for good." : {
+
+    },
+    "This will create your account." : {
+
     },
     "Tiled every 420 pt, opacity 0.14, on chimpHeader" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1618,9 +1663,6 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Would cost %@ XLM, paid by ChimpDAO" : {
-
-    },
     "Wrong" : {
 
     },
@@ -1685,6 +1727,12 @@
     "your" : {
 
     },
+    "Your 4-digit PIN is written on the card. It'll ask for it every time it signs." : {
+
+    },
+    "Your account is ready, but this phone couldn't save it. Try again." : {
+
+    },
     "Your account starts with one card. Add more whenever you want." : {
 
     },
@@ -1711,13 +1759,25 @@
     "Your jungle is empty. Tap Receive to get your first bananas." : {
 
     },
-    "Your Main account (created at the real setup)" : {
+    "Your Main account is created on %@. Network fees are paid by ChimpDAO." : {
 
     },
     "Your money lives on the card, not on your phone." : {
 
     },
     "Your name" : {
+
+    },
+    "Your new PIN" : {
+
+    },
+    "Your PIN can't be removed from the card. Have a pen ready: the card shows an unlock code only once." : {
+
+    },
+    "Your PIN is already on the card, but its unlock code couldn't be shown this time. Keep your PIN safe." : {
+
+    },
+    "Your PIN is already on the card. Type it once more to finish." : {
 
     },
     "Your unlock code" : {

@@ -42,7 +42,12 @@ final class NFCTagSession: NSObject, NFCTagReaderSessionDelegate {
         } catch {
             // Si iOS a fermé la session pendant l'opération (60 s, annulation), c'est la vraie cause :
             // l'erreur radio qui a suivi n'en est que la conséquence.
-            let cause = runner.invalidation ?? error
+            var cause = runner.invalidation ?? error
+            // Exception : un PIN tout juste défini. Le PUK n'existe qu'une fois, il ne doit jamais disparaître derrière
+            // la cause d'iOS : on garde l'erreur qui le porte, avec la cause d'iOS à l'intérieur.
+            if let pinSet = error as? PINSetButSigningFailed {
+                cause = PINSetButSigningFailed(puk: pinSet.puk, underlying: runner.invalidation ?? pinSet.underlying)
+            }
             runner.fail(message: (cause as? LocalizedError)?.errorDescription ?? cause.localizedDescription)
             throw cause
         }

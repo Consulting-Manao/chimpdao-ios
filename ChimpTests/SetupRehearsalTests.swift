@@ -29,20 +29,20 @@ struct SetupRehearsalTests {
         let signer = RecordingSigner()
         let service = MockAccountSetupService(delay: .zero)
 
-        let fresh = try AccountSetupModel(choice: choice(.fresh), service: service, signer: signer)
+        let fresh = try makeSetup(choice(.fresh), service: service, signer: signer)
         await fresh.pinEnter("1234", "1234")
-        #expect(await fresh.scan())
+        #expect(await fresh.rehearsalScan() == .signed)
         #expect(service.lastSalt == ChimpAccountClient.salt(for: k1Key))
 
-        let orphan = try AccountSetupModel(choice: choice(.orphan(lastKnown: oldAccount)), service: service, signer: signer)
+        let orphan = try makeSetup(choice(.orphan(lastKnown: oldAccount)), service: service, signer: signer)
         await orphan.pinEnter("1234", "1234")
-        #expect(await orphan.scan())
+        #expect(await orphan.rehearsalScan() == .signed)
         #expect(service.lastSalt == (try ChimpAccountClient.recoverySalt(publicKey: k1Key, escapedFrom: oldAccount)))
 
         let random = Data(repeating: 0x77, count: 32)
-        let unknown = try AccountSetupModel(choice: choice(.orphan(lastKnown: nil)), service: service, signer: signer, randomSalt: { random })
+        let unknown = try makeSetup(choice(.orphan(lastKnown: nil)), service: service, signer: signer, randomSalt: { random })
         await unknown.pinEnter("1234", "1234")
-        #expect(await unknown.scan())
+        #expect(await unknown.rehearsalScan() == .signed)
         #expect(service.lastSalt == random)
     }
 
@@ -76,7 +76,7 @@ struct SetupRehearsalTests {
 
     @Test("Prénom et nom de carte : vides ou trop longs refusés, espaces ignorés")
     func namesValidation() throws {
-        let model = try AccountSetupModel(choice: choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner())
+        let model = try makeSetup(choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner())
         model.firstName = "   "
         #expect(!model.canContinueFromName)
         model.firstName = " Léo "
@@ -97,19 +97,19 @@ struct SetupRehearsalTests {
     @Test("Ce que demande A6 : Infineon sans PIN = choisir ; Infineon avec PIN = le saisir ; DUOX = rien")
     func pinModes() throws {
         let service = MockAccountSetupService(delay: .zero)
-        let choose = try AccountSetupModel(choice: choice(.fresh), service: service, signer: RecordingSigner())
+        let choose = try makeSetup(choice(.fresh), service: service, signer: RecordingSigner())
         #expect(choose.pinMode == .choose)
         #expect(!choose.canFinish)
-        let existing = try AccountSetupModel(choice: choice(.fresh, pinActive: true), service: service, signer: RecordingSigner())
+        let existing = try makeSetup(choice(.fresh, pinActive: true), service: service, signer: RecordingSigner())
         #expect(existing.pinMode == .existing)
-        let duox = try AccountSetupModel(choice: choice(.fresh, kind: .duox), service: service, signer: RecordingSigner())
+        let duox = try makeSetup(choice(.fresh, kind: .duox), service: service, signer: RecordingSigner())
         #expect(duox.pinMode == .none)
         #expect(duox.canFinish)
     }
 
     @Test("Nouveau PIN : saisie puis confirmation ; deux saisies différentes = « don't match », on recommence de zéro")
     func pinConfirmation() throws {
-        let model = try AccountSetupModel(choice: choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner())
+        let model = try makeSetup(choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner())
         model.pinCompleted("1234")
         #expect(model.pinStep == .confirm)
         #expect(model.pinEntry.isEmpty)
@@ -128,7 +128,7 @@ struct SetupRehearsalTests {
 
     @Test("PIN : seulement 4 chiffres")
     func pinFormat() throws {
-        let model = try AccountSetupModel(choice: choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner())
+        let model = try makeSetup(choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner())
         model.pinCompleted("12a4")
         model.pinCompleted("123")
         #expect(model.pinStep == .first)
@@ -140,9 +140,9 @@ struct SetupRehearsalTests {
     func tapSignsBothDigests() async throws {
         let signer = RecordingSigner()
         let service = MockAccountSetupService(delay: .zero)
-        let model = try AccountSetupModel(choice: choice(.fresh), service: service, signer: signer)
+        let model = try makeSetup(choice(.fresh), service: service, signer: signer)
         await model.pinEnter("1234", "1234")
-        #expect(await model.scan())
+        #expect(await model.rehearsalScan() == .signed)
         #expect(service.prepareCount == 1)
         let plan = try #require(service.lastPlan)
         #expect(signer.calls.count == 1)
@@ -155,24 +155,24 @@ struct SetupRehearsalTests {
     @Test("Répétition : le PIN choisi n'est jamais envoyé à la carte ; un PIN déjà défini est vérifié (VERIFY PIN)")
     func pinSentOnlyWhenExisting() async throws {
         let newPIN = RecordingSigner()
-        let fresh = try AccountSetupModel(choice: choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: newPIN)
+        let fresh = try makeSetup(choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: newPIN)
         await fresh.pinEnter("1234", "1234")
-        #expect(await fresh.scan())
+        #expect(await fresh.rehearsalScan() == .signed)
         #expect(newPIN.calls[0].pin == nil)
 
         let existingPIN = RecordingSigner()
-        let existing = try AccountSetupModel(choice: choice(.fresh, pinActive: true), service: MockAccountSetupService(delay: .zero), signer: existingPIN)
+        let existing = try makeSetup(choice(.fresh, pinActive: true), service: MockAccountSetupService(delay: .zero), signer: existingPIN)
         existing.pinCompleted("5678")
-        #expect(await existing.scan())
+        #expect(await existing.rehearsalScan() == .signed)
         #expect(existingPIN.calls[0].pin == "5678")
     }
 
     @Test("Règle : SET PIN (00 40) n'est jamais envoyé pendant la répétition ; carte sans PIN : ni VERIFY PIN (00 44)")
     func noSetPINOnTheWire() async throws {
         let card = RehearsalInfineon(key: k1Key, pinActive: false)
-        let model = try AccountSetupModel(choice: choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: TransportSigner(card: card))
+        let model = try makeSetup(choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: TransportSigner(card: card))
         await model.pinEnter("1234", "1234")
-        #expect(await model.scan())
+        #expect(await model.rehearsalScan() == .signed)
         #expect(!card.sent.contains { $0.count > 1 && $0[1] == 0x40 })
         #expect(!card.sent.contains { $0.count > 1 && $0[1] == 0x44 })
         #expect(card.sent.filter { $0.count > 1 && $0[1] == 0x18 }.count == 2)
@@ -181,19 +181,18 @@ struct SetupRehearsalTests {
     @Test("Carte qui a déjà un PIN : VERIFY PIN puis SIGN, deux fois, jamais SET PIN")
     func existingPINOnTheWire() async throws {
         let card = RehearsalInfineon(key: k1Key, pinActive: true)
-        let model = try AccountSetupModel(choice: choice(.fresh, pinActive: true), service: MockAccountSetupService(delay: .zero), signer: TransportSigner(card: card))
+        let model = try makeSetup(choice(.fresh, pinActive: true), service: MockAccountSetupService(delay: .zero), signer: TransportSigner(card: card))
         model.pinCompleted("5678")
-        #expect(await model.scan())
+        #expect(await model.rehearsalScan() == .signed)
         #expect(!card.sent.contains { $0.count > 1 && $0[1] == 0x40 })
         #expect(card.sent.filter { $0.count > 1 && $0[1] == 0x44 }.count == 2)
     }
 
     @Test("Tap annulé : retour à A6, feuille toujours ouverte ; rien n'est gardé")
     func tapCancelled() async throws {
-        let model = try AccountSetupModel(choice: choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .cancelled))
+        let model = try makeSetup(choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .cancelled))
         await model.pinEnter("1234", "1234")
-        model.openTapSheet()
-        #expect(!(await model.scan()))
+        #expect(await model.rehearsalScan() != .signed)
         #expect(model.phase == .editing)
         #expect(model.isShowingTapSheet)
         #expect(model.tapProblem == nil)
@@ -201,25 +200,26 @@ struct SetupRehearsalTests {
 
     @Test("Règle 7 : mauvaise carte, mauvais PIN, PIN bloqué, liaison perdue : remontés à l'écran")
     func tapErrorsSurface() async throws {
-        let wrongCard = try AccountSetupModel(choice: choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .wrongCard))
+        let wrongCard = try makeSetup(choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .wrongCard))
         await wrongCard.pinEnter("1234", "1234")
-        #expect(!(await wrongCard.scan()))
+        #expect(await wrongCard.rehearsalScan() != .signed)
         #expect(wrongCard.tapProblem?.kind == .wrongCard)
 
-        let wrongPIN = try AccountSetupModel(choice: choice(.fresh, pinActive: true), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .wrongPIN(retriesLeft: 2)))
+        let wrongPIN = try makeSetup(choice(.fresh, pinActive: true), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .wrongPIN(retriesLeft: 2)))
         wrongPIN.pinCompleted("0000")
-        #expect(!(await wrongPIN.scan()))
+        #expect(await wrongPIN.rehearsalScan() != .signed)
         #expect(wrongPIN.pinState == .wrong(triesLeft: 2))
-        #expect(wrongPIN.pinStep == .done)
+        // Le PIN refusé est effacé : l'utilisateur le retape.
+        #expect(wrongPIN.pinStep == .first)
 
-        let locked = try AccountSetupModel(choice: choice(.fresh, pinActive: true), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .pinLocked))
+        let locked = try makeSetup(choice(.fresh, pinActive: true), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .pinLocked))
         locked.pinCompleted("0000")
-        #expect(!(await locked.scan()))
+        #expect(await locked.rehearsalScan() != .signed)
         #expect(locked.pinState == .blocked)
 
-        let moved = try AccountSetupModel(choice: choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .transport("Tag connection lost")))
+        let moved = try makeSetup(choice(.fresh), service: MockAccountSetupService(delay: .zero), signer: RecordingSigner(error: .transport("Tag connection lost")))
         await moved.pinEnter("1234", "1234")
-        #expect(!(await moved.scan()))
+        #expect(await moved.rehearsalScan() != .signed)
         #expect(moved.tapProblem?.kind == .cardMoved)
         #expect(moved.tapProblem?.technicalDetails.contains("Tag connection lost") == true)
     }
@@ -228,9 +228,9 @@ struct SetupRehearsalTests {
     func prepareFailureNoTap() async throws {
         let signer = RecordingSigner()
         let service = FailingPrepareService()
-        let model = try AccountSetupModel(choice: choice(.fresh), service: service, signer: signer)
+        let model = try makeSetup(choice(.fresh), service: service, signer: signer)
         await model.pinEnter("1234", "1234")
-        #expect(!(await model.scan()))
+        #expect(await model.rehearsalScan() != .signed)
         #expect(signer.calls.isEmpty)
         #expect(model.tapProblem?.kind == .couldntCheck)
     }
@@ -241,11 +241,11 @@ struct SetupRehearsalTests {
     func checks() async throws {
         let service = MockAccountSetupService(scenario: .networkError, delay: .zero)
         let signer = RecordingSigner()
-        let model = try AccountSetupModel(choice: choice(.fresh), service: service, signer: signer)
+        let model = try makeSetup(choice(.fresh), service: service, signer: signer)
         await model.pinEnter("1234", "1234")
-        #expect(await model.scan())
+        #expect(await model.rehearsalScan() == .signed)
         await model.check()
-        guard case .failed(let problem) = model.phase else { Issue.record("expected failure"); return }
+        guard case .rehearsalFailed(let problem) = model.phase else { Issue.record("expected failure"); return }
         #expect(problem.kind == .couldntCheck)
         service.scenario = .success
         await model.check()
@@ -261,7 +261,7 @@ struct SetupRehearsalTests {
         let onboarding = OnboardingModel(
             session: session, reader: MockChipReader(scenario: .infineon, delay: .zero),
             service: MockOnboardingService(scenario: .fresh, delay: .zero),
-            makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), signer: RecordingSigner()) }
+            makeSetup: { try self.makeSetup($0, service: MockAccountSetupService(delay: .zero), signer: RecordingSigner()) }
         )
         onboarding.path = [.reading]
         await onboarding.scan()
@@ -275,8 +275,14 @@ struct SetupRehearsalTests {
         onboarding.continueFromCard()
         #expect(onboarding.path.last == .pickPIN)
         await setup.pinEnter("1234", "1234")
-        #expect(await setup.scan())
+        onboarding.continueFromPIN()
+        #expect(onboarding.path.last == .confirmCreate)
+        setup.openTapSheet(.rehearsal)
+        await onboarding.scanForSetup()
+        #expect(onboarding.path.last == .unlockCode)
+        #expect(setup.unlockCode == nil)
         onboarding.acknowledgeUnlockCode()
+        #expect(onboarding.path.last == .setupCheck)
         await setup.check()
         onboarding.continueAfterCheck()
         #expect(onboarding.path.last == .welcome)
@@ -289,6 +295,21 @@ struct SetupRehearsalTests {
 
     // MARK: Aides
 
+    /// Cérémonie avec services factices ; la répétition est disponible, la création passe par une fausse chaîne.
+    private func makeSetup(
+        _ choice: CardChoice,
+        service: AccountSetupService,
+        signer: ChipSigner,
+        randomSalt: (() throws -> Data)? = nil,
+        session: AppSession? = nil,
+        chain: AccountCreationChain = MockAccountCreationChain(delay: .zero)
+    ) throws -> AccountSetupModel {
+        try AccountSetupModel(
+            choice: choice, service: service, creator: AccountCreator(chain: chain), signer: signer, session: session,
+            rehearsal: service as? AccountRehearsing, randomSalt: randomSalt ?? { try SorobanAuth.randomBytes(count: 32) }
+        )
+    }
+
     private func choice(_ kind: CardChoice.Kind, kind chip: ChipKind = .infineon2Go, pinActive: Bool = false) -> CardChoice {
         let key = chip == .duox ? MockChipReader.p256Key : k1Key
         return CardChoice(kind: kind, card: ChipKeyInfo(kind: chip, publicKey: key, pinActive: pinActive),
@@ -298,9 +319,15 @@ struct SetupRehearsalTests {
 
 extension AccountSetupModel {
     /// Saisie d'un nouveau PIN puis de sa confirmation.
-    fileprivate func pinEnter(_ first: String, _ confirm: String) async {
+    func pinEnter(_ first: String, _ confirm: String) async {
         pinCompleted(first)
         pinCompleted(confirm)
+    }
+
+    /// Tap en mode répétition à blanc.
+    func rehearsalScan() async -> TapOutcome {
+        openTapSheet(.rehearsal)
+        return await scan()
     }
 }
 
@@ -309,7 +336,7 @@ extension MockAccountSetupService {
 }
 
 /// Faux signataire : garde chaque appel (digests, carte attendue, PIN) et renvoie une signature fixe ou une erreur.
-private final class RecordingSigner: ChipSigner, @unchecked Sendable {
+final class RecordingSigner: ChipSigner, @unchecked Sendable {
     struct Call {
         let digests: [Data]
         let expectedKey: ChipPublicKey
@@ -321,10 +348,23 @@ private final class RecordingSigner: ChipSigner, @unchecked Sendable {
 
     init(error: ChipError? = nil) { self.error = error }
 
+    /// Appels à SET PIN (onboarding réel) : le PIN transmis.
+    private(set) var newPINs: [String] = []
+    /// Erreur à renvoyer à la place de `setPINAndSign` (ex. : PIN défini puis signature ratée).
+    var setPINError: Error?
+    /// PUK renvoyé par le faux SET PIN (`nil` : la carte avait déjà un PIN).
+    var puk: Data? = Data([0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04])
+
     func sign(digests: [Data], expectedKey: ChipPublicKey, pin: String?) async throws -> [ChipSignedDigest] {
         calls.append(Call(digests: digests, expectedKey: expectedKey, pin: pin))
         if let error { throw error }
         return digests.map { _ in .secp256k1(signature: Data(repeating: 0x11, count: 64)) }
+    }
+
+    func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {
+        newPINs.append(newPIN)
+        if let setPINError { throw setPINError }
+        return PINSetupSignatures(puk: puk, signatures: try await sign(digests: digests, expectedKey: expectedKey, pin: newPIN))
     }
 }
 
@@ -334,6 +374,10 @@ private struct TransportSigner: ChipSigner {
 
     func sign(digests: [Data], expectedKey: ChipPublicKey, pin: String?) async throws -> [ChipSignedDigest] {
         try await ChipSigning.sign(card, digests: digests, expectedKey: expectedKey, pin: pin)
+    }
+
+    func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {
+        try await ChipSigning.setPINAndSign(card, digests: digests, expectedKey: expectedKey, newPIN: newPIN)
     }
 }
 

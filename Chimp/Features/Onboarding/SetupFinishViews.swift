@@ -1,14 +1,13 @@
 import SwiftUI
 
-/// A6 · Pick a PIN (étape 3 sur 3), puis « Hold your Jungle card to finish ».
+/// A6 · Pick a PIN (étape 3 sur 3), puis « Hold your Jungle card to finish » (→ écran de confirmation).
 /// - Infineon sans PIN : saisie, puis confirmation (PIN obligatoire, décision du 2026-09-29).
-/// - Infineon qui a déjà un PIN : une saisie, vérifiée par la carte au tap.
+/// - Infineon qui a déjà un PIN (ou qui vient de le recevoir) : une saisie, vérifiée par la carte au tap.
 /// - DUOX : pas de PIN, seulement le tap.
-/// La feuille « Chimp Sign » montre ce que la carte va signer avant d'ouvrir la session NFC (règle 8).
 struct PickPINView: View {
     @Bindable var model: AccountSetupModel
     let onBack: () -> Void
-    let onScan: () -> Void
+    let onContinue: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,9 +17,6 @@ struct PickPINView: View {
         }
         .background(Color(.chimpBackground))
         .blocksSwipeBack(model.isBusy)
-        .chimpSheet(isPresented: $model.isShowingTapSheet, height: ChimpSize.cardTapSheetHeight, isDismissDisabled: model.isBusy) {
-            tapSheet
-        }
     }
 
     private var backAction: (() -> Void)? {
@@ -48,9 +44,9 @@ struct PickPINView: View {
 
     private var finishButtons: some View {
         VStack(spacing: ChimpSpacing.xs) {
-            ChimpButton("Hold your \(model.displayCardName) card to finish", isLoading: model.isBusy) { model.openTapSheet() }
+            ChimpButton("Hold your \(model.displayCardName) card to finish", isLoading: model.isBusy, action: onContinue)
                 .disabled(!model.canFinish)
-            if model.pinStep == .done, model.pinMode != .none {
+            if model.pinStep == .done, model.pinMode != .none, !model.pinWasSet {
                 ChimpButton("Change the PIN", kind: .link) { model.restartPIN() }
                     .disabled(model.isBusy)
             }
@@ -60,27 +56,11 @@ struct PickPINView: View {
         .padding(.bottom, ChimpSpacing.l)
     }
 
-    private var tapSheet: some View {
-        let who: LocalizedStringKey? = model.isRehearsal ? "Practice run: nothing is sent, and the PIN isn't set on the card yet." : nil
-        let cancel: (() -> Void)? = model.isBusy ? nil : { model.cancelTapSheet() }
-        return CardTapSheet(
-            cardName: model.displayCardName,
-            cardColor: model.cardColor,
-            stepLabel: "Last step",
-            what: "Your card signs two things: a check that it's really yours, and the link to your new Main account.",
-            who: who,
-            pinStatus: model.pinMode == .none ? .notNeeded : .ready,
-            isScanning: model.isBusy,
-            onScan: onScan,
-            onCancel: cancel
-        )
-    }
-
     private var title: LocalizedStringKey {
         switch (model.pinMode, model.pinStep) {
         case (.none, _): "Last step"
         case (.existing, .done), (.choose, .done): "PIN ready"
-        case (.existing, _): "Your card's PIN"
+        case (.existing, _): model.pinWasSet ? "Your new PIN" : "Your card's PIN"
         case (.choose, .confirm): "Type it again"
         case (.choose, .first): "Pick a 4-digit PIN"
         }
@@ -102,7 +82,9 @@ struct PickPINView: View {
         switch (model.pinMode, model.pinStep) {
         case (.none, _): "This card has no PIN: a tap is all it takes."
         case (_, .done): "All set. Now the card."
-        case (.existing, _): "This card already has a PIN. Type it; the card checks it when you tap."
+        case (.existing, _): model.pinWasSet
+            ? "Your PIN is already on the card. Type it once more to finish."
+            : "This card already has a PIN. Type it; the card checks it when you tap."
         case (.choose, .confirm): "Once more, to be sure."
         case (.choose, .first): "You'll type it each time the card signs. I don't keep a copy, so pick one you won't forget."
         }
@@ -111,11 +93,17 @@ struct PickPINView: View {
 
 /// Code de déblocage (PUK) : la carte le donne **une seule fois** quand elle reçoit son PIN ; il débloque la carte
 /// si le PIN est oublié. Comme l'étape « Unlock code » de `NewCardPin.tsx`, avec « I wrote it down ».
-/// En répétition, aucun PIN n'est envoyé à la carte : il n'y a donc pas de code, seulement l'écran.
+/// Le code n'existe qu'en mémoire, le temps de cet écran : jamais enregistré, jamais journalisé, masqué quand l'app
+/// passe en arrière-plan (aperçu du sélecteur d'apps). En répétition, aucun PIN n'est envoyé : il n'y a pas de code.
 struct UnlockCodeView: View {
-    /// Code de 8 octets en hexadécimal, `nil` en répétition.
-    let code: String?
+    /// Code de 8 octets, `nil` en répétition ou s'il a été perdu.
+    let code: Data?
+    let isRehearsal: Bool
+    /// Le PIN était déjà sur la carte (essai précédent) : pas de code à montrer cette fois.
+    var isLost = false
     let onDone: () -> Void
+
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(spacing: 0) {
@@ -123,19 +111,15 @@ struct UnlockCodeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.l) {
                     ChimpySays(text: "If you ever forget your PIN, this code unlocks the card. It's shown only once: write it down.", pose: .stand)
-                    Text(verbatim: code.map(Self.grouped) ?? "•••• •••• •••• ••••")
+                    Text(verbatim: displayedCode)
                         .chimpFont(.amountS)
                         .monospaced()
                         .textSelection(.disabled)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, ChimpSpacing.xl + ChimpBorder.regular)
                         .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.panel), fill: Color(.chimpSurface), shadow: .card)
-                        .accessibilityLabel(code == nil ? Text("No code in a practice run") : Text(verbatim: code.map(Self.spelled) ?? ""))
-                    if code == nil {
-                        ChimpNoticeBanner(text: "Practice run: the card creates this code during the real setup. Nothing was sent to it.")
-                    } else {
-                        ChimpNoticeBanner(text: "Keep it somewhere safe, away from the card. ChimpDAO can't show it again.")
-                    }
+                        .accessibilityLabel(accessibilityCode)
+                    banner
                 }
                 .padding(.top, ChimpSpacing.xxl)
                 .padding(.horizontal, ChimpSpacing.xxl)
@@ -146,9 +130,42 @@ struct UnlockCodeView: View {
                 .padding(.vertical, ChimpSpacing.l)
         }
         .background(Color(.chimpBackground))
+        .blocksSwipeBack(true)
     }
 
-    /// « 0123 4567 89ab cdef » : plus facile à recopier.
+    private var displayedCode: String {
+        guard let code, scenePhase == .active else { return "•••• •••• •••• ••••" }
+        return Self.grouped(code.hexString.uppercased())
+    }
+
+    private var accessibilityCode: Text {
+        guard let code else { return Text("No code to show") }
+        return Text(verbatim: Self.spelled(code.hexString.uppercased()))
+    }
+
+    @ViewBuilder
+    private var banner: some View {
+        #if CHIMP_ADMIN
+        if isRehearsal {
+            ChimpNoticeBanner(text: untranslated("Practice run: the card creates this code during the real setup. Nothing was sent to it."))
+        } else {
+            realBanner
+        }
+        #else
+        realBanner
+        #endif
+    }
+
+    @ViewBuilder
+    private var realBanner: some View {
+        if isLost {
+            ChimpNoticeBanner(text: "Your PIN is already on the card, but its unlock code couldn't be shown this time. Keep your PIN safe.", marker: .error)
+        } else {
+            ChimpNoticeBanner(text: "Keep it somewhere safe, away from the card. ChimpDAO can't show it again.")
+        }
+    }
+
+    /// « 0123 4567 89AB CDEF » : plus facile à recopier.
     static func grouped(_ code: String) -> String {
         stride(from: 0, to: code.count, by: 4).map { start in
             let from = code.index(code.startIndex, offsetBy: start)
@@ -163,35 +180,36 @@ struct UnlockCodeView: View {
     }
 }
 
-/// Vérifications après le tap. Étape 3 : **répétition à blanc**, tout est simulé, rien n'est envoyé.
+#if CHIMP_ADMIN
+/// Vérifications de la **répétition à blanc** (Debug et Testing) : tout est simulé, rien n'est envoyé.
 struct SetupCheckView: View {
     let model: AccountSetupModel
     let onContinue: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(title: "Practice run", subtitle: "Nothing is sent")
+            ChimpHeader(title: untranslated("Practice run"), subtitle: untranslated("Nothing is sent"))
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.l) {
                     ChimpReviewSteps(steps: [
-                        Text("Check that the card is really yours"),
-                        Text("Your Main account (created at the real setup)"),
-                        Text("Link \(model.displayCardName) to it"),
+                        Text(verbatim: "Check that the card is really yours"),
+                        Text(verbatim: "Your Main account (created at the real setup)"),
+                        Text(verbatim: "Link \(model.displayCardName) to it"),
                     ])
                     switch model.phase {
                     case .checking, .signed:
                         HStack(spacing: ChimpSpacing.s) {
                             ProgressView()
-                            Text("Checking everything on Stellar Testnet…").chimpFont(.body)
+                            Text(verbatim: "Checking everything on Stellar Testnet…").chimpFont(.body)
                         }
                         .foregroundStyle(.chimpTextSecondary)
-                    case .succeeded(let report):
-                        ChimpNoticeBanner(text: "All checks passed. Nothing was sent, nothing was created.", marker: .success)
+                    case .rehearsed(let report):
+                        ChimpNoticeBanner(text: untranslated("All checks passed. Nothing was sent, nothing was created."), marker: .success)
                         ChimpDetailList(items: Self.items(report))
                         if !report.rejectionSamples.isEmpty {
                             ChimpTechnicalDetails(details: report.rejectionSamples.joined(separator: "\n"))
                         }
-                    case .failed(let problem):
+                    case .rehearsalFailed(let problem):
                         ChimpySays(text: CardReadingView.message(for: problem.kind), pose: .head)
                         ChimpTechnicalDetails(details: problem.technicalDetails)
                     default:
@@ -204,7 +222,7 @@ struct SetupCheckView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             Group {
-                if case .failed = model.phase {
+                if case .rehearsalFailed = model.phase {
                     ChimpButton("Try again") { Task { await model.check() } }
                 } else {
                     ChimpButton("Continue", isLoading: model.isBusy, action: onContinue)
@@ -221,17 +239,17 @@ struct SetupCheckView: View {
 
     static func items(_ report: RehearsalReport) -> [ChimpDetailItem] {
         var items = [
-            ChimpDetailItem(id: "account", label: "Main account address", value: report.account, isMonospaced: true),
-            ChimpDetailItem(id: "deploy", label: "Creating it", value: report.accountAlreadyDeployed
-                ? String(localized: "Already exists, nothing to create")
-                : String(localized: "Would cost \(xlm(report.deploymentFee ?? 0)) XLM, paid by ChimpDAO")),
-            ChimpDetailItem(id: "link", label: "Linking the card", value: String(localized: "Would cost \(xlm(report.setOwnerFee)) XLM, paid by ChimpDAO")),
+            ChimpDetailItem(id: "account", label: untranslated("Main account address"), value: report.account, isMonospaced: true),
+            ChimpDetailItem(id: "deploy", label: untranslated("Creating it"), value: report.accountAlreadyDeployed
+                ? "Already exists, nothing to create"
+                : "Would cost \(xlm(report.deploymentFee ?? 0)) XLM, paid by ChimpDAO"),
+            ChimpDetailItem(id: "link", label: untranslated("Linking the card"), value: "Would cost \(xlm(report.setOwnerFee)) XLM, paid by ChimpDAO"),
         ]
         if let id = report.possessionRecoveryID {
-            items.append(ChimpDetailItem(id: "possession", label: "Card check (recovery_id)", value: String(id), isMonospaced: true))
+            items.append(ChimpDetailItem(id: "possession", label: untranslated("Card check (recovery_id)"), value: String(id), isMonospaced: true))
         }
         if let id = report.setOwnerRecoveryID {
-            items.append(ChimpDetailItem(id: "setOwner", label: "Link signature (recovery_id)", value: String(id), isMonospaced: true))
+            items.append(ChimpDetailItem(id: "setOwner", label: untranslated("Link signature (recovery_id)"), value: String(id), isMonospaced: true))
         }
         return items
     }
@@ -241,6 +259,7 @@ struct SetupCheckView: View {
         (Decimal(stroops) / 10_000_000).formatted(.number.precision(.fractionLength(0...7)))
     }
 }
+#endif
 
 /// A7 · How your Jungle works : récapitulatif avant le Wallet. En répétition, « Let's swing » ramène au début.
 struct JungleWelcomeView: View {
@@ -256,9 +275,11 @@ struct JungleWelcomeView: View {
             ChimpHeader(title: "Welcome to the jungle!", subtitle: "Two things to know")
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.lg) {
+                    #if CHIMP_ADMIN
                     if isRehearsal {
-                        ChimpNoticeBanner(text: "Practice run: nothing was created. Let's swing takes you back to the start.")
+                        ChimpNoticeBanner(text: untranslated("Practice run: nothing was created. Let's swing takes you back to the start."))
                     }
+                    #endif
                     drawers
                     VStack(alignment: .leading, spacing: ChimpSpacing.m) {
                         numbered(1, "Main is shared by all your cards. Each card also has its own wallet that only it can spend.")

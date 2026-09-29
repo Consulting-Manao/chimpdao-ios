@@ -42,20 +42,32 @@ struct OnboardingFlow: View {
         case .nameYourCard:
             if let setup = model.setup { NameYourCardView(model: setup, onBack: model.back, onContinue: model.continueFromCard) }
         case .pickPIN:
-            if let setup = model.setup { PickPINView(model: setup, onBack: model.back, onScan: model.scanForSetup) }
+            if let setup = model.setup { PickPINView(model: setup, onBack: model.back, onContinue: model.continueFromPIN) }
+        case .confirmCreate:
+            if let setup = model.setup { CreateAccountConfirmView(model: setup, onBack: model.back, onScan: { Task { await model.scanForSetup() } }) }
         case .unlockCode:
-            // Répétition : aucun PIN n'est envoyé à la carte, donc aucun code (étape 4 : le PUK renvoyé par SET PIN).
-            UnlockCodeView(code: nil, onDone: model.acknowledgeUnlockCode)
-                .blocksSwipeBack(true)
-        case .setupCheck:
-            if let setup = model.setup { SetupCheckView(model: setup, onContinue: model.continueAfterCheck) }
+            if let setup = model.setup {
+                UnlockCodeView(code: setup.unlockCode, isRehearsal: setup.isRehearsal, isLost: setup.unlockCodeLost,
+                               onDone: model.acknowledgeUnlockCode)
+            }
+        case .creating:
+            if let setup = model.setup {
+                CreatingAccountView(
+                    model: setup, onRetry: setup.retryCreation, onNewTap: model.newTapAfterFailure,
+                    onStartOver: model.startOver, onCreated: model.continueAfterCreation
+                )
+            }
         case .welcome:
             if let setup = model.setup {
                 JungleWelcomeView(
                     cardName: setup.trimmedCardName, cardColor: setup.cardColor, hasPIN: setup.pinMode != .none,
-                    isRehearsal: setup.isRehearsal, onFinish: model.finishRehearsal
+                    isRehearsal: setup.isRehearsal, onFinish: model.finishSetup
                 )
             }
+        #if CHIMP_ADMIN
+        case .setupCheck:
+            if let setup = model.setup { SetupCheckView(model: setup, onContinue: model.continueAfterCheck) }
+        #endif
         }
     }
 
@@ -77,13 +89,29 @@ extension OnboardingModel {
         if !NFCTagReaderSession.readingAvailable {
             return OnboardingModel(
                 session: session, reader: MockChipReader(scenario: .infineon), service: MockOnboardingService(scenario: .fresh),
-                makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(), signer: MockChipSigner()) }
+                makeSetup: { choice in
+                    try AccountSetupModel(
+                        choice: choice, service: MockAccountSetupService(), creator: AccountCreator(chain: MockAccountCreationChain()),
+                        signer: MockChipSigner(), session: session, rehearsal: MockAccountSetupService()
+                    )
+                }
             )
         }
         #endif
         return OnboardingModel(
             session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: .testnet),
-            makeSetup: { try AccountSetupModel(choice: $0, service: ChainAccountSetupService(config: .testnet), signer: NFCChipSigner()) }
+            makeSetup: { choice in try Self.liveSetup(choice: choice, session: session) }
         )
+    }
+
+    /// Cérémonie réelle : NFC, testnet, serveur de frais. En Debug et Testing, la répétition à blanc est proposée en plus.
+    private static func liveSetup(choice: CardChoice, session: AppSession) throws -> AccountSetupModel {
+        let service = ChainAccountSetupService(config: .testnet)
+        let creator = AccountCreator(chain: ChainAccountCreation(config: .testnet))
+        #if CHIMP_ADMIN
+        return try AccountSetupModel(choice: choice, service: service, creator: creator, signer: NFCChipSigner(), session: session, rehearsal: service)
+        #else
+        return try AccountSetupModel(choice: choice, service: service, creator: creator, signer: NFCChipSigner(), session: session)
+        #endif
     }
 }

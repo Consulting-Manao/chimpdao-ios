@@ -1,19 +1,67 @@
 import Foundation
 import Observation
 
-/// ViewModel de la création du compte : A4 (prénom), A5 (nom et couleur de la carte), A6 (PIN et tap), code de
-/// déblocage (PUK), vérifications, A7. Ne fait aucune crypto : il appelle `AccountSetupService` et `ChipSigner`.
+/// Un problème pendant la création (après le tap), avec le message de Chimpy et les détails pour le support.
+struct CreationProblem: Equatable {
+    enum Kind: Equatable {
+        /// Stellar injoignable : on peut réessayer, rien n'est perdu.
+        case network
+        /// Serveur de frais occupé ou en panne : réessayer dans un moment.
+        case feeHelperBusy
+        /// Serveur de frais qui refuse de signer : un souci de notre côté, pour le support.
+        case feeHelperRefused
+        /// Envoyé mais pas encore confirmé : vérifier à nouveau, **jamais** renvoyer à l'aveugle.
+        case notConfirmed
+        /// La signature `set_owner` de la carte a expiré : un nouveau tap est nécessaire.
+        case signatureExpired
+        /// La vérification de la signature de la carte a échoué : un nouveau tap est nécessaire.
+        case cardCheckFailed
+        /// Le compte est créé mais le téléphone n'a pas pu l'enregistrer.
+        case saveFailed
+        /// Autre refus du réseau (simulation, envoi).
+        case other
+    }
+
+    let kind: Kind
+    let technicalDetails: String
+
+    /// Le prochain essai demande un nouveau tap de la carte (sinon, on reprend avec les mêmes signatures).
+    var needsNewTap: Bool { kind == .signatureExpired || kind == .cardCheckFailed }
+
+    static func from(_ error: Error) -> CreationProblem {
+        let details = OnboardingModel.details(error)
+        switch error {
+        case AccountCreationError.signatureExpired:
+            return .init(kind: .signatureExpired, technicalDetails: details)
+        case AccountCreationError.notConfirmedOnChain, StellarError.notConfirmed:
+            return .init(kind: .notConfirmed, technicalDetails: details)
+        case FeeSignerError.busy, FeeSignerError.unavailable:
+            return .init(kind: .feeHelperBusy, technicalDetails: details)
+        case is FeeSignerError:
+            return .init(kind: .feeHelperRefused, technicalDetails: details)
+        case is CardPossession.PossessionError, StellarError.signatureRejected:
+            return .init(kind: .cardCheckFailed, technicalDetails: details)
+        case StellarError.rpc, is URLError:
+            return .init(kind: .network, technicalDetails: details)
+        default:
+            return .init(kind: .other, technicalDetails: details)
+        }
+    }
+}
+
+/// ViewModel de la création du compte : A4 (prénom), A5 (carte), A6 (PIN), confirmation, tap, code de déblocage (PUK),
+/// création sur la chaîne, A7. Ne fait aucune crypto : il appelle `AccountSetupService`, `ChipSigner`, `AccountCreator`
+/// et `AppSession`.
 ///
-/// **Étape 3 : répétition à blanc.** Le tap fait signer la carte (preuve de possession et `set_owner`), puis tout est
-/// vérifié par simulation. Rien n'est envoyé au réseau (le service n'a pas de serveur de frais) et **SET PIN n'est
-/// jamais envoyé** : `ChipSigner` ne sait que lire la clé, vérifier un PIN existant et signer.
+/// **Étape 4 : le vrai onboarding.** Le tap définit le PIN (SET PIN, le PUK s'affiche une seule fois) et signe ;
+/// la création passe par le serveur de frais ; le compte n'est enregistré sur le téléphone qu'une fois confirmé
+/// sur la chaîne. La répétition à blanc ne reste que dans les builds Debug et Testing (décision du 2026-09-29).
 @Observable
 final class AccountSetupModel {
-    /// Ce qu'A6 demande pour le PIN, selon la carte (décision du 2026-09-29 : PIN obligatoire sur Infineon).
     enum PINMode: Equatable {
-        /// Infineon sans PIN : l'utilisateur en choisit un (saisie, confirmation), la carte le recevra à la vraie création.
+        /// Infineon sans PIN : l'utilisateur en choisit un, la carte le reçoit au tap (SET PIN).
         case choose
-        /// Infineon qui a déjà un PIN : on le demande une fois, la carte le vérifie au tap.
+        /// Infineon qui a déjà un PIN (ou qui vient de le recevoir) : on le demande, la carte le vérifie au tap.
         case existing
         /// DUOX : pas de PIN.
         case none
@@ -25,18 +73,43 @@ final class AccountSetupModel {
         case done
     }
 
+    /// Vraie création, ou répétition à blanc (Debug et Testing seulement).
+    enum RunMode: Equatable {
+        case real
+        #if CHIMP_ADMIN
+        case rehearsal
+        #endif
+    }
+
     enum Phase: Equatable {
         case editing
-        /// Lectures réseau avant le tap (dernier ledger, adresse du compte).
+        /// Lectures réseau avant le tap.
         case preparing
         /// Feuille NFC ouverte.
         case scanning
-        /// Carte signée, en attente des vérifications (après le code de déblocage).
+        /// Création en cours, à cette étape.
+        case creating(CreationStep)
+        case created(CreationResult)
+        case failed(CreationProblem)
+        #if CHIMP_ADMIN
+        /// Répétition : carte signée, vérifications pas encore lancées.
         case signed
-        /// Simulations en cours.
         case checking
-        case succeeded(RehearsalReport)
-        case failed(OnboardingProblem)
+        case rehearsed(RehearsalReport)
+        case rehearsalFailed(OnboardingProblem)
+        #endif
+    }
+
+    /// Issue d'un tap.
+    enum TapOutcome: Equatable {
+        /// La carte a signé (et reçu son PIN, le cas échéant).
+        case signed
+        /// Le PIN est défini sur la carte mais la signature a échoué : montrer le PUK, puis refaire un tap.
+        case pinSetOnly
+        /// La carte a refusé le PIN : retour à la saisie.
+        case wrongPIN
+        /// Annulé ou échoué avant tout changement sur la carte (le problème est dans `tapProblem`).
+        case failed
     }
 
     static let pinLength = 4
@@ -44,8 +117,8 @@ final class AccountSetupModel {
     static let maximumCardNameLength = 20
 
     let choice: CardChoice
-    let isRehearsal = true
-    let pinMode: PINMode
+    private(set) var pinMode: PINMode
+    private(set) var runMode: RunMode = .real
 
     var firstName = ""
     var cardName = ""
@@ -56,25 +129,51 @@ final class AccountSetupModel {
     var pinState: ChimpPinState = .entering
     private(set) var pinStep: PINStep
     private var firstPIN: String?
+    /// PIN confirmé, gardé en mémoire **seulement jusqu'à ce que la carte ait signé**, puis effacé.
     private var chosenPIN: String?
 
     var isShowingTapSheet = false
     private(set) var phase: Phase = .editing
-    /// Problème survenu avant ou pendant le tap (affiché sur A6, la feuille fermée).
+    /// Problème survenu avant ou pendant le tap (affiché sur l'écran de confirmation).
     private(set) var tapProblem: OnboardingProblem?
 
+    /// Code de déblocage renvoyé par la carte, à montrer **une seule fois**, effacé dès « I wrote it down ».
+    private(set) var unlockCode: Data?
+    /// Le PIN a été défini par un essai précédent dont le PUK s'est perdu : il n'y a pas de code à montrer.
+    private(set) var unlockCodeLost = false
+    /// La carte a reçu son PIN pendant cette cérémonie (irréversible).
+    private(set) var pinWasSet = false
+    /// Dernière étape de création atteinte (affichée en cas d'échec).
+    private(set) var lastReachedStep: CreationStep?
+
     private let service: AccountSetupService
+    private let creator: AccountCreator
     private let signer: ChipSigner
+    private let session: AppSession?
     private let accountSalt: Data
     private var plan: AccountSetupPlan?
     private var signatures: [ChipSignedDigest]?
+    /// Une création est en cours (empêche deux créations en parallèle).
+    private var isCreating = false
+    #if CHIMP_ADMIN
+    private var rehearsal: AccountRehearsing?
+    #endif
 
     /// `randomSalt` : sel d'une carte orpheline dont l'ancien compte est inconnu (`freshSalt` du terminal), tiré une
-    /// seule fois pour toute la cérémonie.
-    init(choice: CardChoice, service: AccountSetupService, signer: ChipSigner, randomSalt: () throws -> Data = { try SorobanAuth.randomBytes(count: 32) }) throws {
+    /// seule fois pour toute la cérémonie. `session` : où enregistrer le compte une fois confirmé (`nil` dans le catalogue).
+    init(
+        choice: CardChoice,
+        service: AccountSetupService,
+        creator: AccountCreator,
+        signer: ChipSigner,
+        session: AppSession?,
+        randomSalt: () throws -> Data = { try SorobanAuth.randomBytes(count: 32) }
+    ) throws {
         self.choice = choice
         self.service = service
+        self.creator = creator
         self.signer = signer
+        self.session = session
         switch choice.kind {
         case .fresh:
             accountSalt = ChimpAccountClient.salt(for: choice.card.publicKey)
@@ -83,12 +182,35 @@ final class AccountSetupModel {
         case .orphan(nil):
             accountSalt = try randomSalt()
         }
-        switch choice.card.kind {
-        case .duox: pinMode = .none
-        case .infineon2Go: pinMode = choice.card.pinActive ? .existing : .choose
+        let mode: PINMode = switch choice.card.kind {
+        case .duox: .none
+        case .infineon2Go: choice.card.pinActive ? .existing : .choose
         }
-        pinStep = pinMode == .none ? .done : .first
+        pinMode = mode
+        pinStep = mode == .none ? .done : .first
     }
+
+    #if CHIMP_ADMIN
+    /// Debug et Testing : la même cérémonie, avec en plus la répétition à blanc.
+    convenience init(
+        choice: CardChoice,
+        service: AccountSetupService,
+        creator: AccountCreator,
+        signer: ChipSigner,
+        session: AppSession?,
+        rehearsal: AccountRehearsing?,
+        randomSalt: () throws -> Data = { try SorobanAuth.randomBytes(count: 32) }
+    ) throws {
+        try self.init(choice: choice, service: service, creator: creator, signer: signer, session: session, randomSalt: randomSalt)
+        self.rehearsal = rehearsal
+    }
+
+    /// La répétition à blanc est-elle proposée ? (Debug et Testing, avec un service de répétition.)
+    var canRehearse: Bool { rehearsal != nil }
+    var isRehearsal: Bool { runMode == .rehearsal }
+    #else
+    var isRehearsal: Bool { false }
+    #endif
 
     // MARK: A4, A5
 
@@ -152,11 +274,22 @@ final class AccountSetupModel {
 
     var canFinish: Bool { pinStep == .done && !isBusy }
 
-    var isBusy: Bool { phase == .preparing || phase == .scanning || phase == .checking }
+    var isBusy: Bool {
+        switch phase {
+        case .preparing, .scanning, .creating: return true
+        #if CHIMP_ADMIN
+        case .checking: return true
+        #endif
+        default: return false
+        }
+    }
 
-    /// « Hold your Jungle card to finish » : ouvre la feuille qui montre ce que la carte va signer (règle 8).
-    func openTapSheet() {
+    // MARK: Confirmation et tap
+
+    /// Écran de confirmation : « Create my account » (ou la répétition, en Debug et Testing) ouvre la feuille du tap.
+    func openTapSheet(_ mode: RunMode) {
         guard canFinish else { return }
+        runMode = mode
         tapProblem = nil
         isShowingTapSheet = true
     }
@@ -166,65 +299,92 @@ final class AccountSetupModel {
         isShowingTapSheet = false
     }
 
-    /// PIN envoyé à la carte pendant le tap. En répétition, seulement un PIN **déjà défini** sur la carte (VERIFY PIN) ;
-    /// le PIN choisi pour une carte sans PIN n'est pas envoyé (SET PIN n'existe pas dans la répétition).
-    private var pinForTap: String? {
-        pinMode == .existing ? chosenPIN : nil
-    }
-
-    // MARK: Tap
-
-    /// « Scan my card » : lectures réseau d'abord (hors session NFC, règle 9), puis un seul tap qui signe les deux digests.
-    /// Renvoie `true` si la carte a signé.
-    @discardableResult
-    func scan() async -> Bool {
-        guard canFinish, phase != .signed else { return false }
+    /// « Scan my card » : lectures réseau d'abord (hors session NFC, règle 9), puis **un seul tap** :
+    /// - vraie création, carte sans PIN : SET PIN (PUK), puis les deux signatures avec ce PIN ;
+    /// - carte avec PIN : VERIFY PIN puis les deux signatures ; DUOX : les deux signatures ;
+    /// - répétition : jamais SET PIN, seulement un PIN déjà défini est vérifié.
+    /// Après une vraie signature, la création doit démarrer aussitôt (la signature `set_owner` ne vaut que ~10 min).
+    func scan() async -> TapOutcome {
+        guard canFinish else { return .failed }
         tapProblem = nil
         guard let pocket = choice.pocket else {
-            fail(OnboardingProblem(kind: .readFailed, technicalDetails: "This card has no wallet (Pocket) on chain."))
-            return false
+            failTap(OnboardingProblem(kind: .readFailed, technicalDetails: "This card has no wallet (Pocket) on chain."))
+            return .failed
         }
         phase = .preparing
         let plan: AccountSetupPlan
         do {
             plan = try await service.prepare(card: choice.card, pocket: pocket, accountSalt: accountSalt)
         } catch {
-            fail(OnboardingProblem(kind: .couldntCheck, technicalDetails: OnboardingModel.details(error)))
-            return false
+            failTap(OnboardingProblem(kind: .couldntCheck, technicalDetails: OnboardingModel.details(error)))
+            return .failed
         }
 
         phase = .scanning
         do {
-            let signed = try await signer.sign(digests: plan.digests, expectedKey: choice.card.publicKey, pin: pinForTap)
+            let signed: [ChipSignedDigest]
+            if runMode == .real, pinMode == .choose, let chosenPIN {
+                let result = try await signer.setPINAndSign(digests: plan.digests, expectedKey: choice.card.publicKey, newPIN: chosenPIN)
+                pinWasSet = true
+                unlockCode = result.puk
+                unlockCodeLost = result.puk == nil
+                signed = result.signatures
+            } else {
+                signed = try await signer.sign(
+                    digests: plan.digests, expectedKey: choice.card.publicKey, pin: pinMode == .existing ? chosenPIN : nil
+                )
+            }
             self.plan = plan
             signatures = signed
             clearPIN()
+            if pinWasSet { pinMode = .existing }
             isShowingTapSheet = false
-            phase = .signed
-            return true
+            #if CHIMP_ADMIN
+            if runMode == .rehearsal {
+                phase = .signed
+                return .signed
+            }
+            #endif
+            // La création est lancée aussitôt par la navigation (`OnboardingModel.scanForSetup`).
+            phase = .creating(.checkingCard)
+            return .signed
+        } catch let error as PINSetButSigningFailed {
+            // Le PIN est écrit sur la carte : on montre le PUK, puis un nouveau tap signera avec ce PIN (gardé en mémoire).
+            pinWasSet = true
+            unlockCode = error.puk
+            pinMode = .existing
+            isShowingTapSheet = false
+            phase = .editing
+            tapProblem = OnboardingProblem(kind: Self.problemKind(for: error.underlying), technicalDetails: OnboardingModel.details(error))
+            return .pinSetOnly
         } catch ChipError.cancelled {
             phase = .editing
+            return .failed
         } catch ChipError.wrongPIN(let retriesLeft) {
             wrongPIN(.wrong(triesLeft: retriesLeft))
+            return .wrongPIN
         } catch ChipError.pinLocked {
             wrongPIN(.blocked)
+            return .wrongPIN
         } catch let error as ChipError {
-            fail(OnboardingProblem(kind: Self.problemKind(for: error), technicalDetails: OnboardingModel.details(error)))
+            failTap(OnboardingProblem(kind: Self.problemKind(for: error), technicalDetails: OnboardingModel.details(error)))
+            return .failed
         } catch {
-            fail(OnboardingProblem(kind: .readFailed, technicalDetails: OnboardingModel.details(error)))
+            failTap(OnboardingProblem(kind: .readFailed, technicalDetails: OnboardingModel.details(error)))
+            return .failed
         }
-        return false
     }
 
-    /// Le PIN de la carte (déjà défini) a été refusé : retour à la saisie, avec l'état donné par la puce.
+    /// Le PIN a été refusé par la carte : retour à la saisie, avec l'état donné par la puce.
     private func wrongPIN(_ state: ChimpPinState) {
         clearPIN()
         isShowingTapSheet = false
         phase = .editing
+        pinStep = .first
         pinState = state
     }
 
-    private func fail(_ problem: OnboardingProblem) {
+    private func failTap(_ problem: OnboardingProblem) {
         isShowingTapSheet = false
         phase = .editing
         tapProblem = problem
@@ -247,26 +407,94 @@ final class AccountSetupModel {
         }
     }
 
-    // MARK: Vérifications (répétition à blanc)
+    // MARK: Code de déblocage
 
-    /// Après le code de déblocage : simulations seulement. Peut être relancé (mêmes signatures, valables ~10 min).
-    func check() async {
-        guard let plan, let signatures, phase == .signed || isFailedCheck else { return }
-        phase = .checking
+    /// « I wrote it down » : le code est effacé de la mémoire, il ne sera plus jamais montré.
+    func acknowledgeUnlockCode() {
+        unlockCode = nil
+        unlockCodeLost = false
+    }
+
+    // MARK: Création (vraie)
+
+    /// Crée le compte avec les signatures du dernier tap, puis l'enregistre sur le téléphone **après** confirmation.
+    /// Relancée par « Try again » / « Check again » : chaque étape déjà faite sur la chaîne est sautée.
+    func create() async {
+        guard runMode == .real, let plan, let signatures, !isCreating else { return }
+        isCreating = true
+        defer { isCreating = false }
+        phase = .creating(.checkingCard)
+        lastReachedStep = .checkingCard
+        let result: CreationResult
         do {
-            phase = .succeeded(try await service.rehearse(plan, signatures: signatures))
+            result = try await creator.create(plan, signatures: signatures) { [weak self] step in
+                self?.phase = .creating(step)
+                self?.lastReachedStep = step
+            }
         } catch {
-            phase = .failed(OnboardingProblem(kind: .couldntCheck, technicalDetails: OnboardingModel.details(error)))
+            phase = .failed(CreationProblem.from(error))
+            return
+        }
+        do {
+            try session?.completeOnboarding(
+                account: result.account,
+                card: SavedCard(
+                    publicKey: choice.card.publicKey.hex, chip: choice.card.kind.rawValue, tokenID: choice.tokenID,
+                    pocket: choice.pocket, name: trimmedCardName, color: cardColor.rawValue
+                ),
+                firstName: trimmedFirstName
+            )
+            phase = .created(result)
+        } catch {
+            phase = .failed(CreationProblem(kind: .saveFailed, technicalDetails: OnboardingModel.details(error)))
         }
     }
 
-    private var isFailedCheck: Bool {
-        if case .failed = phase { return true }
-        return false
+    /// « Try again » après un échec qui ne demande pas de nouveau tap.
+    func retryCreation() {
+        guard case .failed(let problem) = phase, !problem.needsNewTap else { return }
+        // Toutes les étapes déjà faites sur la chaîne sont relues et sautées (y compris après un échec d'enregistrement).
+        Task { await create() }
+    }
+
+    /// Un nouveau tap est nécessaire (signature expirée ou refusée) : retour à A6 ; le PIN est redemandé s'il a été effacé.
+    func prepareNewTap() {
+        signatures = nil
+        plan = nil
+        phase = .editing
+        if chosenPIN == nil, pinMode != .none {
+            pinEntry = ""
+            pinState = .entering
+            pinStep = .first
+        }
+    }
+
+    var createdResult: CreationResult? {
+        if case .created(let result) = phase { return result }
+        return nil
+    }
+
+    // MARK: Répétition à blanc (Debug et Testing)
+
+    #if CHIMP_ADMIN
+    /// Après le code de déblocage : simulations seulement. Peut être relancé (mêmes signatures, valables ~10 min).
+    func check() async {
+        guard let rehearsal, let plan, let signatures else { return }
+        switch phase {
+        case .signed, .rehearsalFailed: break
+        default: return
+        }
+        phase = .checking
+        do {
+            phase = .rehearsed(try await rehearsal.rehearse(plan, signatures: signatures))
+        } catch {
+            phase = .rehearsalFailed(OnboardingProblem(kind: .couldntCheck, technicalDetails: OnboardingModel.details(error)))
+        }
     }
 
     var report: RehearsalReport? {
-        if case .succeeded(let report) = phase { return report }
+        if case .rehearsed(let report) = phase { return report }
         return nil
     }
+    #endif
 }

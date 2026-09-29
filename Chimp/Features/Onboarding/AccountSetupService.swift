@@ -21,6 +21,7 @@ struct AccountSetupPlan {
     var digests: [Data] { [challenge, setOwner.digest] }
 }
 
+#if CHIMP_ADMIN
 /// Résultat de la répétition à blanc : tout ce qui a été vérifié, sans rien envoyer.
 struct RehearsalReport: Equatable {
     let account: String
@@ -37,14 +38,18 @@ struct RehearsalReport: Equatable {
     let rejectionSamples: [String]
 }
 
-/// Création du compte, vue par l'onboarding. Étape 3 : **répétition à blanc seulement**.
-/// Implémenté par `ChainAccountSetupService` (testnet, lectures et simulations) et `MockAccountSetupService`.
-protocol AccountSetupService {
-    /// Avant le tap : dernier ledger, adresse du compte, entrée `set_owner`, défi. Lectures seulement.
-    func prepare(card: ChipKeyInfo, pocket: String, accountSalt: Data) async throws -> AccountSetupPlan
-    /// Après le tap : vérifie la preuve de possession, simule le déploiement et `set_owner` (avec la recherche du
-    /// `recovery_id`). **N'envoie rien** : ce service n'a pas de serveur de frais et n'appelle jamais `sendTransaction`.
+/// Répétition à blanc (Debug et Testing seulement, décision du 2026-09-29) : après le tap, vérifie la preuve de
+/// possession, simule le déploiement et `set_owner`. **N'envoie rien** : pas de serveur de frais, jamais `sendTransaction`.
+protocol AccountRehearsing {
     func rehearse(_ plan: AccountSetupPlan, signatures: [ChipSignedDigest]) async throws -> RehearsalReport
+}
+#endif
+
+/// Préparation de la création du compte, **avant** le tap (règles 8 et 9). Lectures seulement.
+/// Implémenté par `ChainAccountSetupService` (testnet) et `MockAccountSetupService`.
+protocol AccountSetupService {
+    /// Dernier ledger, adresse du compte, entrée `set_owner` déclarée, défi.
+    func prepare(card: ChipKeyInfo, pocket: String, accountSalt: Data) async throws -> AccountSetupPlan
 }
 
 enum AccountSetupError: Error, Equatable, LocalizedError {
@@ -77,6 +82,13 @@ struct ChainAccountSetupService: AccountSetupService {
         )
     }
 
+    static func details(_ error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? "\(error)"
+    }
+}
+
+#if CHIMP_ADMIN
+extension ChainAccountSetupService: AccountRehearsing {
     func rehearse(_ plan: AccountSetupPlan, signatures: [ChipSignedDigest]) async throws -> RehearsalReport {
         guard signatures.count == 2 else { throw AccountSetupError.missingSignatures(signatures.count) }
         let client = SorobanClient(config: config)
@@ -120,11 +132,8 @@ struct ChainAccountSetupService: AccountSetupService {
             setOwnerFee: prepared.transaction.fee, rejectionSamples: rejections
         )
     }
-
-    static func details(_ error: Error) -> String {
-        (error as? LocalizedError)?.errorDescription ?? "\(error)"
-    }
 }
+#endif
 
 /// Faux service pour le simulateur, le catalogue et les tests : aucune requête réseau.
 final class MockAccountSetupService: AccountSetupService, @unchecked Sendable {
@@ -138,7 +147,9 @@ final class MockAccountSetupService: AccountSetupService, @unchecked Sendable {
     var scenario: Scenario
     var delay: Duration
     private(set) var prepareCount = 0
+    #if CHIMP_ADMIN
     private(set) var rehearseCount = 0
+    #endif
     /// Dernier plan préparé (tests).
     private(set) var lastPlan: AccountSetupPlan?
 
@@ -162,6 +173,7 @@ final class MockAccountSetupService: AccountSetupService, @unchecked Sendable {
         return plan
     }
 
+    #if CHIMP_ADMIN
     func rehearse(_ plan: AccountSetupPlan, signatures: [ChipSignedDigest]) async throws -> RehearsalReport {
         rehearseCount += 1
         try await Task.sleep(for: delay)
@@ -179,4 +191,9 @@ final class MockAccountSetupService: AccountSetupService, @unchecked Sendable {
             throw StellarError.signatureRejected("Simulation failed: HostError: Error(Contract, #201)")
         }
     }
+    #endif
 }
+
+#if CHIMP_ADMIN
+extension MockAccountSetupService: AccountRehearsing {}
+#endif

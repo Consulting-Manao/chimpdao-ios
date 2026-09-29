@@ -193,7 +193,7 @@ struct OnboardingFlowTests {
         let service = RecordingService()
         let model = OnboardingModel(session: AppSession(store: store, network: .testnet),
                                     reader: MockChipReader(scenario: .infineon, delay: .zero), service: service,
-                                    makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), signer: MockChipSigner(delay: .zero)) })
+                                    makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), creator: AccountCreator(chain: MockAccountCreationChain(delay: .zero)), signer: MockChipSigner(delay: .zero), session: nil) })
         model.path = [.reading]
         await model.scan()
         #expect(service.hints == [accountB])
@@ -213,7 +213,7 @@ struct OnboardingFlowTests {
                            service: MockOnboardingService.Scenario = .fresh) -> OnboardingModel {
         OnboardingModel(session: session, reader: MockChipReader(scenario: reader, delay: .zero),
                         service: MockOnboardingService(scenario: service, delay: .zero),
-                        makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), signer: MockChipSigner(delay: .zero)) })
+                        makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), creator: AccountCreator(chain: MockAccountCreationChain(delay: .zero)), signer: MockChipSigner(delay: .zero), session: nil) })
     }
 
     private func scanned(_ service: MockOnboardingService.Scenario, reader: MockChipReader.Scenario = .infineon,
