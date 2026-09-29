@@ -15,6 +15,8 @@ struct ChimpCard: View {
     var amount: String?
     /// Texte à côté du montant (« pocket »).
     var subtitle: LocalizedStringKey?
+    /// `true` : `number` est un libellé affiché tel quel, sans « N° » (visite guidée : « CHIMP CARD »).
+    var numberIsLabel = false
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: ChimpRadius.chimpCard)
@@ -33,7 +35,7 @@ struct ChimpCard: View {
             }
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text("\(name) card, number \(number)"))
+            .accessibilityLabel(numberIsLabel ? Text(verbatim: name) : Text("\(name) card, number \(number)"))
             .accessibilityValue(accessibilityValue)
     }
 
@@ -45,7 +47,7 @@ struct ChimpCard: View {
                     .scaledToFit()
                     .frame(width: 30)
                 Spacer(minLength: ChimpSpacing.s)
-                Text(verbatim: "N°\(number)")
+                Text(verbatim: numberIsLabel ? number : "N°\(number)")
                     .chimpFont(.cardNumber)
             }
             Spacer(minLength: 0)

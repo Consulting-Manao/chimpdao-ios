@@ -58,10 +58,13 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case amountEntry   // montant en cours de saisie (C2)
     case displayXL     // solde du Wallet
     case amountL       // solde de Main, montant saisi
+    case welcomeTitle  // titre de l'accueil (A1 « Your wallet is a card. »)
+    case tourTitle     // titres de la visite guidée (A1·1 à A1·4)
     case amountM       // montant d'une carte « tiroir » (Main, B1)
     case displayL      // titres des écrans pleins
     case sheetTitle    // titre d'une feuille
     case key           // touches du pavé numérique
+    case brand         // nom de l'app sur l'accueil (A1)
     case displayM      // titre de l'en-tête
     case amountS       // montant sur une carte
     case greeting      // accroche de l'en-tête du Wallet (« Hey Léo »)
@@ -76,7 +79,10 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case cardName      // nom sur une Chimp Card
     case tile          // libellés des tuiles d'action
     // Nunito
+    case lead          // phrase principale de la visite guidée (A1·1 à A1·4)
     case bodyL         // texte des écrans pleins
+    case tourBody      // phrase secondaire de la visite guidée
+    case bodyM         // bandeau des écrans « tapez la carte » (A2), texte des cartes-choix (A3)
     case rowTitle      // titre d'une ligne
     case optionTitle   // titre d'une ligne de choix dans une feuille (C3, D1)
     case reviewStep    // étape de la carte « What happens » (C4)
@@ -86,6 +92,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case captionStrong // petites méta-infos appuyées, texte sous le montant d'une carte
     case captionS      // petites méta-infos
     // Space Mono
+    case overline      // « HOW CHIMP WORKS · 1 OF 4 » (visite guidée)
     case labelWide     // « STEP 2 OF 3 », étape d'une feuille
     case label         // libellés de section (« READY TO SPEND »)
     case labelS        // « CHIMPY »
@@ -98,14 +105,14 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
 
     var family: ChimpFontFamily {
         switch self {
-        case .celebration, .amountEntry, .displayXL, .amountL, .amountM, .displayL, .sheetTitle, .key, .displayM,
-             .amountS, .greeting, .displayS, .pill, .buttonLarge, .button, .buttonSecondary, .tab, .link, .buttonSmall,
-             .cardName, .tile:
+        case .celebration, .amountEntry, .displayXL, .amountL, .welcomeTitle, .tourTitle, .amountM, .displayL, .sheetTitle,
+             .key, .brand, .displayM, .amountS, .greeting, .displayS, .pill, .buttonLarge, .button, .buttonSecondary, .tab,
+             .link, .buttonSmall, .cardName, .tile:
             .luckiestGuy
-        case .bodyL, .captionS: .nunito(weight: 700)
+        case .bodyL, .tourBody, .bodyM, .captionS: .nunito(weight: 700)
         case .body, .bodyS, .caption, .captionStrong, .reviewStep: .nunito(weight: 800)
-        case .rowTitle, .optionTitle: .nunito(weight: 900)
-        case .labelWide, .label, .labelS, .cardNumber, .monoValue, .address: .spaceMono(bold: true)
+        case .rowTitle, .optionTitle, .lead: .nunito(weight: 900)
+        case .overline, .labelWide, .label, .labelS, .cardNumber, .monoValue, .address: .spaceMono(bold: true)
         case .mono: .spaceMono(bold: false)
         }
     }
@@ -116,14 +123,16 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .celebration, .amountEntry: 64
         case .displayXL: 50
         case .amountL: 44
+        case .welcomeTitle: 40
+        case .tourTitle: 34
         case .displayL: 32
         case .sheetTitle: 27
         case .amountM: 26
-        case .key: 24
+        case .key, .brand: 24
         case .displayM: 23
         case .amountS: 21
         case .greeting: 20
-        case .displayS, .buttonLarge: 18
+        case .displayS, .buttonLarge, .lead: 18
         case .button: 17
         case .cardName: 16
         case .tab, .link, .buttonSecondary: 15
@@ -131,10 +140,10 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .pill: 13
         case .tile: 12
         case .bodyL, .optionTitle, .reviewStep: 16
-        case .rowTitle, .body: 15
-        case .bodyS: 14
+        case .rowTitle, .body, .tourBody: 15
+        case .bodyS, .bodyM: 14
         case .caption, .address: 13
-        case .captionS, .captionStrong: 12
+        case .captionS, .captionStrong, .overline: 12
         case .labelWide, .label: 11
         case .labelS, .cardNumber: 10
         case .monoValue: 14
@@ -145,16 +154,16 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     /// Style système dont on suit la courbe de grossissement.
     var relativeTo: UIFont.TextStyle {
         switch self {
-        case .celebration, .amountEntry, .displayXL, .amountL: .largeTitle
+        case .celebration, .amountEntry, .displayXL, .amountL, .welcomeTitle, .tourTitle: .largeTitle
         case .displayL: .title1
-        case .sheetTitle, .key, .displayM, .amountM: .title2
+        case .sheetTitle, .key, .brand, .displayM, .amountM: .title2
         case .amountS, .greeting: .title3
-        case .displayS, .buttonLarge, .button: .headline
+        case .displayS, .buttonLarge, .button, .lead: .headline
         case .cardName: .callout
         case .bodyL, .optionTitle, .reviewStep: .callout
-        case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .bodyS, .monoValue: .subheadline
+        case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .tourBody, .bodyS, .bodyM, .monoValue: .subheadline
         case .caption, .pill, .address: .footnote
-        case .tile, .captionS, .captionStrong, .mono: .caption1
+        case .tile, .captionS, .captionStrong, .overline, .mono: .caption1
         case .labelWide, .label, .labelS, .cardNumber: .caption2
         }
     }
@@ -163,7 +172,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     var tracking: CGFloat {
         switch self {
         case .tab: 0.3
-        case .labelWide: 2
+        case .labelWide, .overline: 2
         case .label, .labelS: 1.6
         case .cardNumber: 1.2
         default: 0

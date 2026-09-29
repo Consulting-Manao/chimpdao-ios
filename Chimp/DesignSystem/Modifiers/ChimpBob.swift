@@ -11,13 +11,20 @@ private struct ChimpBobModifier: ViewModifier {
         if reduceMotion {
             content
         } else {
-            content.phaseAnimator([0.0, 1.0]) { view, phase in
-                view.offset(y: -amplitude * phase)
-            } animation: { _ in
-                // Chaque moitié (montée, descente) est adoucie, comme les deux intervalles de la keyframe CSS.
-                .easeInOut(duration: duration / 2)
+            // Horloge plutôt qu'animation SwiftUI : seul le décalage vertical bouge. Une animation en boucle
+            // (`phaseAnimator`) animait aussi les changements de taille au premier affichage (Chimpy qui « grandit »).
+            TimelineView(.animation) { context in
+                content.offset(y: -amplitude * Self.height(at: context.date.timeIntervalSinceReferenceDate, duration: duration))
             }
         }
+    }
+
+    /// Hauteur relative (0 à 1) : montée puis descente, chaque moitié adoucie (ease-in-out),
+    /// comme les deux intervalles de la keyframe CSS.
+    static func height(at time: TimeInterval, duration: Double) -> CGFloat {
+        let cycle = time.truncatingRemainder(dividingBy: duration) / duration
+        let half = cycle < 0.5 ? cycle * 2 : (1 - cycle) * 2
+        return half * half * (3 - 2 * half)
     }
 }
 

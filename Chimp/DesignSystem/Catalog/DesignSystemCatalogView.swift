@@ -6,6 +6,10 @@ import SwiftUI
 /// Compilé uniquement en Debug et Testing (drapeau `DESIGN_CATALOG`), jamais en Release.
 struct DesignSystemCatalogView: View {
     @State private var settings = CatalogSettings()
+    /// Session de l'app, pour « oublier le compte » et refaire l'onboarding.
+    @Environment(AppSession.self) private var session: AppSession?
+    @State private var isConfirmingForget = false
+    @State private var forgetError: String?
 
     var body: some View {
         CatalogPage("Design System", settings: settings, scrolls: false) {
@@ -14,6 +18,21 @@ struct DesignSystemCatalogView: View {
                 // Textes du mode admin hors String Catalog (voir `AdminView`).
                 Section {
                     link(untranslated("Admin mode (testnet)"), systemImage: "wrench.and.screwdriver.fill") { AdminView() }
+                    if let session, session.hasAccount {
+                        Button(role: .destructive) {
+                            isConfirmingForget = true
+                        } label: {
+                            Label {
+                                Text(verbatim: "Forget this phone's account (onboarding again)").chimpFont(.rowTitle)
+                            } icon: {
+                                Image(systemName: "arrow.counterclockwise").fontWeight(.heavy)
+                            }
+                            .foregroundStyle(.chimpNegative)
+                        }
+                    }
+                    if let forgetError {
+                        Text(verbatim: forgetError).chimpFont(.caption).foregroundStyle(.chimpNegative)
+                    }
                 } header: {
                     Text(verbatim: "Admin")
                 }
@@ -45,6 +64,7 @@ struct DesignSystemCatalogView: View {
                 .listRowBackground(Color(.chimpSurface))
 
                 Section("Screens") {
+                    link("Onboarding", systemImage: "hand.wave.fill") { OnboardingCatalogPage(settings: settings) }
                     link("Wallet states", systemImage: "wallet.pass.fill") { WalletStatesCatalogPage(settings: settings) }
                     link("Receive states", systemImage: "qrcode") { ReceiveStatesCatalogPage(settings: settings) }
                     link("Send", systemImage: "paperplane.fill") { SendCatalogPage(settings: settings) }
@@ -53,6 +73,26 @@ struct DesignSystemCatalogView: View {
             }
             .scrollContentBackground(.hidden)
         }
+        #if CHIMP_ADMIN
+        .confirmationDialog(
+            Text(verbatim: "Forget this phone's account?"),
+            isPresented: $isConfirmingForget,
+            titleVisibility: .visible
+        ) {
+            Button(role: .destructive) {
+                do {
+                    try session?.forgetAccount()
+                } catch {
+                    forgetError = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+                }
+            } label: {
+                Text(verbatim: "Forget and start onboarding again")
+            }
+            Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
+        } message: {
+            Text(verbatim: "Only this phone forgets: the account, its cards and the money stay on testnet. Tapping a card of the account opens it again.")
+        }
+        #endif
     }
 
     private func link(
