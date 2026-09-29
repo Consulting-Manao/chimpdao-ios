@@ -95,24 +95,6 @@ struct CardChoiceView: View {
     }
 }
 
-/// Suite de la création (A4 : prénom, A5 : nom de la carte, A6 : PIN et tap) : construite à l'étape 3.
-struct CreateAccountPlaceholderView: View {
-    let choice: CardChoice
-    let onBack: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ChimpHeader(title: "Your name", onBack: onBack)
-            VStack(spacing: ChimpSpacing.l) {
-                ChimpNoticeBanner(text: "Next step of the build: your name, the card's name, your PIN, then one tap to finish.")
-                Spacer()
-            }
-            .padding(ChimpSpacing.screenMargin)
-        }
-        .background(Color(.chimpBackground))
-    }
-}
-
 #Preview("Fresh") {
     CardChoiceView(choice: CardChoice(kind: .fresh, card: ChipKeyInfo(kind: .infineon2Go, publicKey: MockChipReader.secp256k1Key, pinActive: false),
                                       tokenID: 7, pocket: nil, pocketIsEmpty: true), onStartNewAccount: {})

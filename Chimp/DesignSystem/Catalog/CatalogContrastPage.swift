@@ -165,6 +165,8 @@ private struct ContrastMatrix: View {
                     }
                 }
             }
+            // Les traits s'arrêtent à l'intérieur du contour.
+            .padding(ChimpBorder.regular)
             .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.key), fill: Color(.chimpSurface))
         }
     }

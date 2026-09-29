@@ -52,6 +52,7 @@ struct ChimpDetailItem: Identifiable {
 
 /// Liste groupée de détails (C4 « ce qui sera signé ») : fond `chimpSurface`, contour 3, rayon 16,
 /// lignes séparées par un trait `chimpSurfaceSecondary` de 2 pt (comme la liste groupée des réglages, I2).
+/// Les traits s'arrêtent à l'intérieur du contour : ils ne le coupent jamais.
 /// Non dessinée dans la maquette.
 struct ChimpDetailList: View {
     let items: [ChimpDetailItem]
@@ -78,11 +79,12 @@ struct ChimpDetailList: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, ChimpSpacing.sm)
-                .padding(.horizontal, 13 + ChimpBorder.regular)
+                .padding(.horizontal, 13)
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(.vertical, ChimpBorder.regular)
+        // Tout le contenu, traits compris, reste à l'intérieur du contour de 3 pt.
+        .padding(ChimpBorder.regular)
         .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.key), fill: Color(.chimpSurface))
     }
 }

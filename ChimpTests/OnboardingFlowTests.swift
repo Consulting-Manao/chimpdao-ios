@@ -192,7 +192,8 @@ struct OnboardingFlowTests {
         let store = InMemoryLocalWalletStore(LocalWallet(cardHints: [CardHint(key: key, account: accountB, at: .now)]))
         let service = RecordingService()
         let model = OnboardingModel(session: AppSession(store: store, network: .testnet),
-                                    reader: MockChipReader(scenario: .infineon, delay: .zero), service: service)
+                                    reader: MockChipReader(scenario: .infineon, delay: .zero), service: service,
+                                    makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), signer: MockChipSigner(delay: .zero)) })
         model.path = [.reading]
         await model.scan()
         #expect(service.hints == [accountB])
@@ -211,7 +212,8 @@ struct OnboardingFlowTests {
     private func makeModel(session: AppSession, reader: MockChipReader.Scenario = .infineon,
                            service: MockOnboardingService.Scenario = .fresh) -> OnboardingModel {
         OnboardingModel(session: session, reader: MockChipReader(scenario: reader, delay: .zero),
-                        service: MockOnboardingService(scenario: service, delay: .zero))
+                        service: MockOnboardingService(scenario: service, delay: .zero),
+                        makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), signer: MockChipSigner(delay: .zero)) })
     }
 
     private func scanned(_ service: MockOnboardingService.Scenario, reader: MockChipReader.Scenario = .infineon,

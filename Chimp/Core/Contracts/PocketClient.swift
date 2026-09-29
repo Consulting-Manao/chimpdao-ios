@@ -63,7 +63,8 @@ struct PocketClient {
         newOwner: String,
         curve: ChipCurve,
         signed: ChipSignedDigest,
-        feePayer: String
+        feePayer: String,
+        onRejected: ((UInt32, Error) -> Void)? = nil
     ) async throws -> (transaction: Transaction, recoveryID: UInt32?) {
         let source = try await client.account(feePayer)
         let build = { (auth: SCValXDR) async throws -> Transaction in
@@ -74,7 +75,7 @@ struct PocketClient {
         }
         switch (curve, signed) {
         case (.secp256k1, .secp256k1(let signature)):
-            let found = try await RecoveryIDSearch.first(rejectionCode: RecoveryIDSearch.RejectionCode.pocket) { recoveryID in
+            let found = try await RecoveryIDSearch.first(rejectionCode: RecoveryIDSearch.RejectionCode.pocket, onRejected: onRejected) { recoveryID in
                 try await build(try ChipAuthEncoding.chipAuthSecp256k1(signature: signature, recoveryID: recoveryID))
             }
             return (found.result, found.recoveryID)
@@ -82,6 +83,27 @@ struct PocketClient {
             return (try await build(try ChipAuthEncoding.chipAuthSecp256r1(signature: signature, rndB: rndB)), nil)
         default:
             throw ChipError.malformedResponse("the signature doesn't match the card's curve")
+        }
+    }
+
+    /// Diagnostic (répétition à blanc) : simule `set_owner` avec un `recovery_id` imposé et renvoie l'erreur obtenue,
+    /// ou `nil` si la simulation passe. Sert à voir le texte exact d'un refus quand le premier essai était le bon.
+    func setOwnerSimulationError(
+        declared: DeclaredAuthorization,
+        pocket: String,
+        newOwner: String,
+        signature: Data,
+        recoveryID: UInt32,
+        feePayer: String
+    ) async throws -> Error? {
+        let source = try await client.account(feePayer)
+        let entry = try declared.signed(with: try ChipAuthEncoding.chipAuthSecp256k1(signature: signature, recoveryID: recoveryID))
+        let transaction = try setOwnerTransaction(source: source, pocket: pocket, newOwner: newOwner, signedEntry: entry)
+        do {
+            _ = try await client.simulate(transaction)
+            return nil
+        } catch {
+            return error
         }
     }
 

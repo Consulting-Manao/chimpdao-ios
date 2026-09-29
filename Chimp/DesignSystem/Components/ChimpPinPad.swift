@@ -9,6 +9,8 @@ enum ChimpPinState: Equatable {
     case wrong(triesLeft: Int?)
     /// Carte bloquée (Infineon : `69 83`).
     case blocked
+    /// Confirmation d'un nouveau PIN : les deux saisies diffèrent (A6, comme `NewCardPin.tsx`).
+    case mismatch
 }
 
 /// Points du PIN : un rond par chiffre, plein quand le chiffre est saisi.
@@ -79,7 +81,7 @@ struct ChimpPinPad<Middle: View>: View {
         }
         .onChange(of: state) { _, newState in
             switch newState {
-            case .wrong: showError()
+            case .wrong, .mismatch: showError()
             case .blocked:
                 // Le PIN refusé ne reste pas en mémoire ; même retour haptique qu'une erreur.
                 pin = ""
@@ -143,6 +145,7 @@ struct ChimpPinPad<Middle: View>: View {
     }
 
     private var wrongMessage: String? {
+        if state == .mismatch { return String(localized: "The PINs don't match. Start again.") }
         guard case .wrong(let triesLeft) = state else { return nil }
         if let triesLeft {
             return String(localized: "Wrong PIN. \(triesLeft) tries left.")
@@ -155,6 +158,7 @@ struct ChimpPinPad<Middle: View>: View {
         case .digit(let value):
             guard pin.count < length else { return }
             if case .wrong = state { state = .entering }
+            if state == .mismatch { state = .entering }
             pin.append(String(value))
             if pin.count == length { onComplete(pin) }
         case .delete:

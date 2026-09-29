@@ -71,6 +71,8 @@ private struct CatalogTypographyRow: View {
         case .tourTitle: Text("Your card is the key")
         case .brand: Text(verbatim: "ChimpDAO")
         case .lead: Text("Your money lives on the card, not on your phone.")
+        case .fieldL: Text(verbatim: "Léo")
+        case .fieldM: Text(verbatim: "Jungle")
         case .tourBody: Text("Lose your phone and nothing is lost. No card, no payment.")
         case .bodyM: Text("Nothing is moved yet. I'm just saying hello to the card.")
         case .overline: Text("How Chimp works · 1 of 4").textCase(.uppercase)

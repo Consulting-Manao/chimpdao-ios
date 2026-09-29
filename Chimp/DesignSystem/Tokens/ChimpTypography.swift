@@ -80,6 +80,8 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case tile          // libellés des tuiles d'action
     // Nunito
     case lead          // phrase principale de la visite guidée (A1·1 à A1·4)
+    case fieldL        // saisie du prénom (A4)
+    case fieldM        // saisie du nom de la carte (A5)
     case bodyL         // texte des écrans pleins
     case tourBody      // phrase secondaire de la visite guidée
     case bodyM         // bandeau des écrans « tapez la carte » (A2), texte des cartes-choix (A3)
@@ -111,7 +113,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
             .luckiestGuy
         case .bodyL, .tourBody, .bodyM, .captionS: .nunito(weight: 700)
         case .body, .bodyS, .caption, .captionStrong, .reviewStep: .nunito(weight: 800)
-        case .rowTitle, .optionTitle, .lead: .nunito(weight: 900)
+        case .rowTitle, .optionTitle, .lead, .fieldL, .fieldM: .nunito(weight: 900)
         case .overline, .labelWide, .label, .labelS, .cardNumber, .monoValue, .address: .spaceMono(bold: true)
         case .mono: .spaceMono(bold: false)
         }
@@ -129,10 +131,11 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .sheetTitle: 27
         case .amountM: 26
         case .key, .brand: 24
+        case .fieldL: 22
         case .displayM: 23
         case .amountS: 21
         case .greeting: 20
-        case .displayS, .buttonLarge, .lead: 18
+        case .displayS, .buttonLarge, .lead, .fieldM: 18
         case .button: 17
         case .cardName: 16
         case .tab, .link, .buttonSecondary: 15
@@ -158,7 +161,8 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .displayL: .title1
         case .sheetTitle, .key, .brand, .displayM, .amountM: .title2
         case .amountS, .greeting: .title3
-        case .displayS, .buttonLarge, .button, .lead: .headline
+        case .displayS, .buttonLarge, .button, .lead, .fieldM: .headline
+        case .fieldL: .title3
         case .cardName: .callout
         case .bodyL, .optionTitle, .reviewStep: .callout
         case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .tourBody, .bodyS, .bodyM, .monoValue: .subheadline

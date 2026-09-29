@@ -125,7 +125,7 @@ private struct TourPage: View {
         case 0: "Your money lives on the card, not on your phone."
         case 1: "Your account starts with one card. Add more whenever you want."
         case 2: "Main is shared: any of your cards can use it."
-        default: "Every transaction needs your PIN and a tap of the card."
+        default: "Nothing moves without a tap of your card."
         }
     }
 
@@ -219,9 +219,9 @@ private struct TourDrawersPanel: View {
             .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.tab), fill: Color(.chimpAccent))
 
             HStack(spacing: ChimpSpacing.s) {
-                Text(verbatim: "⇅").chimpFont(.displayS)
+                Image(systemName: "arrow.up.arrow.down").font(.system(size: 15, weight: .black)).accessibilityHidden(true)
                 Text("move money anytime").chimpFont(.captionStrong)
-                Text(verbatim: "⇅").chimpFont(.displayS)
+                Image(systemName: "arrow.up.arrow.down").font(.system(size: 15, weight: .black)).accessibilityHidden(true)
             }
             .foregroundStyle(.chimpTextSecondary)
             .accessibilityElement(children: .combine)

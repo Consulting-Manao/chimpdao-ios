@@ -15,8 +15,10 @@ enum RecoveryIDSearch {
     }
 
     /// Essaie `attempt` avec les `recovery_id` 0 à 3 et renvoie le premier résultat accepté.
+    /// `onRejected` reçoit chaque refus (diagnostic : texte exact renvoyé par le réseau).
     static func first<T>(
         rejectionCode: Int,
+        onRejected: ((UInt32, Error) -> Void)? = nil,
         attempt: (UInt32) async throws -> T
     ) async throws -> (result: T, recoveryID: UInt32) {
         var lastError: Error?
@@ -25,7 +27,10 @@ enum RecoveryIDSearch {
                 return (try await attempt(recoveryID), recoveryID)
             } catch {
                 lastError = error
-                if isRejectedSignature(error, contractCode: rejectionCode) { continue }
+                if isRejectedSignature(error, contractCode: rejectionCode) {
+                    onRejected?(recoveryID, error)
+                    continue
+                }
                 throw error
             }
         }

@@ -9,6 +9,7 @@ struct OnboardingCatalogPage: View {
     @State private var readerScenario = MockChipReader.Scenario.infineon
     @State private var serviceScenario = MockOnboardingService.Scenario.fresh
     @State private var tourSeen = false
+    @State private var setupScenario = MockAccountSetupService.Scenario.success
     @State private var runningFlow: OnboardingModel?
     @State private var runningSession: AppSession?
 
@@ -26,14 +27,21 @@ struct OnboardingCatalogPage: View {
                     } label: {
                         Text(verbatim: "Network answer")
                     }
+                    Picker(selection: $setupScenario) {
+                        ForEach(MockAccountSetupService.Scenario.allCases) { Text(verbatim: $0.rawValue).tag($0) }
+                    } label: {
+                        Text(verbatim: "Practice run checks")
+                    }
                     Toggle(isOn: $tourSeen) { Text(verbatim: "Tour already seen") }
                     Button {
                         let session = AppSession(store: InMemoryLocalWalletStore(LocalWallet(tourSeen: tourSeen)), network: .testnet)
                         runningSession = session
+                        let setupScenario = self.setupScenario
                         runningFlow = OnboardingModel(
                             session: session,
                             reader: MockChipReader(scenario: readerScenario),
-                            service: MockOnboardingService(scenario: serviceScenario)
+                            service: MockOnboardingService(scenario: serviceScenario),
+                            makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(scenario: setupScenario), signer: MockChipSigner()) }
                         )
                     } label: {
                         Text(verbatim: "Start at A1 · Welcome")

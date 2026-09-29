@@ -11,8 +11,13 @@ enum OnboardingRoute: Hashable {
     case choice(CardChoice)
     /// H3 : pas une vraie carte ChimpDAO.
     case notAChimpCard
-    /// Suite de la création (A4 : prénom…) — construite à l'étape 3.
-    case createAccount(CardChoice)
+    /// Création du compte (état dans `OnboardingModel.setup`) : A4, A5, A6, code de déblocage, vérifications, A7.
+    case yourName
+    case nameYourCard
+    case pickPIN
+    case unlockCode
+    case setupCheck
+    case welcome
 }
 
 /// Ce qu'A3 montre de la carte lue.
@@ -54,6 +59,8 @@ struct OnboardingProblem: Equatable {
         case couldntCheck
         /// Autre erreur de lecture.
         case readFailed
+        /// Au tap d'A6, ce n'est pas la carte lue en A2.
+        case wrongCard
     }
 
     let kind: Kind
@@ -79,14 +86,24 @@ final class OnboardingModel {
     /// Page courante de la visite guidée (0 à 3).
     var tourPage = 0
 
+    /// Création du compte en cours (A4 à A7), `nil` avant « Start a new account ».
+    private(set) var setup: AccountSetupModel?
+
     private let session: AppSession
     private let reader: ChipReader
     private let service: OnboardingService
+    private let makeSetup: (CardChoice) throws -> AccountSetupModel
 
-    init(session: AppSession, reader: ChipReader, service: OnboardingService) {
+    init(
+        session: AppSession,
+        reader: ChipReader,
+        service: OnboardingService,
+        makeSetup: @escaping (CardChoice) throws -> AccountSetupModel
+    ) {
         self.session = session
         self.reader = reader
         self.service = service
+        self.makeSetup = makeSetup
     }
 
     static let tourPageCount = 4
@@ -214,9 +231,55 @@ final class OnboardingModel {
 
     // MARK: A3
 
-    /// « Start a new account » : la suite (prénom, nom de la carte, PIN, tap) arrive à l'étape 3.
+    // MARK: A4 à A7 (étape 3 : répétition à blanc)
+
+    /// « Start a new account » : une nouvelle cérémonie pour la carte lue en A2.
     func startNewAccount(with choice: CardChoice) {
-        path.append(.createAccount(choice))
+        guard let model = try? makeSetup(choice) else { return }
+        setup = model
+        path.append(.yourName)
+    }
+
+    func continueFromName() {
+        guard setup?.canContinueFromName == true else { return }
+        path.append(.nameYourCard)
+    }
+
+    func continueFromCard() {
+        guard setup?.canContinueFromCard == true else { return }
+        path.append(.pickPIN)
+    }
+
+    /// « Scan my card » (feuille d'A6) : après le tap, le code de déblocage (nouveau PIN) ou directement les vérifications.
+    func scanForSetup() {
+        guard let setup else { return }
+        Task {
+            if await setup.scan() {
+                path.append(setup.pinMode == .choose ? .unlockCode : .setupCheck)
+            }
+        }
+    }
+
+    func acknowledgeUnlockCode() {
+        path.append(.setupCheck)
+    }
+
+    func continueAfterCheck() {
+        guard setup?.report != nil else { return }
+        path.append(.welcome)
+    }
+
+    /// Fin de la répétition : rien n'a été créé, retour à A1. Rien n'est enregistré sur le téléphone.
+    func finishRehearsal() {
+        setup = nil
+        readingState = .idle
+        path = []
+    }
+
+    /// Retour d'un écran de la création.
+    func back() {
+        guard !path.isEmpty else { return }
+        path.removeLast()
     }
 
     static func details(_ error: Error) -> String {

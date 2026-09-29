@@ -11,28 +11,39 @@ struct ChimpAccountClient {
     let client: SorobanClient
     let config: ChimpNetworkConfig
 
-    /// Sel du Main account d'une carte fondatrice (`hash(pubBytesFromHex(publicKey))`).
+    /// Sel du Main account d'une carte fondatrice (`ensureAccount` : `hash(pubBytesFromHex(publicKey))`).
     static func salt(for publicKey: ChipPublicKey) -> Data {
         Data(SHA256.hash(data: publicKey.bytes))
     }
 
+    /// Sel d'une carte orpheline qui repart sur un nouveau compte (`recoverySalt` du terminal) :
+    /// `sha256("chimp.recover.v1" ‖ clé publique ‖ 32 octets de l'ancien compte)`. Fixé par le couple (carte, ancien
+    /// compte) : refaire la même reprise retombe sur le même compte, au lieu d'en déployer un second.
+    static func recoverySalt(publicKey: ChipPublicKey, escapedFrom: String) throws -> Data {
+        guard case .contract(let id) = try SCAddressXDR(contractId: escapedFrom) else {
+            throw StellarError.invalidResponse("not a contract address: \(escapedFrom)")
+        }
+        return Data(SHA256.hash(data: Data("chimp.recover.v1".utf8) + publicKey.bytes + id.wrapped))
+    }
+
     /// Adresse prévue : `HashIdPreimageContractId{ networkId, fromAddress{ payeur de frais, sel } }`.
+    static func predictedAddress(feePayer: String, salt: Data, network: Network) throws -> String {
+        try ContractIdUtils.deriveContractId(deployer: try SCAddressXDR(accountId: feePayer), salt: salt, network: network)
+    }
+
+    /// Adresse prévue du Main account fondé par cette carte (sel = `sha256(clé)`).
     static func predictedAddress(feePayer: String, publicKey: ChipPublicKey, network: Network) throws -> String {
-        try ContractIdUtils.deriveContractId(
-            deployer: try SCAddressXDR(accountId: feePayer),
-            salt: salt(for: publicKey),
-            network: network
-        )
+        try predictedAddress(feePayer: feePayer, salt: salt(for: publicKey), network: network)
     }
 
     /// `createCustomContract{ wasmHash, address = payeur de frais, salt, constructorArgs = [Vec[CardSigner{curve, key}]] }` :
     /// `__constructor(cards: Vec<CardSigner>)` reçoit la carte fondatrice, et rien d'autre.
-    static func deployOperation(wasmHash: String, feePayer: String, publicKey: ChipPublicKey, curve: ChipCurve) throws -> InvokeHostFunctionOperation {
+    static func deployOperation(wasmHash: String, feePayer: String, publicKey: ChipPublicKey, curve: ChipCurve, salt: Data? = nil) throws -> InvokeHostFunctionOperation {
         try InvokeHostFunctionOperation.forCreatingContractWithConstructor(
             wasmId: wasmHash,
             address: try SCAddressXDR(accountId: feePayer),
             constructorArguments: [.vec([ChipAuthEncoding.cardSigner(publicKey: publicKey, curve: curve)])],
-            salt: WrappedData32(salt(for: publicKey))
+            salt: WrappedData32(salt ?? Self.salt(for: publicKey))
         )
     }
 
@@ -40,28 +51,32 @@ struct ChimpAccountClient {
         try Self.predictedAddress(feePayer: config.feePayer, publicKey: publicKey, network: client.network)
     }
 
-    /// Transaction de déploiement, source = payeur de frais (séquence fraîche).
-    func deployTransaction(for card: ChipKeyInfo) async throws -> Transaction {
+    func predictedAddress(salt: Data) throws -> String {
+        try Self.predictedAddress(feePayer: config.feePayer, salt: salt, network: client.network)
+    }
+
+    /// Transaction de déploiement, source = payeur de frais (séquence fraîche). `salt` : `nil` = sel de la carte fondatrice.
+    func deployTransaction(for card: ChipKeyInfo, salt: Data? = nil) async throws -> Transaction {
         let source = try await client.account(config.feePayer)
         let operation = try Self.deployOperation(
-            wasmHash: config.contracts.accountWasmHash, feePayer: config.feePayer, publicKey: card.publicKey, curve: card.curve
+            wasmHash: config.contracts.accountWasmHash, feePayer: config.feePayer, publicKey: card.publicKey, curve: card.curve, salt: salt
         )
         return try client.singleOperation(source: source, operation: operation)
     }
 
     /// Répétition à blanc : simule le déploiement sans rien envoyer. Renvoie les frais qui seraient payés (stroops).
-    func simulateDeployment(for card: ChipKeyInfo) async throws -> UInt32 {
-        let transaction = try await deployTransaction(for: card)
+    func simulateDeployment(for card: ChipKeyInfo, salt: Data? = nil) async throws -> UInt32 {
+        let transaction = try await deployTransaction(for: card, salt: salt)
         try client.assemble(transaction, with: try await client.simulate(transaction))
         return transaction.fee
     }
 
-    /// `ensureAccount` : réutilise le Main account s'il est déjà déployé, sinon le déploie (frais signés par le
-    /// serveur de frais). Renvoie son adresse et le hash de la transaction (`nil` si rien n'a été envoyé).
-    func ensureAccount(for card: ChipKeyInfo, feeSigner: FeeSigner) async throws -> (address: String, transactionHash: String?) {
-        let address = try predictedAddress(for: card.publicKey)
+    /// `ensureAccount` / `createFreshAccount` : réutilise le Main account s'il est déjà déployé, sinon le déploie (frais
+    /// signés par le serveur de frais). Renvoie son adresse et le hash de la transaction (`nil` si rien n'a été envoyé).
+    func ensureAccount(for card: ChipKeyInfo, salt: Data? = nil, feeSigner: FeeSigner) async throws -> (address: String, transactionHash: String?) {
+        let address = try predictedAddress(salt: salt ?? Self.salt(for: card.publicKey))
         if try await client.isDeployed(address) { return (address, nil) }
-        let hash = try await client.prepareAndSubmit(try await deployTransaction(for: card), feeSigner: feeSigner)
+        let hash = try await client.prepareAndSubmit(try await deployTransaction(for: card, salt: salt), feeSigner: feeSigner)
         return (address, hash)
     }
 

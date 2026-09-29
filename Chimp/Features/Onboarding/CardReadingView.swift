@@ -77,6 +77,7 @@ struct CardReadingView: View {
         case .multipleCards: "I see more than one card. Tap just one."
         case .couldntCheck: "I read the card but couldn't check it online. Check your connection and tap again."
         case .readFailed: "Something went wrong reading the card. Let's try again."
+        case .wrongCard: "That's not the card you started with. Tap the same card."
         }
     }
 }

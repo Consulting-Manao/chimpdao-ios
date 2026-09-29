@@ -6,6 +6,8 @@ enum ChimpNoticeMarker {
     case info
     /// Erreur (réseau, refus…).
     case error
+    /// Réussite (vérifications passées).
+    case success
     /// Pastille à la couleur d'une carte (« qui peut signer »).
     case card(ChimpCardColor)
 }
@@ -46,6 +48,10 @@ struct ChimpNoticeBanner<Accessory: View>: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .fontWeight(.heavy)
                 .foregroundStyle(.chimpNegative)
+        case .success:
+            Image(systemName: "checkmark.circle.fill")
+                .fontWeight(.heavy)
+                .foregroundStyle(.chimpPositive)
         case .card(let color):
             RoundedRectangle(cornerRadius: 4)
                 .fill(color.fill)

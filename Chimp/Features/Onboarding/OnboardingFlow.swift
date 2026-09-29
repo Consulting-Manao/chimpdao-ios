@@ -37,8 +37,25 @@ struct OnboardingFlow: View {
             CardChoiceView(choice: choice) { model.startNewAccount(with: choice) }
         case .notAChimpCard:
             NotAChimpCardView(onTryAnother: model.tryAnotherCard)
-        case .createAccount(let choice):
-            CreateAccountPlaceholderView(choice: choice) { model.path.removeLast() }
+        case .yourName:
+            if let setup = model.setup { YourNameView(model: setup, onBack: model.back, onContinue: model.continueFromName) }
+        case .nameYourCard:
+            if let setup = model.setup { NameYourCardView(model: setup, onBack: model.back, onContinue: model.continueFromCard) }
+        case .pickPIN:
+            if let setup = model.setup { PickPINView(model: setup, onBack: model.back, onScan: model.scanForSetup) }
+        case .unlockCode:
+            // Répétition : aucun PIN n'est envoyé à la carte, donc aucun code (étape 4 : le PUK renvoyé par SET PIN).
+            UnlockCodeView(code: nil, onDone: model.acknowledgeUnlockCode)
+                .blocksSwipeBack(true)
+        case .setupCheck:
+            if let setup = model.setup { SetupCheckView(model: setup, onContinue: model.continueAfterCheck) }
+        case .welcome:
+            if let setup = model.setup {
+                JungleWelcomeView(
+                    cardName: setup.trimmedCardName, cardColor: setup.cardColor, hasPIN: setup.pinMode != .none,
+                    isRehearsal: setup.isRehearsal, onFinish: model.finishRehearsal
+                )
+            }
         }
     }
 
@@ -58,9 +75,15 @@ extension OnboardingModel {
     static func live(session: AppSession) -> OnboardingModel {
         #if DESIGN_CATALOG
         if !NFCTagReaderSession.readingAvailable {
-            return OnboardingModel(session: session, reader: MockChipReader(scenario: .infineon), service: MockOnboardingService(scenario: .fresh))
+            return OnboardingModel(
+                session: session, reader: MockChipReader(scenario: .infineon), service: MockOnboardingService(scenario: .fresh),
+                makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(), signer: MockChipSigner()) }
+            )
         }
         #endif
-        return OnboardingModel(session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: .testnet))
+        return OnboardingModel(
+            session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: .testnet),
+            makeSetup: { try AccountSetupModel(choice: $0, service: ChainAccountSetupService(config: .testnet), signer: NFCChipSigner()) }
+        )
     }
 }
