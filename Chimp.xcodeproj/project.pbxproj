@@ -643,8 +643,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Soneso/stellar-ios-mac-sdk";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.4.0;
+				kind = exactVersion;
+				version = 3.12.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

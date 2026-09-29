@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Soneso/stellar-ios-mac-sdk",
       "state" : {
-        "revision" : "1a9593a0089b477b46906ab10a45c290ef838825",
-        "version" : "3.4.0"
+        "revision" : "b5dac0a6e8ff312d597c9a3b4269b03131d66e0d",
+        "version" : "3.12.0"
       }
     }
   ],
