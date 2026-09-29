@@ -81,6 +81,14 @@ enum ChipError: Error, Equatable, Sendable {
     case transport(String)
     /// La session NFC s'est terminée pour une autre raison. Le texte vient d'iOS.
     case sessionFailed(String)
+    #if CHIMP_ADMIN
+    /// Mode admin : génération refusée, la carte a déjà une clé n°1.
+    case keyAlreadyPresent
+    /// Mode admin : cette puce ne sait pas générer de clé (DUOX).
+    case keyGenerationUnsupported(String)
+    /// Mode admin : la puce a créé la clé à un autre index que 1.
+    case unexpectedKeySlot(UInt8)
+    #endif
 }
 
 extension ChipError: LocalizedError {
@@ -99,6 +107,11 @@ extension ChipError: LocalizedError {
         case .invalidPublicKey(let length): "The card's public key is not a 65-byte SEC1 key (\(length) bytes)."
         case .transport(let detail): "The connection to the card was lost: \(detail)"
         case .sessionFailed(let detail): "NFC session failed: \(detail)"
+        #if CHIMP_ADMIN
+        case .keyAlreadyPresent: "This card already has a key in slot 1. Nothing was generated."
+        case .keyGenerationUnsupported(let chip): "\(chip) can't generate a key. Nothing was generated."
+        case .unexpectedKeySlot(let slot): "The card created its key in slot \(slot) instead of slot 1. Tell Pamphile before using this card."
+        #endif
         }
     }
 }

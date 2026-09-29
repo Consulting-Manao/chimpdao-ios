@@ -5,23 +5,26 @@ import UIKit
 
 /// Mode admin (testnet) : outil de développement, sans maquette, construit avec le design system.
 /// Compilé uniquement en Debug et Testing (drapeau `CHIMP_ADMIN`), jamais en Release.
-/// Étape A : lecture d'une carte. L'enregistrement (mint) arrive à l'étape B.
+/// Étape A : lecture d'une carte, et génération de la clé d'une Infineon vierge (slot 1 vide, avec confirmation).
+/// L'enregistrement (mint) arrive à l'étape B.
 ///
 /// Textes en anglais et **non traduits** : ils restent hors du String Catalog (`Text(verbatim:)`, `untranslated`),
 /// sinon Xcode les y ajouterait en Debug puis les supprimerait en Release, où ils n'existent pas.
 struct AdminView: View {
     @State private var model = AdminCardReadModel(nfcAvailable: NFCTagReaderSession.readingAvailable)
     @State private var copied = false
+    @State private var isConfirmingKeyGeneration = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ChimpSpacing.sectionGap) {
                 ChimpNoticeBanner(text: untranslated("Admin mode · Stellar Testnet · Debug and Testing builds only"))
                 readerPicker
-                ChimpButton(untranslated("Read a card"), isLoading: model.isReading) {
+                ChimpButton(untranslated("Read a card"), isLoading: model.state == .reading) {
                     copied = false
                     Task { await model.read() }
                 }
+                .disabled(model.isBusy)
                 result
             }
             .padding(ChimpSpacing.screenMargin)
@@ -31,6 +34,22 @@ struct AdminView: View {
         .navigationTitle(Text(verbatim: "Admin"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .confirmationDialog(
+            Text(verbatim: "Generate a key on this card?"),
+            isPresented: $isConfirmingKeyGeneration,
+            titleVisibility: .visible
+        ) {
+            Button(role: .destructive) {
+                copied = false
+                Task { await model.generateKey() }
+            } label: {
+                Text(verbatim: "Generate key (irreversible)")
+            }
+            Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
+        } message: {
+            Text(verbatim: "Irreversible. The card creates its private key in slot 1: it can never be read, erased or replaced. "
+                + "Only for a blank Infineon card whose slot 1 is empty (6A88); the app checks again on the card before generating.")
+        }
     }
 
     private var readerPicker: some View {
@@ -46,7 +65,7 @@ struct AdminView: View {
                 Text(verbatim: "Reader")
             }
             .pickerStyle(.menu)
-            .disabled(model.isReading)
+            .disabled(model.isBusy)
         }
         .foregroundStyle(.chimpTextPrimary)
     }
@@ -57,29 +76,29 @@ struct AdminView: View {
         case .idle, .reading:
             EmptyView()
         case .read(let info):
-            AdminPanel(title: "Card read") {
-                AdminRow(label: "Chip", value: info.kind.displayName)
-                AdminRow(label: "Curve", value: info.curve.rawValue)
-                AdminRow(label: "PIN", value: info.kind == .duox ? "None on this chip" : (info.pinActive ? "Set" : "Not set"))
-                VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
-                    Text(verbatim: "Public key (65 bytes)").chimpFont(.caption).foregroundStyle(.chimpTextSecondary)
-                    Text(verbatim: info.publicKey.hex)
-                        .chimpFont(.address)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ChimpButton(untranslated(copied ? "Copied!" : "Copy key"), kind: .secondary, size: .compact) {
-                        UIPasteboard.general.string = info.publicKey.hex
-                        copied = true
-                    }
-                }
+            keyPanel(title: "Card read", info: info)
+        case .generated(let info):
+            keyPanel(title: "Key generated in slot 1", info: info)
+        case .generating:
+            AdminPanel(title: "Generating the key…") {
+                Text(verbatim: "Keep the card on the iPhone until the NFC sheet closes.").chimpFont(.body)
             }
         case .noKey(let statusWord):
             AdminPanel(title: "Card without a key", tone: .negative) {
-                Text(verbatim: "Key slot 1 is empty (status \(statusWord.hexStatus)). This card can't be enrolled.")
+                Text(verbatim: "Key slot 1 is empty (status \(statusWord.hexStatus)). This card can't be enrolled until it has a key.")
                     .chimpFont(.body)
-                Text(verbatim: "ChimpDAO never generates a key on a card. Ask Pamphile before doing anything with it.")
-                    .chimpFont(.caption)
-                    .foregroundStyle(.chimpTextSecondary)
+                if model.canGenerateKey {
+                    Text(verbatim: "Admin mode only: you can generate its key (approved by Pamphile for an empty slot 1).")
+                        .chimpFont(.caption)
+                        .foregroundStyle(.chimpTextSecondary)
+                    ChimpButton(untranslated("Generate a key…"), kind: .destructive) {
+                        isConfirmingKeyGeneration = true
+                    }
+                } else {
+                    Text(verbatim: "Only an empty slot 1 (6A88) allows generating a key. Ask Pamphile before doing anything with it.")
+                        .chimpFont(.caption)
+                        .foregroundStyle(.chimpTextSecondary)
+                }
             }
         case .cancelled:
             AdminPanel(title: "Scan cancelled") {
@@ -88,6 +107,28 @@ struct AdminView: View {
         case .failed(let message):
             AdminPanel(title: "Couldn't read the card", tone: .negative) {
                 Text(verbatim: message).chimpFont(.body).textSelection(.enabled)
+            }
+        }
+    }
+}
+
+extension AdminView {
+    /// Résultat d'une lecture ou d'une génération : puce, courbe, PIN et clé publique copiable.
+    fileprivate func keyPanel(title: String, info: ChipKeyInfo) -> some View {
+        AdminPanel(title: title) {
+            AdminRow(label: "Chip", value: info.kind.displayName)
+            AdminRow(label: "Curve", value: info.curve.rawValue)
+            AdminRow(label: "PIN", value: info.kind == .duox ? "None on this chip" : (info.pinActive ? "Set" : "Not set"))
+            VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
+                Text(verbatim: "Public key (65 bytes)").chimpFont(.caption).foregroundStyle(.chimpTextSecondary)
+                Text(verbatim: info.publicKey.hex)
+                    .chimpFont(.address)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                ChimpButton(untranslated(copied ? "Copied!" : "Copy key"), kind: .secondary, size: .compact) {
+                    UIPasteboard.general.string = info.publicKey.hex
+                    copied = true
+                }
             }
         }
     }
