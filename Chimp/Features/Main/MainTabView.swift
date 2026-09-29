@@ -7,12 +7,21 @@ import SwiftUI
 struct MainTabView: View {
     @State private var selection = ChimpTab.wallet
     /// Gardé ici pour que les soldes restent chargés quand on change d'onglet.
-    @State private var walletModel = WalletViewModel(dataSource: MockWalletDataSource())
+    @State private var walletModel: WalletViewModel
+    private let session: AppSession
     /// Écrans poussés dans l'onglet Wallet.
     @State private var walletPath: [WalletRoute] = []
     #if DESIGN_CATALOG
     @State private var isShowingCatalog = false
     #endif
+
+    /// Le vrai Wallet : soldes lus sur le réseau de l'app (testnet), prix du XLM par l'oracle de mainnet.
+    init(session: AppSession, config: ChimpNetworkConfig = .testnet) {
+        self.session = session
+        _walletModel = State(initialValue: WalletViewModel(dataSource: ChainWalletDataSource(
+            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle()
+        )))
+    }
 
     var body: some View {
         switch selection {
@@ -24,7 +33,7 @@ struct MainTabView: View {
                     .navigationDestination(for: WalletRoute.self) { route in
                         switch route {
                         case .receive:
-                            ReceiveDestination()
+                            ReceiveDestination(session: session)
                         case .send:
                             SendFlowRoot { walletPath.removeAll() }
                         }
@@ -75,8 +84,12 @@ enum WalletRoute: Hashable {
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
 private struct ReceiveDestination: View {
-    @State private var model = ReceiveViewModel(dataSource: MockReceiveDataSource())
+    @State private var model: ReceiveViewModel
     @Environment(\.dismiss) private var dismiss
+
+    init(session: AppSession) {
+        _model = State(initialValue: ReceiveViewModel(dataSource: LocalReceiveDataSource(session: session)))
+    }
 
     var body: some View {
         ReceiveView(model: model, onBack: { dismiss() })
@@ -108,5 +121,5 @@ private extension View {
 }
 
 #Preview {
-    MainTabView()
+    MainTabView(session: AppSession(store: InMemoryLocalWalletStore(), network: .testnet))
 }

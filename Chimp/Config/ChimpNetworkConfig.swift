@@ -67,3 +67,34 @@ struct ChimpNetworkConfig: Equatable, Sendable {
         usdcIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
     )
 }
+
+/// Oracles de prix Reflector (SEP-40), **toujours sur mainnet et en lecture seule**, quel que soit le réseau de l'app
+/// (décision du 2026-09-29, DESIGN_NOTES §12). Valeurs de `reference/terminal/src/chain/prices.ts`.
+struct PriceOracleConfig: Equatable, Sendable {
+    /// RPC mainnet utilisé par le terminal pour les prix (Quasar).
+    let rpc: URL
+    let passphrase: String
+    /// Flux « CEX & DEX », base USD.
+    let cexFeed: String
+    /// Flux « FX rates », base USD (repli pour les codes de devises).
+    let fxFeed: String
+    /// Compte source des simulations (`SIM_SOURCE`) : n'importe quelle adresse G valide, jamais lue ni utilisée pour envoyer.
+    let simulationSource: String
+    /// Échelle des prix des flux : 14 décimales (`ORACLE_ONE`).
+    let decimals: Int
+    /// Durée de validité d'un prix lu : l'échantillonnage des flux, 5 minutes (`RATES_TTL_MS`).
+    let cacheDuration: Duration
+    /// Stablecoins comptés à exactement 1 $ (`STABLE_USD`, décision produit : USDC = 1 $).
+    let stableUSD: Set<String>
+
+    static let reflector = PriceOracleConfig(
+        rpc: URL(string: "https://rpc.lightsail.network")!,
+        passphrase: "Public Global Stellar Network ; September 2015",
+        cexFeed: "CAFJZQWSED6YAWZU3GWRTOCNPPCGBN32L7QV43XX5LZLFTK6JLN34DLN",
+        fxFeed: "CBKGPWGKSKZF52CFHMTRR23TBWTPMRDIYZ4O2P5VS65BMHYH4DXMCJZC",
+        simulationSource: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+        decimals: 14,
+        cacheDuration: .seconds(5 * 60),
+        stableUSD: ["USDC", "RLUSD", "USDT", "DAI", "PYUSD"]
+    )
+}

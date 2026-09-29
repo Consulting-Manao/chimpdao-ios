@@ -82,6 +82,12 @@ struct WalletView: View {
                 .padding(.bottom, ChimpSpacing.l)
             }
 
+            if content.isShowingAssetAmounts {
+                // État absent de la maquette (décision du 2026-09-29) : pas de total partiel en dollars.
+                ChimpNoticeBanner(text: "Prices are unavailable right now, so amounts are shown per asset.")
+                    .padding(.bottom, ChimpSpacing.l)
+            }
+
             HStack(spacing: ChimpSize.keypadSpacing) {
                 ForEach(model.availableActions) { action in
                     ChimpActionTile(
@@ -120,13 +126,13 @@ struct WalletView: View {
             }
             .padding(.top, ChimpSpacing.xl)
 
-            cards(content.cards)
+            cards(content.cards, perAsset: content.isShowingAssetAmounts)
                 .padding(.top, 11)
         }
     }
 
     @ViewBuilder
-    private func cards(_ cards: [WalletContent.Card]) -> some View {
+    private func cards(_ cards: [WalletContent.Card], perAsset: Bool) -> some View {
         if cards.isEmpty {
             // Filet de sécurité : d'après le contrat, un compte a toujours au moins une carte.
             Text("No card here yet")
@@ -147,7 +153,8 @@ struct WalletView: View {
                     Button {
                         model.openCard(id: card.id)
                     } label: {
-                        ChimpCard(name: card.name, color: card.color, number: card.id, amount: card.amount, subtitle: "on card")
+                        // Montants par actif (« 12.5 XLM · 100 USDC ») : « on card » laisse la place au montant.
+                        ChimpCard(name: card.name, color: card.color, number: card.number, amount: card.amount, subtitle: perAsset ? nil : "on card")
                     }
                     .buttonStyle(ChimpPressableStyle())
                 }

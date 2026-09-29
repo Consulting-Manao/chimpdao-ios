@@ -923,6 +923,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "No XLM price: amounts per asset, no dollar total." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "No, stop" : {
 
     },
@@ -1108,6 +1112,13 @@
       "extractionState" : "manual"
     },
     "Pressed" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Prices are unavailable right now, so amounts are shown per asset." : {
+
+    },
+    "Prices unavailable" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },

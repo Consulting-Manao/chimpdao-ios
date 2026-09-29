@@ -9,7 +9,7 @@ struct ReceiveDrawer: Equatable, Identifiable {
         case card(name: String, color: ChimpCardColor)
     }
 
-    /// « main », ou le numéro de la carte (`token_id` de son NFT, d'après DESIGN_NOTES §1.1).
+    /// « main », ou l'identifiant de la carte (sa clé publique ; le numéro dans les données factices).
     let id: String
     let kind: Kind
     /// Adresse Stellar complète du contrat (`C…`, 56 caractères) : c'est elle qu'on copie, partage et met dans le QR.
@@ -22,11 +22,26 @@ struct ReceiveOptions: Equatable {
     var drawers: [ReceiveDrawer]
 }
 
-/// Source des adresses de réception. Au jalon 5, une implémentation branchée sur les services de `Core/`
-/// (adresse du Chimp account mémorisée, Pockets via `pocket-factory.get_account`) remplacera
-/// `MockReceiveDataSource`, sans toucher à la vue ni au ViewModel.
+/// Source des adresses de réception : `LocalReceiveDataSource` dans l'app, `MockReceiveDataSource` dans le catalogue.
 protocol ReceiveDataSource {
     func fetchReceiveOptions() async throws -> ReceiveOptions
+}
+
+/// Les vraies adresses, depuis le stockage local : le Main account, puis la Pocket de chaque carte connue sur ce
+/// téléphone (adresses vérifiées sur la chaîne à l'onboarding). Rien à lire sur le réseau, rien à signer.
+struct LocalReceiveDataSource: ReceiveDataSource {
+    let session: AppSession
+
+    func fetchReceiveOptions() async throws -> ReceiveOptions {
+        guard let account = session.wallet.account else { throw ChainWalletDataSource.ReadError.noAccount }
+        let main = ReceiveDrawer(id: "main", kind: .main, address: account.address)
+        let cards = account.cards.compactMap { card -> ReceiveDrawer? in
+            guard let pocket = card.pocket else { return nil }
+            let color = card.color.flatMap(ChimpCardColor.init(rawValue:)) ?? .jungle
+            return ReceiveDrawer(id: card.publicKey, kind: .card(name: card.name ?? String(localized: "Card"), color: color), address: pocket)
+        }
+        return ReceiveOptions(network: session.network, drawers: [main] + cards)
+    }
 }
 
 /// Données factices (noms de la maquette), avec des scénarios pour tester chaque état.

@@ -12,6 +12,7 @@ enum WalletAction: String, CaseIterable, Identifiable {
 struct WalletContent: Equatable {
     struct Card: Equatable, Identifiable {
         let id: String
+        let number: String
         let name: String
         let color: ChimpCardColor
         let amount: String
@@ -27,6 +28,8 @@ struct WalletContent: Equatable {
     var mainGrowing: String?
     var cards: [Card]
     var isZeroBalance: Bool
+    /// Un actif détenu n'a pas de prix : montants affichés par actif (« 1,000 XLM · 25 USDC »), pas en dollars.
+    var isShowingAssetAmounts: Bool
     var updatedAt: Date
 
     /// Valeurs de remplacement pour le squelette de chargement (jamais montrées lisibles).
@@ -38,10 +41,11 @@ struct WalletContent: Equatable {
         mainReady: nil,
         mainGrowing: nil,
         cards: [
-            Card(id: "placeholder-1", name: "Card", color: .jungle, amount: "$00.00"),
-            Card(id: "placeholder-2", name: "Card", color: .banana, amount: "$00.00"),
+            Card(id: "placeholder-1", number: "0000", name: "Card", color: .jungle, amount: "$00.00"),
+            Card(id: "placeholder-2", number: "0000", name: "Card", color: .banana, amount: "$00.00"),
         ],
         isZeroBalance: false,
+        isShowingAssetAmounts: false,
         updatedAt: .distantPast
     )
 }
@@ -124,24 +128,55 @@ final class WalletViewModel {
 
     // MARK: Formatage
 
-    private static func format(_ snapshot: WalletSnapshot) -> WalletContent {
+    /// Montants en dollars (`NetWorth.usd`, exact et tronqué au centime). Si un actif détenu n'a pas de prix, aucun total
+    /// partiel : les tiroirs concernés et le total affichent leurs montants par actif, comme le terminal.
+    static func format(_ snapshot: WalletSnapshot) -> WalletContent {
         // Symbole court (« $ » et non « US$ » hors des États-Unis) ; séparateurs selon la région du téléphone.
         let currency = Decimal.FormatStyle.Currency(code: snapshot.currencyCode).presentation(.narrow)
         let wholeCurrency = currency.precision(.fractionLength(0...2))
+        let prices = snapshot.usdPrices
+        func usd(_ assets: [AssetAmount]) -> Decimal? {
+            NetWorth.usd(assets.map { ($0.code, $0.amount) }, prices: prices)
+        }
+        /// En dollars si possible, sinon par actif.
+        func amount(_ assets: [AssetAmount], plus growing: Decimal = 0) -> String {
+            usd(assets).map { ($0 + growing).formatted(currency) } ?? assetText(assets)
+        }
+
         let main = snapshot.main
-        let hasSavings = (main.growing ?? 0) > 0
+        let growing = main.growing ?? 0
+        let hasSavings = growing > 0
+        let mainReady = usd(main.assets)
+        let total = usd(snapshot.allAssets)
+        let isZero = snapshot.allAssets.allSatisfy { $0.amount == 0 } && growing == 0
         return WalletContent(
             firstName: snapshot.firstName,
-            total: snapshot.total.formatted(currency),
-            weeklyChange: snapshot.weeklyChange?.formatted(currency.sign(strategy: .always())),
-            mainAmount: main.total.formatted(currency),
-            mainReady: hasSavings ? main.ready.formatted(wholeCurrency) : nil,
-            mainGrowing: hasSavings ? main.growing?.formatted(wholeCurrency) : nil,
+            total: total.map { ($0 + growing).formatted(currency) } ?? assetText(snapshot.allAssets),
+            weeklyChange: total == nil ? nil : snapshot.weeklyChange?.formatted(currency.sign(strategy: .always())),
+            mainAmount: amount(main.assets, plus: growing),
+            mainReady: hasSavings ? (mainReady?.formatted(wholeCurrency) ?? assetText(main.assets)) : nil,
+            mainGrowing: hasSavings ? growing.formatted(wholeCurrency) : nil,
             cards: snapshot.cards.map { card in
-                WalletContent.Card(id: card.id, name: card.name, color: card.color, amount: card.balance.formatted(currency))
+                WalletContent.Card(id: card.id, number: card.number, name: card.name, color: card.color, amount: amount(card.assets))
             },
-            isZeroBalance: snapshot.total == 0,
+            isZeroBalance: isZero,
+            isShowingAssetAmounts: total == nil,
             updatedAt: snapshot.fetchedAt
         )
+    }
+
+    /// « 1,000 XLM · 25 USDC » : actifs non nuls, additionnés par code, dans l'ordre d'apparition ; « 0 » si tout est nul.
+    static func assetText(_ assets: [AssetAmount]) -> String {
+        var codes: [String] = []
+        var sums: [String: Decimal] = [:]
+        for asset in assets {
+            if sums[asset.code] == nil { codes.append(asset.code) }
+            sums[asset.code, default: 0] += asset.amount
+        }
+        let parts = codes.compactMap { code -> String? in
+            guard let sum = sums[code], sum != 0 else { return nil }
+            return "\(sum.formatted(.number.precision(.fractionLength(0...2)))) \(code)"
+        }
+        return parts.isEmpty ? 0.formatted() : parts.joined(separator: " · ")
     }
 }

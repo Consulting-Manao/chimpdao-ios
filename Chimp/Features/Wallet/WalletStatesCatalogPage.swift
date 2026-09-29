@@ -61,6 +61,7 @@ private extension MockWalletDataSource.Scenario {
         case .loadingForever: "Loading"
         case .networkError: "Network error"
         case .staleAfterRefresh: "Refresh fails"
+        case .pricesUnavailable: "Prices unavailable"
         }
     }
 
@@ -74,6 +75,7 @@ private extension MockWalletDataSource.Scenario {
         case .loadingForever: "Skeleton that never finishes."
         case .networkError: "First load fails."
         case .staleAfterRefresh: "Loads, then pull to refresh to see the banner."
+        case .pricesUnavailable: "No XLM price: amounts per asset, no dollar total."
         }
     }
 }

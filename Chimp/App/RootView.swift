@@ -7,7 +7,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if !session.showsOnboarding {
-                MainTabView()
+                MainTabView(session: session)
                     .transition(.opacity)
             } else {
                 OnboardingFlow(model: .live(session: session))

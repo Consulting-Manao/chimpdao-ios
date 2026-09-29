@@ -87,4 +87,39 @@ struct ChimpAccountClient {
         guard let member = value.bool else { throw StellarError.invalidResponse("has_card returned \(value)") }
         return member
     }
+
+    /// `cards()` : toutes les cartes du compte (`readAccountCards` de `provisioning.ts`), dans l'ordre du contrat.
+    func cards(account: String, source: Account) async throws -> [(publicKey: ChipPublicKey, curve: ChipCurve)] {
+        try Self.decodeCards(try await client.readValue(source: source, contract: account, function: "cards"))
+    }
+
+    /// `Vec<CardSigner { curve, key }>` → cartes. Une forme inattendue ou une courbe inconnue est une erreur,
+    /// jamais une liste raccourcie (`Malformed card`, `Unknown curve on account card`).
+    static func decodeCards(_ value: SCValXDR) throws -> [(publicKey: ChipPublicKey, curve: ChipCurve)] {
+        guard case .vec(let items) = value else { throw StellarError.invalidResponse("cards returned \(value)") }
+        return try (items ?? []).map { item in
+            guard case .map(let entries) = item else { throw StellarError.invalidResponse("Malformed card \(item)") }
+            func field(_ name: String) -> SCValXDR? {
+                entries?.first { if case .symbol(name) = $0.key { true } else { false } }?.val
+            }
+            guard case .bytes(let key) = field("key") else { throw StellarError.invalidResponse("Malformed card \(item)") }
+            // `chipCurveOf` : le nom est le premier élément du `Vec` (variante d'enum sans donnée).
+            let name: String? = switch field("curve") {
+            case .vec(let parts): parts?.first.flatMap { if case .symbol(let s) = $0 { s } else { nil } }
+            case .symbol(let s): s
+            default: nil
+            }
+            let curve: ChipCurve
+            switch name {
+            case "Secp256r1": curve = .p256
+            case "Secp256k1": curve = .secp256k1
+            default: throw StellarError.invalidResponse("Unknown curve on account card: \(name ?? "nil")")
+            }
+            do {
+                return (try ChipPublicKey(key), curve)
+            } catch {
+                throw StellarError.invalidResponse("Malformed card key (\(key.count) bytes)")
+            }
+        }
+    }
 }

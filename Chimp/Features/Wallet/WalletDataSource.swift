@@ -1,11 +1,17 @@
 import Foundation
 
-/// Soldes du Wallet tels que l'écran en a besoin (montants en dollars, pas en unités on-chain).
+/// Montant d'un actif, en unités de l'actif (« 25 » USDC), jamais en unités on-chain.
+struct AssetAmount: Equatable {
+    var code: String
+    var amount: Decimal
+}
+
+/// Soldes du Wallet : montants par actif de chaque tiroir, et prix en dollars lus au même moment.
 ///
 /// Données locales ou encore sans source décidée (DESIGN_NOTES §12, questions 7 et 8) :
 /// `firstName` et `weeklyChange` sont facultatifs et masqués quand ils manquent.
 struct WalletSnapshot: Equatable {
-    /// Prénom saisi à l'onboarding, stocké sur l'appareil (source à confirmer).
+    /// Prénom saisi à l'onboarding (A4), stocké sur l'appareil.
     var firstName: String?
     /// Devise d'affichage (code ISO 4217, ex. « USD »).
     var currencyCode: String
@@ -15,34 +21,36 @@ struct WalletSnapshot: Equatable {
     var cards: [CardBalance]
     /// Variation sur 7 jours (source à confirmer : oracles de prix, historique).
     var weeklyChange: Decimal?
+    /// Prix en dollars par code d'actif (USDC = 1). Un actif détenu **sans prix** : pas de total en dollars, l'écran
+    /// affiche les montants par actif (comme le terminal, décision du 2026-09-29).
+    var usdPrices: [String: Decimal]
     /// Heure de la lecture des soldes.
     var fetchedAt: Date
 
-    var total: Decimal {
-        cards.reduce(main.total) { $0 + $1.balance }
-    }
+    /// Tous les avoirs, tiroirs confondus.
+    var allAssets: [AssetAmount] { main.assets + cards.flatMap(\.assets) }
 }
 
-/// Solde d'un tiroir : part disponible et part en épargne (Grow, facultative).
+/// Solde d'un tiroir : ses actifs, plus une part en épargne (Grow, facultative, en dollars).
 struct DrawerBalance: Equatable {
-    var ready: Decimal
+    var assets: [AssetAmount]
+    /// Pas encore lue sur la chaîne (Grow n'est pas construit) : seulement dans les données factices.
     var growing: Decimal?
-
-    var total: Decimal { ready + (growing ?? 0) }
 }
 
 /// Wallet d'une carte.
 struct CardBalance: Equatable, Identifiable {
-    /// Numéro de la carte (`token_id` de son NFT, d'après DESIGN_NOTES §1.1).
+    /// Clé publique de la carte (hexadécimal) : identité stable.
     var id: String
+    /// Numéro de la carte (`token_id` de son NFT) sur 4 chiffres, « ···· » s'il est inconnu.
+    var number: String
     /// Nom et couleur choisis par l'utilisateur (données locales).
     var name: String
     var color: ChimpCardColor
-    var balance: Decimal
+    var assets: [AssetAmount]
 }
 
-/// Source des soldes du Wallet. Au jalon 5, une implémentation branchée sur les services de `Core/`
-/// remplacera `MockWalletDataSource`, sans toucher à la vue ni au ViewModel.
+/// Source des soldes du Wallet : `ChainWalletDataSource` (testnet) dans l'app, `MockWalletDataSource` dans le catalogue.
 protocol WalletDataSource {
     func fetchWallet() async throws -> WalletSnapshot
 }
@@ -66,6 +74,8 @@ final class MockWalletDataSource: WalletDataSource {
         case networkError
         /// Premier chargement réussi, puis chaque rafraîchissement échoue.
         case staleAfterRefresh
+        /// Prix du XLM illisible : montants par actif, pas de total en dollars.
+        case pricesUnavailable
 
         var id: String { rawValue }
     }
@@ -97,35 +107,45 @@ final class MockWalletDataSource: WalletDataSource {
     }
 
     private var snapshot: WalletSnapshot {
-        let jungle = CardBalance(id: "0421", name: "Jungle", color: .jungle, balance: Decimal(string: "62.50")!)
-        let banana = CardBalance(id: "0688", name: "Banana", color: .banana, balance: Decimal(string: "102.50")!)
+        // Montants de la maquette B1 : Main $820 disponibles (dont $600 en XLM à $0.20) + $500 en épargne, Jungle $62.50,
+        // Banana $102.50 (dont $2.50 en XLM).
+        let jungle = CardBalance(id: "jungle", number: "0421", name: "Jungle", color: .jungle, assets: [usdc("62.50")])
+        let banana = CardBalance(id: "banana", number: "0688", name: "Banana", color: .banana, assets: [xlm("12.50"), usdc("100")])
         var snapshot = WalletSnapshot(
             firstName: "Léo",
             currencyCode: "USD",
-            main: DrawerBalance(ready: 820, growing: 500),
+            main: DrawerBalance(assets: [xlm("3000"), usdc("220")], growing: 500),
             cards: [jungle, banana],
             weeklyChange: Decimal(string: "6.20")!,
+            usdPrices: ["XLM": Decimal(string: "0.2")!, "USDC": 1],
             fetchedAt: .now
         )
         switch scenario {
         case .withoutSavings:
-            snapshot.main = DrawerBalance(ready: 1320)
+            snapshot.main.growing = nil
+            snapshot.main.assets = [xlm("3000"), usdc("720")]
         case .minimal:
             snapshot.firstName = nil
             snapshot.weeklyChange = nil
         case .zeroBalance:
-            snapshot.main = DrawerBalance(ready: 0)
+            snapshot.main = DrawerBalance(assets: [xlm("0"), usdc("0")])
             snapshot.cards = snapshot.cards.map { card in
                 var card = card
-                card.balance = 0
+                card.assets = [xlm("0"), usdc("0")]
                 return card
             }
             snapshot.weeklyChange = nil
         case .noCards:
             snapshot.cards = []
+        case .pricesUnavailable:
+            snapshot.usdPrices = ["USDC": 1]
+            snapshot.weeklyChange = nil
         default:
             break
         }
         return snapshot
     }
+
+    private func xlm(_ value: String) -> AssetAmount { AssetAmount(code: "XLM", amount: Decimal(string: value)!) }
+    private func usdc(_ value: String) -> AssetAmount { AssetAmount(code: "USDC", amount: Decimal(string: value)!) }
 }

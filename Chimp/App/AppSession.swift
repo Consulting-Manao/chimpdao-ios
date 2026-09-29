@@ -72,6 +72,18 @@ final class AppSession {
         try persist(next)
     }
 
+    /// Cartes que le compte déclare lui-même (`cards()`, lu par le Wallet) : gardées comme indices « carte → compte »,
+    /// comme `loadAccountView` du terminal. N'écrit que si quelque chose change ; un échec d'écriture est sans gravité.
+    func rememberCards(_ keys: [String], account: String, at date: Date = .now) {
+        let missing = keys.filter { key in !wallet.cardHints.contains { $0.key == key && $0.account == account } }
+        guard !missing.isEmpty else { return }
+        var next = wallet
+        for key in missing.reversed() {
+            next.cardHints = CardHint.adding(CardHint(key: key, account: account, at: date), to: next.cardHints)
+        }
+        try? persist(next)
+    }
+
     /// Compte créé **et confirmé sur la chaîne** (étape 4) : on l'enregistre sur le téléphone, avec le prénom, le nom
     /// et la couleur de la carte (données locales), puis A7 s'affiche avant le Wallet.
     func completeOnboarding(account: String, card: SavedCard, firstName: String, at date: Date = .now) throws {
