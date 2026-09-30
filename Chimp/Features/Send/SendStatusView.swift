@@ -102,7 +102,7 @@ struct SendStatusView: View {
         case .finished(.nothingSent):
             ChimpySays(text: "Your money didn't move. You can try again.", pose: .head)
         case .finished(.undetermined):
-            ChimpySays(text: "I can't tell yet if it went through. Check on Stellar Expert before trying again.", pose: .head)
+            ChimpySays(text: "I can't tell yet if it went through. Don't send it again — tap Check again in a moment.", pose: .head)
         default:
             EmptyView()
         }

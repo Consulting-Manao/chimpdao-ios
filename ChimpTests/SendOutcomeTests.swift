@@ -225,6 +225,13 @@ struct SendOutcomeTests {
         #expect(store.wallet.pendingSend == nil)
     }
 
+    @Test("Lien explorateur : Stellar Expert, réseau testnet, hash tel quel (`explorerTx` du terminal)")
+    func explorerURL() {
+        let hash = "6fe0ba5710cb2ade0b653e689f516cf01f3731cf401fb73769bd8d6beda75af4"
+        #expect(ChimpNetworkConfig.testnet.explorerURL(transactionHash: hash).absoluteString
+            == "https://stellar.expert/explorer/testnet/tx/\(hash)")
+    }
+
     // MARK: Tiroirs du vrai service
 
     @Test("Vrai service : Main puis le wallet de chaque carte, PIN selon la puce, prix du XLM, récents vides")
