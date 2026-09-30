@@ -110,6 +110,14 @@ extension Infineon2Go {
         return try SignatureEncoding.lowS(SignatureEncoding.rawSignature(fromDER: der), curve: .secp256k1)
     }
 
+    /// SELECT puis VERIFY PIN, sans signer (reconnexion d'une carte, décision de Barth du 2026-09-29). Mêmes commandes
+    /// que le début de `signDigest` du bridge : il n'existe pas de « VERIFY PIN seul » dans `reference/`.
+    static func verifyPIN(_ transport: some APDUTransport, pin: String) async throws {
+        let apdu = try verifyPINAPDU(pin: pin)
+        _ = try parseSelect(try await transport.send(selectAPDU))
+        try checkVerifyPIN(try await transport.send(apdu))
+    }
+
     static func sign(_ transport: some APDUTransport, digest: Data, pin: String?) async throws -> ChipSignedDigest {
         _ = try parseSelect(try await transport.send(selectAPDU))
         if let pin, !pin.isEmpty {

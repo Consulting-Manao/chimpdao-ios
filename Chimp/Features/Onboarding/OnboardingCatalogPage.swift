@@ -11,6 +11,7 @@ struct OnboardingCatalogPage: View {
     @State private var tourSeen = false
     @State private var setupScenario = MockAccountSetupService.Scenario.success
     @State private var creationScenario = MockAccountCreationChain.Scenario.success
+    @State private var pinScenario = ReconnectPINScenario.accepted
     @State private var runningFlow: OnboardingModel?
     @State private var runningSession: AppSession?
 
@@ -38,6 +39,11 @@ struct OnboardingCatalogPage: View {
                     } label: {
                         Text(verbatim: "Real creation (fake chain)")
                     }
+                    Picker(selection: $pinScenario) {
+                        ForEach(ReconnectPINScenario.allCases) { Text(verbatim: $0.rawValue).tag($0) }
+                    } label: {
+                        Text(verbatim: "PIN check (member card with PIN)")
+                    }
                     Toggle(isOn: $tourSeen) { Text(verbatim: "Tour already seen") }
                     Button {
                         let session = AppSession(store: InMemoryLocalWalletStore(LocalWallet(tourSeen: tourSeen)), network: .testnet)
@@ -48,6 +54,7 @@ struct OnboardingCatalogPage: View {
                             session: session,
                             reader: MockChipReader(scenario: readerScenario),
                             service: MockOnboardingService(scenario: serviceScenario),
+                            signer: MockChipSigner(outcome: pinScenario.outcome),
                             makeSetup: { choice in
                                 try AccountSetupModel(
                                     choice: choice, service: MockAccountSetupService(scenario: setupScenario),
@@ -129,6 +136,25 @@ struct OnboardingCatalogPage: View {
     private static func choice(_ kind: CardChoice.Kind, empty: Bool?) -> CardChoice {
         CardChoice(kind: kind, card: ChipKeyInfo(kind: .infineon2Go, publicKey: MockChipReader.secp256k1Key, pinActive: false),
                    tokenID: 7, pocket: nil, pocketIsEmpty: empty)
+    }
+}
+
+/// Réponse de la fausse carte à VERIFY PIN, à la reconnexion (carte « member » avec PIN).
+enum ReconnectPINScenario: String, CaseIterable, Identifiable {
+    case accepted
+    case wrongPIN
+    case locked
+    case otherCard
+
+    var id: String { rawValue }
+
+    var outcome: Result<ChipSignedDigest, ChipError> {
+        switch self {
+        case .accepted: .success(.secp256k1(signature: Data(repeating: 0x11, count: 64)))
+        case .wrongPIN: .failure(.wrongPIN(retriesLeft: 2))
+        case .locked: .failure(.pinLocked)
+        case .otherCard: .failure(.wrongCard)
+        }
     }
 }
 

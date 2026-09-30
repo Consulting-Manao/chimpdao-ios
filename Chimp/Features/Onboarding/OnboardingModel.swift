@@ -11,6 +11,10 @@ enum OnboardingRoute: Hashable {
     case choice(CardChoice)
     /// H3 : pas une vraie carte ChimpDAO.
     case notAChimpCard
+    /// Reconnexion d'une Infineon avec PIN : PIN, puis second tap (état dans `OnboardingModel.reconnection`).
+    case reconnectPIN
+    /// « Welcome back! » : prénom, nom et couleur de la carte, s'ils manquent sur ce téléphone.
+    case welcomeBack
     /// Création du compte (état dans `OnboardingModel.setup`) : A4, A5, A6, confirmation, code de déblocage,
     /// création en cours, A7.
     case yourName
@@ -94,21 +98,27 @@ final class OnboardingModel {
 
     /// Création du compte en cours (A4 à A7), `nil` avant « Start a new account ».
     private(set) var setup: AccountSetupModel?
+    /// Reconnexion d'une carte déjà liée à un compte (PIN, « Welcome back! »), `nil` sinon.
+    private(set) var reconnection: ReconnectModel?
 
     private let session: AppSession
     private let reader: ChipReader
     private let service: OnboardingService
+    /// Vérification du PIN à la reconnexion (second tap).
+    private let signer: ChipSigner
     private let makeSetup: (CardChoice) throws -> AccountSetupModel
 
     init(
         session: AppSession,
         reader: ChipReader,
         service: OnboardingService,
+        signer: ChipSigner,
         makeSetup: @escaping (CardChoice) throws -> AccountSetupModel
     ) {
         self.session = session
         self.reader = reader
         self.service = service
+        self.signer = signer
         self.makeSetup = makeSetup
     }
 
@@ -149,6 +159,7 @@ final class OnboardingModel {
     /// A2 remplace la visite dans la pile : « retour » ramène à A1.
     func openReading() {
         readingState = .idle
+        reconnection = nil
         path = [.reading]
         Task { await scan() }
     }
@@ -199,17 +210,57 @@ final class OnboardingModel {
         case .unknown(let detail):
             readingState = .failed(OnboardingProblem(kind: .couldntCheck, technicalDetails: detail))
         case .signIn(let account, _):
-            // Carte déjà dans un compte : on l'ouvre sur ce téléphone (le Wallet remplace l'onboarding).
-            try session.signIn(account: account, card: SavedCard(
-                publicKey: inspection.card.publicKey.hex,
-                chip: inspection.card.kind.rawValue,
-                tokenID: inspection.tokenID,
-                pocket: inspection.pocket,
-                name: nil,
-                color: nil
-            ))
+            // Carte déjà dans un compte : PIN d'une Infineon, puis « Welcome back! » si besoin, puis le Wallet.
             readingState = .idle
+            let reconnect = ReconnectModel(account: account, inspection: inspection, session: session, signer: signer)
+            reconnection = reconnect
+            if reconnect.needsPIN {
+                path.append(.reconnectPIN)
+            } else {
+                try continueReconnection()
+            }
         }
+    }
+
+    // MARK: Reconnexion
+
+    /// « Scan my card » de la feuille du tap (PIN saisi) : la carte vérifie le PIN, puis on continue.
+    func scanForReconnection() async {
+        guard let reconnection, await reconnection.scan() else { return }
+        do {
+            try continueReconnection()
+        } catch {
+            // L'enregistrement a échoué : « Welcome back! » l'affiche et permet de réessayer.
+            replaceLast(with: .welcomeBack)
+        }
+    }
+
+    /// PIN vérifié (ou pas de PIN) : « Welcome back! » si le téléphone ne connaît pas les noms, sinon le compte s'ouvre.
+    private func continueReconnection() throws {
+        guard let reconnection, reconnection.isPINVerified else { return }
+        if reconnection.needsWelcomeBack {
+            replaceLast(with: .welcomeBack)
+        } else {
+            try reconnection.save()
+        }
+    }
+
+    /// « Let's swing » de « Welcome back! » : le compte s'ouvre sur ce téléphone (le Wallet remplace l'onboarding).
+    func finishWelcomeBack() {
+        try? reconnection?.save()
+    }
+
+    /// Retour depuis la reconnexion : A2, prêt pour un nouveau tap (rien n'a été enregistré).
+    func cancelReconnection() {
+        reconnection = nil
+        readingState = .idle
+        path = [.reading]
+    }
+
+    /// L'écran du PIN (vérifié) ne doit plus être accessible : « Welcome back! » le remplace dans la pile.
+    private func replaceLast(with route: OnboardingRoute) {
+        if path.last == .reconnectPIN { path.removeLast() }
+        if path.last != route { path.append(route) }
     }
 
     private func choice(_ kind: CardChoice.Kind, _ inspection: CardInspection) -> CardChoice {

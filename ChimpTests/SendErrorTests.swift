@@ -277,6 +277,8 @@ private final class KeysSpy: ChipSigner, @unchecked Sendable {
     func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {
         PINSetupSignatures(puk: nil, signatures: try await sign(digests: digests, expectedKey: expectedKey, pin: newPIN))
     }
+
+    func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws {}
 }
 
 private struct EmptyWallet: WalletDataSource {

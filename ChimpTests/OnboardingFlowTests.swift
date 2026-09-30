@@ -156,13 +156,18 @@ struct OnboardingFlowTests {
         #expect(await scanned(.fresh, reader: .unknownChip).path.last == .notAChimpCard)
     }
 
-    @Test("Carte déjà dans un compte → compte ouvert sur le téléphone, sans rien signer")
-    func routesMember() async {
+    @Test("Carte déjà dans un compte (sans PIN) → « Welcome back! », puis compte ouvert sur le téléphone, sans rien signer")
+    func routesMember() async throws {
         let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
         let model = await scanned(.member, session: session)
+        #expect(model.path == [.reading, .welcomeBack])
+        #expect(!session.hasAccount)
+        let reconnect = try #require(model.reconnection)
+        reconnect.firstName = "Léo"
+        reconnect.cardName = "Jungle"
+        model.finishWelcomeBack()
         #expect(session.wallet.account?.address == MockOnboardingService.memberAccount)
         #expect(session.wallet.account?.cards.first?.tokenID == 421)
-        #expect(model.path == [.reading])
     }
 
     @Test("Réseau : « unknown » ou panne → « Couldn't check this card », on reste sur A2 (jamais orpheline)")
@@ -193,6 +198,7 @@ struct OnboardingFlowTests {
         let service = RecordingService()
         let model = OnboardingModel(session: AppSession(store: store, network: .testnet),
                                     reader: MockChipReader(scenario: .infineon, delay: .zero), service: service,
+                                    signer: MockChipSigner(delay: .zero),
                                     makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), creator: AccountCreator(chain: MockAccountCreationChain(delay: .zero)), signer: MockChipSigner(delay: .zero), session: nil) })
         model.path = [.reading]
         await model.scan()
@@ -210,16 +216,18 @@ struct OnboardingFlowTests {
     }
 
     private func makeModel(session: AppSession, reader: MockChipReader.Scenario = .infineon,
-                           service: MockOnboardingService.Scenario = .fresh) -> OnboardingModel {
+                           service: MockOnboardingService.Scenario = .fresh,
+                           signer: ChipSigner = MockChipSigner(delay: .zero)) -> OnboardingModel {
         OnboardingModel(session: session, reader: MockChipReader(scenario: reader, delay: .zero),
                         service: MockOnboardingService(scenario: service, delay: .zero),
+                        signer: signer,
                         makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), creator: AccountCreator(chain: MockAccountCreationChain(delay: .zero)), signer: MockChipSigner(delay: .zero), session: nil) })
     }
 
     private func scanned(_ service: MockOnboardingService.Scenario, reader: MockChipReader.Scenario = .infineon,
-                         session: AppSession? = nil) async -> OnboardingModel {
+                         session: AppSession? = nil, signer: ChipSigner = MockChipSigner(delay: .zero)) async -> OnboardingModel {
         let model = makeModel(session: session ?? AppSession(store: InMemoryLocalWalletStore(), network: .testnet),
-                              reader: reader, service: service)
+                              reader: reader, service: service, signer: signer)
         model.path = [.reading]
         await model.scan()
         return model

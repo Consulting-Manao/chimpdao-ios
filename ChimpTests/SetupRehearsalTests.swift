@@ -260,7 +260,7 @@ struct SetupRehearsalTests {
         let session = AppSession(store: store, network: .testnet)
         let onboarding = OnboardingModel(
             session: session, reader: MockChipReader(scenario: .infineon, delay: .zero),
-            service: MockOnboardingService(scenario: .fresh, delay: .zero),
+            service: MockOnboardingService(scenario: .fresh, delay: .zero), signer: RecordingSigner(),
             makeSetup: { try self.makeSetup($0, service: MockAccountSetupService(delay: .zero), signer: RecordingSigner()) }
         )
         onboarding.path = [.reading]
@@ -376,6 +376,14 @@ final class RecordingSigner: ChipSigner, @unchecked Sendable {
         if let setPINError { throw setPINError }
         return PINSetupSignatures(puk: puk, signatures: try await sign(digests: digests, expectedKey: expectedKey, pin: newPIN))
     }
+
+    /// PIN vérifiés (reconnexion) ; même erreur que `sign` si elle est donnée.
+    private(set) var verifiedPINs: [String] = []
+
+    func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws {
+        verifiedPINs.append(pin)
+        if let error { throw error }
+    }
 }
 
 /// Le vrai chemin de signature (`ChipSigning`) sur une carte simulée, pour contrôler les APDU envoyés.
@@ -396,6 +404,10 @@ private struct TransportSigner: ChipSigner {
 
     func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {
         try await ChipSigning.setPINAndSign(card, digests: digests, expectedKey: expectedKey, newPIN: newPIN)
+    }
+
+    func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws {
+        try await ChipSigning.verifyPIN(card, expectedKey: expectedKey, pin: pin)
     }
 }
 

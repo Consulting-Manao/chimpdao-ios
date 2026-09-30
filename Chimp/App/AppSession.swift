@@ -54,9 +54,11 @@ final class AppSession {
     }
 
     /// Carte déjà membre d'un Main account (`signIn` de la résolution) : on ouvre ce compte sur le téléphone.
-    /// Comme le terminal : une simple lecture suffit, rien n'est signé. L'indice « carte → compte » est mis à jour.
-    func signIn(account: String, card: SavedCard, at date: Date = .now) throws {
+    /// Comme le terminal : rien n'est signé (une Infineon a d'abord vérifié son PIN, `ReconnectModel`). L'indice
+    /// « carte → compte » est mis à jour. `firstName` : prénom redemandé par « Welcome back! » (sinon, celui du téléphone).
+    func signIn(account: String, card: SavedCard, firstName: String? = nil, at date: Date = .now) throws {
         var next = wallet
+        if let firstName { next.firstName = firstName }
         var cards = next.account?.address == account ? next.account?.cards ?? [] : []
         if let index = cards.firstIndex(where: { $0.publicKey == card.publicKey }) {
             // Garder le nom et la couleur déjà choisis sur ce téléphone.

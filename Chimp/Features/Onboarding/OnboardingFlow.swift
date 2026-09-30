@@ -37,6 +37,17 @@ struct OnboardingFlow: View {
             CardChoiceView(choice: choice) { model.startNewAccount(with: choice) }
         case .notAChimpCard:
             NotAChimpCardView(onTryAnother: model.tryAnotherCard)
+        case .reconnectPIN:
+            if let reconnection = model.reconnection {
+                ReconnectPINView(
+                    model: reconnection, onBack: model.cancelReconnection,
+                    onScan: { Task { await model.scanForReconnection() } }, onOtherCard: model.tryAnotherCard
+                )
+            }
+        case .welcomeBack:
+            if let reconnection = model.reconnection {
+                WelcomeBackView(model: reconnection, onBack: model.cancelReconnection, onFinish: model.finishWelcomeBack)
+            }
         case .yourName:
             if let setup = model.setup { YourNameView(model: setup, onBack: model.back, onContinue: model.continueFromName) }
         case .nameYourCard:
@@ -89,6 +100,7 @@ extension OnboardingModel {
         if !NFCTagReaderSession.readingAvailable {
             return OnboardingModel(
                 session: session, reader: MockChipReader(scenario: .infineon), service: MockOnboardingService(scenario: .fresh),
+                signer: MockChipSigner(),
                 makeSetup: { choice in
                     try AccountSetupModel(
                         choice: choice, service: MockAccountSetupService(), creator: AccountCreator(chain: MockAccountCreationChain()),
@@ -100,6 +112,7 @@ extension OnboardingModel {
         #endif
         return OnboardingModel(
             session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: .testnet),
+            signer: NFCChipSigner(),
             makeSetup: { choice in try Self.liveSetup(choice: choice, session: session) }
         )
     }

@@ -33,6 +33,9 @@ protocol ChipSigner {
     /// Onboarding d'une Infineon (étape 4) : dans le **même tap**, définit le PIN (SET PIN, qui renvoie le PUK une seule
     /// fois), puis signe les digests avec ce PIN. Voir `ChipSigning.setPINAndSign`.
     func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures
+    /// Reconnexion d'une Infineon déjà liée à un compte (décision de Barth du 2026-09-29) : la carte vérifie le PIN, rien
+    /// n'est signé. Voir `ChipSigning.verifyPIN`.
+    func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws
 }
 
 /// SET PIN a réussi (le PIN est défini sur la carte, pour toujours) mais une signature a échoué juste après
@@ -201,6 +204,19 @@ enum ChipSigning {
         }
         return PINSetupSignatures(puk: puk, signatures: signatures)
     }
+
+    /// Reconnexion : lecture de la clé (même carte qu'en A2 ?) → SELECT → VERIFY PIN. Rien n'est signé.
+    /// Adaptation à l'iPhone (DESIGN_NOTES §13) : le terminal se reconnecte par simple lecture ; Barth demande le PIN
+    /// d'une Infineon (2026-09-29). Une carte sans PIN actif ou une DUOX est refusée **sans** VERIFY PIN : l'app ne
+    /// demande le PIN que si la lecture d'A2 a dit « PIN actif », et une Infineon ne perd jamais son PIN.
+    /// Un PIN faux coûte un essai à la carte (`63 Cx`), comme pour une signature.
+    static func verifyPIN(_ transport: some APDUTransport, expectedKey: ChipPublicKey, pin: String) async throws {
+        _ = try Infineon2Go.verifyPINAPDU(pin: pin)
+        let card = try await ChipDetector.readKey(transport)
+        guard card.publicKey == expectedKey else { throw ChipError.wrongCard }
+        guard card.kind == .infineon2Go, card.pinActive else { throw ChipError.pinUnsupported }
+        try await Infineon2Go.verifyPIN(transport, pin: pin)
+    }
 }
 
 /// Signature par Core NFC : une feuille NFC, une carte.
@@ -240,6 +256,15 @@ struct NFCChipSigner: ChipSigner {
             try await ChipSigning.setPINAndSign(transport, digests: digests, expectedKey: expectedKey, newPIN: newPIN)
         }
     }
+
+    func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws {
+        try await NFCTagSession.run(
+            alertMessage: String(localized: "Hold your card near the top of your iPhone."),
+            successMessage: String(localized: "Card read.")
+        ) { transport in
+            try await ChipSigning.verifyPIN(transport, expectedKey: expectedKey, pin: pin)
+        }
+    }
 }
 
 /// Faux signataire : renvoie une signature fixe (invalide sur le réseau) pour chaque digest, pour faire tourner l'interface.
@@ -272,5 +297,11 @@ struct MockChipSigner: ChipSigner {
 
     func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {
         PINSetupSignatures(puk: Self.fakePUK, signatures: try await sign(digests: digests, expectedKey: expectedKey, pin: newPIN))
+    }
+
+    /// Le faux PIN est accepté si `outcome` réussit (même délai qu'un tap).
+    func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws {
+        try await Task.sleep(for: delay)
+        _ = try outcome.get()
     }
 }
