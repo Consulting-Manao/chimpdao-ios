@@ -284,7 +284,7 @@ private final class KeysSpy: ChipSigner, @unchecked Sendable {
 private struct EmptyWallet: WalletDataSource {
     var firstName: String? { nil }
     func fetchWallet() async throws -> WalletSnapshot {
-        WalletSnapshot(currencyCode: "USD", main: DrawerBalance(assets: []), cards: [], weeklyChange: nil, usdPrices: [:], fetchedAt: .now)
+        WalletSnapshot(currency: .usd, main: DrawerBalance(assets: []), cards: [], weeklyChange: nil, usdPrices: [:], fetchedAt: .now)
     }
 }
 

@@ -191,3 +191,75 @@ struct ChimpSegmentedPicker<Value: Hashable>: View {
     .frame(maxHeight: .infinity)
     .background(Color(.chimpBackground))
 }
+
+/// Ligne à choix unique d'une `ChimpGroupedBox` (I3 « Show amounts in ») : pastille carrée (jaune si choisie), titre,
+/// rond de sélection.
+struct ChimpChoiceListRow: View {
+    let badge: String
+    let title: String
+    var subtitle: String?
+    let isSelected: Bool
+    /// Choix impossible pour l'instant (grisé, `subtitle` dit pourquoi).
+    var isEnabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: ChimpSpacing.sm) {
+                Text(verbatim: badge)
+                    .chimpFont(Self.badgeStyle(badge))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .foregroundStyle(Color(.chimpOnAccent))
+                    .frame(width: 34 - 2 * ChimpBorder.thin, height: 34 - 2 * ChimpBorder.thin)
+                    .padding(ChimpBorder.thin)
+                    .background(RoundedRectangle(cornerRadius: 11).fill(isSelected ? Color(.chimpAccent) : Color(.chimpSurfaceSecondary)))
+                    .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.thin))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: title)
+                        .chimpFont(.optionTitle)
+                        .foregroundStyle(.chimpTextPrimary)
+                    if let subtitle {
+                        Text(verbatim: subtitle)
+                            .chimpFont(.captionS)
+                            .foregroundStyle(.chimpTextSecondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                ChimpRadio(isSelected: isSelected)
+            }
+            .opacity(isEnabled ? 1 : ChimpOpacity.disabled)
+            .padding(.vertical, 7)
+            .padding(.horizontal, 13)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ChimpPressableStyle())
+        .disabled(!isEnabled)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// Luckiest Guy 14 pour des lettres (« CHF », « XLM »), comme la maquette. Un symbole seul y est plus petit que des
+    /// capitales : « $ » passe à 18 pt, et « € », « £ », « ¥ » (dessinés minuscules dans Luckiest Guy) en Nunito 900.
+    static func badgeStyle(_ badge: String) -> ChimpTextStyle {
+        guard badge.count == 1 else { return .buttonSmall }
+        return badge == "$" ? .displayS : .lead
+    }
+}
+
+/// Rond de sélection : vide, ou plein avec un anneau intérieur jaune (maquette : `inset 0 0 0 4px #FFD11E`).
+struct ChimpRadio: View {
+    let isSelected: Bool
+
+    var body: some View {
+        Circle()
+            .fill(isSelected ? Color(.chimpOutline) : .clear)
+            .padding(isSelected ? ChimpBorder.regular + 4 : 0)
+            .background { if isSelected { Circle().fill(Color(.chimpAccent)) } }
+            .overlay { Circle().strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.regular) }
+            .frame(width: ChimpSize.radio, height: ChimpSize.radio)
+            .accessibilityHidden(true)
+    }
+}

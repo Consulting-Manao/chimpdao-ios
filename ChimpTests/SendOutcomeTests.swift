@@ -226,7 +226,7 @@ struct SendOutcomeTests {
             ]
         ))), network: .testnet)
         let snapshot = WalletSnapshot(
-            currencyCode: "USD",
+            currency: .usd,
             main: DrawerBalance(assets: [AssetAmount(code: "XLM", amount: 999), AssetAmount(code: "USDC", amount: 0)]),
             cards: [
                 CardBalance(id: infineon.hex, number: "0007", name: "Banana", color: .banana, assets: [AssetAmount(code: "XLM", amount: 1000)], pocket: "CPOCKET1"),

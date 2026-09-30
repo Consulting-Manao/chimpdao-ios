@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// I2 · Settings (maquette) : prénom, nom et couleur des cartes, apparence, réseau (affichage seulement), visite,
+/// I2 · Settings (maquette) : prénom, nom et couleur des cartes, devise (I3), apparence, réseau (affichage seulement), visite,
 /// « Disconnect this phone », « Erase everything on this phone », liens (licences, aide), version. Les lignes de la
 /// maquette pas encore faisables (paranoid mode, shop mode, raw signing) ne sont pas affichées : aucune ligne sans
 /// destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision de Barth du
@@ -46,6 +46,9 @@ struct SettingsView: View {
                     sectionLabel("Display")
                         .padding(.top, ChimpSpacing.sectionGap)
                     ChimpGroupedBox {
+                        ChimpSettingsRow(title: "Currency", value: model.currency.settingsValue) {
+                            model.isChoosingCurrency = true
+                        }
                         ChimpSettingsControlRow(title: "Look") {
                             ChimpSegmentedPicker(segments: Self.lookSegments, selection: $model.look)
                         }
@@ -138,6 +141,10 @@ struct SettingsView: View {
         }
         .chimpSheet(isPresented: $model.isEditingFirstName, height: 380) {
             firstNameSheet
+        }
+        .chimpSheet(isPresented: $model.isChoosingCurrency, height: 500) {
+            CurrencySheet(selection: model.currency, unavailable: model.unavailableCurrencies, onChoose: model.choose)
+                .task { await model.loadCurrencyRates() }
         }
         .navigationDestination(item: Binding(
             get: { model.editingCard },
@@ -359,6 +366,45 @@ struct SettingsView: View {
         }
         .padding(.horizontal, ChimpSpacing.xxl)
         .padding(.bottom, ChimpSpacing.l)
+    }
+}
+
+/// I3 · Currency (maquette) : « Show amounts in ». La devise ne change que l'affichage du Wallet et des pages de tiroir ;
+/// l'Activity, Envoyer et les montants signés gardent les actifs réellement bougés.
+struct CurrencySheet: View {
+    let selection: DisplayCurrency
+    /// Devises que l'oracle ne cote pas : grisées, avec la raison.
+    var unavailable: Set<DisplayCurrency> = []
+    let onChoose: (DisplayCurrency) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Show amounts in")
+                .chimpFont(.sheetTitle)
+                .foregroundStyle(.chimpTextPrimary)
+                .accessibilityAddTraits(.isHeader)
+            Text("Only changes how numbers look. Your coins stay the same.")
+                .chimpFont(.bodyM)
+                .foregroundStyle(.chimpTextSecondary)
+                .padding(.top, ChimpSpacing.xxs)
+            ScrollView {
+                ChimpGroupedBox {
+                    ForEach(DisplayCurrency.allCases) { currency in
+                        ChimpChoiceListRow(
+                            badge: currency.badge, title: currency.title,
+                            subtitle: unavailable.contains(currency) ? String(localized: "No price from the oracle yet") : nil,
+                            isSelected: currency == selection, isEnabled: !unavailable.contains(currency)
+                        ) {
+                            onChoose(currency)
+                        }
+                    }
+                }
+                .padding(.top, ChimpSpacing.ml)
+                .padding(.bottom, ChimpSpacing.l)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .padding(.horizontal, ChimpSpacing.xxl)
     }
 }
 

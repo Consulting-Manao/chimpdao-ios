@@ -38,9 +38,13 @@ final class SettingsModel {
     /// Dernière écriture ratée (texte technique).
     private(set) var saveError: String?
 
-    init(session: AppSession, walletCards: [CardBalance]) {
+    /// Prix de l'oracle Reflector, pour savoir quelles devises de I3 il cote ; `nil` : toutes proposées.
+    private let oracle: PriceOracle?
+
+    init(session: AppSession, walletCards: [CardBalance], oracle: PriceOracle? = nil) {
         self.session = session
         self.walletCards = walletCards
+        self.oracle = oracle
     }
 
     static let maximumCardNameLength = AccountSetupModel.maximumCardNameLength
@@ -185,6 +189,38 @@ final class SettingsModel {
     }
 
     // MARK: Display
+
+    /// « Show amounts in » (I3) : ne change que l'affichage du Wallet et des pages de tiroir.
+    var currency: DisplayCurrency {
+        get { session.preferences.currency }
+        set { session.preferences.currency = newValue }
+    }
+
+    var isChoosingCurrency = false
+    /// Devises que l'oracle ne cote pas (aujourd'hui : CHF, absent du flux FX de Reflector) : grisées dans I3, comme
+    /// `listDenominations` du terminal ne propose que les devises cotées. Vide tant qu'on ne sait pas.
+    private(set) var unavailableCurrencies: Set<DisplayCurrency> = []
+
+    /// À l'ouverture de I3 : demande à l'oracle le prix de chaque devise (5 minutes en mémoire). Si l'oracle ne répond
+    /// pour aucune (réseau absent), rien n'est grisé : on ne sait pas.
+    func loadCurrencyRates() async {
+        guard let oracle else { return }
+        let codes = Set(DisplayCurrency.allCases.filter { $0 != .usd }.map(\.code))
+        let prices = await oracle.usdPrices(for: codes)
+        unavailableCurrencies = Self.unavailable(prices: prices)
+    }
+
+    static func unavailable(prices: [String: Decimal]) -> Set<DisplayCurrency> {
+        guard !prices.isEmpty else { return [] }
+        return Set(DisplayCurrency.allCases.filter { $0 != .usd && (prices[$0.code] ?? 0) <= 0 })
+    }
+
+    /// Choix d'une devise dans la feuille I3 : enregistré, puis la feuille se ferme.
+    func choose(_ currency: DisplayCurrency) {
+        guard !unavailableCurrencies.contains(currency) else { return }
+        self.currency = currency
+        isChoosingCurrency = false
+    }
 
     /// « Look » : comme l'iPhone, Yellow banana (clair) ou Jungle night (sombre). Toute l'app change aussitôt.
     var look: ChimpLook {

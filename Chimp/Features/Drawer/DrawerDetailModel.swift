@@ -191,8 +191,8 @@ final class DrawerDetailModel {
     static func content(
         assets: [AssetAmount], snapshot: WalletSnapshot, signers: [DrawerDetailContent.Signer], address: String?
     ) -> DrawerDetailContent {
-        let currency = Decimal.FormatStyle.Currency(code: snapshot.currencyCode).presentation(.narrow)
-        let usd = NetWorth.usd(assets.map { ($0.code, $0.amount) }, prices: snapshot.usdPrices)
+        let money = snapshot.money
+        let total = money.value(assets)
 
         var codes: [String] = []
         var sums: [String: Decimal] = [:]
@@ -203,7 +203,7 @@ final class DrawerDetailModel {
         let lines: [DrawerDetailContent.Asset] = codes.compactMap { code in
             guard let amount = sums[code], amount != 0 else { return nil }
             let known = SendAsset.allCases.first { $0.code == code }
-            let value = snapshot.usdPrices[code.uppercased()].map { Self.tileMoney(NetWorth.truncatedToCents(amount * $0), currency: currency) }
+            let value = money.value([AssetAmount(code: code, amount: amount)]).map { money.text($0, style: .wholeWhenRound) }
             return DrawerDetailContent.Asset(
                 code: code,
                 amount: known?.formattedWithCode(amount) ?? "\(amount) \(code)",
@@ -211,7 +211,7 @@ final class DrawerDetailModel {
             )
         }
         return DrawerDetailContent(
-            total: usd?.formatted(currency) ?? WalletViewModel.assetText(assets),
+            total: total.map { money.text($0) } ?? WalletViewModel.assetText(assets),
             assets: lines,
             signers: signers,
             address: address,
@@ -260,9 +260,5 @@ final class DrawerDetailModel {
         }
     }
 
-    /// Valeur d'une tuile : sans centimes si le montant est rond (« $620 »), sinon avec (« $62.50 »), comme la maquette.
-    static func tileMoney(_ value: Decimal, currency: Decimal.FormatStyle.Currency) -> String {
-        value.formatted(currency.precision(.fractionLength(value.isWhole ? 0 : 2)))
-    }
 
 }

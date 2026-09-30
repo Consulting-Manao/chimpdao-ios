@@ -120,38 +120,42 @@ final class WalletViewModel {
 
     // MARK: Formatage
 
-    /// Montants en dollars (`NetWorth.usd`, exact et tronqué au centime). Si un actif détenu n'a pas de prix, aucun total
-    /// partiel : les tiroirs concernés et le total affichent leurs montants par actif, comme le terminal.
+    /// Montants dans la devise d'affichage (`DisplayMoney`, portage exact de `netWorthIn`, coupé aux décimales de la
+    /// devise). Si un actif détenu ou la devise n'a pas de prix, aucun total partiel : les tiroirs concernés et le total
+    /// affichent leurs montants par actif, comme le terminal.
     static func format(_ snapshot: WalletSnapshot) -> WalletContent {
-        // Symbole court (« $ » et non « US$ » hors des États-Unis) ; séparateurs selon la région du téléphone.
-        let currency = Decimal.FormatStyle.Currency(code: snapshot.currencyCode).presentation(.narrow)
-        let wholeCurrency = currency.precision(.fractionLength(0...2))
-        let prices = snapshot.usdPrices
-        func usd(_ assets: [AssetAmount]) -> Decimal? {
-            NetWorth.usd(assets.map { ($0.code, $0.amount) }, prices: prices)
-        }
-        /// En dollars si possible, sinon par actif.
-        func amount(_ assets: [AssetAmount], plus growing: Decimal = 0) -> String {
-            usd(assets).map { ($0 + growing).formatted(currency) } ?? assetText(assets)
+        let money = snapshot.money
+        /// Dans la devise si possible, sinon par actif.
+        func amount(_ assets: [AssetAmount], plus growing: Decimal? = nil) -> String {
+            guard let value = money.value(assets) else { return assetText(assets) }
+            guard let growing else { return money.text(value) }
+            guard let saved = money.value(usd: growing) else { return assetText(assets) }
+            return money.text(value + saved)
         }
 
         let main = snapshot.main
         let growing = main.growing ?? 0
         let hasSavings = growing > 0
-        let mainReady = usd(main.assets)
-        let total = usd(snapshot.allAssets)
+        let total = money.value(snapshot.allAssets)
+        let growingValue = hasSavings ? money.value(usd: growing) : 0
         let isZero = snapshot.allAssets.allSatisfy { $0.amount == 0 } && growing == 0
+        let totalText: String
+        if let total, let growingValue {
+            totalText = money.text(total + growingValue)
+        } else {
+            totalText = assetText(snapshot.allAssets)
+        }
         return WalletContent(
-            total: total.map { ($0 + growing).formatted(currency) } ?? assetText(snapshot.allAssets),
-            weeklyChange: total == nil ? nil : snapshot.weeklyChange?.formatted(currency.sign(strategy: .always())),
-            mainAmount: amount(main.assets, plus: growing),
-            mainReady: hasSavings ? (mainReady?.formatted(wholeCurrency) ?? assetText(main.assets)) : nil,
-            mainGrowing: hasSavings ? growing.formatted(wholeCurrency) : nil,
+            total: totalText,
+            weeklyChange: total == nil ? nil : snapshot.weeklyChange.flatMap(money.value(usd:)).map { money.text($0, style: .signed) },
+            mainAmount: amount(main.assets, plus: hasSavings ? growing : nil),
+            mainReady: hasSavings ? (money.value(main.assets).map { money.text($0, style: .upToDigits) } ?? assetText(main.assets)) : nil,
+            mainGrowing: hasSavings ? growingValue.map { money.text($0, style: .upToDigits) } : nil,
             cards: snapshot.cards.map { card in
                 WalletContent.Card(id: card.id, number: card.number, name: card.name, color: card.color, amount: amount(card.assets))
             },
             isZeroBalance: isZero,
-            isShowingAssetAmounts: total == nil,
+            isShowingAssetAmounts: total == nil || growingValue == nil,
             updatedAt: snapshot.fetchedAt
         )
     }

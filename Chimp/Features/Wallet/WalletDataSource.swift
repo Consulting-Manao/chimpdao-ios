@@ -11,19 +11,23 @@ struct AssetAmount: Hashable, Sendable {
 /// Donnée encore sans source décidée (DESIGN_NOTES §12, question 8) : `weeklyChange`, facultatif et masqué s'il manque.
 /// Le prénom n'en fait pas partie : il vient du téléphone (`WalletDataSource.firstName`), même si la lecture échoue.
 struct WalletSnapshot: Equatable {
-    /// Devise d'affichage (code ISO 4217, ex. « USD »).
-    var currencyCode: String
+    /// Devise d'affichage choisie dans les réglages (I3) au moment de la lecture ; son prix est dans `usdPrices`.
+    var currency: DisplayCurrency
     /// Main : le compte partagé par toutes les cartes.
     var main: DrawerBalance
     /// Wallets des cartes (Pockets).
     var cards: [CardBalance]
     /// Variation sur 7 jours (source à confirmer : oracles de prix, historique).
     var weeklyChange: Decimal?
-    /// Prix en dollars par code d'actif (USDC = 1). Un actif détenu **sans prix** : pas de total en dollars, l'écran
-    /// affiche les montants par actif (comme le terminal, décision du 2026-09-29).
+    /// Prix en dollars par code d'actif (USDC = 1), plus celui de la devise d'affichage. Un actif détenu **sans prix**, ou
+    /// une devise sans prix : pas de total, l'écran affiche les montants par actif (comme le terminal, décision du
+    /// 2026-09-29).
     var usdPrices: [String: Decimal]
     /// Heure de la lecture des soldes.
     var fetchedAt: Date
+
+    /// Conversion dans la devise d'affichage.
+    var money: DisplayMoney { DisplayMoney(currency: currency, usdPrices: usdPrices) }
 
     /// Tous les avoirs, tiroirs confondus.
     var allAssets: [AssetAmount] { main.assets + cards.flatMap(\.assets) }
@@ -120,7 +124,7 @@ final class MockWalletDataSource: WalletDataSource {
         let jungle = CardBalance(id: "jungle", number: "0421", name: "Jungle", color: .jungle, assets: [usdc("62.50")])
         let banana = CardBalance(id: "banana", number: "0688", name: "Banana", color: .banana, assets: [xlm("12.50"), usdc("100")])
         var snapshot = WalletSnapshot(
-            currencyCode: "USD",
+            currency: .usd,
             main: DrawerBalance(assets: [xlm("3000"), usdc("220")], growing: 500),
             cards: [jungle, banana],
             weeklyChange: Decimal(string: "6.20")!,

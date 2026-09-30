@@ -35,9 +35,15 @@ final class AppPreferences {
         didSet { store.set(look.rawValue, for: .look) }
     }
 
+    /// Devise d'affichage du Wallet et des pages de tiroir (I3) : dollar par défaut, comme le terminal (`readDenom`).
+    var currency: DisplayCurrency {
+        didSet { store.set(currency.rawValue, for: .currency) }
+    }
+
     init(store: PreferencesStore) {
         self.store = store
         look = store.string(for: .look).flatMap(ChimpLook.init(rawValue:)) ?? .auto
+        currency = store.string(for: .currency).flatMap(DisplayCurrency.init(rawValue:)) ?? .usd
     }
 
     /// Préférences gardées dans `UserDefaults` (l'app) ; en mémoire pour les tests et le catalogue.
@@ -48,6 +54,7 @@ final class AppPreferences {
     /// « Erase everything on this phone » : retour aux valeurs par défaut.
     func reset() {
         look = .auto
+        currency = .usd
         // Après les valeurs par défaut (leur `didSet` les écrit) : rien ne reste dans le stockage.
         store.removeAll()
     }
@@ -56,6 +63,7 @@ final class AppPreferences {
 /// Clés des préférences.
 enum PreferenceKey: String, CaseIterable {
     case look = "chimp.look"
+    case currency = "chimp.currency"
 }
 
 /// Lecture et écriture des préférences. Implémenté par `UserDefaultsPreferencesStore` et `InMemoryPreferencesStore`.

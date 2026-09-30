@@ -216,7 +216,7 @@ struct WalletTests {
 
     private func snapshot(prices: [String: Decimal]) -> WalletSnapshot {
         WalletSnapshot(
-            currencyCode: "USD",
+            currency: .usd,
             main: DrawerBalance(assets: [AssetAmount(code: "XLM", amount: 1000), AssetAmount(code: "USDC", amount: 20)]),
             cards: [CardBalance(id: "k", number: "0007", name: "Banana", color: .banana, assets: [AssetAmount(code: "USDC", amount: 25)])],
             weeklyChange: 1, usdPrices: prices, fetchedAt: .distantPast

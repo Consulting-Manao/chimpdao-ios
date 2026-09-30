@@ -18,7 +18,7 @@ struct DrawerDetailTests {
 
     private func snapshot(prices: [String: Decimal] = ["XLM": Decimal(string: "0.25")!, "USDC": 1], cardAssets: [AssetAmount]? = nil) -> WalletSnapshot {
         WalletSnapshot(
-            currencyCode: "USD",
+            currency: .usd,
             main: DrawerBalance(assets: [AssetAmount(code: "XLM", amount: 800), AssetAmount(code: "USDC", amount: 620)]),
             cards: [
                 CardBalance(id: k1, number: "0007", name: "Card", color: .jungle,
@@ -101,10 +101,10 @@ struct DrawerDetailTests {
 
     @Test("Tuiles : sans centimes pour un montant rond, avec sinon (« $620 », « $62.50 »)")
     func tileMoney() {
-        let usd = Decimal.FormatStyle.Currency(code: "USD", locale: Locale(identifier: "en_US")).presentation(.narrow)
-        #expect(DrawerDetailModel.tileMoney(620, currency: usd) == "$620")
-        #expect(DrawerDetailModel.tileMoney(Decimal(string: "62.5")!, currency: usd) == "$62.50")
-        #expect(DrawerDetailModel.tileMoney(Decimal(string: "0.07")!, currency: usd) == "$0.07")
+        let usd = DisplayMoney(currency: .usd, usdPrices: [:], locale: Locale(identifier: "en_US"))
+        #expect(usd.text(620, style: .wholeWhenRound) == "$620")
+        #expect(usd.text(Decimal(string: "62.5")!, style: .wholeWhenRound) == "$62.50")
+        #expect(usd.text(Decimal(string: "0.07")!, style: .wholeWhenRound) == "$0.07")
     }
 
     @Test("Copier l'adresse : l'adresse complète, puis « Copied! »")

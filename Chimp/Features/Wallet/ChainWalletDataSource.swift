@@ -26,7 +26,8 @@ protocol WalletChain {
 /// Le vrai Wallet, lu sur la chaîne : portage de la partie Stellar de `loadAccountView`
 /// (`reference/terminal/src/modules/account/view.ts`). Les cartes sont celles que le **compte** déclare (`cards()`),
 /// comme le terminal ; le prénom, le nom, la couleur et le numéro viennent du stockage local quand il les connaît.
-/// Prix : USDC = 1 $, XLM par l'oracle Reflector de mainnet (lecture seule). Rien n'est signé ni envoyé.
+/// Prix : USDC = 1 $, XLM et la devise d'affichage par l'oracle Reflector de mainnet (lecture seule). Rien n'est signé
+/// ni envoyé.
 struct ChainWalletDataSource: WalletDataSource {
     let session: AppSession
     let chain: WalletChain
@@ -65,17 +66,18 @@ struct ChainWalletDataSource: WalletDataSource {
         session.rememberCards(members.map(\.publicKey.hex), account: account.address)
 
         let snapshot = WalletSnapshot(
-            currencyCode: "USD",
+            currency: session.preferences.currency,
             main: DrawerBalance(assets: mainAssets),
             cards: cards,
             weeklyChange: nil,
             usdPrices: [:],
             fetchedAt: now()
         )
-        // Un prix seulement pour les actifs détenus (un solde nul n'a pas besoin de prix, `nonZero` du terminal).
+        // Un prix seulement pour les actifs détenus (un solde nul n'a pas besoin de prix, `nonZero` du terminal), plus
+        // celui de la devise d'affichage (`usdRates([...holdings, denom])` de `useNetWorth`).
         let held = Set(snapshot.allAssets.filter { $0.amount != 0 }.map(\.code))
         var priced = snapshot
-        priced.usdPrices = held.isEmpty ? [:] : await oracle.usdPrices(for: held)
+        priced.usdPrices = held.isEmpty ? [:] : await oracle.usdPrices(for: DisplayMoney.priceCodes(held: held, currency: snapshot.currency))
         return priced
     }
 

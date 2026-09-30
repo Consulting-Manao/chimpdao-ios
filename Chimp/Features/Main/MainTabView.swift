@@ -330,7 +330,7 @@ private struct SettingsDestination: View {
     let onExit: () -> Void
 
     init(session: AppSession, walletCards: [CardBalance], onDeveloper: (() -> Void)?, onExit: @escaping () -> Void) {
-        _model = State(initialValue: SettingsModel(session: session, walletCards: walletCards))
+        _model = State(initialValue: SettingsModel(session: session, walletCards: walletCards, oracle: ReflectorPriceOracle()))
         self.onDeveloper = onDeveloper
         self.onExit = onExit
     }
