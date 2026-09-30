@@ -159,9 +159,8 @@ struct SettingsView: View {
         .chimpSheet(isPresented: $model.isEditingFirstName, height: 380) {
             firstNameSheet
         }
-        .chimpSheet(isPresented: $model.isChoosingCurrency, height: 500) {
-            CurrencySheet(selection: model.currency, unavailable: model.unavailableCurrencies, onChoose: model.choose)
-                .task { await model.loadCurrencyRates() }
+        .chimpSheet(isPresented: $model.isChoosingCurrency, height: 500, fitsContent: true) {
+            CurrencySheet(selection: model.currency, onChoose: model.choose)
         }
         .navigationDestination(item: Binding(
             get: { model.editingCard },
@@ -270,7 +269,7 @@ struct SettingsView: View {
                     value: network,
                     title: LocalizedStringKey(network.shortName),
                     isEnabled: !row.comingSoon.contains(network),
-                    badge: row.comingSoon.contains(network) ? "Coming soon" : nil
+                    lockedHint: row.comingSoon.contains(network) ? "Coming soon" : nil
                 )
             },
             selection: .constant(row.current),
@@ -497,8 +496,6 @@ struct AccountsSheet: View {
 /// l'Activity, Envoyer et les montants signés gardent les actifs réellement bougés.
 struct CurrencySheet: View {
     let selection: DisplayCurrency
-    /// Devises que l'oracle ne cote pas : grisées, avec la raison.
-    var unavailable: Set<DisplayCurrency> = []
     let onChoose: (DisplayCurrency) -> Void
 
     var body: some View {
@@ -511,22 +508,15 @@ struct CurrencySheet: View {
                 .chimpFont(.bodyM)
                 .foregroundStyle(.chimpTextSecondary)
                 .padding(.top, ChimpSpacing.xxs)
-            ScrollView {
-                ChimpGroupedBox {
-                    ForEach(DisplayCurrency.allCases) { currency in
-                        ChimpChoiceListRow(
-                            badge: currency.badge, title: currency.title,
-                            subtitle: unavailable.contains(currency) ? String(localized: "No price from the oracle yet") : nil,
-                            isSelected: currency == selection, isEnabled: !unavailable.contains(currency)
-                        ) {
-                            onChoose(currency)
-                        }
+            // La feuille s'ajuste à la liste et fait elle-même défiler aux grandes tailles de texte.
+            ChimpGroupedBox {
+                ForEach(DisplayCurrency.allCases) { currency in
+                    ChimpChoiceListRow(badge: currency.badge, title: currency.title, isSelected: currency == selection) {
+                        onChoose(currency)
                     }
                 }
-                .padding(.top, ChimpSpacing.ml)
-                .padding(.bottom, ChimpSpacing.l)
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .padding(.top, ChimpSpacing.ml)
         }
         .padding(.horizontal, ChimpSpacing.xxl)
     }

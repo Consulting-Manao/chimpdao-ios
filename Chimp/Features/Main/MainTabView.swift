@@ -338,12 +338,11 @@ private struct SettingsDestination: View {
         session: AppSession, walletCards: [CardBalance], walletTotal: String?, config: ChimpNetworkConfig,
         onDeveloper: (() -> Void)?, onExit: @escaping () -> Void
     ) {
-        let oracle = ReflectorPriceOracle()
         let summaries = ChainAccountSummaryReader(wallet: ChainWalletDataSource(
-            session: session, chain: ChainWalletReader(config: config), oracle: oracle
+            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle()
         ))
         _model = State(initialValue: SettingsModel(
-            session: session, walletCards: walletCards, walletTotal: walletTotal, oracle: oracle, summaries: summaries
+            session: session, walletCards: walletCards, walletTotal: walletTotal, summaries: summaries
         ))
         self.onDeveloper = onDeveloper
         self.onExit = onExit

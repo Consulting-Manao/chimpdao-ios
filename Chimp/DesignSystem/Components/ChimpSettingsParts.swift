@@ -98,10 +98,11 @@ struct ChimpSegment<Value: Hashable>: Identifiable {
     let title: LocalizedStringKey
     /// Titre lu par VoiceOver, s'il doit être plus clair que le titre affiché (« Auto » → « Same as my iPhone »).
     var accessibilityTitle: LocalizedStringKey?
-    /// Segment grisé, qu'on ne peut pas choisir (« Mainnet · Coming soon »).
+    /// Segment grisé, qu'on ne peut pas choisir (Mainnet).
     var isEnabled = true
-    /// Petite étiquette sous le titre d'un segment grisé.
-    var badge: LocalizedStringKey?
+    /// Segment pas encore prêt : un petit cadenas après le titre, et ce texte lu par VoiceOver (« Coming soon »). Pas
+    /// d'étiquette écrite : elle doublait la hauteur de la ligne (retour de Barth du 2026-09-30).
+    var lockedHint: LocalizedStringKey?
 
     var id: Value { value }
 }
@@ -128,7 +129,7 @@ struct ChimpSegmentedPicker<Value: Hashable>: View {
                 }
                 .buttonStyle(ChimpPressableStyle())
                 .accessibilityLabel(Text(segment.accessibilityTitle ?? segment.title))
-                .accessibilityValue(segment.badge.map { Text($0) } ?? Text(verbatim: ""))
+                .accessibilityValue(segment.lockedHint.map { Text($0) } ?? Text(verbatim: ""))
                 .accessibilityAddTraits(segment.value == selection ? .isSelected : [])
             }
         }
@@ -142,13 +143,13 @@ struct ChimpSegmentedPicker<Value: Hashable>: View {
     private func label(_ segment: ChimpSegment<Value>) -> some View {
         let isSelected = segment.value == selection
         let shape = RoundedRectangle(cornerRadius: ChimpRadius.segment)
-        return VStack(spacing: 1) {
+        return HStack(spacing: 3) {
             Text(segment.title)
                 .chimpFont(.segment)
-            if let badge = segment.badge {
-                Text(badge)
-                    .chimpFont(.labelS)
-                    .textCase(.uppercase)
+            if segment.lockedHint != nil {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 9, weight: .heavy))
+                    .accessibilityHidden(true)
             }
         }
         .lineLimit(1)
@@ -182,7 +183,7 @@ struct ChimpSegmentedPicker<Value: Hashable>: View {
             ChimpSettingsControlRow(title: "Network") {
                 ChimpSegmentedPicker(segments: [
                     ChimpSegment(value: "testnet", title: "Testnet"),
-                    ChimpSegment(value: "mainnet", title: "Mainnet", isEnabled: false, badge: "Coming soon"),
+                    ChimpSegment(value: "mainnet", title: "Mainnet", isEnabled: false, lockedHint: "Coming soon"),
                 ], selection: $network)
             }
         }
@@ -197,10 +198,7 @@ struct ChimpSegmentedPicker<Value: Hashable>: View {
 struct ChimpChoiceListRow: View {
     let badge: String
     let title: String
-    var subtitle: String?
     let isSelected: Bool
-    /// Choix impossible pour l'instant (grisé, `subtitle` dit pourquoi).
-    var isEnabled = true
     let action: () -> Void
 
     var body: some View {
@@ -216,32 +214,23 @@ struct ChimpChoiceListRow: View {
                     .background(RoundedRectangle(cornerRadius: 11).fill(isSelected ? Color(.chimpAccent) : Color(.chimpSurfaceSecondary)))
                     .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.thin))
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: title)
-                        .chimpFont(.optionTitle)
-                        .foregroundStyle(.chimpTextPrimary)
-                    if let subtitle {
-                        Text(verbatim: subtitle)
-                            .chimpFont(.captionS)
-                            .foregroundStyle(.chimpTextSecondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(verbatim: title)
+                    .chimpFont(.optionTitle)
+                    .foregroundStyle(.chimpTextPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 ChimpRadio(isSelected: isSelected)
             }
-            .opacity(isEnabled ? 1 : ChimpOpacity.disabled)
             .padding(.vertical, 7)
             .padding(.horizontal, 13)
             .frame(minHeight: 48)
             .contentShape(Rectangle())
         }
         .buttonStyle(ChimpPressableStyle())
-        .disabled(!isEnabled)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
-    /// Luckiest Guy 14 pour des lettres (« CHF », « XLM »), comme la maquette. Un symbole seul y est plus petit que des
+    /// Luckiest Guy 14 pour des lettres (« XLM »), comme la maquette. Un symbole seul y est plus petit que des
     /// capitales : « $ » passe à 18 pt, et « € », « £ », « ¥ » (dessinés minuscules dans Luckiest Guy) en Nunito 900.
     static func badgeStyle(_ badge: String) -> ChimpTextStyle {
         guard badge.count == 1 else { return .buttonSmall }

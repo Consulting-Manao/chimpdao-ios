@@ -32,8 +32,9 @@ struct DisplayCurrencyTests {
 
     @Test("netWorthIn : une devise sans prix refuse le total")
     func refusesUnpricedDenomination() {
-        #expect(money(.chf).value([AssetAmount(code: "USDC", amount: 1)]) == nil)
-        #expect(money(.chf).rate == nil)
+        // Vecteur du terminal : CHF sans taux. CHF n'est plus proposé (non coté par Reflector) : même règle avec le yen.
+        #expect(money(.jpy).value([AssetAmount(code: "USDC", amount: 1)]) == nil)
+        #expect(money(.jpy).rate == nil)
         #expect(money(.eur, ["USDC": 1, "EUR": 0]).rate == nil, "Un prix nul ne sert jamais de diviseur")
     }
 
@@ -83,12 +84,12 @@ struct DisplayCurrencyTests {
         #expect(money(.usd).text(620, style: .wholeWhenRound) == "$620")
         #expect(money(.usd).text(Decimal(string: "6.2")!, style: .signed) == "+$6.20")
         #expect(money(.usd).text(1200, style: .upToDigits) == "$1,200")
-        #expect(money(.chf).text(10).contains("CHF"))
     }
 
-    @Test("Liste de la maquette I3, dans l'ordre ; valeurs de la ligne « Currency »")
+    @Test("Liste de la maquette I3 sans le franc suisse (non coté par Reflector), dans l'ordre ; valeurs de la ligne « Currency »")
     func catalogue() {
-        #expect(DisplayCurrency.allCases.map(\.code) == ["USD", "EUR", "GBP", "CHF", "JPY", "XLM"])
+        #expect(DisplayCurrency.allCases.map(\.code) == ["USD", "EUR", "GBP", "JPY", "XLM"])
+        #expect(DisplayCurrency(rawValue: "chf") == nil)
         #expect(DisplayCurrency.usd.settingsValue == "USD $")
         #expect(DisplayCurrency.xlm.title == "Show everything in XLM")
         #expect(!DisplayCurrency.xlm.isFiat && DisplayCurrency.jpy.fractionDigits == 0)
@@ -104,11 +105,12 @@ struct DisplayCurrencyTests {
         let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet, preferences: preferences)
         let model = SettingsModel(session: session, walletCards: [])
         model.isChoosingCurrency = true
-        model.choose(.chf)
+        model.choose(.gbp)
         #expect(!model.isChoosingCurrency)
-        #expect(store.values[.currency] == "chf")
-        #expect(AppPreferences(store: store).currency == .chf)
+        #expect(store.values[.currency] == "gbp")
+        #expect(AppPreferences(store: store).currency == .gbp)
         #expect(AppPreferences(store: InMemoryPreferencesStore([.currency: "btc"])).currency == .usd)
+        #expect(AppPreferences(store: InMemoryPreferencesStore([.currency: "chf"])).currency == .usd, "Ancien choix CHF : dollar")
         try session.eraseEverything()
         #expect(preferences.currency == .usd && store.values.isEmpty)
     }
@@ -178,27 +180,3 @@ struct DisplayCurrencyTests {
     }
 }
 
-/// Devises que l'oracle ne cote pas (CHF est absent du flux FX de Reflector, vérifié le 2026-09-30).
-struct CurrencyAvailabilityTests {
-    @Test("Une devise sans prix est grisée ; oracle muet : rien n'est grisé")
-    func unavailable() {
-        let prices: [String: Decimal] = ["EUR": 1.1, "GBP": 1.3, "JPY": 0.006, "XLM": 0.2]
-        #expect(SettingsModel.unavailable(prices: prices) == [.chf])
-        #expect(SettingsModel.unavailable(prices: [:]).isEmpty)
-    }
-
-    @Test("Choisir une devise grisée ne change rien")
-    func cannotChooseUnavailable() async {
-        final class NoCHF: PriceOracle, @unchecked Sendable {
-            func usdPrices(for codes: Set<String>) async -> [String: Decimal] { ["EUR": 1.1, "GBP": 1.3, "JPY": 0.006, "XLM": 0.2] }
-        }
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
-        let model = SettingsModel(session: session, walletCards: [], oracle: NoCHF())
-        await model.loadCurrencyRates()
-        model.isChoosingCurrency = true
-        model.choose(.chf)
-        #expect(model.currency == .usd && model.isChoosingCurrency)
-        model.choose(.jpy)
-        #expect(model.currency == .jpy && !model.isChoosingCurrency)
-    }
-}

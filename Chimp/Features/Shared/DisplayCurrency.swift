@@ -2,9 +2,10 @@ import Foundation
 
 /// Devise d'affichage du Wallet et des pages de tiroir (I3 « Show amounts in »). **Ne change que l'affichage** : les
 /// montants signés, envoyés et ceux de l'Activity restent ceux des actifs réellement bougés.
-/// Liste de la maquette I3 ; ce sont aussi les premières de `FIAT_FIRST` du terminal (`chain/prices.ts`), plus XLM.
+/// Liste de la maquette I3, **limitée aux devises cotées par Reflector** comme `listDenominations` du terminal : le franc
+/// suisse de la maquette est retiré, le flux FX ne le cote pas (vérifié le 2026-09-30, DESIGN_NOTES §13).
 enum DisplayCurrency: String, CaseIterable, Identifiable, Sendable {
-    case usd, eur, gbp, chf, jpy
+    case usd, eur, gbp, jpy
     /// « Show everything in XLM ».
     case xlm
 
@@ -21,19 +22,17 @@ enum DisplayCurrency: String, CaseIterable, Identifiable, Sendable {
         case .usd: "USD $"
         case .eur: "EUR €"
         case .gbp: "GBP £"
-        case .chf: "CHF"
         case .jpy: "JPY ¥"
         case .xlm: "XLM"
         }
     }
 
-    /// Pastille de la feuille I3 (« $ », « € », « CHF »…).
+    /// Pastille de la feuille I3 (« $ », « € », « XLM »…).
     var badge: String {
         switch self {
         case .usd: "$"
         case .eur: "€"
         case .gbp: "£"
-        case .chf: "CHF"
         case .jpy: "¥"
         case .xlm: "XLM"
         }
@@ -45,7 +44,6 @@ enum DisplayCurrency: String, CaseIterable, Identifiable, Sendable {
         case .usd: String(localized: "US Dollar")
         case .eur: String(localized: "Euro")
         case .gbp: String(localized: "British Pound")
-        case .chf: String(localized: "Swiss Franc")
         case .jpy: String(localized: "Japanese Yen")
         case .xlm: String(localized: "Show everything in XLM")
         }

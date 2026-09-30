@@ -38,21 +38,17 @@ final class SettingsModel {
     /// Dernière écriture ratée (texte technique).
     private(set) var saveError: String?
 
-    /// Prix de l'oracle Reflector, pour savoir quelles devises de I3 il cote ; `nil` : toutes proposées.
-    private let oracle: PriceOracle?
     /// Total du compte affiché, déjà lu par le Wallet (I6).
     private let walletTotal: String?
     /// Résumés des autres comptes ouverts (I6) ; `nil` : seulement le nombre de cartes connu du téléphone.
     private let summaries: AccountSummaryReader?
 
     init(
-        session: AppSession, walletCards: [CardBalance], walletTotal: String? = nil, oracle: PriceOracle? = nil,
-        summaries: AccountSummaryReader? = nil
+        session: AppSession, walletCards: [CardBalance], walletTotal: String? = nil, summaries: AccountSummaryReader? = nil
     ) {
         self.session = session
         self.walletCards = walletCards
         self.walletTotal = walletTotal
-        self.oracle = oracle
         self.summaries = summaries
     }
 
@@ -310,27 +306,8 @@ final class SettingsModel {
     }
 
     var isChoosingCurrency = false
-    /// Devises que l'oracle ne cote pas (aujourd'hui : CHF, absent du flux FX de Reflector) : grisées dans I3, comme
-    /// `listDenominations` du terminal ne propose que les devises cotées. Vide tant qu'on ne sait pas.
-    private(set) var unavailableCurrencies: Set<DisplayCurrency> = []
-
-    /// À l'ouverture de I3 : demande à l'oracle le prix de chaque devise (5 minutes en mémoire). Si l'oracle ne répond
-    /// pour aucune (réseau absent), rien n'est grisé : on ne sait pas.
-    func loadCurrencyRates() async {
-        guard let oracle else { return }
-        let codes = Set(DisplayCurrency.allCases.filter { $0 != .usd }.map(\.code))
-        let prices = await oracle.usdPrices(for: codes)
-        unavailableCurrencies = Self.unavailable(prices: prices)
-    }
-
-    static func unavailable(prices: [String: Decimal]) -> Set<DisplayCurrency> {
-        guard !prices.isEmpty else { return [] }
-        return Set(DisplayCurrency.allCases.filter { $0 != .usd && (prices[$0.code] ?? 0) <= 0 })
-    }
-
     /// Choix d'une devise dans la feuille I3 : enregistré, puis la feuille se ferme.
     func choose(_ currency: DisplayCurrency) {
-        guard !unavailableCurrencies.contains(currency) else { return }
         self.currency = currency
         isChoosingCurrency = false
     }
