@@ -179,20 +179,27 @@ final class ActivityViewModel {
     // MARK: Affichage
 
     /// Tickets affichés pour le filtre choisi : le paiement en attente d'abord, puis une journée par ticket.
-    var tickets: [ActivityTicket] {
+    var tickets: [ActivityTicket] { tickets(for: filter) }
+
+    /// Tickets d'un filtre donné, sans toucher au filtre de l'onglet (historique d'un tiroir, B2 et B3).
+    func tickets(for filter: Filter) -> [ActivityTicket] {
         var tickets: [ActivityTicket] = []
-        if let pendingTicket { tickets.append(pendingTicket) }
-        return tickets + Self.tickets(for: visibleRecords, filter: filter, drawers: drawers, cardName: { [source] in source.cardName(key: $0) }, calendar: calendar, now: now())
+        if let pendingTicket = pendingTicket(for: filter) { tickets.append(pendingTicket) }
+        return tickets + Self.tickets(for: visibleRecords(for: filter), filter: filter, drawers: drawers, cardName: { [source] in source.cardName(key: $0) }, calendar: calendar, now: now())
     }
 
     /// Lignes du filtre choisi, parmi celles qui concernent un tiroir actuel du compte.
-    var visibleRecords: [ActivityRecord] {
+    var visibleRecords: [ActivityRecord] { visibleRecords(for: filter) }
+
+    func visibleRecords(for filter: Filter) -> [ActivityRecord] {
         Self.filtered(records, filter: filter, drawers: drawers)
     }
 
     /// Rien à montrer pour ce filtre, lecture finie.
-    var isEmpty: Bool {
-        phase == .loaded && !isSyncing && visibleRecords.isEmpty && pending == nil
+    var isEmpty: Bool { isEmpty(for: filter) }
+
+    func isEmpty(for filter: Filter) -> Bool {
+        phase == .loaded && !isSyncing && visibleRecords(for: filter).isEmpty && pendingTicket(for: filter) == nil
     }
 
     static func filtered(_ records: [ActivityRecord], filter: Filter, drawers: [ActivityDrawer]) -> [ActivityRecord] {
@@ -209,7 +216,7 @@ final class ActivityViewModel {
         }
     }
 
-    private var pendingTicket: ActivityTicket? {
+    private func pendingTicket(for filter: Filter) -> ActivityTicket? {
         guard let pending else { return nil }
         let addresses = Set(drawers.map(\.address))
         if case .drawer(let address) = filter, pending.trace.from != address, pending.trace.destination != address { return nil }

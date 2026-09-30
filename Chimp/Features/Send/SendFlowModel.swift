@@ -112,10 +112,12 @@ final class SendFlowModel {
     /// Appelé par « Done » à la fin du parcours (retour au Wallet).
     var onExit: (() -> Void)?
 
-    init(service: SendService, signingOrder: SigningOrder = .pinThenTap, kind: FlowKind = .send) {
+    /// `initialDrawerID` : tiroir « From » choisi d'avance (Send ou Move depuis la page d'un tiroir, B2 et B3) ; Main sinon.
+    init(service: SendService, signingOrder: SigningOrder = .pinThenTap, kind: FlowKind = .send, initialDrawerID: String? = nil) {
         self.service = service
         self.signingOrder = signingOrder
         self.kind = kind
+        if let initialDrawerID { selectedDrawerID = initialDrawerID }
     }
 
     var isMove: Bool { kind == .move }

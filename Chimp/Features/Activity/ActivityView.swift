@@ -11,8 +11,6 @@ struct ActivityView: View {
     var onPending: () -> Void = {}
     /// « Pay again » du reçu : la coque ouvre Envoyer avec cette adresse collée en C1.
     var onPayAgain: (String) -> Void = { _ in }
-    /// Adresse choisie dans le reçu : Envoyer s'ouvre une fois la feuille refermée.
-    @State private var payAgainAddress: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,23 +26,7 @@ struct ActivityView: View {
         }
         .background(Color(.chimpBackground))
         .task { await model.refresh() }
-        .chimpSheet(isPresented: isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true, onDismiss: {
-            if let address = payAgainAddress {
-                payAgainAddress = nil
-                onPayAgain(address)
-            }
-        }) {
-            if let record = model.selectedRecord, let receipt = model.receipt(for: record) {
-                ActivityReceiptSheet(receipt: receipt, model: model) { address in
-                    payAgainAddress = address
-                    model.selectedRecord = nil
-                }
-            }
-        }
-    }
-
-    private var isReceiptPresented: Binding<Bool> {
-        Binding(get: { model.selectedRecord != nil }, set: { if !$0 { model.selectedRecord = nil } })
+        .activityReceiptSheet(model: model, onPayAgain: onPayAgain)
     }
 
     // MARK: Filtres
@@ -67,10 +49,50 @@ struct ActivityView: View {
 
 }
 
+/// Reçu d'une ligne touchée (I1.1d), partagé par l'onglet Activity et l'historique d'un tiroir (B2, B3).
+private struct ActivityReceiptSheetModifier: ViewModifier {
+    @Bindable var model: ActivityViewModel
+    let onPayAgain: (String) -> Void
+    /// Adresse choisie dans le reçu : Envoyer s'ouvre une fois la feuille refermée.
+    @State private var payAgainAddress: String?
+
+    func body(content: Content) -> some View {
+        content
+            .chimpSheet(isPresented: isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true, onDismiss: {
+                if let address = payAgainAddress {
+                    payAgainAddress = nil
+                    onPayAgain(address)
+                }
+            }) {
+                if let record = model.selectedRecord, let receipt = model.receipt(for: record) {
+                    ActivityReceiptSheet(receipt: receipt, model: model) { address in
+                        payAgainAddress = address
+                        model.selectedRecord = nil
+                    }
+                }
+            }
+    }
+
+    private var isReceiptPresented: Binding<Bool> {
+        Binding(get: { model.selectedRecord != nil }, set: { if !$0 { model.selectedRecord = nil } })
+    }
+}
+
+extension View {
+    /// Ouvre le reçu de `model.selectedRecord` ; « Pay again » appelle `onPayAgain` une fois la feuille refermée.
+    func activityReceiptSheet(model: ActivityViewModel, onPayAgain: @escaping (String) -> Void) -> some View {
+        modifier(ActivityReceiptSheetModifier(model: model, onPayAgain: onPayAgain))
+    }
+}
+
 /// Contenu sous l'en-tête : tickets et états. Séparé de la vue défilante.
 struct ActivityContent: View {
     @Bindable var model: ActivityViewModel
+    /// Filtre imposé (historique d'un tiroir, B2 et B3) ; sinon celui des pastilles de l'onglet.
+    var filter: ActivityViewModel.Filter?
     var onPending: () -> Void = {}
+
+    private var shownFilter: ActivityViewModel.Filter { filter ?? model.filter }
 
     var body: some View { content }
 
@@ -88,10 +110,10 @@ struct ActivityContent: View {
                         ChimpPillButton("Retry") { Task { await model.refresh() } }
                     }
                 }
-                if model.isEmpty {
+                if model.isEmpty(for: shownFilter) {
                     ChimpySays(text: emptyText, pose: .banana)
                 }
-                ForEach(Array(model.tickets.enumerated()), id: \.element.id) { index, ticket in
+                ForEach(Array(model.tickets(for: shownFilter).enumerated()), id: \.element.id) { index, ticket in
                     ticketView(ticket, tilt: index.isMultiple(of: 2) ? -0.6 : 0.5)
                 }
                 if model.isSyncing {
@@ -104,7 +126,7 @@ struct ActivityContent: View {
                     .frame(maxWidth: .infinity)
                     .accessibilityElement(children: .combine)
                 }
-                if !model.records.isEmpty || model.pending != nil {
+                if filter == nil ? (!model.records.isEmpty || model.pending != nil) : !model.visibleRecords(for: shownFilter).isEmpty {
                     Text("Stellar only keeps about a week of history. What this phone has seen stays here.")
                         .chimpFont(.captionS)
                         .foregroundStyle(.chimpTextSecondary)
@@ -116,7 +138,7 @@ struct ActivityContent: View {
     }
 
     private var emptyText: LocalizedStringKey {
-        if case .drawer = model.filter { return "Nothing moved here yet." }
+        if case .drawer = shownFilter { return "Nothing moved here yet." }
         return "Nothing here yet. Payments, moves and new cards will show up here."
     }
 

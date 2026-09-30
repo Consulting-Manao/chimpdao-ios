@@ -12,6 +12,8 @@ struct WalletView: View {
     var onAction: (WalletAction) -> Void = { _ in }
     /// « + Add » (G1) : ajouter une carte au compte.
     var onAddCard: () -> Void = {}
+    /// Main ou une carte touchée : son détail (B2, B3).
+    var onOpenDrawer: (DrawerSelection) -> Void = { _ in }
 
     var body: some View {
         // Le défilement passe sous la barre d'état : l'en-tête comble lui-même la zone sûre du haut,
@@ -114,7 +116,7 @@ struct WalletView: View {
                 ready: content.mainReady,
                 growing: content.mainGrowing
             ) {
-                model.openMain()
+                if model.content != nil { onOpenDrawer(.main) }
             }
             .padding(.top, ChimpSpacing.l)
 
@@ -154,7 +156,7 @@ struct WalletView: View {
             ) {
                 ForEach(cards) { card in
                     Button {
-                        model.openCard(id: card.id)
+                        if model.content != nil { onOpenDrawer(.card(card.id)) }
                     } label: {
                         // Montants par actif (« 12.5 XLM · 100 USDC ») : « on card » laisse la place au montant.
                         ChimpCard(name: card.name, color: card.color, number: card.number, amount: card.amount, subtitle: perAsset ? nil : "on card")

@@ -13,9 +13,10 @@ struct SendFlowRoot: View {
         signingOrder: SigningOrder = SendMockSettings.signingOrder,
         kind: SendFlowModel.FlowKind = .send,
         prefilledAddress: String? = nil,
+        fromDrawerID: String? = nil,
         onExit: @escaping () -> Void
     ) {
-        let model = SendFlowModel(service: service, signingOrder: signingOrder, kind: kind)
+        let model = SendFlowModel(service: service, signingOrder: signingOrder, kind: kind, initialDrawerID: fromDrawerID)
         model.onExit = onExit
         // « Pay again » (reçu de l'Activity) : l'adresse est collée en C1, comme si on l'avait collée ; tout le reste
         // (montant, tiroir, vérification, carte) se fait comme pour un nouvel envoi.

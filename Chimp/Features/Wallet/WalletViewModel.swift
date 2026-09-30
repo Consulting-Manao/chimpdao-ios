@@ -67,9 +67,11 @@ final class WalletViewModel {
     private(set) var isShowingStaleData = false
     /// Cartes du compte lues au dernier chargement réussi (clé, numéro, puce, wallet) : les réglages s'en servent.
     private(set) var cards: [CardBalance] = []
+    /// Dernière lecture réussie, telle quelle : le détail d'un tiroir (B2, B3) en tire ses soldes par actif.
+    private(set) var snapshot: WalletSnapshot?
 
-    /// Actions des tuiles. Pour l'instant les quatre de la maquette ; Swap dépend du périmètre V1.
-    let availableActions: [WalletAction] = WalletAction.allCases
+    /// Actions des tuiles. Swap (E3) est masqué tant qu'il n'existe pas : aucune tuile sans destination.
+    let availableActions: [WalletAction] = [.send, .receive, .move]
 
     private let dataSource: WalletDataSource
     private var hasLoaded = false
@@ -95,6 +97,7 @@ final class WalletViewModel {
             let snapshot = try await dataSource.fetchWallet()
             content = Self.format(snapshot)
             cards = snapshot.cards
+            self.snapshot = snapshot
             isShowingStaleData = false
             phase = .loaded
         } catch is CancellationError {
@@ -113,17 +116,6 @@ final class WalletViewModel {
     func isEnabled(_ action: WalletAction) -> Bool {
         guard let content, phase == .loaded else { return false }
         return action == .receive || !content.isZeroBalance
-    }
-
-    // MARK: Actions (écrans des lots suivants du jalon 4)
-    // Les tuiles (Send, Receive, Move, Swap) sont routées par `MainTabView`.
-
-    func openMain() {
-        // TODO(jalon 4) : ouvrir Main (B2).
-    }
-
-    func openCard(id: String) {
-        // TODO(jalon 4) : ouvrir le wallet de la carte (B3).
     }
 
     // MARK: Formatage

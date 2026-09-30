@@ -38,25 +38,31 @@ struct MainTabView: View {
         switch selection {
         case .wallet:
             NavigationStack(path: $walletPath) {
-                WalletView(model: walletModel, onSettings: settingsAction, onAction: openWalletAction, onAddCard: { walletPath.append(.addCard) })
+                WalletView(
+                    model: walletModel, onSettings: settingsAction, onAction: openWalletAction,
+                    onAddCard: { walletPath.append(.addCard) }, onOpenDrawer: { walletPath.append(.drawer($0)) }
+                )
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
                     .navigationDestination(for: WalletRoute.self) { route in
                         switch route {
-                        case .receive:
-                            ReceiveDestination(session: session)
-                        case .send:
+                        case .receive(let drawerID):
+                            ReceiveDestination(session: session, initialDrawerID: drawerID)
+                        case .send(let drawerID):
                             // Le vrai envoi (testnet) ; au retour, les soldes du Wallet sont relus.
-                            SendFlowRoot(service: ChainSendService(session: session)) {
-                                walletPath.removeAll()
-                                Task { await walletModel.refresh() }
-                            }
-                        case .move:
+                            SendFlowRoot(service: ChainSendService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
+                        case .move(let drawerID):
                             // E1 : le même parcours, entre ses propres tiroirs (testnet).
-                            SendFlowRoot(service: ChainSendService(session: session), kind: .move) {
-                                walletPath.removeAll()
-                                Task { await walletModel.refresh() }
-                            }
+                            SendFlowRoot(service: ChainSendService(session: session), kind: .move, fromDrawerID: drawerID, onExit: closeFlow)
+                        case .payAgain(let address):
+                            // « Pay again » d'un reçu ouvert depuis la page d'un tiroir.
+                            SendFlowRoot(service: ChainSendService(session: session), prefilledAddress: address, onExit: closeFlow)
+                        case .pendingSend:
+                            // Envoyer rouvre l'état du paiement en attente (« Check again »), jamais un nouvel envoi.
+                            SendFlowRoot(service: ChainSendService(session: session), onExit: closeFlow)
+                        case .drawer(let selection):
+                            // B2 / B3 : le détail d'un tiroir, sur les soldes déjà lus par le Wallet.
+                            DrawerDestination(selection: selection, wallet: walletModel, activity: activityModel, session: session, actions: drawerActions)
                         case .addCard:
                             // G1 → G3 : ajouter une carte au compte (testnet) ; au retour, le Wallet relit ses cartes.
                             AddCardDestination(session: session) {
@@ -108,15 +114,41 @@ struct MainTabView: View {
     private func openWalletAction(_ action: WalletAction) {
         switch action {
         case .receive:
-            walletPath.append(.receive)
+            walletPath.append(.receive(nil))
         case .send:
-            walletPath.append(.send)
+            walletPath.append(.send(nil))
         case .move:
-            walletPath.append(.move)
+            walletPath.append(.move(nil))
         case .swap:
             // TODO(jalon 4b) : Swap (E3), selon le périmètre V1.
             break
         }
+    }
+
+    /// Fin d'un parcours (Send, Move…) : retour à la page du tiroir d'où il est parti, sinon au Wallet ; soldes et
+    /// historique relus.
+    private func closeFlow() {
+        if let index = walletPath.lastIndex(where: { if case .drawer = $0 { true } else { false } }) {
+            walletPath.removeSubrange((index + 1)...)
+        } else {
+            walletPath.removeAll()
+        }
+        Task { await walletModel.refresh() }
+        Task { await activityModel.refresh() }
+    }
+
+    /// Actions de la page d'un tiroir (B2, B3) : chacune part de ce tiroir.
+    private var drawerActions: DrawerDetailActions {
+        DrawerDetailActions(
+            onBack: {
+                if !walletPath.isEmpty { walletPath.removeLast() }
+            },
+            onSend: { walletPath.append(.send($0)) },
+            onReceive: { walletPath.append(.receive($0)) },
+            onMove: { walletPath.append(.move($0)) },
+            onPayAgain: { walletPath.append(.payAgain($0)) },
+            onPending: { walletPath.append(.pendingSend) }
+        )
     }
 
     /// Roue dentée : les réglages (I2).
@@ -136,11 +168,17 @@ struct MainTabView: View {
 
 /// Écrans qu'on peut pousser depuis le Wallet.
 enum WalletRoute: Hashable {
-    case receive
-    case send
-    case move
+    /// Recevoir, sur un tiroir choisi d'avance (identifiant) ou sur Main.
+    case receive(String?)
+    /// Envoyer, depuis un tiroir choisi d'avance ou depuis Main.
+    case send(String?)
+    /// Move, depuis un tiroir choisi d'avance ou depuis Main.
+    case move(String?)
+    case payAgain(String)
+    case pendingSend
     case settings
     case addCard
+    case drawer(DrawerSelection)
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
@@ -148,12 +186,30 @@ private struct ReceiveDestination: View {
     @State private var model: ReceiveViewModel
     @Environment(\.dismiss) private var dismiss
 
-    init(session: AppSession) {
-        _model = State(initialValue: ReceiveViewModel(dataSource: LocalReceiveDataSource(session: session)))
+    init(session: AppSession, initialDrawerID: String? = nil) {
+        _model = State(initialValue: ReceiveViewModel(dataSource: LocalReceiveDataSource(session: session), initialDrawerID: initialDrawerID))
     }
 
     var body: some View {
         ReceiveView(model: model, onBack: { dismiss() })
+            .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Détail d'un tiroir (B2, B3) : un ViewModel neuf à chaque ouverture, sur les soldes du Wallet.
+private struct DrawerDestination: View {
+    @State private var model: DrawerDetailModel
+    let activity: ActivityViewModel
+    let actions: DrawerDetailActions
+
+    init(selection: DrawerSelection, wallet: WalletViewModel, activity: ActivityViewModel, session: AppSession, actions: DrawerDetailActions) {
+        _model = State(initialValue: DrawerDetailModel(selection: selection, wallet: wallet, session: session))
+        self.activity = activity
+        self.actions = actions
+    }
+
+    var body: some View {
+        DrawerDetailView(model: model, activity: activity, actions: actions)
             .toolbar(.hidden, for: .navigationBar)
     }
 }
