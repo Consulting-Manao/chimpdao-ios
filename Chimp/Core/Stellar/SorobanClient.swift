@@ -367,8 +367,45 @@ struct SorobanClient {
         endLedger: UInt32
     ) async throws -> EventScan {
         let filter = EventFilter(type: "contract", contractIds: [contract], topics: [TopicFilter(segmentMatchers: topics)])
-        let pageLimit = 100
+        let range = try await contractEvents(filters: [filter], startLedger: startLedger, endLedger: endLedger)
         var hashes: [String] = []
+        for event in range.events where !hashes.contains(event.transactionHash) {
+            hashes.append(event.transactionHash)
+        }
+        return EventScan(transactionHashes: hashes, oldestLedger: range.oldestLedger, latestLedger: range.latestLedger)
+    }
+
+    /// Un événement de contrat tel que le RPC le rend (`getEvents`) : sujets et valeur en XDR base64, non décodés.
+    struct ContractEvent: Equatable, Sendable {
+        /// Identifiant unique de l'événement (`id` du RPC).
+        let id: String
+        /// Contrat qui a émis l'événement : fixé par Stellar, impossible à falsifier par un autre contrat.
+        let contractID: String
+        let ledger: UInt32
+        /// Heure de fermeture du ledger (ISO 8601, `ledgerClosedAt`).
+        let ledgerClosedAt: String
+        let transactionHash: String
+        let topics: [String]
+        let value: String
+    }
+
+    /// Événements trouvés dans une fenêtre de ledgers, et la fenêtre que le RPC garde en mémoire.
+    struct EventRange: Equatable, Sendable {
+        let events: [ContractEvent]
+        let oldestLedger: UInt32?
+        let latestLedger: UInt32
+    }
+
+    /// Tous les événements qui correspondent à `filters` (5 au plus, chacun avec 5 motifs de sujets au plus), des ledgers
+    /// `startLedger` à `endLedger` inclus, dans l'ordre de la chaîne (`getEvents`, comme `backfillChainHistory`).
+    /// Même pagination que `eventTransactions` (voir plus haut) : le curseur est suivi jusqu'à couvrir la fenêtre.
+    func contractEvents(
+        filters: [EventFilter],
+        startLedger: UInt32,
+        endLedger: UInt32,
+        pageLimit: Int = 100
+    ) async throws -> EventRange {
+        var events: [ContractEvent] = []
         var cursor: String?
         var latest: UInt32 = 0
         var oldest: UInt32?
@@ -377,7 +414,7 @@ struct SorobanClient {
             switch await server.getEvents(
                 startLedger: cursor == nil ? Int(startLedger) : nil,
                 endLedger: cursor == nil ? Int(endLedger) + 1 : nil,
-                eventFilters: [filter],
+                eventFilters: filters,
                 paginationOptions: PaginationOptions(cursor: cursor, limit: pageLimit)
             ) {
             case .success(let page): response = page
@@ -386,15 +423,18 @@ struct SorobanClient {
             latest = UInt32(clamping: response.latestLedger)
             oldest = response.oldestLedger.map { UInt32(clamping: $0) }
             // Avec le curseur seul, le RPC peut dépasser la fenêtre : on ne garde que ce qui est dedans.
-            for event in response.events where event.ledger <= Int(endLedger) && !hashes.contains(event.txHash) {
-                hashes.append(event.txHash)
+            for event in response.events where event.ledger <= Int(endLedger) {
+                events.append(ContractEvent(
+                    id: event.id, contractID: event.contractId, ledger: UInt32(clamping: event.ledger),
+                    ledgerClosedAt: event.ledgerClosedAt, transactionHash: event.txHash, topics: event.topic, value: event.value
+                ))
             }
             let passedWindow = response.events.contains { $0.ledger > Int(endLedger) }
             guard let next = response.cursor, let reached = Self.cursorLedger(next) else {
                 throw StellarError.invalidResponse("getEvents returned no usable cursor")
             }
             if passedWindow || (response.events.count < pageLimit && reached >= endLedger) {
-                return EventScan(transactionHashes: hashes, oldestLedger: oldest, latestLedger: latest)
+                return EventRange(events: events, oldestLedger: oldest, latestLedger: latest)
             }
             cursor = next
         }
