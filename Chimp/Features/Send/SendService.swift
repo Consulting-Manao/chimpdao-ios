@@ -71,6 +71,11 @@ struct SendDraft: Equatable {
     /// Montant exact, indépendant de la langue du téléphone.
     let amount: Decimal
     let network: StellarNetwork
+    /// Move (E1) : le tiroir d'arrivée, l'un des siens (Main ou le wallet d'une carte). `recipient` est alors son
+    /// adresse. `nil` pour un envoi.
+    var destination: SendDrawer? = nil
+
+    var isMove: Bool { destination != nil }
 }
 
 /// Envoi préparé **avant** la session NFC (règle 9) : solde relu, cartes qui peuvent signer, et l'autorisation que la

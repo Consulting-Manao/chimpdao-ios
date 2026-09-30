@@ -11,9 +11,10 @@ struct SendFlowRoot: View {
     init(
         service: SendService = SendMockSettings.makeService(),
         signingOrder: SigningOrder = SendMockSettings.signingOrder,
+        kind: SendFlowModel.FlowKind = .send,
         onExit: @escaping () -> Void
     ) {
-        let model = SendFlowModel(service: service, signingOrder: signingOrder)
+        let model = SendFlowModel(service: service, signingOrder: signingOrder, kind: kind)
         model.onExit = onExit
         _model = State(initialValue: model)
         self.onExit = onExit
@@ -24,6 +25,10 @@ struct SendFlowRoot: View {
             if model.resumedPending {
                 // Un paiement signé attend encore son issue : son état, jamais un nouvel envoi.
                 SendStatusView(model: model)
+            } else if model.isMove {
+                // E1 : le Move commence directement par les tiroirs et le montant.
+                SendAmountView(model: model, onBack: onExit)
+                    .task { await model.loadIfNeeded() }
             } else {
                 SendRecipientView(model: model, onBack: onExit)
             }

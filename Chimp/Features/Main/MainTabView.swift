@@ -40,6 +40,12 @@ struct MainTabView: View {
                                 walletPath.removeAll()
                                 Task { await walletModel.refresh() }
                             }
+                        case .move:
+                            // E1 : le même parcours, entre ses propres tiroirs (testnet).
+                            SendFlowRoot(service: ChainSendService(session: session), kind: .move) {
+                                walletPath.removeAll()
+                                Task { await walletModel.refresh() }
+                            }
                         }
                     }
                 #if DESIGN_CATALOG
@@ -63,8 +69,10 @@ struct MainTabView: View {
             walletPath.append(.receive)
         case .send:
             walletPath.append(.send)
-        case .move, .swap:
-            // TODO(jalon 4b) : Move (E1), Swap (E3).
+        case .move:
+            walletPath.append(.move)
+        case .swap:
+            // TODO(jalon 4b) : Swap (E3), selon le périmètre V1.
             break
         }
     }
@@ -84,6 +92,7 @@ struct MainTabView: View {
 enum WalletRoute: Hashable {
     case receive
     case send
+    case move
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.

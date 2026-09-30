@@ -13,6 +13,7 @@ struct SendCatalogPage: View {
     /// Parcours ouvert. Un drapeau et non `@Environment(\.dismiss)` : lu au-dessus du parcours, `dismiss` changeait à
     /// chaque écran poussé et faisait tourner l'app en boucle (même piège que C2 / C4, corrigé au jalon 7).
     @State private var isShowingDemo = false
+    @State private var isShowingMoveDemo = false
 
     var body: some View {
         CatalogPage("Send", settings: settings, scrolls: false) {
@@ -89,6 +90,11 @@ struct SendCatalogPage: View {
                     } label: {
                         Text("Open Send (C1)").chimpFont(.rowTitle)
                     }
+                    Button {
+                        isShowingMoveDemo = true
+                    } label: {
+                        Text(verbatim: "Open Move (E1)").chimpFont(.rowTitle)
+                    }
                 }
                 .listRowBackground(Color(.chimpSurface))
 
@@ -120,6 +126,9 @@ struct SendCatalogPage: View {
         .navigationDestination(isPresented: $isShowingDemo) {
             SendCatalogDemo(settings: settings) { isShowingDemo = false }
         }
+        .navigationDestination(isPresented: $isShowingMoveDemo) {
+            SendCatalogDemo(settings: settings, kind: .move) { isShowingMoveDemo = false }
+        }
     }
 
     /// Exemples à copier (tap = copié), pour tester chaque message du champ d'adresse.
@@ -140,10 +149,11 @@ struct SendCatalogPage: View {
 /// Le parcours en plein écran, dans la pile du catalogue.
 private struct SendCatalogDemo: View {
     let settings: CatalogSettings
+    var kind: SendFlowModel.FlowKind = .send
     let onExit: () -> Void
 
     var body: some View {
-        SendFlowRoot(onExit: onExit)
+        SendFlowRoot(kind: kind, onExit: onExit)
             .catalogOverrides(settings)
     }
 }

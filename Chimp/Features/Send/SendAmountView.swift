@@ -9,8 +9,13 @@ import SwiftUI
 /// Retour par le drapeau du ViewModel, jamais par `@Environment(\.dismiss)` : lu par C2 et C4, poussés l'un sur l'autre
 /// par `navigationDestination(isPresented:)`, `dismiss` changeait à chaque rendu de l'autre écran, en boucle
 /// (app figée sur « Check it over », 100 % du processeur ; corrigé au jalon 7).
+///
+/// **E1 · Move between drawers** : le même écran, avec « From », ⇅ et « To » (maquette E1), sans étapes ; c'est l'écran
+/// de départ du Move (`onBack` ramène au Wallet).
 struct SendAmountView: View {
     @Bindable var model: SendFlowModel
+    /// Retour : pour un envoi, vers C1 (défaut) ; pour un Move, sortie du parcours.
+    var onBack: (() -> Void)?
 
     @Environment(\.locale) private var locale
     @Environment(\.chimpScreenInsets) private var screenInsets
@@ -18,7 +23,13 @@ struct SendAmountView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(title: title, step: 2, steps: 3, onBack: { model.isAmountPresented = false })
+            ChimpHeader(
+                title: title,
+                subtitle: model.isMove ? "Between your own drawers" : nil,
+                step: model.isMove ? 0 : 2,
+                steps: model.isMove ? 0 : 3,
+                onBack: onBack ?? { model.isAmountPresented = false }
+            )
             switch model.loadPhase {
             case .failed:
                 failure
@@ -34,6 +45,9 @@ struct SendAmountView: View {
         .chimpSheet(isPresented: $model.isAssetSheetPresented, height: assetSheetHeight) {
             assetSheet
         }
+        .chimpSheet(isPresented: $model.isDestinationSheetPresented, height: drawerSheetHeight) {
+            destinationSheet
+        }
         .navigationDestination(isPresented: $model.isReviewPresented) {
             SendReviewView(model: model)
                 .toolbar(.hidden, for: .navigationBar)
@@ -41,7 +55,9 @@ struct SendAmountView: View {
     }
 
     private var title: LocalizedStringKey {
-        if let name = model.recipientName {
+        if model.isMove {
+            "Move"
+        } else if let name = model.recipientName {
             "How much for \(name)?"
         } else {
             "How much to send?"
@@ -95,10 +111,47 @@ struct SendAmountView: View {
 
     private var pickerRow: some View {
         let isLoading = model.loadPhase == .loading
-        return drawerPicker
-            .redacted(reason: isLoading ? .placeholder : [])
-            .disabled(isLoading)
-            .padding(.horizontal, ChimpSpacing.xxl)
+        return Group {
+            if model.isMove {
+                VStack(spacing: ChimpSpacing.xs) {
+                    drawerPicker
+                    swapButton
+                    destinationPicker
+                }
+            } else {
+                drawerPicker
+            }
+        }
+        .redacted(reason: isLoading ? .placeholder : [])
+        .disabled(isLoading)
+        .padding(.horizontal, ChimpSpacing.xxl)
+    }
+
+    /// E1 : ⇅ échange le départ et l'arrivée.
+    private var swapButton: some View {
+        Button(action: model.swapDrawers) {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.system(size: 16, weight: .black))
+                .foregroundStyle(.chimpTextPrimary)
+                .frame(width: 40, height: 40)
+                .cartoonSurface(Circle(), fill: Color(.chimpSurface))
+                .contentShape(Circle())
+        }
+        .buttonStyle(ChimpPressableStyle())
+        .accessibilityLabel(Text("Swap From and To"))
+    }
+
+    private var destinationPicker: some View {
+        let drawer = model.destinationDrawer
+        let line = model.destinationBalanceLine
+        return ChimpDrawerPicker(
+            label: "To",
+            icon: drawer?.icon ?? .main,
+            title: drawer?.title ?? String(localized: "Pick a drawer"),
+            balance: drawer == nil ? nil : line.before,
+            balanceAfter: line.after,
+            action: model.canChooseDrawer ? { model.showDestinationSheet() } : nil
+        )
     }
 
     private func keypad(isCompact: Bool) -> some View {
@@ -193,7 +246,7 @@ struct SendAmountView: View {
                 model.setMax()
             }
             .disabled(model.available <= 0)
-            .accessibilityHint(Text("Sends everything in this drawer"))
+            .accessibilityHint(model.isMove ? Text("Moves everything in this drawer") : Text("Sends everything in this drawer"))
         }
         .disabled(model.loadPhase != .loaded)
     }
@@ -248,6 +301,38 @@ struct SendAmountView: View {
         .padding(.horizontal, ChimpSpacing.xxl)
     }
 
+    // MARK: E1 · Feuille « To »
+
+    private var destinationSheet: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Where should it go?")
+                .chimpFont(.sheetTitle)
+                .foregroundStyle(.chimpTextPrimary)
+                .accessibilityAddTraits(.isHeader)
+
+            VStack(spacing: ChimpSpacing.listGap) {
+                ForEach(model.drawers) { drawer in
+                    ChimpDrawerOptionRow(
+                        icon: drawer.icon,
+                        title: drawer.title,
+                        subtitle: model.asset.formattedWithCode(drawer.balance(of: model.asset), locale: locale),
+                        isSelected: drawer.id == model.destinationDrawer?.id
+                    ) {
+                        model.selectDestination(drawerID: drawer.id)
+                    }
+                }
+            }
+            .padding(.top, ChimpSpacing.l)
+
+            ChimpySays(
+                text: "Money in a card's wallet can only be spent with that card. Main works with any of your cards.",
+                pose: .crawl
+            )
+            .padding(.top, ChimpSpacing.l)
+        }
+        .padding(.horizontal, ChimpSpacing.xxl)
+    }
+
     // MARK: Feuille de l'actif
 
     private var assetSheetHeight: CGFloat {
@@ -256,7 +341,7 @@ struct SendAmountView: View {
 
     private var assetSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("What do you want to send?")
+            Text(model.isMove ? "What do you want to move?" : "What do you want to send?")
                 .chimpFont(.sheetTitle)
                 .foregroundStyle(.chimpTextPrimary)
                 .accessibilityAddTraits(.isHeader)

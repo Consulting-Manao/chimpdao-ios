@@ -30,8 +30,8 @@ struct SendReviewView: View {
         VStack(spacing: 0) {
             ChimpHeader(
                 title: "Here's what happens",
-                step: 3,
-                steps: 3,
+                step: model.isMove ? 0 : 3,
+                steps: model.isMove ? 0 : 3,
                 onBack: model.isSigningLocked ? nil : { model.isReviewPresented = false }
             )
             if let draft = model.draft {
@@ -46,7 +46,7 @@ struct SendReviewView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // L'avertissement reste visible au-dessus du bouton, même si le reste défile.
             VStack(spacing: ChimpSpacing.sm) {
-                Text("Payments can't be undone once signed.")
+                Text(model.isMove ? "Moves can't be undone once signed. You can always move it back." : "Payments can't be undone once signed.")
                     .chimpFont(.caption)
                     .foregroundStyle(.chimpTextSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -77,7 +77,9 @@ struct SendReviewView: View {
         VStack(alignment: .leading, spacing: 0) {
             ChimpReviewSteps(steps: [
                 Text("\(amountText(draft)) leaves \(draft.drawer.title)"),
-                Text("\(recipientLabel(draft)) gets it in about 5 seconds"),
+                draft.isMove
+                    ? Text("\(recipientLabel(draft)) gets it in about 5 seconds. Nothing leaves your account.")
+                    : Text("\(recipientLabel(draft)) gets it in about 5 seconds"),
                 Text("Network fees paid by ChimpDAO"),
             ])
 
@@ -166,7 +168,7 @@ struct SendReviewView: View {
                 PinSheet(
                     stepLabel: stepLabel(for: .pin),
                     title: pinTitle(draft),
-                    subtitle: "Paying \(recipientLabel(draft)) \(draft.asset.formattedWithCode(draft.amount, locale: locale))",
+                    subtitle: whatIsSigned(draft),
                     pin: $model.pin,
                     length: model.pinLength,
                     state: $model.pinState,
@@ -181,7 +183,7 @@ struct SendReviewView: View {
                     cardColor: card.color,
                     stepLabel: stepLabel(for: step),
                     title: tapTitle(draft, step: step),
-                    what: "Paying \(recipientLabel(draft)) \(draft.asset.formattedWithCode(draft.amount, locale: locale))",
+                    what: whatIsSigned(draft),
                     who: tapWho(draft),
                     pinStatus: pinStatus(for: step),
                     isScanning: model.isSigningLocked,
@@ -192,6 +194,16 @@ struct SendReviewView: View {
                 )
             }
         }
+    }
+
+    /// Rappel de ce qui est signé, dans la feuille du PIN et celle du tap (règle 8) : « Paying Maya 25 USDC », ou pour un
+    /// Move « Moving 50 USDC from Main account to Jungle's wallet » (maquette E2).
+    private func whatIsSigned(_ draft: SendDraft) -> LocalizedStringKey {
+        let amount = draft.asset.formattedWithCode(draft.amount, locale: locale)
+        if draft.isMove {
+            return "Moving \(amount) from \(draft.drawer.title) to \(recipientLabel(draft))"
+        }
+        return "Paying \(recipientLabel(draft)) \(amount)"
     }
 
     /// « Step 1 of 2 · PIN », « Step 3 of 3 · Tap », ou « Last step · Tap » s'il n'y a qu'une étape.

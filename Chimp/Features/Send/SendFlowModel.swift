@@ -4,10 +4,20 @@ import Observation
 /// ViewModel du parcours Envoyer (C1 → C9), partagé par tous ses écrans : destinataire, tiroir source,
 /// actif, montant, puis (étapes B et C) vérification, signature et envoi.
 ///
+/// **Move** (E1, E2) : le même parcours, sans C1. Déplacer de l'argent entre ses tiroirs est un `SAC.transfer` comme un
+/// envoi, vers l'adresse d'un de ses tiroirs (`moveFunds` du terminal, ARCHITECTURE §3.9) : même préparation, mêmes
+/// ordres (Pocket : ordre 1, seulement sa carte ; Main : ordre 2, n'importe quelle carte), mêmes feuilles et issues.
+///
 /// Ne fait aucun calcul crypto et ne connaît que le protocole `SendService`. La vérification des adresses
 /// passe par `StellarAddressParser` (SDK Stellar).
 @Observable
 final class SendFlowModel {
+    /// Envoyer vers une adresse, ou déplacer entre ses propres tiroirs.
+    enum FlowKind: Equatable {
+        case send
+        case move
+    }
+
     enum LoadPhase: Equatable {
         case loading
         case loaded
@@ -42,6 +52,8 @@ final class SendFlowModel {
     private(set) var chosenContact: SendContact?
 
     private(set) var selectedDrawerID = "main"
+    /// Move : tiroir d'arrivée (`nil` pour un envoi, ou tant que les tiroirs ne sont pas lus).
+    private(set) var destinationDrawerID: String?
     private(set) var asset: SendAsset = .usdc
     private(set) var amount = AmountEntry()
     /// Augmente à chaque touche refusée : déclenche un retour haptique.
@@ -51,10 +63,14 @@ final class SendFlowModel {
     var isAmountPresented = false
     var isReviewPresented = false
     var isDrawerSheetPresented = false
+    /// Move : feuille « Where should it go? ».
+    var isDestinationSheetPresented = false
     var isAssetSheetPresented = false
 
     /// Montant et destinataire figés pour la vérification (C4).
     private(set) var draft: SendDraft?
+
+    let kind: FlowKind
 
     // Signature (C4 → C5 / C6).
     let signingOrder: SigningOrder
@@ -96,10 +112,13 @@ final class SendFlowModel {
     /// Appelé par « Done » à la fin du parcours (retour au Wallet).
     var onExit: (() -> Void)?
 
-    init(service: SendService, signingOrder: SigningOrder = .pinThenTap) {
+    init(service: SendService, signingOrder: SigningOrder = .pinThenTap, kind: FlowKind = .send) {
         self.service = service
         self.signingOrder = signingOrder
+        self.kind = kind
     }
+
+    var isMove: Bool { kind == .move }
 
     // MARK: Chargement
 
@@ -124,6 +143,9 @@ final class SendFlowModel {
             self.context = context
             if !context.drawers.contains(where: { $0.id == selectedDrawerID }) {
                 selectedDrawerID = context.drawers.first?.id ?? "main"
+            }
+            if isMove, destinationDrawer == nil || destinationDrawerID == selectedDrawerID {
+                destinationDrawerID = defaultDestination(for: selectedDrawerID)
             }
             loadPhase = context.drawers.isEmpty ? .failed : .loaded
         } catch is CancellationError {
@@ -217,10 +239,58 @@ final class SendFlowModel {
 
     var canReview: Bool {
         loadPhase == .loaded
-            && resolvedRecipient != nil
+            && hasDestination
             && selectedDrawer != nil
             && amount.value > 0
             && amountIssue == nil
+    }
+
+    /// Envoi : une adresse valide. Move : un tiroir d'arrivée différent du tiroir de départ.
+    private var hasDestination: Bool {
+        switch kind {
+        case .send: resolvedRecipient != nil
+        case .move: destinationDrawer != nil && destinationDrawer?.id != selectedDrawer?.id
+        }
+    }
+
+    // MARK: E1 · Move : tiroir d'arrivée
+
+    /// Tiroir d'arrivée d'un Move.
+    var destinationDrawer: SendDrawer? {
+        guard isMove, let destinationDrawerID else { return nil }
+        return drawers.first { $0.id == destinationDrawerID }
+    }
+
+    /// Main → la première carte ; une carte → Main (comme la maquette E1 : « Main account » → « Jungle's wallet »).
+    private func defaultDestination(for source: String) -> String? {
+        source == "main" ? drawers.first { $0.id != "main" }?.id : drawers.first { $0.id == "main" }?.id
+    }
+
+    /// Solde du tiroir d'arrivée, puis après le Move s'il y a un montant valide (« 62.50 → 112.50 USDC »).
+    var destinationBalanceLine: (before: String, after: String?) {
+        let held = destinationDrawer?.balance(of: asset) ?? 0
+        let value = amount.value
+        guard value > 0, value <= available else { return (asset.formattedWithCode(held), nil) }
+        return (asset.formatted(held), asset.formattedWithCode(held + value))
+    }
+
+    func showDestinationSheet() {
+        guard isMove, drawers.count > 1 else { return }
+        isDestinationSheetPresented = true
+    }
+
+    /// Choisir le tiroir d'arrivée ; si c'est le tiroir de départ, les deux s'échangent (jamais le même des deux côtés).
+    func selectDestination(drawerID: String) {
+        if drawerID == selectedDrawerID { selectedDrawerID = destinationDrawerID ?? selectedDrawerID }
+        destinationDrawerID = drawerID
+        isDestinationSheetPresented = false
+    }
+
+    /// ⇅ : départ et arrivée s'échangent. Le montant est gardé (le message dit s'il dépasse le nouveau solde).
+    func swapDrawers() {
+        guard isMove, let destination = destinationDrawerID else { return }
+        destinationDrawerID = selectedDrawerID
+        selectedDrawerID = destination
     }
 
     /// Solde du tiroir choisi, puis solde après l'envoi s'il y a un montant valide (« 720 → 695 USDC »).
@@ -274,6 +344,7 @@ final class SendFlowModel {
     }
 
     func select(drawerID: String) {
+        if isMove, drawerID == destinationDrawerID { destinationDrawerID = selectedDrawerID }
         selectedDrawerID = drawerID
         isDrawerSheetPresented = false
     }
@@ -288,11 +359,23 @@ final class SendFlowModel {
 
     /// Fige le brouillon et ouvre la vérification (C4).
     func continueToReview() {
-        guard canReview, let recipient = resolvedRecipient, let drawer = selectedDrawer, let network = context?.network else { return }
-        draft = SendDraft(
-            recipient: recipient, recipientName: recipientName, drawer: drawer,
-            asset: asset, amount: amount.value, network: network
-        )
+        guard canReview, let drawer = selectedDrawer, let network = context?.network else { return }
+        switch kind {
+        case .send:
+            guard let recipient = resolvedRecipient else { return }
+            draft = SendDraft(
+                recipient: recipient, recipientName: recipientName, drawer: drawer,
+                asset: asset, amount: amount.value, network: network
+            )
+        case .move:
+            // L'adresse du tiroir d'arrivée, vérifiée comme une adresse collée (somme de contrôle, forme canonique).
+            guard let destination = destinationDrawer,
+                  case .success(let recipient) = StellarAddressParser.parse(destination.address) else { return }
+            draft = SendDraft(
+                recipient: recipient, recipientName: destination.title, drawer: drawer,
+                asset: asset, amount: amount.value, network: network, destination: destination
+            )
+        }
         isReviewPresented = true
     }
 
