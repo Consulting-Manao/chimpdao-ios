@@ -9,11 +9,14 @@ final class AppSession {
     /// Le fichier n'a pas pu être lu au lancement (texte technique) : l'app repart de l'onboarding.
     private(set) var loadError: String?
     let network: StellarNetwork
+    /// Historique (onglet Activity), dans son propre fichier.
+    let activity: ActivityStore
     private let store: LocalWalletStore
 
-    init(store: LocalWalletStore, network: StellarNetwork) {
+    init(store: LocalWalletStore, network: StellarNetwork, activity: ActivityStore = InMemoryActivityStore()) {
         self.store = store
         self.network = network
+        self.activity = activity
         do {
             wallet = try store.load()
         } catch {
@@ -26,7 +29,8 @@ final class AppSession {
     static func live() -> AppSession {
         let network = ChimpNetworkConfig.testnet.network
         do {
-            return AppSession(store: try FileLocalWalletStore(network: network), network: network)
+            let activity: ActivityStore = (try? FileActivityStore(network: network)) ?? InMemoryActivityStore()
+            return AppSession(store: try FileLocalWalletStore(network: network), network: network, activity: activity)
         } catch {
             // Application Support inaccessible : l'app fonctionne, mais sans rien retenir.
             let session = AppSession(store: InMemoryLocalWalletStore(), network: network)
@@ -155,6 +159,11 @@ final class AppSession {
         next.account = Self.upserting(card, into: account)
         next.cardHints = CardHint.adding(CardHint(key: card.publicKey, account: address, at: date), to: next.cardHints)
         try persist(next)
+    }
+
+    /// Ligne d'historique écrite par ce téléphone (envoi, Move ou carte ajoutée **confirmés**), rangée avec ce compte.
+    func recordActivity(_ record: ActivityRecord, account: String) {
+        activity.recordLocal(record, account: account)
     }
 
     /// Rejoindre un compte depuis l'onboarding (A9) : même enregistrement qu'une création (`completeOnboarding`).

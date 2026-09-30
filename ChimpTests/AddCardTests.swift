@@ -112,6 +112,15 @@ struct AddCardTests {
         #expect(saved == SavedCard(publicKey: k1.hex, chip: "infineon2Go", tokenID: 913, pocket: MockAddCardService.pocket(for: k1), name: "Leaf", color: "leaf"))
         #expect(store.wallet.hint(for: k1) == account, "Une carte ajoutée n'a que son indice pour retrouver son compte")
         #expect(store.wallet.account?.cards.count == 2)
+
+        // Historique (session « Activity ») : la carte entrée, avec la carte du compte qui a dit oui.
+        let rows = session.activity.activity(of: account).records
+        #expect(rows.count == 1)
+        #expect(rows.first?.event == .cardAdded)
+        #expect(rows.first?.cardKey == k1.hex)
+        #expect(rows.first?.approvedBy == r1.hex)
+        #expect(rows.first?.isLocal == true)
+        #expect(rows.first?.id == "stellar:\(rows.first?.hash ?? "")")
     }
 
     @Test("Nouvelle carte refusée : déjà dans le compte, dans un autre compte, jamais enregistrée ; on reste sur G1")

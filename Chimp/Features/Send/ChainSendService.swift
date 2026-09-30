@@ -163,6 +163,12 @@ final class ChainSendService: SendService {
             throw SendServiceError.unknownDrawer(signed.prepared.draft.drawer.id)
         }
         let hash = try await payments.submit(payment, signed: card, feeSigner: feeSigner, onProgress: onProgress)
+        let draft = signed.prepared.draft
+        if let account = session.wallet.account?.address {
+            session.recordActivity(.payment(
+                hash: hash, from: draft.drawer.address, to: draft.recipient.address, assetCode: draft.asset.code, amount: draft.amount
+            ), account: account)
+        }
         return SendReceipt(
             summary: SendSummary(signed.prepared.draft), transactionHash: hash, sentAt: .now,
             explorerURL: explorerURL(transactionHash: hash)
@@ -170,7 +176,16 @@ final class ChainSendService: SendService {
     }
 
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck {
-        try await payments.check(trace)
+        let result = try await payments.check(trace)
+        // Un paiement en attente finalement parti : écrit dans l'historique comme un envoi confirmé.
+        if case .sent(let hash) = result, let account = session.wallet.account?.address,
+           let code = (try? SACClient.stellarAssets(config: config))?.first(where: { $0.contract == trace.token })?.code {
+            session.recordActivity(.payment(
+                hash: hash, from: trace.from, to: trace.destination, assetCode: code,
+                amount: SACClient.amount(fromUnits: Decimal(trace.units)), at: session.wallet.pendingSend?.signedAt ?? .now
+            ), account: account)
+        }
+        return result
     }
 
     var pendingSend: PendingSend? { session.wallet.pendingSend }

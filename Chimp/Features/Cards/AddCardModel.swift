@@ -148,6 +148,9 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     private var linkTask: Task<Void, Never>?
     private var prepared: CardMembershipClient.PreparedAddCard?
     private var memberSignature: CardSignatures?
+    /// `add_card` envoyé depuis ce téléphone (hash, carte qui a dit oui), gardé pour l'historique jusqu'à la confirmation,
+    /// même à travers un « Try again ». Une cérémonie reprise sans ce hash : l'historique le relira sur la chaîne.
+    private var admission: (hash: String, approvedBy: String)?
     private var isRunning = false
     /// Nombre de cartes du compte une fois la nouvelle entrée (G3), s'il est connu.
     private(set) var cardCount: Int?
@@ -621,7 +624,8 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             if try await !service.hasCard(account: account, publicKey: newCard.publicKey) {
                 guard let prepared, let memberSignature else { throw AddCardError.memberSignatureExpired }
                 if try await service.needsRefresh(prepared) { throw AddCardError.memberSignatureExpired }
-                _ = try await service.submitAddCard(prepared, signed: memberSignature)
+                let hash = try await service.submitAddCard(prepared, signed: memberSignature)
+                admission = (hash, memberSignature.card.publicKey.hex)
             }
 
             step = .confirming
@@ -638,6 +642,11 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         }
         do {
             try save(account: account, card: newCard, addable: addable)
+            if let admission {
+                session.recordActivity(.cardAdded(
+                    hash: admission.hash, account: account, cardKey: newCard.publicKey.hex, approvedBy: admission.approvedBy
+                ), account: account)
+            }
             screen = .done
         } catch {
             addingPhase = .failed(.confirming, CreationProblem(kind: .saveFailed, technicalDetails: OnboardingModel.details(error)))

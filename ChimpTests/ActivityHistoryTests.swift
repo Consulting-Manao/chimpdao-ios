@@ -207,6 +207,22 @@ struct ActivityHistoryTests {
         #expect(rows.first { $0.hash == "h1" }?.isLocal == true)
     }
 
+    @Test("recordPayment : envoi confirmé écrit par le téléphone, rangé avec son compte, adresse exacte gardée (M)")
+    func recordedPayment() {
+        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let m = "MAQAA5L65LSYH7CQ3VTJ7F3HHLGCL3DSLAR2Y47263D56MNNGHSQSAAAAAAAAAAE2LP26"
+        session.recordActivity(.payment(
+            hash: "abc", from: Self.pocket, to: m, assetCode: "USDC", amount: Decimal(string: "2.5")!, at: Date(timeIntervalSince1970: 5)
+        ), account: Self.account)
+        let rows = session.activity.activity(of: Self.account).records
+        #expect(rows == [ActivityRecord(
+            id: "stellar:abc", event: .transfer, hash: "abc", from: Self.pocket, to: m, assetCode: "USDC",
+            amount: Decimal(string: "2.5")!, at: Date(timeIntervalSince1970: 5), isLocal: true
+        )])
+        #expect(rows.first?.kind(drawers: [Self.account, Self.pocket]) == .sent)
+        #expect(session.activity.activity(of: Self.pocket).records.isEmpty)
+    }
+
     @Test("Fichier : relu à l'identique, rangé par compte ; fichier illisible mis de côté")
     func fileStore() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

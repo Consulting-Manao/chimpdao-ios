@@ -51,6 +51,25 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+extension ActivityRecord {
+    /// `recordPayment` du terminal : un envoi ou un Move confirmé sur la chaîne, écrit par ce téléphone. `to` est
+    /// l'adresse exacte payée (G, M ou C).
+    static func payment(hash: String, from: String, to: String, assetCode: String, amount: Decimal, at: Date = .now) -> ActivityRecord {
+        ActivityRecord(
+            id: "stellar:\(hash)", event: .transfer, hash: hash, from: from, to: to, assetCode: assetCode, amount: amount,
+            at: at, isLocal: true
+        )
+    }
+
+    /// `recordNft` du terminal, pour une carte entrée dans le compte (`add_card` confirmé), avec la carte qui a dit oui.
+    static func cardAdded(hash: String, account: String, cardKey: String, approvedBy: String?, at: Date = .now) -> ActivityRecord {
+        ActivityRecord(
+            id: "stellar:\(hash)", event: .cardAdded, hash: hash, from: account, to: "", cardKey: cardKey, approvedBy: approvedBy,
+            at: at, isLocal: true
+        )
+    }
+}
+
 /// Nature d'une ligne pour le compte affiché.
 enum ActivityKind: Equatable, Sendable {
     case sent
