@@ -94,6 +94,10 @@ struct SavedAccount: Codable, Equatable {
     /// Prénom de ce compte, gardé ici quand ce n'est pas le compte affiché (autre compte ouvert, ou compte fermé par
     /// « Disconnect this phone »).
     var firstName: String? = nil
+    /// « Face ID to open the app » (I2) : réglage **de ce compte**, pas du téléphone. Il le suit partout (autre compte
+    /// ouvert, compte fermé par « Disconnect », reconnexion). `nil` : désactivé (par défaut). Optionnel : un fichier écrit
+    /// avant ce champ reste lisible.
+    var opensWithFaceID: Bool? = nil
 }
 
 /// Une carte du compte : données publiques (clé, puce, NFT, Pocket) et données locales (nom, couleur).

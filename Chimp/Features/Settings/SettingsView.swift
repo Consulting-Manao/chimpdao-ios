@@ -284,8 +284,8 @@ struct SettingsView: View {
                         case .failed(let details): lockProblem = ("Face ID didn't work. Try again.", details)
                         }
                     }
-                } else {
-                    lock.disable()
+                } else if let details = lock.disable() {
+                    lockProblem = ("This phone couldn't save it. Try again.", details)
                 }
             }
         )) {

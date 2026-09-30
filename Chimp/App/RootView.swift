@@ -20,6 +20,10 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.3), value: session.showsOnboarding)
         .chimpWindowStyle(session.preferences.look.interfaceStyle)
         .chimpAppLock(lock, style: session.preferences.look.interfaceStyle)
+        // Arrivée sur un autre compte (ou plus de compte) : Face ID si ce compte l'a activé, aucun verrou sinon.
+        .onChange(of: session.wallet.account?.address) {
+            Task { await lock.accountDidChange() }
+        }
         .environment(session)
         .environment(lock)
     }

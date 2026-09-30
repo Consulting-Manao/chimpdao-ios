@@ -93,8 +93,19 @@ final class AppSession {
         } else {
             cards.append(card)
         }
-        next.account = SavedAccount(address: account, cards: cards)
+        // Le réglage Face ID d'un compte déjà connu de ce téléphone revient avec lui.
+        next.account = SavedAccount(address: account, cards: cards, opensWithFaceID: wallet.knownAccount(account)?.opensWithFaceID)
         next.cardHints = CardHint.adding(CardHint(key: card.publicKey, account: account, at: date), to: next.cardHints)
+        try persist(next)
+    }
+
+    /// « Face ID to open the app » (I2) pour le compte affiché. Lève une erreur si aucun compte n'est ouvert ou si le
+    /// téléphone n'a pas pu l'écrire.
+    func setOpensWithFaceID(_ isOn: Bool) throws {
+        guard var account = wallet.account else { throw SettingsError.noAccount }
+        account.opensWithFaceID = isOn ? true : nil
+        var next = wallet
+        next.account = account
         try persist(next)
     }
 
@@ -145,7 +156,9 @@ final class AppSession {
         var next = wallet
         next.firstName = firstName
         // Un compte déjà ouvert puis fermé sur ce téléphone (rejoindre) garde les noms de ses autres cartes.
-        let known = SavedAccount(address: account, cards: Self.knownCards(of: account, in: next))
+        let known = SavedAccount(
+            address: account, cards: Self.knownCards(of: account, in: next), opensWithFaceID: next.knownAccount(account)?.opensWithFaceID
+        )
         next.account = Self.upserting(card, into: known)
         next.disconnectedAccounts = Self.removing(account, from: next.disconnectedAccounts)
         next.otherAccounts = Self.removing(account, from: next.otherAccounts)

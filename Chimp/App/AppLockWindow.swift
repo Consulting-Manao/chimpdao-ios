@@ -79,12 +79,15 @@ private struct LockWindowHost: UIViewRepresentable {
     }
 }
 
-/// Écran de verrouillage (non dessiné dans la maquette, texte proposé) : fond de l'en-tête, tête de Chimpy, bouton de
-/// déverrouillage. Face ID est proposé tout seul au lancement et au retour ; le bouton sert après une annulation.
+/// Écran de verrouillage (non dessiné dans la maquette, texte proposé) : fond de l'en-tête, tête de Chimpy, et **toujours**
+/// deux moyens d'ouvrir : « Unlock with Face ID » (Face ID, avec repli sur le code) et « Use iPhone passcode » (le code de
+/// l'iPhone, directement, sans attendre un échec de Face ID). Face ID est aussi proposé tout seul au lancement, au retour
+/// d'arrière-plan et en arrivant sur le compte. Pas de code propre à l'app.
 struct AppLockView: View {
     let lock: AppLock
 
     var body: some View {
+        let kind = lock.kind
         VStack(spacing: 0) {
             Spacer()
             Image(.tileHead)
@@ -109,22 +112,36 @@ struct AppLockView: View {
                 ChimpTechnicalDetails(details: failure, onDarkBackground: true)
                     .padding(.bottom, ChimpSpacing.m)
             }
-            ChimpButton(Self.unlockTitle(lock.kind), size: .large, isLoading: lock.isAuthenticating) {
-                Task { await lock.unlock() }
+            if let biometry = Self.biometryTitle(kind) {
+                ChimpButton(biometry, size: .large, isLoading: lock.isAuthenticating) {
+                    Task { await lock.unlock() }
+                }
+                ChimpButton("Use iPhone passcode", kind: .onHeader, size: .large) {
+                    Task { await lock.unlockWithPasscode() }
+                }
+                .disabled(lock.isAuthenticating)
+                .padding(.top, ChimpSpacing.m)
+                .padding(.bottom, ChimpSpacing.xxl)
+            } else {
+                // Pas de biométrie enregistrée : le code de l'iPhone seul (ou plus de code : l'app s'ouvre).
+                ChimpButton(kind == .passcode ? "Use iPhone passcode" : "Unlock", size: .large, isLoading: lock.isAuthenticating) {
+                    Task { await lock.unlockWithPasscode() }
+                }
+                .padding(.bottom, ChimpSpacing.xxl)
             }
-            .padding(.bottom, ChimpSpacing.xxl)
         }
         .padding(.horizontal, ChimpSpacing.fullScreenMargin)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .chimpFullScreenBackground()
     }
 
-    static func unlockTitle(_ kind: DeviceLockKind) -> LocalizedStringKey {
+    /// Bouton biométrique ; `nil` si l'iPhone n'a que son code.
+    static func biometryTitle(_ kind: DeviceLockKind) -> LocalizedStringKey? {
         switch kind {
         case .faceID: "Unlock with Face ID"
         case .touchID: "Unlock with Touch ID"
         case .opticID: "Unlock with Optic ID"
-        case .passcode, .unavailable: "Unlock"
+        case .passcode, .unavailable: nil
         }
     }
 }
