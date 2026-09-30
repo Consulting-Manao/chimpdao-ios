@@ -19,13 +19,13 @@ enum DrawerSelection: Hashable {
 struct DrawerDetailContent: Equatable {
     struct Asset: Equatable, Identifiable {
         let code: String
-        let glyph: ChimpAssetGlyph
-        /// « US Dollar », « Stellar ».
-        let title: String
         /// « 620 USDC », « 800 XLM ».
         let amount: String
-        /// « $620.00 » ; `nil` si l'actif n'a pas de prix.
+        /// « $620 », « $62.50 » (tuile de B2e / B3) ; `nil` si l'actif n'a pas de prix.
         let value: String?
+
+        /// Bandeau de la tuile (« USDC · READY »).
+        var band: String { String(localized: "\(code) · Ready").uppercased() }
 
         var id: String { code }
     }
@@ -34,12 +34,12 @@ struct DrawerDetailContent: Equatable {
         let id: String
         let name: String
         let color: ChimpCardColor
+        /// « 0421 » (plateau de B2e).
+        var number: String = "····"
     }
 
     /// Total du tiroir : en dollars, ou par actif si un prix manque (comme B1).
     let total: String
-    /// Libellé « Ready to spend · $820 ».
-    let ready: String
     /// Actifs non nuls, dans l'ordre du Wallet (XLM, USDC).
     let assets: [Asset]
     /// Cartes qui peuvent signer pour ce tiroir : toutes celles du compte pour Main, la carte seule pour son wallet.
@@ -116,7 +116,7 @@ final class DrawerDetailModel {
             let saved = names.first { $0.publicKey == card.id }
             return DrawerDetailContent.Signer(
                 id: card.id, name: saved?.name ?? card.name,
-                color: saved?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? card.color
+                color: saved?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? card.color, number: card.number
             )
         }
         switch selection {
@@ -185,7 +185,6 @@ final class DrawerDetailModel {
         assets: [AssetAmount], snapshot: WalletSnapshot, signers: [DrawerDetailContent.Signer], address: String?
     ) -> DrawerDetailContent {
         let currency = Decimal.FormatStyle.Currency(code: snapshot.currencyCode).presentation(.narrow)
-        let wholeCurrency = currency.precision(.fractionLength(0...2))
         let usd = NetWorth.usd(assets.map { ($0.code, $0.amount) }, prices: snapshot.usdPrices)
 
         var codes: [String] = []
@@ -197,19 +196,15 @@ final class DrawerDetailModel {
         let lines: [DrawerDetailContent.Asset] = codes.compactMap { code in
             guard let amount = sums[code], amount != 0 else { return nil }
             let known = SendAsset.allCases.first { $0.code == code }
-            let value = snapshot.usdPrices[code.uppercased()].map { NetWorth.truncatedToCents(amount * $0).formatted(currency) }
+            let value = snapshot.usdPrices[code.uppercased()].map { Self.tileMoney(NetWorth.truncatedToCents(amount * $0), currency: currency) }
             return DrawerDetailContent.Asset(
                 code: code,
-                glyph: known?.glyph ?? .xlm,
-                title: known.map(Self.assetName) ?? code,
                 amount: known?.formattedWithCode(amount) ?? "\(amount) \(code)",
                 value: value
             )
         }
-        let readyAmount = usd?.formatted(wholeCurrency) ?? WalletViewModel.assetText(assets)
         return DrawerDetailContent(
             total: usd?.formatted(currency) ?? WalletViewModel.assetText(assets),
-            ready: String(localized: "Ready to spend · \(readyAmount)"),
             assets: lines,
             signers: signers,
             address: address,
@@ -217,11 +212,9 @@ final class DrawerDetailModel {
         )
     }
 
-    /// Nom d'un actif dans le détail d'un tiroir (maquette B2 : « US Dollar », « Stellar »).
-    static func assetName(_ asset: SendAsset) -> String {
-        switch asset {
-        case .usdc: String(localized: "US Dollar")
-        case .xlm: String(localized: "Stellar")
-        }
+    /// Valeur d'une tuile : sans centimes si le montant est rond (« $620 »), sinon avec (« $62.50 »), comme la maquette.
+    static func tileMoney(_ value: Decimal, currency: Decimal.FormatStyle.Currency) -> String {
+        value.formatted(currency.precision(.fractionLength(value.isWhole ? 0 : 2)))
     }
+
 }

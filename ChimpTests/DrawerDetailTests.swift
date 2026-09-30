@@ -50,9 +50,10 @@ struct DrawerDetailTests {
         let content = try #require(model.content)
         #expect(content.total == Decimal(820).formatted(.currency(code: "USD").presentation(.narrow)))
         #expect(content.assets.map(\.code) == ["XLM", "USDC"])
-        #expect(content.assets.map(\.title) == ["Stellar", "US Dollar"])
+        #expect(content.assets.map(\.band) == ["XLM · READY", "USDC · READY"])
         #expect(content.assets.first?.amount == SendAsset.xlm.formattedWithCode(800))
-        #expect(content.assets.first?.value == Decimal(200).formatted(.currency(code: "USD").presentation(.narrow)))
+        #expect(content.assets.first?.value == Decimal(200).formatted(.currency(code: "USD").presentation(.narrow).precision(.fractionLength(0))), "Tuile : « $200 » (maquette B2e)")
+        #expect(content.signers.first?.number == "0007", "Numéro pour le plateau des cartes")
         #expect(content.signers.map(\.name) == ["Banana", "Card"], "Nom du téléphone, sinon celui du Wallet")
         #expect(content.signers.first?.color == .banana)
         #expect(content.address == account)
@@ -96,6 +97,14 @@ struct DrawerDetailTests {
         let model = await model(.card("04dead"))
         #expect(model.isMissing)
         #expect(model.content == nil)
+    }
+
+    @Test("Tuiles : sans centimes pour un montant rond, avec sinon (« $620 », « $62.50 »)")
+    func tileMoney() {
+        let usd = Decimal.FormatStyle.Currency(code: "USD", locale: Locale(identifier: "en_US")).presentation(.narrow)
+        #expect(DrawerDetailModel.tileMoney(620, currency: usd) == "$620")
+        #expect(DrawerDetailModel.tileMoney(Decimal(string: "62.5")!, currency: usd) == "$62.50")
+        #expect(DrawerDetailModel.tileMoney(Decimal(string: "0.07")!, currency: usd) == "$0.07")
     }
 
     @Test("Copier l'adresse : l'adresse complète, puis « Copied! »")
