@@ -10,6 +10,8 @@ struct WalletView: View {
     var onSettings: (() -> Void)?
     /// Tuile d'action touchée (Send, Receive…) : la navigation est décidée par la coque (`MainTabView`).
     var onAction: (WalletAction) -> Void = { _ in }
+    /// « + Add » (G1) : ajouter une carte au compte.
+    var onAddCard: () -> Void = {}
 
     var body: some View {
         // Le défilement passe sous la barre d'état : l'en-tête comble lui-même la zone sûre du haut,
@@ -122,7 +124,8 @@ struct WalletView: View {
                     .foregroundStyle(.chimpTextPrimary)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                ChimpPillButton("+ Add") { model.addCard() }
+                ChimpPillButton("+ Add", action: onAddCard)
+                    .disabled(model.phase != .loaded)
             }
             .padding(.top, ChimpSpacing.xl)
 

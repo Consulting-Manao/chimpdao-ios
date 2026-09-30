@@ -4,14 +4,18 @@ import SwiftUI
 /// - Infineon sans PIN : saisie, puis confirmation (PIN obligatoire, décision du 2026-09-29).
 /// - Infineon qui a déjà un PIN (ou qui vient de le recevoir) : une saisie, vérifiée par la carte au tap.
 /// - DUOX : pas de PIN, seulement le tap.
-struct PickPINView: View {
-    @Bindable var model: AccountSetupModel
+struct PickPINView<Model: CardPINChoosing>: View {
+    @Bindable var model: Model
+    var step = 3
+    var steps = 3
+    /// Bouton de fin ; par défaut « Hold your {carte} card to finish » (A6).
+    var continueTitle: LocalizedStringKey?
     let onBack: () -> Void
     let onContinue: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(title: title, step: 3, steps: 3, onBack: backAction)
+            ChimpHeader(title: title, step: step, steps: steps, onBack: backAction)
             entry
             finishButtons
         }
@@ -44,7 +48,7 @@ struct PickPINView: View {
 
     private var finishButtons: some View {
         VStack(spacing: ChimpSpacing.xs) {
-            ChimpButton("Hold your \(model.displayCardName) card to finish", isLoading: model.isBusy, action: onContinue)
+            ChimpButton(continueTitle ?? "Hold your \(model.displayCardName) card to finish", isLoading: model.isBusy, action: onContinue)
                 .disabled(!model.canFinish)
             if model.pinStep == .done, model.pinMode != .none, !model.pinWasSet {
                 ChimpButton("Change the PIN", kind: .link) { model.restartPIN() }

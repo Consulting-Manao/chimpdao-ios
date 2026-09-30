@@ -134,12 +134,10 @@ struct ChainAccountCreation: AccountCreationChain {
     }
 
     func linkCard(_ plan: AccountSetupPlan, signed: ChipSignedDigest) async throws -> String {
-        let client = client
-        let prepared = try await PocketClient(client: client).prepareSetOwner(
-            declared: plan.setOwner, pocket: plan.pocket, newOwner: plan.account,
-            curve: plan.card.curve, signed: signed, feePayer: config.feePayer
+        try await CardMembershipClient(client: client, config: config).submitLink(
+            plan.setOwner, pocket: plan.pocket, account: plan.account, curve: plan.card.curve,
+            signed: signed, feeSigner: feeSigner
         )
-        return try await client.refitAndSubmit(prepared.transaction, feeSigner: feeSigner)
     }
 
     func hasCard(account: String, publicKey: ChipPublicKey) async throws -> Bool {

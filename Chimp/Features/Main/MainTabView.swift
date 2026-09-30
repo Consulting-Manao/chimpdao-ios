@@ -27,7 +27,7 @@ struct MainTabView: View {
         switch selection {
         case .wallet:
             NavigationStack(path: $walletPath) {
-                WalletView(model: walletModel, onSettings: settingsAction, onAction: openWalletAction)
+                WalletView(model: walletModel, onSettings: settingsAction, onAction: openWalletAction, onAddCard: { walletPath.append(.addCard) })
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
                     .navigationDestination(for: WalletRoute.self) { route in
@@ -43,6 +43,12 @@ struct MainTabView: View {
                         case .move:
                             // E1 : le même parcours, entre ses propres tiroirs (testnet).
                             SendFlowRoot(service: ChainSendService(session: session), kind: .move) {
+                                walletPath.removeAll()
+                                Task { await walletModel.refresh() }
+                            }
+                        case .addCard:
+                            // G1 → G3 : ajouter une carte au compte (testnet) ; au retour, le Wallet relit ses cartes.
+                            AddCardDestination(session: session) {
                                 walletPath.removeAll()
                                 Task { await walletModel.refresh() }
                             }
@@ -104,6 +110,7 @@ enum WalletRoute: Hashable {
     case send
     case move
     case settings
+    case addCard
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
@@ -118,6 +125,27 @@ private struct ReceiveDestination: View {
     var body: some View {
         ReceiveView(model: model, onBack: { dismiss() })
             .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Ajouter une carte (G1 → G3) : un ViewModel neuf à chaque ouverture, sur la vraie carte et le testnet. Sur un appareil
+/// sans NFC (simulateur), les builds Debug et Testing prennent une carte et une chaîne factices.
+private struct AddCardDestination: View {
+    @State private var model: AddCardModel?
+    let onExit: () -> Void
+
+    init(session: AppSession, onExit: @escaping () -> Void) {
+        _model = State(initialValue: session.wallet.account.map { AddCardModel.live(account: $0.address, session: session) })
+        self.onExit = onExit
+    }
+
+    var body: some View {
+        Group {
+            if let model {
+                AddCardFlowView(model: model, onExit: onExit)
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 

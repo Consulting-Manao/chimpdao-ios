@@ -126,10 +126,6 @@ final class WalletViewModel {
         // TODO(jalon 4) : ouvrir le wallet de la carte (B3).
     }
 
-    func addCard() {
-        // TODO(jalon 4) : ajouter une carte (G1).
-    }
-
     // MARK: Formatage
 
     /// Montants en dollars (`NetWorth.usd`, exact et tronqué au centime). Si un actif détenu n'a pas de prix, aucun total

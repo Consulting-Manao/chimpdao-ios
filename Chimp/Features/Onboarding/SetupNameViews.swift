@@ -1,15 +1,17 @@
 import SwiftUI
 
 /// A4 · Your name (étape 1 sur 3) : le prénom, gardé seulement sur le téléphone, pour dire bonjour.
-struct YourNameView: View {
-    @Bindable var model: AccountSetupModel
+struct YourNameView<Model: FirstNameEditing>: View {
+    @Bindable var model: Model
+    var step = 1
+    var steps = 3
     let onBack: () -> Void
     let onContinue: () -> Void
     @FocusState private var isFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(title: "What should I call you?", step: 1, steps: 3, onBack: onBack)
+            ChimpHeader(title: "What should I call you?", step: step, steps: steps, onBack: onBack)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     ChimpySays(text: "I'm Chimpy. And you are...?", pose: .head)
@@ -54,23 +56,28 @@ struct YourNameView: View {
 }
 
 /// A5 · Name your card (étape 2 sur 3) : nom et couleur, données locales, affichés chaque fois qu'une carte est demandée.
-struct NameYourCardView: View {
-    @Bindable var model: AccountSetupModel
+struct NameYourCardView<Model: CardNaming>: View {
+    @Bindable var model: Model
+    /// G1b (ajout d'une carte) : « Name your new card » · « Before you let it in ».
+    var title: LocalizedStringKey = "Name your card"
+    var subtitle: LocalizedStringKey?
+    var step = 2
+    var steps = 3
     let onBack: () -> Void
     let onContinue: () -> Void
     @FocusState private var isFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(title: "Name your card", step: 2, steps: 3, onBack: onBack)
+            ChimpHeader(title: title, subtitle: subtitle, step: step, steps: steps, onBack: onBack)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     ChimpCard(
                         name: model.trimmedCardName.isEmpty ? String(localized: "Jungle") : model.trimmedCardName,
                         color: model.cardColor,
                         number: model.cardNumber,
-                        amount: model.choice.pocketIsEmpty == true ? Decimal(0).formatted(.currency(code: "USD").presentation(.narrow)) : nil,
-                        subtitle: model.choice.pocketIsEmpty == true ? "on card" : nil
+                        amount: model.pocketIsEmpty == true ? Decimal(0).formatted(.currency(code: "USD").presentation(.narrow)) : nil,
+                        subtitle: model.pocketIsEmpty == true ? "on card" : nil
                     )
                     .frame(width: 250)
                     .frame(maxWidth: .infinity)

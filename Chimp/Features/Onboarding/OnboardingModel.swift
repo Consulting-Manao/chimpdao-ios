@@ -15,6 +15,8 @@ enum OnboardingRoute: Hashable {
     case reconnectPIN
     /// « Welcome back! » : prénom, nom et couleur de la carte, s'ils manquent sur ce téléphone.
     case welcomeBack
+    /// Rejoindre un compte avec la carte lue en A2 (A4 → A5 → A6 → A8 → A9), état dans `OnboardingModel.join`.
+    case join
     /// Création du compte (état dans `OnboardingModel.setup`) : A4, A5, A6, confirmation, code de déblocage,
     /// création en cours, A7.
     case yourName
@@ -100,6 +102,8 @@ final class OnboardingModel {
     private(set) var setup: AccountSetupModel?
     /// Reconnexion d'une carte déjà liée à un compte (PIN, « Welcome back! »), `nil` sinon.
     private(set) var reconnection: ReconnectModel?
+    /// Rejoindre un compte (A3 « Join an account I already have »), `nil` sinon.
+    private(set) var join: AddCardModel?
 
     private let session: AppSession
     private let reader: ChipReader
@@ -107,19 +111,45 @@ final class OnboardingModel {
     /// Vérification du PIN à la reconnexion (second tap).
     private let signer: ChipSigner
     private let makeSetup: (CardChoice) throws -> AccountSetupModel
+    /// Chaîne de l'ajout d'une carte ; `nil` : « Join » reste grisé (« Coming soon »).
+    private let joinService: AddCardService?
 
     init(
         session: AppSession,
         reader: ChipReader,
         service: OnboardingService,
         signer: ChipSigner,
+        joinService: AddCardService? = nil,
         makeSetup: @escaping (CardChoice) throws -> AccountSetupModel
     ) {
         self.session = session
         self.reader = reader
         self.service = service
         self.signer = signer
+        self.joinService = joinService
         self.makeSetup = makeSetup
+    }
+
+    // MARK: A3 · Rejoindre un compte
+
+    var canJoin: Bool { joinService != nil }
+
+    /// « Join an account I already have » (carte neuve) : la nouvelle carte d'abord (prénom, nom, couleur, PIN), puis une
+    /// carte du compte (A8) ; le compte s'ouvre sur ce téléphone après confirmation sur la chaîne (A9).
+    func startJoin(with choice: CardChoice) {
+        guard let joinService, case .fresh = choice.kind else { return }
+        join = AddCardModel(
+            entry: .join, session: session, reader: reader, signer: signer, service: joinService,
+            newCard: choice.card, tokenID: choice.tokenID
+        )
+        path.append(.join)
+    }
+
+    /// Sortie du parcours « rejoindre » sans l'avoir fini : retour à A3.
+    func leaveJoin() {
+        guard path.last == .join else { return }
+        path.removeLast()
+        join = nil
     }
 
     static let tourPageCount = 4

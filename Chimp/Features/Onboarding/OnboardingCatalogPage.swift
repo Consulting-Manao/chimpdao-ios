@@ -12,6 +12,7 @@ struct OnboardingCatalogPage: View {
     @State private var setupScenario = MockAccountSetupService.Scenario.success
     @State private var creationScenario = MockAccountCreationChain.Scenario.success
     @State private var pinScenario = ReconnectPINScenario.accepted
+    @State private var joinScenario = MockAddCardService.Scenario.success
     @State private var runningFlow: OnboardingModel?
     @State private var runningSession: AppSession?
 
@@ -44,6 +45,11 @@ struct OnboardingCatalogPage: View {
                     } label: {
                         Text(verbatim: "PIN check (member card with PIN)")
                     }
+                    Picker(selection: $joinScenario) {
+                        ForEach(MockAddCardService.Scenario.allCases) { Text(verbatim: $0.rawValue).tag($0) }
+                    } label: {
+                        Text(verbatim: "Join (fake chain)")
+                    }
                     Toggle(isOn: $tourSeen) { Text(verbatim: "Tour already seen") }
                     Button {
                         let session = AppSession(store: InMemoryLocalWalletStore(LocalWallet(tourSeen: tourSeen)), network: .testnet)
@@ -55,6 +61,7 @@ struct OnboardingCatalogPage: View {
                             reader: MockChipReader(scenario: readerScenario),
                             service: MockOnboardingService(scenario: serviceScenario),
                             signer: MockChipSigner(outcome: pinScenario.outcome),
+                            joinService: MockAddCardService(scenario: joinScenario),
                             makeSetup: { choice in
                                 try AccountSetupModel(
                                     choice: choice, service: MockAccountSetupService(scenario: setupScenario),

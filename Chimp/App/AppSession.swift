@@ -135,16 +135,38 @@ final class AppSession {
     /// Nom et couleur d'une carte du compte (données locales, rien on-chain). Une carte que ce téléphone ne connaissait
     /// pas encore (ajoutée ailleurs, lue par `cards()`) y est enregistrée avec ce que le Wallet a lu d'elle.
     func renameCard(_ card: SavedCard) throws {
-        guard var account = wallet.account else { throw SettingsError.noAccount }
+        guard let account = wallet.account else { throw SettingsError.noAccount }
+        var next = wallet
+        next.account = Self.upserting(card, into: account)
+        try persist(next)
+    }
+
+    /// Carte ajoutée au compte (G3), **après** confirmation sur la chaîne : enregistrée avec son nom et sa couleur, et
+    /// gardée comme indice « carte → compte » : une carte ajoutée n'a que lui pour retrouver son compte sur un téléphone
+    /// (`account.add_card` n'écrit aucun pointeur, `cardHint.ts`).
+    func addCard(_ card: SavedCard, account address: String, at date: Date = .now) throws {
+        guard let account = wallet.account, account.address == address else { throw SettingsError.noAccount }
+        var next = wallet
+        next.account = Self.upserting(card, into: account)
+        next.cardHints = CardHint.adding(CardHint(key: card.publicKey, account: address, at: date), to: next.cardHints)
+        try persist(next)
+    }
+
+    /// Rejoindre un compte depuis l'onboarding (A9) : même enregistrement qu'une création (`completeOnboarding`).
+    func completeJoin(account: String, card: SavedCard, firstName: String, at date: Date = .now) throws {
+        try completeOnboarding(account: account, card: card, firstName: firstName, at: date)
+    }
+
+    /// Une carte connue garde sa puce, son NFT et son wallet ; seuls le nom et la couleur changent. Sinon, elle est ajoutée.
+    private static func upserting(_ card: SavedCard, into account: SavedAccount) -> SavedAccount {
+        var account = account
         if let index = account.cards.firstIndex(where: { $0.publicKey == card.publicKey }) {
             account.cards[index].name = card.name
             account.cards[index].color = card.color
         } else {
             account.cards.append(card)
         }
-        var next = wallet
-        next.account = account
-        try persist(next)
+        return account
     }
 
     /// Prénom de « Hey Léo » (A4 : « you can change it in Settings »).

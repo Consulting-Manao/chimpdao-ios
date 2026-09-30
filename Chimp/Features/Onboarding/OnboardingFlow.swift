@@ -34,7 +34,10 @@ struct OnboardingFlow: View {
                 Task { await model.scan() }
             }
         case .choice(let choice):
-            CardChoiceView(choice: choice) { model.startNewAccount(with: choice) }
+            CardChoiceView(
+                choice: choice, onStartNewAccount: { model.startNewAccount(with: choice) },
+                onJoin: model.canJoin ? { model.startJoin(with: choice) } : nil
+            )
         case .notAChimpCard:
             NotAChimpCardView(onTryAnother: model.tryAnotherCard)
         case .reconnectPIN:
@@ -47,6 +50,10 @@ struct OnboardingFlow: View {
         case .welcomeBack:
             if let reconnection = model.reconnection {
                 WelcomeBackView(model: reconnection, onBack: model.cancelReconnection, onFinish: model.finishWelcomeBack)
+            }
+        case .join:
+            if let join = model.join {
+                AddCardFlowView(model: join, onExit: model.leaveJoin)
             }
         case .yourName:
             if let setup = model.setup { YourNameView(model: setup, onBack: model.back, onContinue: model.continueFromName) }
@@ -100,7 +107,7 @@ extension OnboardingModel {
         if !NFCTagReaderSession.readingAvailable {
             return OnboardingModel(
                 session: session, reader: MockChipReader(scenario: .infineon), service: MockOnboardingService(scenario: .fresh),
-                signer: MockChipSigner(),
+                signer: MockChipSigner(), joinService: MockAddCardService(),
                 makeSetup: { choice in
                     try AccountSetupModel(
                         choice: choice, service: MockAccountSetupService(), creator: AccountCreator(chain: MockAccountCreationChain()),
@@ -112,7 +119,7 @@ extension OnboardingModel {
         #endif
         return OnboardingModel(
             session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: .testnet),
-            signer: NFCChipSigner(),
+            signer: NFCChipSigner(), joinService: ChainAddCardService(config: .testnet),
             makeSetup: { choice in try Self.liveSetup(choice: choice, session: session) }
         )
     }

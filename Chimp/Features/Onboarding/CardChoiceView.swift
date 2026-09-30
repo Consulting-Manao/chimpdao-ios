@@ -7,6 +7,8 @@ import SwiftUI
 struct CardChoiceView: View {
     let choice: CardChoice
     let onStartNewAccount: () -> Void
+    /// « Join an account I already have » (A8) ; `nil` : grisé, « Coming soon ».
+    var onJoin: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,8 +38,8 @@ struct CardChoiceView: View {
                         ChimpChoiceCard(
                             title: "Join an account I already have",
                             detail: "You'll tap one of that account's cards next, to let this one in.",
-                            isAvailable: false
-                        ) {}
+                            isAvailable: onJoin != nil
+                        ) { onJoin?() }
                     }
                 }
                 .padding(.top, ChimpSpacing.xl)

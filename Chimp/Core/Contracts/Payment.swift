@@ -28,17 +28,11 @@ struct PaymentClient {
         case insufficientBalance(held: Decimal)
         /// Solde illisible : on ne dépense jamais sur un solde inconnu (« fail-closed »).
         case balanceUnknown
-        /// La simulation n'a rendu aucune autorisation (`simulation missing auth for … transfer`).
-        case missingAuthorization
-        /// La simulation a rendu autre chose qu'une seule autorisation, ou une autre opération que celle demandée.
-        case unexpectedAuthorization(String)
 
         var errorDescription: String? {
             switch self {
             case .insufficientBalance(let held): "Insufficient balance (\(held) units held)."
             case .balanceUnknown: "The balance couldn't be read, so nothing was signed."
-            case .missingAuthorization: "The simulation returned no authorization for the transfer."
-            case .unexpectedAuthorization(let detail): "Unexpected authorization from the simulation: \(detail)"
             }
         }
     }
@@ -52,6 +46,7 @@ struct PaymentClient {
     /// Défense en profondeur, absente du terminal : l'entrée rendue doit être **exactement** l'appel demandé (même
     /// contrat, `transfer`, mêmes arguments, aucun sous-appel), sinon rien n'est signé. Sans cela, un serveur RPC
     /// malveillant pourrait faire signer à la carte un autre transfert que celui affiché (règle 8).
+    /// La simulation et cette vérification sont dans `AuthorizedCall.prepareAccountEntry` (partagée avec `add_card`).
     func prepareFromAccount(account: String, token: String, destination: String, units: UInt64) async throws -> PreparedPayment {
         let source = try await client.account(config.feePayer)
         async let heldRead = SACClient(client: client).balance(token: token, holder: account, source: try PocketClient.copy(source))
@@ -59,24 +54,15 @@ struct PaymentClient {
         try Self.checkBalance(try await heldRead, units: units)
         let cards = try await cardsRead
 
-        let arguments = try SACClient.transferArguments(from: account, to: destination, units: units)
-        let transaction = try client.contractCall(source: try PocketClient.copy(source), contract: token, function: "transfer", arguments: arguments)
-        let simulation = try await client.simulate(transaction)
-        guard let entries = simulation.sorobanAuth, !entries.isEmpty else { throw PaymentError.missingAuthorization }
-        let simulatedLedger = UInt32(clamping: simulation.latestLedger)
-        let expiration = simulatedLedger + SorobanAuth.expirationLedgers
-        let pending = try SorobanAuth.pendingEntries(entries, signer: account, passphrase: config.passphrase, expirationLedger: expiration)
-        guard pending.count == 1, let only = pending.first else {
-            throw PaymentError.unexpectedAuthorization("\(pending.count) entries to sign")
-        }
-        let expected = try SorobanAuth.contractInvocation(contract: token, function: "transfer", arguments: arguments)
-        guard try XDREncoder.encode(only.entry.rootInvocation) == XDREncoder.encode(expected) else {
-            throw PaymentError.unexpectedAuthorization("the authorized call is not the requested transfer")
-        }
+        let prepared = try await AuthorizedCall.prepareAccountEntry(
+            client: client, source: source, account: account, contract: token, function: "transfer",
+            arguments: try SACClient.transferArguments(from: account, to: destination, units: units),
+            passphrase: config.passphrase
+        )
         return PreparedPayment(
             authorizer: .account(account), token: token, destination: destination, units: units,
-            entry: only.entry, digest: only.digest, expirationLedger: expiration,
-            preparedAtLedger: simulatedLedger, acceptedKeys: cards.map(\.publicKey)
+            entry: prepared.entry, digest: prepared.digest, expirationLedger: prepared.expirationLedger,
+            preparedAtLedger: prepared.simulatedLedger, acceptedKeys: cards.map(\.publicKey)
         )
     }
 
@@ -133,29 +119,13 @@ struct PaymentClient {
             guard signed.signatures.count == 1, let signature = signed.signatures.first else {
                 throw ChipError.malformedResponse("expected 1 signature, got \(signed.signatures.count)")
             }
-            let source = try await client.account(config.feePayer)
-            let arguments = try SACClient.transferArguments(from: prepared.from, to: prepared.destination, units: prepared.units)
-            let build = { (chipAuth: SCValXDR) async throws -> Transaction in
-                let entry = try SorobanAuth.restamped(prepared.entry, signature: prepared.envelope(chipAuth, card: signed.card.publicKey))
-                let transaction = try client.contractCall(
-                    source: try PocketClient.copy(source), contract: prepared.token, function: "transfer",
-                    arguments: arguments, auth: [entry]
-                )
-                // Une entrée signée est jointe : le RPC simule en mode `enforce` (`prepareTransaction` du terminal).
-                try client.assemble(transaction, with: try await client.simulate(transaction))
-                return transaction
-            }
-            let transaction: Transaction
-            switch (signed.card.curve, signature) {
-            case (.secp256k1, .secp256k1(let bytes)):
-                transaction = try await RecoveryIDSearch.first(rejectionCode: prepared.rejectionCode) { recoveryID in
-                    try await build(try ChipAuthEncoding.chipAuthSecp256k1(signature: bytes, recoveryID: recoveryID))
-                }.result
-            case (.p256, .p256(let bytes, let rndB)):
-                transaction = try await build(try ChipAuthEncoding.chipAuthSecp256r1(signature: bytes, rndB: rndB))
-            default:
-                throw ChipError.malformedResponse("the signature doesn't match the card's curve")
-            }
+            let transaction = try await AuthorizedCall.assembled(
+                client: client, source: try await client.account(config.feePayer),
+                contract: prepared.token, function: "transfer",
+                arguments: try SACClient.transferArguments(from: prepared.from, to: prepared.destination, units: prepared.units),
+                entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCode: prepared.rejectionCode,
+                envelope: { prepared.envelope($0, card: signed.card.publicKey) }
+            )
             trace.transactionMaxTime = transaction.preconditions?.timeBounds?.maxTime
             onProgress?(.sending)
             return try await client.refitAndSubmit(transaction, feeSigner: feeSigner) { onProgress?(.confirming) }
