@@ -260,3 +260,31 @@ struct SettingsTests {
         #expect(ThirdPartyLicense.all.first { $0.name == "stellar-ios-mac-sdk" }?.text()?.contains("Apache License") == true)
     }
 }
+
+/// « Network » (I2) : affichage seulement, le réseau vient de la configuration de build (session « Réglages », point 5).
+struct NetworkRowTests {
+    @Test("Debug et Testing : Testnet choisi, Mainnet grisé « Coming soon »")
+    func developerBuild() {
+        let row = SettingsModel.networkRow(current: .testnet, isDeveloperBuild: true)
+        #expect(row.options == [.testnet, .mainnet])
+        #expect(row.current == .testnet)
+        #expect(row.comingSoon == [.mainnet])
+    }
+
+    @Test("Release : seulement le réseau réellement utilisé, sans autre option ni « Coming soon »")
+    func releaseBuild() {
+        let testnet = SettingsModel.networkRow(current: .testnet, isDeveloperBuild: false)
+        #expect(testnet.options == [.testnet] && testnet.comingSoon.isEmpty)
+        let mainnet = SettingsModel.networkRow(current: .mainnet, isDeveloperBuild: false)
+        #expect(mainnet.options == [.mainnet] && mainnet.comingSoon.isEmpty)
+    }
+
+    @Test("Les tests tournent en Debug : la ligne des réglages suit le réseau de la session")
+    func rowFollowsSession() {
+        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let model = SettingsModel(session: session, walletCards: [])
+        #expect(SettingsModel.isDeveloperBuild)
+        #expect(model.networkRow == SettingsModel.networkRow(current: .testnet, isDeveloperBuild: true))
+        #expect(StellarNetwork.testnet.shortName == "Testnet" && StellarNetwork.mainnet.shortName == "Mainnet")
+    }
+}

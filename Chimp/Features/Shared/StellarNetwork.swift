@@ -13,4 +13,12 @@ enum StellarNetwork: String, Equatable, Sendable {
         case .mainnet: "Stellar"
         }
     }
+
+    /// Libellé court du sélecteur « Network » des réglages (I2, maquette : « Mainnet », « Testnet »).
+    var shortName: String {
+        switch self {
+        case .testnet: "Testnet"
+        case .mainnet: "Mainnet"
+        }
+    }
 }

@@ -192,6 +192,43 @@ final class SettingsModel {
         set { session.preferences.look = newValue }
     }
 
+    // MARK: Network (affichage seulement)
+
+    /// Ce que montre la ligne « Network » (I2). **Jamais un interrupteur** : le réseau vient de la configuration de build,
+    /// l'app ne le change pas (DESIGN_NOTES §12, 2026-09-30).
+    struct NetworkRow: Equatable {
+        /// Segments affichés, dans l'ordre.
+        let options: [StellarNetwork]
+        /// Réseau réellement utilisé par l'app : le segment choisi.
+        let current: StellarNetwork
+        /// Segments grisés « Coming soon » : un toucher montre la bulle de Chimpy, rien ne change.
+        let comingSoon: Set<StellarNetwork>
+    }
+
+    /// Debug et Testing : Testnet (le réseau utilisé) et Mainnet grisé « Coming soon ». Release : **seulement** le réseau
+    /// réellement utilisé, sans autre option ni « Coming soon » (décision de Barth du 2026-09-30).
+    static func networkRow(current: StellarNetwork, isDeveloperBuild: Bool) -> NetworkRow {
+        guard isDeveloperBuild else { return NetworkRow(options: [current], current: current, comingSoon: []) }
+        let options: [StellarNetwork] = [.testnet, .mainnet]
+        return NetworkRow(options: options, current: current, comingSoon: Set(options.filter { $0 != current }))
+    }
+
+    /// Build de développement (Debug, Testing) : ceux qui ont le catalogue et le mode admin.
+    static var isDeveloperBuild: Bool {
+        #if DESIGN_CATALOG
+        true
+        #else
+        false
+        #endif
+    }
+
+    var networkRow: NetworkRow {
+        Self.networkRow(current: session.network, isDeveloperBuild: Self.isDeveloperBuild)
+    }
+
+    /// Bulle « Real bananas are coming soon! » après un toucher sur un réseau grisé.
+    var isShowingNetworkBubble = false
+
     // MARK: Visite, aide, version
 
     /// « How ChimpDAO works · Replay the tour ».

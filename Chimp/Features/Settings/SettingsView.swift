@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// I2 · Settings (maquette) : prénom, nom et couleur des cartes, apparence, visite, « Disconnect this phone », « Erase
-/// everything on this phone », liens (licences, aide), version. Les lignes de la maquette pas encore faisables (changer de
-/// compte, paranoid mode, Face ID, devise, shop mode, raw signing) ne sont pas affichées : aucune ligne sans
+/// I2 · Settings (maquette) : prénom, nom et couleur des cartes, apparence, réseau (affichage seulement), visite,
+/// « Disconnect this phone », « Erase everything on this phone », liens (licences, aide), version. Les lignes de la
+/// maquette pas encore faisables (paranoid mode, shop mode, raw signing) ne sont pas affichées : aucune ligne sans
 /// destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision de Barth du
-/// 2026-09-30). Pas de choix du réseau (décision du 2026-09-28). En Debug et Testing, une section « Developer » ouvre le
-/// catalogue et le mode admin.
+/// 2026-09-30). « Network » montre le réseau de la configuration de build, jamais un interrupteur (2026-09-30). En Debug
+/// et Testing, une section « Developer » ouvre le catalogue et le mode admin.
 struct SettingsView: View {
     @Bindable var model: SettingsModel
     let onBack: () -> Void
@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var isShowingLicenses = false
     /// Carte dont on change le PIN.
     @State private var pinCard: PINCard?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,11 +55,19 @@ struct SettingsView: View {
                     sectionLabel("More")
                         .padding(.top, ChimpSpacing.sectionGap)
                     ChimpGroupedBox {
+                        ChimpSettingsControlRow(title: "Network") {
+                            networkPicker
+                        }
                         ChimpSettingsRow(title: "How ChimpDAO works", value: String(localized: "Replay the tour")) {
                             model.isReplayingTour = true
                         }
                     }
                     .padding(.top, ChimpSpacing.s)
+                    if model.isShowingNetworkBubble {
+                        ChimpySays(text: "Real bananas are coming soon!", pose: .banana)
+                            .padding(.top, ChimpSpacing.m)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
 
                     if let onDeveloper {
                         sectionLabel("Developer")
@@ -224,6 +233,36 @@ struct SettingsView: View {
                 .foregroundStyle(.chimpTextSecondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: Network
+
+    /// Affichage seulement : le segment choisi est toujours le réseau de l'app. Un segment grisé ne change rien, il
+    /// montre la bulle de Chimpy quelques secondes.
+    private var networkPicker: some View {
+        let row = model.networkRow
+        return ChimpSegmentedPicker(
+            segments: row.options.map { network in
+                ChimpSegment(
+                    value: network,
+                    title: LocalizedStringKey(network.shortName),
+                    isEnabled: !row.comingSoon.contains(network),
+                    badge: row.comingSoon.contains(network) ? "Coming soon" : nil
+                )
+            },
+            selection: .constant(row.current),
+            onDisabledTap: { _ in showNetworkBubble() }
+        )
+        .task(id: model.isShowingNetworkBubble) {
+            guard model.isShowingNetworkBubble else { return }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { model.isShowingNetworkBubble = false }
+        }
+    }
+
+    private func showNetworkBubble() {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { model.isShowingNetworkBubble = true }
+        AccessibilityNotification.Announcement(String(localized: "Real bananas are coming soon!")).post()
     }
 
     // MARK: Liens (maquette : « Terms Privacy Licenses Help »)
