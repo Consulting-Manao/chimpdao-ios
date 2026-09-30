@@ -24,6 +24,8 @@
 	<true/>
 	<key>NFCReaderUsageDescription</key>
 	<string>This app uses NFC to read/write data and sign messages to the chip. Allowing to claim and transfer the merch on the blockchain.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>ChimpDAO uses Face ID to lock the app, so only you can open it. Face ID never signs anything: your cards do.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
