@@ -9,6 +9,8 @@ enum OnboardingRoute: Hashable {
     case reading
     /// A3 : carte neuve ou orpheline, que doit-elle faire ?
     case choice(CardChoice)
+    /// H1 : carte neuve chargée d'argent (carte cadeau), mêmes choix qu'A3.
+    case giftCard(CardChoice)
     /// H3 : pas une vraie carte ChimpDAO.
     case notAChimpCard
     /// Reconnexion d'une Infineon avec PIN : PIN, puis second tap (état dans `OnboardingModel.reconnection`).
@@ -47,6 +49,8 @@ struct CardChoice: Hashable {
     let pocket: String?
     /// La Pocket est vide ; `nil` si on ne le sait pas.
     let pocketIsEmpty: Bool?
+    /// Soldes de la Pocket (H1), `nil` si on ne les connaît pas.
+    var pocketBalances: [AssetAmount]? = nil
 }
 
 extension ChipKeyInfo: Hashable {
@@ -113,6 +117,8 @@ final class OnboardingModel {
     private let makeSetup: (CardChoice) throws -> AccountSetupModel
     /// Chaîne de l'ajout d'une carte ; `nil` : « Join » reste grisé (« Coming soon »).
     private let joinService: AddCardService?
+    /// Prix en dollars des soldes d'une carte cadeau (H1) ; `nil` : montants par actif.
+    let oracle: PriceOracle?
 
     init(
         session: AppSession,
@@ -120,8 +126,10 @@ final class OnboardingModel {
         service: OnboardingService,
         signer: ChipSigner,
         joinService: AddCardService? = nil,
+        oracle: PriceOracle? = nil,
         makeSetup: @escaping (CardChoice) throws -> AccountSetupModel
     ) {
+        self.oracle = oracle
         self.session = session
         self.reader = reader
         self.service = service
@@ -153,6 +161,9 @@ final class OnboardingModel {
     }
 
     static let tourPageCount = 4
+
+    /// H2 · « Look who's back! » : ce téléphone a déjà ouvert un compte, fermé depuis par « Disconnect this phone ».
+    var isReturning: Bool { session.wallet.disconnectedAccounts?.isEmpty == false }
 
     var isBusy: Bool { readingState == .scanning || readingState == .checking }
 
@@ -230,7 +241,8 @@ final class OnboardingModel {
         switch inspection.resolution {
         case .enrolled:
             readingState = .idle
-            path.append(.choice(choice(.fresh, inspection)))
+            // Une carte neuve qui arrive avec de l'argent sur son wallet : H1 (« Somebody likes you! »), sinon A3.
+            path.append(inspection.isLoadedGiftCard ? .giftCard(choice(.fresh, inspection)) : .choice(choice(.fresh, inspection)))
         case .orphan(let lastKnown):
             readingState = .idle
             path.append(.choice(choice(.orphan(lastKnown: lastKnown), inspection)))
@@ -294,7 +306,10 @@ final class OnboardingModel {
     }
 
     private func choice(_ kind: CardChoice.Kind, _ inspection: CardInspection) -> CardChoice {
-        CardChoice(kind: kind, card: inspection.card, tokenID: inspection.tokenID, pocket: inspection.pocket, pocketIsEmpty: inspection.pocketIsEmpty)
+        CardChoice(
+            kind: kind, card: inspection.card, tokenID: inspection.tokenID, pocket: inspection.pocket,
+            pocketIsEmpty: inspection.pocketIsEmpty, pocketBalances: inspection.pocketBalances
+        )
     }
 
     /// Carte sans clé, puce inconnue ou tag qui n'est pas une carte : ce n'est pas une carte ChimpDAO (H3).

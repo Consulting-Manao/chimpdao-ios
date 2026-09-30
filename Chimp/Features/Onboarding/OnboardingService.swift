@@ -11,6 +11,14 @@ struct CardInspection: Equatable {
     let pocket: String?
     /// La Pocket est vide (XLM et USDC à zéro) ; `nil` si on ne le sait pas (lecture sans réponse ou en échec).
     let pocketIsEmpty: Bool?
+    /// Soldes XLM et USDC de la Pocket (carte neuve ou orpheline), `nil` si on ne les connaît pas.
+    var pocketBalances: [AssetAmount]? = nil
+
+    /// Carte neuve chargée d'argent (H1 · A gift card).
+    var isLoadedGiftCard: Bool {
+        guard case .enrolled = resolution else { return false }
+        return pocketBalances?.contains { $0.amount != 0 } == true
+    }
 }
 
 /// Le réseau vu par l'onboarding. Implémenté par `ChainOnboardingService` (testnet) et `MockOnboardingService`.
@@ -34,17 +42,20 @@ struct ChainOnboardingService: OnboardingService {
             return CardInspection(card: card, resolution: resolution, tokenID: state.tokenID, pocket: state.pocket, pocketIsEmpty: nil)
         case .enrolled, .orphan:
             let state = try await resolver.state(of: card.publicKey)
-            var empty: Bool?
+            var balances: [AssetAmount]?
             if let pocket = state.pocket {
-                // Affichage seulement (A3 « $0.00, empty ») : une lecture ratée donne « on ne sait pas », jamais « vide ».
-                empty = try? await pocketIsEmpty(pocket)
+                // Affichage seulement (A3 « $0.00, empty », H1) : une lecture ratée donne « on ne sait pas », jamais « vide ».
+                balances = try? await pocketBalances(pocket)
             }
-            return CardInspection(card: card, resolution: resolution, tokenID: state.tokenID, pocket: state.pocket, pocketIsEmpty: empty)
+            return CardInspection(
+                card: card, resolution: resolution, tokenID: state.tokenID, pocket: state.pocket,
+                pocketIsEmpty: balances.map { $0.allSatisfy { $0.amount == 0 } }, pocketBalances: balances
+            )
         }
     }
 
-    /// XLM et USDC de la Pocket à zéro ? `nil` si un solde n'a rendu aucune valeur.
-    private func pocketIsEmpty(_ pocket: String) async throws -> Bool? {
+    /// Soldes XLM et USDC de la Pocket, en unités de l'actif. `nil` si un solde n'a rendu aucune valeur.
+    private func pocketBalances(_ pocket: String) async throws -> [AssetAmount]? {
         let client = SorobanClient(config: config)
         let source = try await client.account(config.feePayer)
         let sac = SACClient(client: client)
@@ -52,12 +63,13 @@ struct ChainOnboardingService: OnboardingService {
             Asset(type: AssetType.ASSET_TYPE_NATIVE)!,
             Asset(type: AssetType.ASSET_TYPE_CREDIT_ALPHANUM4, code: "USDC", issuer: try KeyPair(accountId: config.usdcIssuer))!,
         ]
-        for asset in assets {
+        var balances: [AssetAmount] = []
+        for (code, asset) in zip(["XLM", "USDC"], assets) {
             let token = try SACClient.contractID(for: asset, network: client.network)
             guard let units = try await sac.balance(token: token, holder: pocket, source: source) else { return nil }
-            if units != 0 { return false }
+            balances.append(AssetAmount(code: code, amount: SACClient.amount(fromUnits: units)))
         }
-        return true
+        return balances
     }
 }
 
@@ -96,7 +108,10 @@ struct MockOnboardingService: OnboardingService {
         case .fresh:
             return CardInspection(card: card, resolution: .enrolled, tokenID: 7, pocket: pocket, pocketIsEmpty: true)
         case .freshWithMoney:
-            return CardInspection(card: card, resolution: .enrolled, tokenID: 688, pocket: pocket, pocketIsEmpty: false)
+            return CardInspection(
+                card: card, resolution: .enrolled, tokenID: 688, pocket: pocket, pocketIsEmpty: false,
+                pocketBalances: [AssetAmount(code: "XLM", amount: 250), AssetAmount(code: "USDC", amount: 40)]
+            )
         case .orphan:
             return CardInspection(card: card, resolution: .orphan(lastKnown: Self.memberAccount), tokenID: 421, pocket: pocket, pocketIsEmpty: true)
         case .member:

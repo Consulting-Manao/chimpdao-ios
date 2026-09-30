@@ -1,7 +1,7 @@
 import Foundation
 
 /// Montant d'un actif, en unités de l'actif (« 25 » USDC), jamais en unités on-chain.
-struct AssetAmount: Equatable {
+struct AssetAmount: Hashable, Sendable {
     var code: String
     var amount: Decimal
 }

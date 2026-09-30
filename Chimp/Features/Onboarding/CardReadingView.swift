@@ -3,8 +3,12 @@ import SwiftUI
 /// A2 · Reading the card : écran plein pendant que la feuille NFC d'iOS lit la carte, puis pendant la vérification
 /// en ligne. États ajoutés à la maquette (DESIGN_NOTES §11) : attente d'un nouveau scan, vérification, problème
 /// (message de Chimpy + détails techniques). Rien n'est signé ni payé.
+///
+/// H2 · New phone (« Look who's back! ») : même écran, quand ce téléphone a déjà ouvert un compte fermé depuis par
+/// « Disconnect this phone » (`isReturning`) : titre, phrase et bulle de Chimpy de la maquette.
 struct CardReadingView: View {
     let state: OnboardingModel.ReadingState
+    var isReturning = false
     let onScan: () -> Void
 
     var body: some View {
@@ -18,6 +22,17 @@ struct CardReadingView: View {
                 .padding(.horizontal, 30)
                 .accessibilityAddTraits(.isHeader)
                 .animation(nil, value: state)
+
+            if showsReturningText {
+                Text("Tap any card from your account to open it on this phone.")
+                    .chimpFont(.bodyL)
+                    .lineSpacing(4)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.chimpOnHeaderSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, ChimpSpacing.sm)
+                    .padding(.horizontal, 30)
+            }
 
             ChimpNFCRings(config: ChimpMotion.Ring.fullScreen, size: 290) {
                 Image(.tileHead)
@@ -45,14 +60,28 @@ struct CardReadingView: View {
                     .padding(.bottom, ChimpSpacing.lg)
             }
 
-            ChimpFullScreenBanner(text: "Nothing is moved yet. I'm just saying hello to the card.")
+            if showsReturningText {
+                ChimpySays(text: "Just once. After that, peek at your bananas anytime, no card.", pose: .crawl)
+                    .padding(.horizontal, ChimpSpacing.fullScreenMargin)
+                    .padding(.bottom, ChimpSpacing.xl)
+            } else {
+                ChimpFullScreenBanner(text: "Nothing is moved yet. I'm just saying hello to the card.")
+            }
         }
         .chimpFullScreenBackground(patternOpacity: 0.12)
         .blocksSwipeBack(state == .scanning || state == .checking)
     }
 
     private var title: LocalizedStringKey {
-        state == .checking ? "Checking your card…" : "Hold the card to the top of your phone"
+        if state == .checking { return "Checking your card…" }
+        return isReturning ? "Look who's back!" : "Hold the card to the top of your phone"
+    }
+
+    /// Phrase et bulle d'H2, tant qu'aucun problème ne prend la place de la bulle.
+    private var showsReturningText: Bool {
+        guard isReturning else { return false }
+        if case .failed = state { return false }
+        return state != .checking
     }
 
     private var showsScanButton: Bool {
@@ -84,6 +113,10 @@ struct CardReadingView: View {
 
 #Preview("Scanning") {
     CardReadingView(state: .scanning, onScan: {})
+}
+
+#Preview("H2 · New phone") {
+    CardReadingView(state: .idle, isReturning: true, onScan: {})
 }
 
 #Preview("Problem") {

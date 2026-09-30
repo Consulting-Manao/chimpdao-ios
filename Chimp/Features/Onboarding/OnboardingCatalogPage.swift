@@ -93,6 +93,10 @@ struct OnboardingCatalogPage: View {
                     demo("A3 · Fresh card, empty") { CardChoiceView(choice: Self.choice(.fresh, empty: true), onStartNewAccount: {}) }
                     demo("A3 · Fresh card with money") { CardChoiceView(choice: Self.choice(.fresh, empty: false), onStartNewAccount: {}) }
                     demo("A3 · Orphan card") { CardChoiceView(choice: Self.choice(.orphan(lastKnown: nil), empty: nil), onStartNewAccount: {}) }
+                    demo("H1 · A gift card") {
+                        GiftCardView(model: GiftCardModel(choice: Self.giftChoice, oracle: nil), onJoin: {}, onStartNewAccount: {})
+                    }
+                    demo("H2 · New phone (Look who's back!)") { CardReadingView(state: .idle, isReturning: true, onScan: {}) }
                     demo("H3 · Not a real Chimp card") { NotAChimpCardView(onTryAnother: {}) }
                 } header: {
                     Text(verbatim: "Screens")
@@ -139,6 +143,13 @@ struct OnboardingCatalogPage: View {
         ("A2 · Couldn't check online", .init(kind: .couldntCheck, technicalDetails: "Stellar RPC error: The request timed out.")),
         ("A2 · Read failed", .init(kind: .readFailed, technicalDetails: "GET KEY INFO failed (status 6D00).")),
     ]
+
+    /// Carte cadeau de la maquette H1 : 250 XLM et 40 USDC (prix en dollars absents : montants par actif).
+    private static let giftChoice = CardChoice(
+        kind: .fresh, card: ChipKeyInfo(kind: .infineon2Go, publicKey: MockChipReader.secp256k1Key, pinActive: false),
+        tokenID: 688, pocket: nil, pocketIsEmpty: false,
+        pocketBalances: [AssetAmount(code: "XLM", amount: 250), AssetAmount(code: "USDC", amount: 40)]
+    )
 
     private static func choice(_ kind: CardChoice.Kind, empty: Bool?) -> CardChoice {
         CardChoice(kind: kind, card: ChipKeyInfo(kind: .infineon2Go, publicKey: MockChipReader.secp256k1Key, pinActive: false),

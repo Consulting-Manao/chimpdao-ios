@@ -30,13 +30,19 @@ struct OnboardingFlow: View {
         case .tour:
             TourView(page: $model.tourPage, onNext: model.nextTourPage, onSkip: model.finishTour)
         case .reading:
-            CardReadingView(state: model.readingState) {
+            CardReadingView(state: model.readingState, isReturning: model.isReturning) {
                 Task { await model.scan() }
             }
         case .choice(let choice):
             CardChoiceView(
                 choice: choice, onStartNewAccount: { model.startNewAccount(with: choice) },
                 onJoin: model.canJoin ? { model.startJoin(with: choice) } : nil
+            )
+        case .giftCard(let choice):
+            GiftCardView(
+                model: GiftCardModel(choice: choice, oracle: model.oracle),
+                onJoin: model.canJoin ? { model.startJoin(with: choice) } : nil,
+                onStartNewAccount: { model.startNewAccount(with: choice) }
             )
         case .notAChimpCard:
             NotAChimpCardView(onTryAnother: model.tryAnotherCard)
@@ -119,7 +125,7 @@ extension OnboardingModel {
         #endif
         return OnboardingModel(
             session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: .testnet),
-            signer: NFCChipSigner(), joinService: ChainAddCardService(config: .testnet),
+            signer: NFCChipSigner(), joinService: ChainAddCardService(config: .testnet), oracle: ReflectorPriceOracle(),
             makeSetup: { choice in try Self.liveSetup(choice: choice, session: session) }
         )
     }
