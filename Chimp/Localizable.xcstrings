@@ -4,11 +4,15 @@
     "%@" : {
 
     },
-    "%@ joined" : {
-
-    },
-    "%@ paid you" : {
-
+    "%@ · N°%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · N°%2$@"
+          }
+        }
+      }
     },
     "%@ · N°%@ is ready" : {
       "localizations" : {
@@ -20,13 +24,25 @@
         }
       }
     },
+    "%@ · Ready" : {
+
+    },
     "%@ already points to your account." : {
 
     },
     "%@ becomes its first card." : {
 
     },
+    "%@ can no longer use Main" : {
+
+    },
+    "%@ card" : {
+
+    },
     "%@ card, number %@" : {
+
+    },
+    "%@ checks your current PIN" : {
 
     },
     "%@ gets it in about 5 seconds" : {
@@ -61,13 +77,31 @@
     "%@ is in the gang!" : {
 
     },
+    "%@ is locked out" : {
+
+    },
+    "%@ is removed from your account" : {
+
+    },
+    "%@ is your only card" : {
+
+    },
+    "%@ joined" : {
+
+    },
     "%@ leaves %@" : {
+
+    },
+    "%@ left your account" : {
 
     },
     "%@ links itself to your account with a tap." : {
 
     },
     "%@ links itself to your account. It checks its PIN when you tap." : {
+
+    },
+    "%@ paid you" : {
 
     },
     "%@ ready" : {
@@ -79,10 +113,32 @@
     "%@ this week" : {
 
     },
+    "%@'s account" : {
+
+    },
     "%@'s PIN" : {
 
     },
+    "%@'s PIN is changed" : {
+
+    },
     "%@'s wallet" : {
+
+    },
+    "%@'s wallet · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@'s wallet · %2$@"
+          }
+        }
+      }
+    },
+    "%@'s wallet is empty. Tap Receive or Move to fill it." : {
+
+    },
+    "%lld cards" : {
 
     },
     "%lld cards in your account now. Keep one at home as a spare." : {
@@ -95,184 +151,10 @@
     "+ Add" : {
 
     },
+    "+ Add an account · tap one of its cards" : {
+
+    },
     "+$6.20 this week" : {
-
-    },
-    "A new card" : {
-
-    },
-    "A signed payment not confirmed yet, on top" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Activity states" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Added to" : {
-
-    },
-    "All drawers" : {
-
-    },
-    "Approved by" : {
-
-    },
-    "approved by %@" : {
-
-    },
-    "Checking…" : {
-
-    },
-    "Chimpy-certified" : {
-
-    },
-    "Confirmed" : {
-
-    },
-    "Copy the transaction" : {
-
-    },
-    "Couldn't refresh. Showing what this phone already has." : {
-
-    },
-    "Day total per asset" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Day total: %@" : {
-
-    },
-    "Empty" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Fee" : {
-
-    },
-    "First read that never ends" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "from %@" : {
-
-    },
-    "Got it" : {
-
-    },
-    "into %@" : {
-
-    },
-    "Kept lines, refresh fails" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Moved" : {
-
-    },
-    "Moved to %@" : {
-
-    },
-    "Moving to %@" : {
-
-    },
-    "New card" : {
-
-    },
-    "Nothing here yet. Payments, moves and new cards will show up here." : {
-
-    },
-    "Nothing kept, Stellar unreachable" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Nothing moved here yet." : {
-
-    },
-    "Nothing moved yet" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Opens the payment's status" : {
-
-    },
-    "Opens the receipt" : {
-
-    },
-    "Paid" : {
-
-    },
-    "Paid by ChimpDAO" : {
-
-    },
-    "Pay again" : {
-
-    },
-    "Paying %@" : {
-
-    },
-    "Payment waiting" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Pending" : {
-
-    },
-    "Reading older days on Stellar…" : {
-
-    },
-    "Reading the last 7 days on Stellar…" : {
-
-    },
-    "Refresh failed" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Share" : {
-
-    },
-    "Status" : {
-
-    },
-    "Stellar only keeps about a week of history. What this phone has seen stays here." : {
-
-    },
-    "Thanks for monkeying around" : {
-
-    },
-    "Today" : {
-
-    },
-    "Today, yesterday and older: paid, got, moved, new card" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Total" : {
-
-    },
-    "Transaction %@" : {
-
-    },
-    "Transaction copied" : {
-
-    },
-    "Tx" : {
-
-    },
-    "Wait until %@" : {
-
-    },
-    "Waiting" : {
-
-    },
-    "XLM and USDC the same day" : {
-      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
-      "extractionState" : "manual"
-    },
-    "Yesterday" : {
-
-    },
-    "You paid %@" : {
 
     },
     "≈ %@" : {
@@ -281,6 +163,9 @@
     "$820 ready · $500 growing" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "1 card" : {
+
     },
     "1 card to start · add as many as you like" : {
 
@@ -304,8 +189,24 @@
     "A Main account,\nplus one per card" : {
 
     },
+    "A new card" : {
+
+    },
+    "A payment is still being checked. Open Send to see how it ended, then try again." : {
+
+    },
     "A payment is still being checked. Open Send to see how it ended, then you can disconnect." : {
 
+    },
+    "A payment is still being checked. Open Send to see how it ended, then you can erase." : {
+
+    },
+    "A payment is still being checked. Open Send to see how it ended, then you can switch accounts." : {
+
+    },
+    "A signed payment not confirmed yet, on top" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
     },
     "Accessibility 1" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -319,11 +220,24 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Account ···%@" : {
+
+    },
     "Action tiles" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
     "Activity" : {
+
+    },
+    "Activity states" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Add a card" : {
+
+    },
+    "Added to" : {
 
     },
     "Adding %@" : {
@@ -346,6 +260,12 @@
     "Addresses to paste" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "All activity" : {
+
+    },
+    "All drawers" : {
+
     },
     "All set!" : {
 
@@ -385,6 +305,9 @@
     "Any of your cards can spend it" : {
 
     },
+    "Any other card of your account can do it." : {
+
+    },
     "Anyone can pay you" : {
 
     },
@@ -394,6 +317,15 @@
     "Appearance" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Approved by" : {
+
+    },
+    "approved by %@" : {
+
+    },
+    "Auto" : {
+
     },
     "Back" : {
 
@@ -448,6 +380,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "British Pound" : {
+
+    },
     "Brown" : {
 
     },
@@ -491,17 +426,32 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Cards that can sign: %@" : {
+
+    },
     "Catalog settings" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Change %@'s PIN?" : {
+
+    },
+    "Change PIN" : {
+
+    },
     "Change the PIN" : {
+
+    },
+    "Changing %@'s PIN. Nothing is signed or moved." : {
 
     },
     "Check again" : {
 
     },
     "Check it over" : {
+
+    },
+    "Check with my new PIN" : {
 
     },
     "Checking it's really your card" : {
@@ -517,10 +467,16 @@
     "Checking your card…" : {
 
     },
+    "Checking…" : {
+
+    },
     "CHIMP CARD" : {
 
     },
     "ChimpDAO %@ · made with bananas" : {
+
+    },
+    "ChimpDAO is locked" : {
 
     },
     "ChimpDAO's fee helper is busy right now. Try again in a moment." : {
@@ -552,6 +508,9 @@
     "Chimpy says" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Chimpy-certified" : {
+
     },
     "Chimpy: %@" : {
 
@@ -594,6 +553,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Confirmed" : {
+
+    },
     "Confirmed at once: Swoosh! and the receipt." : {
 
     },
@@ -631,6 +593,9 @@
     "Copy for support" : {
 
     },
+    "Copy the transaction" : {
+
+    },
     "Couldn't get ready to send. Nothing was sent. Check your connection and try again." : {
 
     },
@@ -640,6 +605,12 @@
     "Couldn't refresh. Balances from 10:42." : {
 
     },
+    "Couldn't refresh. Showing the last balances." : {
+
+    },
+    "Couldn't refresh. Showing what this phone already has." : {
+
+    },
     "Create my account" : {
 
     },
@@ -647,6 +618,9 @@
 
     },
     "Creating your Main account" : {
+
+    },
+    "Currency" : {
 
     },
     "Cut short" : {
@@ -660,6 +634,13 @@
     "Date" : {
       "comment" : "Label for the date of a transaction.",
       "isCommentAutoGenerated" : true
+    },
+    "Day total per asset" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Day total: %@" : {
+
     },
     "Debug and Testing builds only" : {
 
@@ -692,6 +673,9 @@
     "Developer" : {
 
     },
+    "Did it work?" : {
+
+    },
     "Disabled" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -704,10 +688,25 @@
       "comment" : "A button that disconnects a phone.",
       "isCommentAutoGenerated" : true
     },
+    "Disconnect %@'s account" : {
+
+    },
+    "Disconnect %@'s account?" : {
+
+    },
+    "Disconnect this account" : {
+
+    },
+    "Disconnect this account?" : {
+
+    },
     "Disconnect this phone" : {
 
     },
     "Disconnect this phone?" : {
+
+    },
+    "Display" : {
 
     },
     "Done" : {
@@ -729,6 +728,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Each account has its own Main and its own cards." : {
+
+    },
     "Each card also has its own wallet only it can spend. Move money between them whenever you like." : {
 
     },
@@ -738,9 +740,25 @@
     "empty" : {
 
     },
+    "Empty" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Empty balances" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Erase" : {
+
+    },
+    "Erase everything on this phone" : {
+
+    },
+    "Erase everything on this phone?" : {
+
+    },
+    "Euro" : {
+
     },
     "Every card is equal. A spare at home, one for a friend, one as a gift." : {
 
@@ -752,6 +770,12 @@
     "Exchanges often ask for one. Numbers only." : {
 
     },
+    "Face ID didn't work. Try again." : {
+
+    },
+    "Face ID to open the app" : {
+
+    },
     "Failed" : {
 
     },
@@ -759,7 +783,14 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Fee" : {
+
+    },
     "First load fails." : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "First read that never ends" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
@@ -776,6 +807,9 @@
     "From" : {
 
     },
+    "from %@" : {
+
+    },
     "From %@ · %@" : {
       "comment" : "A label displaying the date and time the user sent the asset.",
       "isCommentAutoGenerated" : true,
@@ -788,6 +822,9 @@
         }
       }
     },
+    "From %@'s account" : {
+
+    },
     "From Main, any of your cards works. From a card's own wallet, only that card. Just looking never needs a card." : {
 
     },
@@ -795,9 +832,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "From your account" : {
+
+    },
     "Generated on the phone by Core Image, error correction H. White in both themes." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Got it" : {
+
     },
     "Grab any of your cards. The money is in Main, so any of them can sign." : {
 
@@ -825,12 +868,21 @@
     "Hang on, I'm setting everything up. It takes a few seconds." : {
 
     },
+    "Hang on, I'm telling your account. It takes a few seconds." : {
+
+    },
     "has money on it" : {
+
+    },
+    "Have a pen ready and keep the card still until it's done: the new unlock code is shown only once." : {
 
     },
     "Header" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Help" : {
+
     },
     "Here's what happens" : {
 
@@ -874,6 +926,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "How ChimpDAO works" : {
+
+    },
     "How ChimpDAO works · %lld of %lld" : {
 
     },
@@ -902,12 +957,24 @@
     "I couldn't reach Stellar. Check your connection and try again: I'll pick up where I stopped." : {
 
     },
+    "I couldn't reach Stellar. Check your connection and try again. Nothing was sent." : {
+
+    },
     "I don't have a card yet" : {
+
+    },
+    "I lost this card" : {
+
+    },
+    "I only close this account on this phone. Your money stays on its cards, promise. Your other accounts stay open. Tap any card of this account to come back." : {
 
     },
     "I only close your account on this phone. Your money stays on your cards, promise. Tap any card of your account to come back." : {
       "comment" : "A message displayed in the body of the disconnect confirmation alert.",
       "isCommentAutoGenerated" : true
+    },
+    "I only forget this phone. Your money stays on your cards, promise." : {
+
     },
     "I read the card but couldn't check it online. Check your connection and tap again." : {
 
@@ -922,6 +989,9 @@
 
     },
     "I'm just finding your account. Nothing is signed yet." : {
+
+    },
+    "If it goes, nobody could ever open Main again. Add another card first, then you can remove this one." : {
 
     },
     "If you ever forget your PIN, this code unlocks the card. It's shown only once: write it down." : {
@@ -949,7 +1019,13 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "inside" : {
+
+    },
     "Into" : {
+
+    },
+    "into %@" : {
 
     },
     "Into Main, Testnet badge, tap Copy for the copied state." : {
@@ -959,13 +1035,43 @@
     "is a card." : {
 
     },
+    "It can never open Main again, even with the PIN" : {
+
+    },
     "It can spend from Main, like your other cards" : {
+
+    },
+    "It can start its own account later" : {
+
+    },
+    "It can't open Main anymore, even with its PIN. Your other cards work as before." : {
+
+    },
+    "It gives you a new unlock code. The old one stops working." : {
+
+    },
+    "It keeps its own wallet (empty right now)" : {
+
+    },
+    "It keeps its own wallet and the %@ on it" : {
 
     },
     "It keeps its own wallet, only it can spend that" : {
 
     },
+    "It keeps its own wallet. Tap it on any phone to start a new account with it." : {
+
+    },
+    "It saves your new PIN" : {
+
+    },
+    "It stays tied to that card: only that card can ever spend it. You can't get it back without it." : {
+
+    },
     "It was sent, but Stellar hasn't confirmed it yet. Check again in a moment. Don't worry, nothing is sent twice." : {
+
+    },
+    "It was sent, but Stellar still lists the card. Check again in a moment. Nothing is sent twice." : {
 
     },
     "It's from %@, so only that card works." : {
@@ -978,6 +1084,18 @@
 
     },
     "It's part of your account now. Keep one card at home as a spare." : {
+
+    },
+    "Its %@ stays locked on the lost card" : {
+
+    },
+    "Its new unlock code couldn't be shown. Change the PIN once more to get one." : {
+
+    },
+    "Its wallet is empty: nothing is left behind" : {
+
+    },
+    "Japanese Yen" : {
 
     },
     "Join an account I already have" : {
@@ -998,12 +1116,18 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Jungle night" : {
+
+    },
     "Jungle's PIN" : {
 
     },
     "Jungle's wallet" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Just once. After that, peek at your bananas anytime, no card." : {
+
     },
     "Keep it short: %lld characters at most." : {
 
@@ -1016,6 +1140,13 @@
     },
     "Keep the big money in Main, pocket money on the cards." : {
 
+    },
+    "Keep your card still until it's done." : {
+
+    },
+    "Kept lines, refresh fails" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
     },
     "Keypad · amount" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1034,6 +1165,9 @@
     "Last step · Tap" : {
 
     },
+    "Lately" : {
+
+    },
     "Leaf's wallet" : {
 
     },
@@ -1046,6 +1180,9 @@
     "Let %@ in?" : {
       "comment" : "Title of the view",
       "isCommentAutoGenerated" : true
+    },
+    "Let's lock it out" : {
+
     },
     "Let's start" : {
 
@@ -1062,6 +1199,9 @@
     "Letting it in" : {
       "comment" : "A label displayed in the \"Letting it in\" step of the card addition process.",
       "isCommentAutoGenerated" : true
+    },
+    "Licenses" : {
+
     },
     "Light" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1092,6 +1232,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Locking %@ out" : {
+
+    },
     "Long balance: it moves under the name." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1099,6 +1242,12 @@
     "Long title" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Look" : {
+
+    },
+    "Look who's back!" : {
+
     },
     "Looking is free. Moving money always asks for a tap and your PIN." : {
 
@@ -1118,6 +1267,9 @@
     "Main" : {
 
     },
+    "Main · %@" : {
+
+    },
     "Main $1,320 with $500 growing, two cards." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1127,6 +1279,9 @@
       "extractionState" : "manual"
     },
     "Main account" : {
+
+    },
+    "Main is empty. Tap Receive to get your first bananas." : {
 
     },
     "Main is shared by all your cards. Each card also has its own wallet that only it can spend." : {
@@ -1189,6 +1344,9 @@
     "Money on Jungle" : {
 
     },
+    "More" : {
+
+    },
     "Motion" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1196,7 +1354,16 @@
     "Move" : {
 
     },
+    "Move it to Main first" : {
+
+    },
     "move money anytime" : {
+
+    },
+    "Moved" : {
+
+    },
+    "Moved to %@" : {
 
     },
     "Moves can't be undone once signed. You can always move it back." : {
@@ -1215,6 +1382,9 @@
         }
       }
     },
+    "Moving to %@" : {
+
+    },
     "My banana stash" : {
 
     },
@@ -1232,6 +1402,9 @@
 
     },
     "N°%@ · no account yet" : {
+
+    },
+    "N°%@ · only this card can sign" : {
 
     },
     "N°%@ · Rename & colour" : {
@@ -1273,6 +1446,9 @@
     "new" : {
       "comment" : "Name of a card that has not been named yet.",
       "isCommentAutoGenerated" : true
+    },
+    "New card" : {
+
     },
     "Next" : {
 
@@ -1327,6 +1503,9 @@
     "No first name, no weekly change" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "No other card can lock it out, and Main only opens with it. If you find it, add a second card right away." : {
+
     },
     "No PIN (DUOX)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1395,6 +1574,9 @@
     "Not yet" : {
 
     },
+    "Nothing here yet. Payments, moves and new cards will show up here." : {
+
+    },
     "Nothing is lost" : {
 
     },
@@ -1405,10 +1587,24 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Nothing kept, Stellar unreachable" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Nothing moved here yet." : {
+
+    },
+    "Nothing moved yet" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Nothing moves between drawers on its own. You do it with Move." : {
 
     },
     "Nothing moves without a tap of your card." : {
+
+    },
+    "Nothing on it. Good." : {
 
     },
     "Nothing was sent" : {
@@ -1469,6 +1665,15 @@
     "One character is off. Copy the address again." : {
 
     },
+    "One of your cards will let it in" : {
+
+    },
+    "Only %@ can sign its own removal." : {
+
+    },
+    "Only changes how numbers look. Your coins stay the same." : {
+
+    },
     "Only for the flow opened here. The Send tile of the Wallet sends for real on testnet." : {
 
     },
@@ -1483,6 +1688,9 @@
       "extractionState" : "manual"
     },
     "only this card" : {
+
+    },
+    "Only this card can sign: %@" : {
 
     },
     "Only this card can spend it" : {
@@ -1502,6 +1710,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Opens the payment's status" : {
+
+    },
+    "Opens the receipt" : {
+
+    },
+    "Optic ID to open the app" : {
+
+    },
     "Option rows (asset sheet)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1516,6 +1733,15 @@
     "Page %lld of %lld" : {
 
     },
+    "Paid" : {
+
+    },
+    "Paid by ChimpDAO" : {
+
+    },
+    "Passcode to open the app" : {
+
+    },
     "Paste" : {
 
     },
@@ -1526,19 +1752,38 @@
     "Paste it from the app or exchange you're paying. Check the first and last characters." : {
 
     },
+    "Pay again" : {
+
+    },
+    "Paying %@" : {
+
+    },
     "Paying %@ %@" : {
 
     },
     "Paying Maya $25.00" : {
 
     },
+    "Payment waiting" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Payments can't be undone once signed." : {
+
+    },
+    "Pending" : {
 
     },
     "Pick a 4-digit PIN" : {
 
     },
     "Pick a drawer" : {
+
+    },
+    "Pick a new 4-digit PIN" : {
+
+    },
+    "Pick one you won't forget. I don't keep a copy." : {
 
     },
     "Pick where your bananas grow" : {
@@ -1558,6 +1803,9 @@
     "PIN and tap" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "PIN changed." : {
+
     },
     "PIN length: %lld" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1611,9 +1859,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Privacy" : {
+
+    },
     "Proposed" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Put it in my jungle" : {
+
     },
     "QR code" : {
 
@@ -1628,9 +1882,18 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Reading older days on Stellar…" : {
+
+    },
+    "Reading the last 7 days on Stellar…" : {
+
+    },
     "Ready to spend" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Real bananas are coming soon!" : {
+
     },
     "Real Chimp cards are switched on at our workshop before they ship. This one wasn't, so it can't hold money." : {
 
@@ -1664,6 +1927,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Refresh failed" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Refresh fails" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1675,7 +1942,28 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Remove from account" : {
+
+    },
+    "Remove the %@ card" : {
+
+    },
+    "Removing %@" : {
+
+    },
+    "Removing %@ from your account" : {
+
+    },
+    "Removing %@ from your account, for good." : {
+
+    },
+    "Removing %@ from your account. Its wallet stays on the card." : {
+
+    },
     "Rename & colour" : {
+
+    },
+    "Replay the tour" : {
 
     },
     "Reset" : {
@@ -1702,9 +1990,18 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Safe" : {
+
+    },
+    "Safety" : {
+
+    },
     "Safety net: should never happen." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Same as my iPhone" : {
+
     },
     "Same total, everything ready to spend." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1764,6 +2061,9 @@
     "Sent" : {
 
     },
+    "Set a passcode on your iPhone first." : {
+
+    },
     "Setting up your account" : {
 
     },
@@ -1774,7 +2074,13 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Share" : {
+
+    },
     "Share my address" : {
+
+    },
+    "Shared · any of your cards can sign" : {
 
     },
     "shared · any of your cards can use it" : {
@@ -1789,6 +2095,12 @@
     "Sheets" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Show amounts in" : {
+
+    },
+    "Show everything in XLM" : {
+
     },
     "Shown" : {
 
@@ -1824,10 +2136,16 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Somebody\nlikes you!" : {
+
+    },
     "Something went wrong on Stellar. Try again, or send the technical details to support." : {
 
     },
     "Something went wrong reading the card. Let's try again." : {
+
+    },
+    "Sorry bro. Tip for next time: keep card wallets small, keep Main big." : {
 
     },
     "Spacing" : {
@@ -1838,10 +2156,19 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Start a fresh jungle with it" : {
+
+    },
     "Start a new account" : {
 
     },
     "Start over" : {
+
+    },
+    "Status" : {
+
+    },
+    "Stays on the lost card" : {
 
     },
     "Stellar address" : {
@@ -1855,6 +2182,9 @@
 
     },
     "Stellar couldn't be reached." : {
+
+    },
+    "Stellar only keeps about a week of history. What this phone has seen stays here." : {
 
     },
     "Stellar refused it." : {
@@ -1902,6 +2232,9 @@
     "Swap From and To" : {
 
     },
+    "Switch account" : {
+
+    },
     "Swoosh!" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1926,6 +2259,9 @@
       "comment" : "A button that lets the user tap their card again.",
       "isCommentAutoGenerated" : true
     },
+    "Tap %@ to change it" : {
+
+    },
     "Tap %lld of %lld" : {
       "localizations" : {
         "en" : {
@@ -1940,6 +2276,15 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Tap another card to confirm" : {
+
+    },
+    "Tap another of your cards" : {
+
+    },
+    "Tap any card from your account to open it on this phone." : {
+
+    },
     "Tap any of your cards" : {
 
     },
@@ -1953,6 +2298,12 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Tap the card again" : {
+
+    },
+    "Tap the card once more: I'll try your new PIN. If the old one is still the right one, the card counts it as one wrong try." : {
+
+    },
     "Tap the same card again" : {
 
     },
@@ -1963,6 +2314,9 @@
     "Tap to load for 2 seconds" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Tap your %@ card" : {
+
     },
     "Tap your %@ card again" : {
 
@@ -1979,12 +2333,21 @@
     "Technical details" : {
 
     },
+    "Terms" : {
+
+    },
     "Testnet" : {
 
     },
     "Text size" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Thanks for monkeying around" : {
+
+    },
+    "That card belongs to the account you're in. Tap a card of the other account." : {
+
     },
     "That card is still in another account. Its owner has to give it away first." : {
 
@@ -1995,7 +2358,13 @@
     "That card isn't one of yours. Any card of your account can sign. Nothing was sent." : {
 
     },
+    "That card isn't one of yours. Tap another card of your account. Nothing was sent." : {
+
+    },
     "That card isn't one of yours. This money is in %@'s wallet, so only that card can sign. Nothing was sent." : {
+
+    },
+    "That's %@, the card you're removing. Tap another card of your account. Nothing was sent." : {
 
     },
     "That's %@. Use Move instead." : {
@@ -2015,6 +2384,26 @@
     },
     "That's it. Ready when you are!" : {
 
+    },
+    "That's not %@. Only %@ can sign its own removal. Nothing was sent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "That's not %1$@. Only %2$@ can sign its own removal. Nothing was sent."
+          }
+        }
+      }
+    },
+    "That's not %@. Tap %@ to change its PIN. Nothing was changed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "That's not %1$@. Tap %2$@ to change its PIN. Nothing was changed."
+          }
+        }
+      }
     },
     "That's not the card you started with. Tap the same card." : {
 
@@ -2036,11 +2425,20 @@
     "The card checks its PIN when you tap." : {
 
     },
+    "The card checks your current PIN first." : {
+
+    },
     "The card checks your PIN." : {
       "comment" : "The text that describes the action of the card.",
       "isCommentAutoGenerated" : true
     },
     "The card is in your account, but this phone couldn't save it. Try again." : {
+
+    },
+    "The card is out of your account, but this phone couldn't update itself. Try again." : {
+
+    },
+    "The card moved away before it answered. I can't tell if your new PIN was saved." : {
 
     },
     "The card moved away too soon. Hold it still at the top of your phone." : {
@@ -2115,13 +2513,25 @@
     "This address is incomplete. A Stellar address has 56 characters (69 with a memo ID). Copy it again." : {
 
     },
+    "This card" : {
+
+    },
     "This card already has a PIN. Type it; the card checks it when you tap." : {
 
     },
     "This card becomes the first key of a brand-new account." : {
 
     },
+    "This card came stuffed with bananas." : {
+
+    },
+    "This card has no PIN to change. Nothing was changed." : {
+
+    },
     "This card has no PIN: a tap is all it takes." : {
+
+    },
+    "This card has no PIN: whoever finds it can spend it." : {
 
     },
     "This card is already in your account. Nothing to add." : {
@@ -2136,6 +2546,12 @@
     "This card is yours" : {
 
     },
+    "This card isn't in an account yet. Tap a card that already has one." : {
+
+    },
+    "This card isn't on your account anymore." : {
+
+    },
     "This card wasn't switched on by ChimpDAO, so it can't join an account." : {
       "comment" : "Message displayed when a card is not a Chimp card.",
       "isCommentAutoGenerated" : true
@@ -2148,6 +2564,9 @@
 
     },
     "This isn't a Stellar address. It should start with G, C or M." : {
+
+    },
+    "This license text is missing from the app." : {
 
     },
     "This number is too big for a memo ID." : {
@@ -2181,13 +2600,38 @@
     "To" : {
 
     },
+    "to add" : {
+
+    },
+    "today" : {
+
+    },
+    "Today" : {
+
+    },
+    "Today, yesterday and older: paid, got, moved, new card" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "Tokens" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Total" : {
+
+    },
+    "Touch ID to open the app" : {
+
+    },
     "Transaction" : {
       "comment" : "Label for the transaction hash in the send receipt sheet.",
       "isCommentAutoGenerated" : true
+    },
+    "Transaction %@" : {
+
+    },
+    "Transaction copied" : {
+
     },
     "Try again" : {
 
@@ -2205,6 +2649,12 @@
     "Two things to know" : {
 
     },
+    "Tx" : {
+
+    },
+    "Type %@'s PIN as it is today. The card checks it when you tap." : {
+
+    },
     "Type it again" : {
 
     },
@@ -2219,8 +2669,26 @@
     "Unknown card first" : {
 
     },
+    "Unlock" : {
+
+    },
+    "Unlock ChimpDAO" : {
+
+    },
+    "Unlock with Face ID" : {
+
+    },
+    "Unlock with Optic ID" : {
+
+    },
+    "Unlock with Touch ID" : {
+
+    },
     "Unlocking a card isn't available yet." : {
       "comment" : "TODO : texte provisoire. Que faire quand une carte est bloquée (PUK ?) : à décider avec Pamphile."
+    },
+    "US Dollar" : {
+
     },
     "Use another card" : {
 
@@ -2230,6 +2698,9 @@
       "isCommentAutoGenerated" : true
     },
     "Use the same card: your PIN is for %@." : {
+
+    },
+    "Use your new PIN from now on. The old one doesn't work anymore." : {
 
     },
     "Valid G (exchange, add a memo ID)" : {
@@ -2269,6 +2740,12 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Wait until %@" : {
+
+    },
+    "Waiting" : {
+
+    },
     "Wallet" : {
 
     },
@@ -2280,6 +2757,16 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Want the %@ back in Main? Move it before you remove %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Want the %1$@ back in Main? Move it before you remove %2$@."
+          }
+        }
+      }
+    },
     "Welcome back!" : {
 
     },
@@ -2289,10 +2776,16 @@
     "Welcome to the jungle!" : {
 
     },
+    "What ChimpDAO is built with" : {
+
+    },
     "What do you want to move?" : {
 
     },
     "What do you want to send?" : {
+
+    },
+    "What happens" : {
 
     },
     "What should I call you?" : {
@@ -2322,6 +2815,9 @@
     "Who's it for?" : {
 
     },
+    "Whoever finds it would also need its PIN." : {
+
+    },
     "Without amount (A5, G1b)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -2329,6 +2825,9 @@
     "Without savings" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Writes an email to %@" : {
+
     },
     "Wrong" : {
 
@@ -2375,6 +2874,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "XLM and USDC the same day" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
     "XRP Ledger" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -2386,7 +2889,19 @@
     "Yellow" : {
 
     },
+    "Yellow banana" : {
+
+    },
+    "yesterday" : {
+
+    },
+    "Yesterday" : {
+
+    },
     "You" : {
+
+    },
+    "You paid %@" : {
 
     },
     "You tapped your %@ card, but your PIN is for %@. Nothing was sent." : {
@@ -2430,6 +2945,9 @@
     "your" : {
 
     },
+    "Your %@ card is lost" : {
+
+    },
     "Your 4-digit PIN is written on the card. It'll ask for it every time it signs." : {
 
     },
@@ -2440,6 +2958,12 @@
 
     },
     "Your account starts with one card. Add more whenever you want." : {
+
+    },
+    "Your account, names, colours and history leave this phone, for good. Your money stays on your cards. To come back, tap a card of your account. A card that was added to an account may need one of the account's other cards to find it again." : {
+
+    },
+    "Your bananas are safe on your cards." : {
 
     },
     "Your card" : {
@@ -2461,6 +2985,9 @@
     "Your cards" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Your current PIN" : {
+
     },
     "Your jungle is empty. Tap Receive to get your first bananas." : {
 
@@ -2485,6 +3012,18 @@
 
     },
     "Your new PIN" : {
+
+    },
+    "Your old PIN still works: nothing was changed. The card has %lld tries left. Let's start again." : {
+
+    },
+    "Your old unlock code no longer works. Keep this one somewhere safe, away from the card. ChimpDAO can't show it again." : {
+
+    },
+    "Your other card's PIN" : {
+
+    },
+    "Your other cards can still open it." : {
 
     },
     "Your PIN can't be removed from the card. Have a pen ready: the card shows an unlock code only once." : {
