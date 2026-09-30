@@ -28,7 +28,7 @@ struct ActivityView: View {
         }
         .background(Color(.chimpBackground))
         .task { await model.refresh() }
-        .chimpSheet(isPresented: isReceiptPresented, height: ChimpSize.cardTapSheetHeight, onDismiss: {
+        .chimpSheet(isPresented: isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true, onDismiss: {
             if let address = payAgainAddress {
                 payAgainAddress = nil
                 onPayAgain(address)

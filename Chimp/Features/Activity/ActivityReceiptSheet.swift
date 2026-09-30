@@ -7,14 +7,11 @@ struct ActivityReceiptSheet: View {
     let model: ActivityViewModel
     var onPayAgain: (String) -> Void = { _ in }
 
+    /// La feuille (`chimpSheet(fitsContent:)`) fait défiler le contenu s'il dépasse l'écran.
     var body: some View {
-        ScrollView {
-            ActivityReceiptContent(receipt: receipt, model: model, onPayAgain: onPayAgain)
-                .padding(.horizontal, ChimpSpacing.xxl)
-                .padding(.top, ChimpSpacing.xs)
-                .padding(.bottom, ChimpSpacing.xl)
-        }
-        .scrollBounceBehavior(.basedOnSize)
+        ActivityReceiptContent(receipt: receipt, model: model, onPayAgain: onPayAgain)
+            .padding(.horizontal, ChimpSpacing.xxl)
+            .padding(.top, ChimpSpacing.xs)
     }
 }
 
