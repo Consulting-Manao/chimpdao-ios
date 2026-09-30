@@ -131,6 +131,8 @@ struct ActivityLog: Codable, Equatable, Sendable {
 protocol ActivityStore: AnyObject {
     func load() throws -> ActivityLog
     func save(_ log: ActivityLog) throws
+    /// « Erase everything on this phone » : l'historique de tous les comptes disparaît du téléphone.
+    func erase() throws
 }
 
 extension ActivityStore {
@@ -189,6 +191,13 @@ final class FileActivityStore: ActivityStore {
     func save(_ log: ActivityLog) throws {
         try FileLocalWalletStore.encoder.encode(log).write(to: fileURL, options: FileLocalWalletStore.writingOptions)
     }
+
+    /// Supprime le fichier et sa copie mise de côté (`.unreadable`).
+    func erase() throws {
+        for url in [fileURL, fileURL.appendingPathExtension("unreadable")] where FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+    }
 }
 
 /// Stockage en mémoire, pour les tests, le catalogue et le simulateur.
@@ -205,5 +214,9 @@ final class InMemoryActivityStore: ActivityStore, @unchecked Sendable {
     func save(_ log: ActivityLog) throws {
         self.log = log
         saveCount += 1
+    }
+
+    func erase() throws {
+        log = ActivityLog()
     }
 }

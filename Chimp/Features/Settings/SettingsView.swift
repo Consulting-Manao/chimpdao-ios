@@ -1,13 +1,16 @@
 import SwiftUI
 
-/// I2 · Settings (maquette), réglages de base : prénom, nom et couleur des cartes, « Disconnect this phone ».
-/// Les lignes de la maquette pas encore construites (paranoid mode, Face ID, devise, apparence, shop mode, raw signing,
-/// visite, liens légaux) ne sont pas affichées : aucune ligne sans destination. Pas de choix du réseau (décision du
-/// 2026-09-28). En Debug et Testing, une section « Developer » ouvre le catalogue et le mode admin.
+/// I2 · Settings (maquette) : prénom, nom et couleur des cartes, visite, « Disconnect this phone », « Erase everything on
+/// this phone », liens (licences, aide), version. Les lignes de la maquette pas encore faisables (changer de compte,
+/// paranoid mode, Face ID, devise, apparence, shop mode, raw signing) ne sont pas affichées : aucune ligne sans
+/// destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision de Barth du
+/// 2026-09-30). Pas de choix du réseau (décision du 2026-09-28). En Debug et Testing, une section « Developer » ouvre le
+/// catalogue et le mode admin.
 struct SettingsView: View {
     @Bindable var model: SettingsModel
     let onBack: () -> Void
     var onDeveloper: (() -> Void)?
+    @State private var isShowingLicenses = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,6 +30,15 @@ struct SettingsView: View {
                         .foregroundStyle(.chimpTextSecondary)
                         .padding(.top, ChimpSpacing.s)
 
+                    sectionLabel("More")
+                        .padding(.top, ChimpSpacing.sectionGap)
+                    ChimpGroupedList(rows: [
+                        ChimpGroupedRow(id: "tour", title: "How ChimpDAO works", value: String(localized: "Replay the tour")) {
+                            model.isReplayingTour = true
+                        },
+                    ])
+                    .padding(.top, ChimpSpacing.s)
+
                     if let onDeveloper {
                         sectionLabel("Developer")
                             .padding(.top, ChimpSpacing.sectionGap)
@@ -36,6 +48,14 @@ struct SettingsView: View {
 
                     ChimpButton("Disconnect this phone", kind: .destructive) { model.isConfirmingDisconnect = true }
                         .padding(.top, ChimpSpacing.sectionGap)
+                    Button { model.isConfirmingErase = true } label: {
+                        Text("Erase everything on this phone")
+                            .chimpFont(.link)
+                            .foregroundStyle(.chimpNegative)
+                            .frame(maxWidth: .infinity, minHeight: ChimpSize.minimumTouchTarget)
+                    }
+                    .buttonStyle(ChimpPressableStyle())
+                    .padding(.top, ChimpSpacing.s)
 
                     if let error = model.saveError, !model.isEditingFirstName {
                         VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
@@ -45,8 +65,10 @@ struct SettingsView: View {
                         .padding(.top, ChimpSpacing.m)
                     }
 
+                    links
+                        .padding(.top, ChimpSpacing.xxl)
                     footer
-                        .padding(.top, ChimpSpacing.xxxl)
+                        .padding(.top, ChimpSpacing.l)
                 }
                 .padding(.horizontal, ChimpSpacing.xxl)
                 .padding(.vertical, ChimpSpacing.xl)
@@ -63,6 +85,23 @@ struct SettingsView: View {
             }
         } message: {
             Text(disconnectMessage)
+        }
+        .alert(eraseTitle, isPresented: $model.isConfirmingErase) {
+            if model.hasPendingPayment {
+                Button("OK", role: .cancel) {}
+            } else {
+                Button("Erase", role: .destructive, action: model.eraseEverything)
+                Button("Cancel", role: .cancel) {}
+            }
+        } message: {
+            Text(eraseMessage)
+        }
+        .fullScreenCover(isPresented: $model.isReplayingTour) {
+            TourReplayView { model.isReplayingTour = false }
+        }
+        .navigationDestination(isPresented: $isShowingLicenses) {
+            LicensesView { isShowingLicenses = false }
+                .toolbar(.hidden, for: .navigationBar)
         }
         .chimpSheet(isPresented: $model.isEditingFirstName, height: 380) {
             firstNameSheet
@@ -148,16 +187,50 @@ struct SettingsView: View {
                 .scaledToFit()
                 .frame(width: 26)
                 .accessibilityHidden(true)
-            Text("ChimpDAO \(Self.version) · made with bananas")
+            Text("ChimpDAO \(SettingsModel.versionText) · made with bananas")
                 .chimpFont(.caption)
                 .foregroundStyle(.chimpTextSecondary)
         }
         .frame(maxWidth: .infinity)
     }
 
-    /// Version de l'app (« 1.1.0 »), lue dans le paquet de l'app.
-    static var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    // MARK: Liens (maquette : « Terms Privacy Licenses Help »)
+
+    private var links: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: ChimpSpacing.l) { linkItems }
+            VStack(spacing: ChimpSpacing.s) { linkItems }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var linkItems: some View {
+        // TODO(avant l'App Store et les testeurs externes) : URLs des conditions et de la politique de confidentialité.
+        toAdd("Terms")
+        toAdd("Privacy")
+        Button { isShowingLicenses = true } label: { linkLabel("Licenses") }
+            .buttonStyle(ChimpPressableStyle())
+        if let help = SettingsModel.helpURL {
+            Link(destination: help) { linkLabel("Help") }
+                .accessibilityHint(Text("Writes an email to \(SettingsModel.helpEmail)"))
+        }
+    }
+
+    private func linkLabel(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .chimpFont(.buttonSmall)
+            .underline()
+            .foregroundStyle(.chimpTextPrimary)
+            .frame(minHeight: ChimpSize.minimumTouchTarget)
+    }
+
+    /// Lien prévu dont l'URL manque encore : affiché pour qu'on y pense, pas un bouton.
+    private func toAdd(_ title: LocalizedStringKey) -> some View {
+        (Text(title) + Text(verbatim: " · ") + Text("to add"))
+            .chimpFont(.captionS)
+            .foregroundStyle(.chimpTextSecondary)
+            .frame(minHeight: ChimpSize.minimumTouchTarget)
     }
 
     // MARK: Disconnect this phone
@@ -170,6 +243,18 @@ struct SettingsView: View {
         model.hasPendingPayment
             ? "A payment is still being checked. Open Send to see how it ended, then you can disconnect."
             : "I only close your account on this phone. Your money stays on your cards, promise. Tap any card of your account to come back."
+    }
+
+    // MARK: Erase everything on this phone
+
+    private var eraseTitle: LocalizedStringKey {
+        model.hasPendingPayment ? "Not yet" : "Erase everything on this phone?"
+    }
+
+    private var eraseMessage: LocalizedStringKey {
+        model.hasPendingPayment
+            ? "A payment is still being checked. Open Send to see how it ended, then you can erase."
+            : "Your account, names, colours and history leave this phone, for good. Your money stays on your cards. To come back, tap a card of your account. A card that was added to an account may need one of the account's other cards to find it again."
     }
 
     // MARK: Prénom

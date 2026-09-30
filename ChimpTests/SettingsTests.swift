@@ -184,4 +184,79 @@ struct SettingsTests {
         #expect(model.saveError != nil)
         #expect(!session.showsOnboarding)
     }
+
+    // MARK: Session « Avant TestFlight », étape 2
+
+    @Test("Erase everything on this phone : compte, comptes fermés, indices, visite et historique effacés ; retour à A1")
+    func eraseEverything() throws {
+        var wallet = namedWallet
+        wallet.disconnectedAccounts = [SavedAccount(address: "CBBBB", cards: [], firstName: "Léo")]
+        let activity = InMemoryActivityStore()
+        try activity.update(account) { $0.records = [ActivityRecord(id: "stellar:a", event: .transfer, hash: "a", from: account, to: "G", assetCode: "XLM", amount: 1, at: .now, isLocal: true)] }
+        let store = InMemoryLocalWalletStore(wallet)
+        let session = AppSession(store: store, network: .testnet, activity: activity)
+        let model = SettingsModel(session: session, walletCards: [])
+        model.eraseEverything()
+        #expect(model.saveError == nil)
+        #expect(store.wallet == LocalWallet())
+        #expect(session.wallet == LocalWallet())
+        #expect(activity.log == ActivityLog())
+        #expect(session.showsOnboarding)
+        #expect(!session.wallet.tourSeen, "La visite sera reproposée")
+    }
+
+    @Test("Erase everything : refusé pendant un paiement en attente, rien n'est effacé")
+    func eraseRefusedWhilePending() throws {
+        var wallet = namedWallet
+        let trace = PaymentTrace(token: "T", from: account, destination: "G", units: 1, nonce: 1, preparedAtLedger: 1, expirationLedger: 121)
+        wallet.pendingSend = PendingSend(trace: trace, recipient: "G", recipientName: nil, drawerTitle: "Main account", asset: "XLM", amount: 1, signedAt: .now)
+        let activity = InMemoryActivityStore()
+        try activity.update(account) { $0.records = [ActivityRecord(id: "stellar:a", event: .transfer, hash: "a", from: account, to: "G", assetCode: "XLM", amount: 1, at: .now, isLocal: true)] }
+        let store = InMemoryLocalWalletStore(wallet)
+        let session = AppSession(store: store, network: .testnet, activity: activity)
+        let model = SettingsModel(session: session, walletCards: [])
+        model.eraseEverything()
+        #expect(model.saveError != nil)
+        #expect(store.wallet == wallet)
+        #expect(activity.log.accounts[account]?.records.count == 1)
+        #expect(!session.showsOnboarding)
+    }
+
+    @Test("Fichiers du téléphone : l'effacement retire aussi les copies mises de côté (.unreadable)")
+    func fileErase() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let walletStore = try FileLocalWalletStore(network: .testnet, directory: directory)
+        let activityStore = try FileActivityStore(network: .testnet, directory: directory)
+        try walletStore.save(namedWallet)
+        try activityStore.save(ActivityLog())
+        for url in [walletStore.fileURL, activityStore.fileURL] {
+            try Data("x".utf8).write(to: url.appendingPathExtension("unreadable"))
+        }
+        try walletStore.erase()
+        try activityStore.erase()
+        let left = try FileManager.default.contentsOfDirectory(atPath: directory.appending(path: "ChimpDAO").path)
+        #expect(left.isEmpty)
+        try walletStore.erase()
+    }
+
+    @Test("Aide : un e-mail à chimpdao@consulting-manao.com, la version dans l'objet")
+    func helpEmail() throws {
+        let url = try #require(SettingsModel.helpURL)
+        #expect(url.scheme == "mailto")
+        #expect(url.absoluteString.hasPrefix("mailto:chimpdao@consulting-manao.com?subject=ChimpDAO%20help"))
+        #expect(url.absoluteString.contains(SettingsModel.versionText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!))
+    }
+
+    @Test("Version : « 1.1.0 (1) », lue dans le paquet de l'app")
+    func version() {
+        #expect(SettingsModel.versionText.range(of: #"^\d+\.\d+(\.\d+)? \(\d+\)$"#, options: .regularExpression) != nil)
+    }
+
+    @Test("Licences : le texte de chaque composant tiers est dans l'app")
+    func licenses() {
+        for item in ThirdPartyLicense.all {
+            #expect(item.text()?.isEmpty == false, "\(item.file).txt manque")
+        }
+        #expect(ThirdPartyLicense.all.first { $0.name == "stellar-ios-mac-sdk" }?.text()?.contains("Apache License") == true)
+    }
 }

@@ -156,9 +156,10 @@ struct FileLocalWalletStore: LocalWalletStore {
     /// Écriture atomique, fichier protégé (`NSFileProtectionComplete`). Le simulateur n'applique pas la protection.
     static let writingOptions: Data.WritingOptions = [.atomic, .completeFileProtection]
 
+    /// Supprime le fichier, et sa copie mise de côté s'il y en a une (`.unreadable`) : rien ne reste sur le téléphone.
     func erase() throws {
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            try FileManager.default.removeItem(at: fileURL)
+        for url in [fileURL, fileURL.appendingPathExtension("unreadable")] where FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
         }
     }
 

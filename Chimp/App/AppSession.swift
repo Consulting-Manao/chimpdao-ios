@@ -207,6 +207,18 @@ final class AppSession {
         try persist(next)
     }
 
+    /// « Erase everything on this phone » (I2, demandé par Barth le 2026-09-30) : pour un téléphone qu'on donne ou qu'on
+    /// vend. Tout ce que l'app garde s'en va : compte ouvert, comptes fermés (prénoms, noms et couleurs des cartes), indices
+    /// « carte → compte », visite, historique de l'Activity. L'app revient à A1. Rien ne change on-chain : l'argent reste
+    /// sur les cartes. Refusé tant qu'un paiement signé attend son issue (le téléphone doit le garder).
+    func eraseEverything() throws {
+        guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
+        try activity.erase()
+        try store.erase()
+        wallet = LocalWallet()
+        isFinishingOnboarding = false
+    }
+
     /// Cartes connues de ce téléphone pour ce compte : celles du compte ouvert, sinon celles du compte fermé.
     private static func knownCards(of account: String, in wallet: LocalWallet) -> [SavedCard] {
         if wallet.account?.address == account { return wallet.account?.cards ?? [] }

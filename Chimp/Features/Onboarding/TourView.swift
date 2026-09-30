@@ -7,6 +7,8 @@ struct TourView: View {
     @Binding var page: Int
     let onNext: () -> Void
     let onSkip: () -> Void
+    /// Bouton de la dernière page : « Tap my card » à l'onboarding, « Got it » quand on la rejoue depuis les réglages.
+    var lastPageTitle: LocalizedStringKey = "Tap my card"
 
     private let count = OnboardingModel.tourPageCount
 
@@ -41,7 +43,7 @@ struct TourView: View {
 
             VStack(spacing: ChimpSpacing.l) {
                 ChimpPageDots(count: count, current: page)
-                ChimpButton(page == count - 1 ? "Tap my card" : "Next", size: .large, action: onNext)
+                ChimpButton(page == count - 1 ? lastPageTitle : "Next", size: .large, action: onNext)
             }
             .padding(.top, ChimpSpacing.lg)
             .padding(.horizontal, ChimpSpacing.xxxl)

@@ -161,4 +161,44 @@ final class SettingsModel {
             saveError = OnboardingModel.details(error)
         }
     }
+
+    // MARK: Erase everything on this phone
+
+    var isConfirmingErase = false
+
+    /// Après confirmation : tout ce que l'app garde sur ce téléphone est effacé, l'app revient à A1.
+    func eraseEverything() {
+        do {
+            try session.eraseEverything()
+            saveError = nil
+        } catch {
+            saveError = OnboardingModel.details(error)
+        }
+    }
+
+    // MARK: Visite, aide, version
+
+    /// « How ChimpDAO works · Replay the tour ».
+    var isReplayingTour = false
+
+    /// Adresse d'aide et de contact (demande de Barth du 2026-09-30).
+    static let helpEmail = "chimpdao@consulting-manao.com"
+
+    /// « Help » : un e-mail prêt à écrire, avec la version de l'app dans l'objet (utile au support).
+    static var helpURL: URL? {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = helpEmail
+        components.queryItems = [URLQueryItem(name: "subject", value: "ChimpDAO help (\(versionText))")]
+        return components.url
+    }
+
+    /// Version de l'app et numéro de build : « 1.1.0 (1) ».
+    static var versionText: String { versionText(bundle: .main) }
+
+    static func versionText(bundle: Bundle) -> String {
+        let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        guard let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String, !build.isEmpty else { return version }
+        return "\(version) (\(build))"
+    }
 }
