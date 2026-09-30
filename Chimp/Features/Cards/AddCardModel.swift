@@ -174,10 +174,11 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         case .join:
             self.newCard = newCard
             self.tokenID = tokenID
-            screen = session.wallet.firstName == nil ? .firstName : .nameCard
+            // Rejoindre se fait sans compte ouvert : le prénom est toujours demandé (chaque compte a le sien).
+            screen = .firstName
             if let newCard { setPINMode(for: newCard) }
         }
-        firstName = session.wallet.firstName ?? ""
+        firstName = entry == .join ? "" : session.wallet.firstName ?? ""
     }
 
     static let pinLength = AccountSetupModel.pinLength
@@ -710,8 +711,8 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         case .firstName: return false
         case .nameCard:
             if case .wallet = entry { screen = .tapNew; return true }
-            if session.wallet.firstName == nil { screen = .firstName; return true }
-            return false
+            screen = .firstName
+            return true
         case .pin: screen = .nameCard
         case .findAccount: screen = pinMode == .none ? .nameCard : .pin
         case .confirm:

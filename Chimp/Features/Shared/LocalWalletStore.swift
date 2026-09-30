@@ -7,7 +7,8 @@ struct LocalWallet: Codable, Equatable {
     static let currentVersion = 1
 
     var version = LocalWallet.currentVersion
-    /// Prénom saisi à l'onboarding (A4), pour « Hey Léo ».
+    /// Prénom du compte ouvert (A4, « Hey Léo »). Chaque compte a le sien : à la déconnexion, il part avec le compte
+    /// fermé (`SavedAccount.firstName`) et revient avec lui à la reconnexion.
     var firstName: String?
     /// La visite guidée (A1·1 à A1·4) a été vue ou passée : elle n'est montrée qu'au premier lancement.
     var tourSeen = false
@@ -27,6 +28,16 @@ struct LocalWallet: Codable, Equatable {
     /// Compte fermé sur ce téléphone, s'il y en a un à cette adresse.
     func disconnectedAccount(_ address: String) -> SavedAccount? {
         disconnectedAccounts?.first { $0.address == address }
+    }
+
+    /// Prénom connu de ce téléphone pour ce compte : celui du compte ouvert, ou celui gardé avec le compte fermé.
+    /// Fichier écrit par la version précédente (prénom resté au niveau du téléphone après une déconnexion) : il appartient
+    /// au dernier compte fermé, et à lui seul.
+    func firstName(for address: String) -> String? {
+        if account?.address == address { return firstName }
+        guard let closed = disconnectedAccount(address) else { return nil }
+        if let name = closed.firstName { return name }
+        return account == nil && disconnectedAccounts?.first?.address == address ? firstName : nil
     }
 
     /// Compte mémorisé pour cette carte, vérifié en premier par la résolution (jamais cru sans `has_card`).
@@ -56,6 +67,8 @@ struct SavedAccount: Codable, Equatable {
     /// Adresse C du Main account.
     var address: String
     var cards: [SavedCard]
+    /// Prénom de ce compte, gardé ici seulement quand le compte est fermé (« Disconnect this phone »).
+    var firstName: String? = nil
 }
 
 /// Une carte du compte : données publiques (clé, puce, NFT, Pocket) et données locales (nom, couleur).

@@ -122,7 +122,9 @@ struct ReconnectTests {
 
     @Test("Prénom déjà connu du téléphone : « Welcome back! » ne demande que la carte")
     func asksOnlyWhatIsMissing() async throws {
-        let store = InMemoryLocalWalletStore(LocalWallet(firstName: "Léo", tourSeen: true))
+        // Compte fermé dont le téléphone connaît le prénom, mais pas cette carte (ajoutée ailleurs).
+        let closed = SavedAccount(address: MockOnboardingService.memberAccount, cards: [], firstName: "Léo")
+        let store = InMemoryLocalWalletStore(LocalWallet(tourSeen: true, disconnectedAccounts: [closed]))
         let session = AppSession(store: store, network: .testnet)
         let model = await scannedMember(reader: .duox, session: session)
         let reconnect = try #require(model.reconnection)

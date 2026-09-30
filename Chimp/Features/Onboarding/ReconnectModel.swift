@@ -64,10 +64,11 @@ final class ReconnectModel {
             : session.wallet.disconnectedAccount(account)
         let saved = known?.cards.first { $0.publicKey == inspection.card.publicKey.hex }
         let knownColor = saved?.color.flatMap(ChimpCardColor.init(rawValue:))
-        firstName = session.wallet.firstName ?? ""
+        let knownFirstName = session.wallet.firstName(for: account)
+        firstName = knownFirstName ?? ""
         cardName = saved?.name ?? ""
         cardColor = knownColor ?? .jungle
-        asksFirstName = session.wallet.firstName == nil
+        asksFirstName = knownFirstName == nil
         asksCard = saved?.name == nil || knownColor == nil
     }
 

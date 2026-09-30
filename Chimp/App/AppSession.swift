@@ -59,7 +59,7 @@ final class AppSession {
     /// Les noms et couleurs des cartes d'un compte fermé par « Disconnect this phone » sont repris.
     func signIn(account: String, card: SavedCard, firstName: String? = nil, at date: Date = .now) throws {
         var next = wallet
-        if let firstName { next.firstName = firstName }
+        next.firstName = firstName ?? next.firstName(for: account)
         var cards = Self.knownCards(of: account, in: next)
         next.disconnectedAccounts = Self.removing(account, from: next.disconnectedAccounts)
         if let index = cards.firstIndex(where: { $0.publicKey == card.publicKey }) {
@@ -189,10 +189,12 @@ final class AppSession {
     func disconnect() throws {
         guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
         var next = wallet
-        if let account = next.account {
+        if var account = next.account {
+            account.firstName = next.firstName
             next.disconnectedAccounts = [account] + (Self.removing(account.address, from: next.disconnectedAccounts) ?? [])
         }
         next.account = nil
+        next.firstName = nil
         try persist(next)
     }
 

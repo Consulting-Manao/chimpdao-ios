@@ -112,8 +112,10 @@ struct SettingsTests {
         #expect(!model.hasPendingPayment)
         model.disconnect()
         #expect(store.wallet.account == nil)
-        #expect(store.wallet.firstName == "Barth")
-        #expect(store.wallet.disconnectedAccounts == [namedWallet.account!])
+        #expect(store.wallet.firstName == nil, "Le prénom part avec le compte fermé")
+        var closed = namedWallet.account!
+        closed.firstName = "Barth"
+        #expect(store.wallet.disconnectedAccounts == [closed])
         #expect(store.wallet.cardHints == namedWallet.cardHints)
         #expect(store.wallet.tourSeen)
         #expect(session.showsOnboarding)
@@ -138,7 +140,35 @@ struct SettingsTests {
         let other = "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
         try session.signIn(account: other, card: SavedCard(publicKey: r1, chip: "duox", tokenID: 9, pocket: nil, name: "Pinky", color: "pink"))
         #expect(store.wallet.account?.cards.map(\.name) == ["Pinky"])
-        #expect(store.wallet.disconnectedAccounts == [namedWallet.account!])
+        #expect(store.wallet.firstName == nil, "Le prénom du compte fermé ne passe pas à un autre compte")
+        #expect(store.wallet.disconnectedAccounts?.first?.firstName == "Barth")
+    }
+
+    @Test("Deux comptes sur le même téléphone : chacun garde son prénom, dans les deux sens")
+    func firstNamePerAccount() throws {
+        let (session, store) = session(namedWallet)
+        let other = "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+        try session.disconnect()
+        try session.signIn(account: other, card: SavedCard(publicKey: r1, chip: "duox", tokenID: 9, pocket: nil, name: "Pinky", color: "pink"), firstName: "Léo")
+        #expect(store.wallet.firstName == "Léo")
+        try session.disconnect()
+        try session.signIn(account: account, card: SavedCard(publicKey: k1, chip: "infineon2Go", tokenID: 7, pocket: "CPOCKET7", name: nil, color: nil))
+        #expect(store.wallet.firstName == "Barth")
+        try session.disconnect()
+        try session.signIn(account: other, card: SavedCard(publicKey: r1, chip: "duox", tokenID: 9, pocket: nil, name: nil, color: nil))
+        #expect(store.wallet.firstName == "Léo")
+        #expect(store.wallet.account?.cards.first?.name == "Pinky")
+    }
+
+    @Test("Fichier de la version précédente (prénom resté au niveau du téléphone) : il ne revient qu'au dernier compte fermé")
+    func legacyFirstName() {
+        let other = "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+        let legacy = LocalWallet(firstName: "Barth", tourSeen: true, disconnectedAccounts: [
+            SavedAccount(address: account, cards: []), SavedAccount(address: other, cards: []),
+        ])
+        #expect(legacy.firstName(for: account) == "Barth")
+        #expect(legacy.firstName(for: other) == nil)
+        #expect(legacy.firstName(for: "CUNKNOWN") == nil)
     }
 
     @Test("Paiement en attente : la déconnexion est refusée, rien n'est effacé")
