@@ -4,6 +4,12 @@
     "%@" : {
 
     },
+    "%@ joined" : {
+
+    },
+    "%@ paid you" : {
+
+    },
     "%@ · N°%@ is ready" : {
       "localizations" : {
         "en" : {
@@ -90,6 +96,147 @@
 
     },
     "+$6.20 this week" : {
+
+    },
+    "A new card" : {
+
+    },
+    "A signed payment not confirmed yet, on top" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Activity states" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Added to" : {
+
+    },
+    "All drawers" : {
+
+    },
+    "Approved by" : {
+
+    },
+    "approved by %@" : {
+
+    },
+    "Checking…" : {
+
+    },
+    "Chimpy-certified" : {
+
+    },
+    "Couldn't refresh. Showing what this phone already has." : {
+
+    },
+    "Day total per asset" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Day total: %@" : {
+
+    },
+    "Empty" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "First read that never ends" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "from %@" : {
+
+    },
+    "Got it" : {
+
+    },
+    "into %@" : {
+
+    },
+    "Kept lines, refresh fails" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Moved" : {
+
+    },
+    "Moved to %@" : {
+
+    },
+    "Moving to %@" : {
+
+    },
+    "New card" : {
+
+    },
+    "Nothing here yet. Payments, moves and new cards will show up here." : {
+
+    },
+    "Nothing kept, Stellar unreachable" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Nothing moved here yet." : {
+
+    },
+    "Nothing moved yet" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Opens the payment's status" : {
+
+    },
+    "Opens the receipt" : {
+
+    },
+    "Paid" : {
+
+    },
+    "Paying %@" : {
+
+    },
+    "Payment waiting" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Pending" : {
+
+    },
+    "Reading older days on Stellar…" : {
+
+    },
+    "Reading the last 7 days on Stellar…" : {
+
+    },
+    "Refresh failed" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Stellar only keeps about a week of history. What this phone has seen stays here." : {
+
+    },
+    "Today" : {
+
+    },
+    "Today, yesterday and older: paid, got, moved, new card" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Wait until %@" : {
+
+    },
+    "Waiting" : {
+
+    },
+    "XLM and USDC the same day" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
+    },
+    "Yesterday" : {
+
+    },
+    "You paid %@" : {
 
     },
     "≈ %@" : {

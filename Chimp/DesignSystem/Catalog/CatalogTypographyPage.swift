@@ -108,6 +108,12 @@ private struct CatalogTypographyRow: View {
         case .monoValue: Text(verbatim: "820.00 USDC")
         case .mono: Text(verbatim: "AAAAAgAAAACHm2nUx0FH")
         case .address: Text(verbatim: "CAIO2SJ6…AZVOX2")
+        case .tabTitle: Text("Activity")
+        case .stamp: Text("Paid")
+        case .seal: Text("Chimpy-certified")
+        case .ticketTitle: Text(verbatim: "You paid GBLW…YEZ6M")
+        case .ticketMeta: Text(verbatim: "14:02 · from Jungle")
+        case .ticketAmount: Text(verbatim: "−$25.00")
         }
     }
 }

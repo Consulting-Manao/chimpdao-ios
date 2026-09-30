@@ -68,6 +68,7 @@ struct DesignSystemCatalogView: View {
                     link("Wallet states", systemImage: "wallet.pass.fill") { WalletStatesCatalogPage(settings: settings) }
                     link("Receive states", systemImage: "qrcode") { ReceiveStatesCatalogPage(settings: settings) }
                     link("Send", systemImage: "paperplane.fill") { SendCatalogPage(settings: settings) }
+                    link("Activity states", systemImage: "list.bullet.rectangle.portrait.fill") { ActivityStatesCatalogPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))
             }

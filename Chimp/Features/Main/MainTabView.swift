@@ -11,6 +11,10 @@ struct MainTabView: View {
     private let session: AppSession
     /// Écrans poussés dans l'onglet Wallet.
     @State private var walletPath: [WalletRoute] = []
+    /// Gardé ici pour que l'historique reste affiché quand on change d'onglet.
+    @State private var activityModel: ActivityViewModel
+    /// Écran d'état d'un paiement en attente, ouvert depuis l'Activity.
+    @State private var isShowingPendingSend = false
     #if DESIGN_CATALOG
     @State private var isShowingCatalog = false
     #endif
@@ -18,8 +22,13 @@ struct MainTabView: View {
     /// Le vrai Wallet : soldes lus sur le réseau de l'app (testnet), prix du XLM par l'oracle de mainnet.
     init(session: AppSession, config: ChimpNetworkConfig = .testnet) {
         self.session = session
-        _walletModel = State(initialValue: WalletViewModel(dataSource: ChainWalletDataSource(
+        let wallet = WalletViewModel(dataSource: ChainWalletDataSource(
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle()
+        ))
+        _walletModel = State(initialValue: wallet)
+        // L'historique : téléphone + RPC de testnet ; les cartes lues par le Wallet complètent celles du téléphone.
+        _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
+            session: session, config: config, walletCards: { [weak wallet] in wallet?.cards ?? [] }
         )))
     }
 
@@ -66,7 +75,20 @@ struct MainTabView: View {
                     }
                 #endif
             }
-        case .grow, .activity:
+        case .activity:
+            NavigationStack {
+                ActivityView(model: activityModel) { isShowingPendingSend = true }
+                    .toolbar(.hidden, for: .navigationBar)
+                    .withTabBar($selection)
+                    .navigationDestination(isPresented: $isShowingPendingSend) {
+                        // Envoyer rouvre l'état du paiement en attente (« Check again »), jamais un nouvel envoi.
+                        SendFlowRoot(service: ChainSendService(session: session)) {
+                            isShowingPendingSend = false
+                            Task { await activityModel.refresh() }
+                        }
+                    }
+            }
+        case .grow:
             NavigationStack {
                 PlaceholderTabView(tab: selection)
                     .toolbar(.hidden, for: .navigationBar)
@@ -167,7 +189,7 @@ private struct SettingsDestination: View {
     }
 }
 
-/// Onglet pas encore construit (Grow, Activity) : en-tête seul.
+/// Onglet pas encore construit (Grow) : en-tête seul.
 struct PlaceholderTabView: View {
     let tab: ChimpTab
 

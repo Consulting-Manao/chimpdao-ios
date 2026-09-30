@@ -276,26 +276,9 @@ struct SendReceiptSheet: View {
     let receipt: SendReceipt
 
     @Environment(\.locale) private var locale
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: ChimpSpacing.m) {
-                Text("Receipt")
-                    .chimpFont(.sheetTitle)
-                    .foregroundStyle(.chimpTextPrimary)
-                    .accessibilityAddTraits(.isHeader)
-                ChimpDetailList(items: items)
-                Text("Network fees paid by ChimpDAO")
-                    .chimpFont(.caption)
-                    .foregroundStyle(.chimpTextSecondary)
-                if let url = receipt.explorerURL {
-                    ChimpButton("View on Stellar Expert", kind: .secondary) { openURL(url) }
-                }
-            }
-            .padding(.horizontal, ChimpSpacing.fullScreenMargin)
-            .padding(.vertical, ChimpSpacing.l)
-        }
+        ReceiptSheet(items: items, showsFees: true, explorerURL: receipt.explorerURL)
     }
 
     private var items: [ChimpDetailItem] {
@@ -317,5 +300,37 @@ struct SendReceiptSheet: View {
         items.append(ChimpDetailItem(id: "network", label: "Network", value: summary.network.displayName))
         items.append(ChimpDetailItem(id: "hash", label: "Transaction", value: receipt.transactionHash, isMonospaced: true))
         return items
+    }
+}
+
+/// Feuille « Receipt » : détails, frais offerts (pour ce que ChimpDAO a payé), lien vers Stellar Expert. Partagée par
+/// Envoyer (C9) et l'onglet Activity (détail d'un mouvement).
+struct ReceiptSheet: View {
+    let items: [ChimpDetailItem]
+    let showsFees: Bool
+    let explorerURL: URL?
+
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: ChimpSpacing.m) {
+                Text("Receipt")
+                    .chimpFont(.sheetTitle)
+                    .foregroundStyle(.chimpTextPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                ChimpDetailList(items: items)
+                if showsFees {
+                    Text("Network fees paid by ChimpDAO")
+                        .chimpFont(.caption)
+                        .foregroundStyle(.chimpTextSecondary)
+                }
+                if let explorerURL {
+                    ChimpButton("View on Stellar Expert", kind: .secondary) { openURL(explorerURL) }
+                }
+            }
+            .padding(.horizontal, ChimpSpacing.fullScreenMargin)
+            .padding(.vertical, ChimpSpacing.l)
+        }
     }
 }

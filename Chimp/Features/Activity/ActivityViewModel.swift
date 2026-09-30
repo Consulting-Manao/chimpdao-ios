@@ -1,0 +1,418 @@
+import Foundation
+import Observation
+import SwiftUI
+
+/// Tampon d'une ligne du ticket (textes validés par Barth le 2026-09-30).
+enum ActivityStamp: Equatable, Sendable {
+    case paid
+    case gotIt
+    case moved
+    case newCard
+    case pending
+}
+
+/// Montant coloré (reçu) ou neutre.
+enum ActivityTone: Equatable, Sendable {
+    case positive
+    case negative
+    case neutral
+}
+
+/// Une ligne du ticket, prête à afficher.
+struct ActivityRow: Identifiable, Equatable {
+    let id: String
+    let title: String
+    /// « 14:02 · from Jungle ».
+    let meta: String
+    let stamp: ActivityStamp
+    /// Montant signé (« −$25.00 », « +1,000 XLM », « 50 USDC » pour un Move) ; `nil` pour une carte ajoutée.
+    let amount: String?
+    let tone: ActivityTone
+    /// La ligne d'origine (reçu) ; `nil` pour le paiement en attente (il ouvre l'écran d'état d'Envoyer).
+    let record: ActivityRecord?
+}
+
+/// Un ticket : une journée (ou le paiement en attente, en haut).
+struct ActivityTicket: Identifiable, Equatable {
+    let id: String
+    /// « TODAY », « YESTERDAY », « MONDAY » (majuscules à l'affichage).
+    let title: String
+    /// « SEP 30 » selon la région du téléphone.
+    let date: String
+    let rows: [ActivityRow]
+    /// Total du jour pour ce qui est affiché ; `nil` s'il n'y a eu aucun montant (carte ajoutée seulement, en attente).
+    let net: String?
+    let netTone: ActivityTone
+    /// Le paiement en attente n'est pas encore « Chimpy-certified ».
+    let isPending: Bool
+}
+
+/// ViewModel de l'onglet Activity (I1) : l'historique gardé sur le téléphone s'affiche tout de suite, la chaîne est relue
+/// derrière (tirer pour rafraîchir). Ne fait aucune crypto et ne connaît que `ActivityDataSource`.
+@Observable
+final class ActivityViewModel {
+    enum Phase: Equatable {
+        /// Rien de gardé, première lecture en cours.
+        case loading
+        /// Lignes affichées (éventuellement anciennes si la dernière lecture a échoué).
+        case loaded
+        /// Rien de gardé et la lecture a échoué.
+        case failed
+    }
+
+    /// Filtre du haut : tous les tiroirs, ou un seul (adresse).
+    enum Filter: Hashable {
+        case all
+        case drawer(String)
+    }
+
+    /// Issue du paiement en attente, telle que la dernière vérification l'a vue.
+    enum PendingStatus: Equatable {
+        case checking
+        case notConfirmed
+        case waiting(until: Date)
+        case unknown
+    }
+
+    private(set) var phase: Phase = .loading
+    private(set) var records: [ActivityRecord] = []
+    private(set) var drawers: [ActivityDrawer] = []
+    /// Lecture de la chaîne en cours (les lignes déjà trouvées s'affichent au fur et à mesure).
+    private(set) var isSyncing = false
+    /// La dernière lecture a échoué alors que des lignes plus anciennes sont affichées.
+    private(set) var isShowingStaleData = false
+    private(set) var pending: PendingSend?
+    private(set) var pendingStatus: PendingStatus = .checking
+    var filter: Filter = .all
+    /// Ligne touchée : son reçu est ouvert.
+    var selectedRecord: ActivityRecord?
+
+    let source: ActivityDataSource
+    private let calendar: Calendar
+    private let now: () -> Date
+
+    init(source: ActivityDataSource, calendar: Calendar = .current, now: @escaping () -> Date = { .now }) {
+        self.source = source
+        self.calendar = calendar
+        self.now = now
+    }
+
+    var network: StellarNetwork { source.network }
+
+    /// Lecture en cours, détachée de l'écran : SwiftUI annule les tâches de `.task` et `.refreshable` (onglet quitté,
+    /// pastille touchée pendant le rafraîchissement) ; la lecture, elle, va au bout et enregistre ce qu'elle trouve.
+    private var syncTask: Task<Void, Never>?
+
+    /// À chaque affichage de l'onglet et « tirer pour rafraîchir » : ce qui est gardé tout de suite, puis ce qui manque
+    /// de la chaîne (en général une seule requête). Une lecture déjà en cours est attendue, jamais doublée.
+    func refresh() async {
+        if let syncTask {
+            await syncTask.value
+            return
+        }
+        let task = Task { await self.performRefresh() }
+        syncTask = task
+        await task.value
+        syncTask = nil
+    }
+
+    private func performRefresh() async {
+        drawers = source.drawers()
+        if case .drawer(let address) = filter, !drawers.contains(where: { $0.address == address }) { filter = .all }
+        let stored = source.storedActivity()
+        if !stored.records.isEmpty || !records.isEmpty {
+            records = ActivityLog.combining(records, stored.records)
+            phase = .loaded
+        } else if phase != .loaded {
+            phase = .loading
+        }
+        isSyncing = true
+        defer { isSyncing = false }
+        async let pendingCheck: Void = checkPending()
+        do {
+            let result = try await source.sync { [weak self] progress in
+                guard let self else { return }
+                records = progress.records
+                if !records.isEmpty { phase = .loaded }
+            }
+            records = result.records
+            isShowingStaleData = false
+            phase = .loaded
+        } catch is CancellationError {
+            // Onglet quitté : on garde l'état actuel.
+        } catch {
+            if records.isEmpty {
+                phase = .failed
+            } else {
+                isShowingStaleData = true
+                phase = .loaded
+            }
+        }
+        await pendingCheck
+    }
+
+    /// Le paiement en attente : sa dernière issue connue. Envoyé ou rien n'est parti : il disparaît (et l'envoi apparaît
+    /// dans l'historique).
+    private func checkPending() async {
+        pending = source.pendingSend
+        guard let pending else { return }
+        pendingStatus = .checking
+        do {
+            switch try await source.checkPending(pending) {
+            case .sent:
+                self.pending = nil
+                records = ActivityLog.combining(records, source.storedActivity().records)
+            case .nothingSent:
+                self.pending = nil
+            case .pending:
+                pendingStatus = .notConfirmed
+            case .waiting(_, let end):
+                pendingStatus = .waiting(until: end)
+            case .undetermined:
+                pendingStatus = .unknown
+            }
+        } catch {
+            pendingStatus = .unknown
+        }
+    }
+
+    // MARK: Affichage
+
+    /// Tickets affichés pour le filtre choisi : le paiement en attente d'abord, puis une journée par ticket.
+    var tickets: [ActivityTicket] {
+        var tickets: [ActivityTicket] = []
+        if let pendingTicket { tickets.append(pendingTicket) }
+        return tickets + Self.tickets(for: visibleRecords, filter: filter, drawers: drawers, cardName: { [source] in source.cardName(key: $0) }, calendar: calendar, now: now())
+    }
+
+    /// Lignes du filtre choisi, parmi celles qui concernent un tiroir actuel du compte.
+    var visibleRecords: [ActivityRecord] {
+        Self.filtered(records, filter: filter, drawers: drawers)
+    }
+
+    /// Rien à montrer pour ce filtre, lecture finie.
+    var isEmpty: Bool {
+        phase == .loaded && !isSyncing && visibleRecords.isEmpty && pending == nil
+    }
+
+    static func filtered(_ records: [ActivityRecord], filter: Filter, drawers: [ActivityDrawer]) -> [ActivityRecord] {
+        let addresses = Set(drawers.map(\.address))
+        return records.filter { record in
+            guard record.kind(drawers: addresses) != nil else { return false }
+            switch filter {
+            case .all:
+                return true
+            case .drawer(let address):
+                if record.event == .cardAdded { return drawers.first { $0.address == address }?.isMain == true }
+                return record.from == address || record.to == address
+            }
+        }
+    }
+
+    private var pendingTicket: ActivityTicket? {
+        guard let pending else { return nil }
+        let addresses = Set(drawers.map(\.address))
+        if case .drawer(let address) = filter, pending.trace.from != address, pending.trace.destination != address { return nil }
+        let isMove = addresses.contains(pending.trace.destination)
+        let to = drawers.first { $0.address == pending.trace.destination }
+        let title = isMove
+            ? String(localized: "Moving to \(to?.title ?? StellarAddressParser.short(pending.recipient))")
+            : String(localized: "Paying \(pending.recipientName ?? StellarAddressParser.short(pending.recipient))")
+        let time = pending.signedAt.formatted(date: .omitted, time: .shortened)
+        let row = ActivityRow(
+            id: "pending", title: title, meta: "\(time) · \(Self.statusText(pendingStatus))", stamp: .pending,
+            amount: Self.amountText(pending.amount, code: SendAsset(rawValue: pending.asset)?.code ?? pending.asset, sign: isMove ? nil : .negative),
+            tone: .neutral, record: nil
+        )
+        return ActivityTicket(
+            id: "pending", title: String(localized: "Waiting"), date: Self.dateText(pending.signedAt), rows: [row],
+            net: nil, netTone: .neutral, isPending: true
+        )
+    }
+
+    static func statusText(_ status: PendingStatus) -> String {
+        switch status {
+        case .checking: String(localized: "Checking…")
+        case .notConfirmed: String(localized: "Not confirmed yet")
+        case .waiting(let end): String(localized: "Wait until \(end.formatted(date: .omitted, time: .shortened))")
+        case .unknown: String(localized: "Can't tell yet")
+        }
+    }
+
+    // MARK: Tickets (fonctions pures, testées)
+
+    static func tickets(
+        for records: [ActivityRecord],
+        filter: Filter,
+        drawers: [ActivityDrawer],
+        cardName: (String) -> String?,
+        calendar: Calendar,
+        now: Date
+    ) -> [ActivityTicket] {
+        let addresses = Set(drawers.map(\.address))
+        var days: [(day: Date, records: [ActivityRecord])] = []
+        for record in records.sorted(by: { $0.at > $1.at }) {
+            let day = calendar.startOfDay(for: record.at)
+            if days.last?.day == day {
+                days[days.count - 1].records.append(record)
+            } else {
+                days.append((day, [record]))
+            }
+        }
+        return days.map { day, records in
+            let rows = records.compactMap { row(for: $0, drawers: drawers, addresses: addresses, cardName: cardName) }
+            let net = net(of: records, filter: filter, addresses: addresses)
+            return ActivityTicket(
+                id: "\(day.timeIntervalSince1970)", title: dayTitle(day, calendar: calendar, now: now), date: dateText(day),
+                rows: rows, net: net?.text, netTone: net?.tone ?? .neutral, isPending: false
+            )
+        }
+    }
+
+    static func row(for record: ActivityRecord, drawers: [ActivityDrawer], addresses: Set<String>, cardName: (String) -> String?) -> ActivityRow? {
+        guard let kind = record.kind(drawers: addresses) else { return nil }
+        func drawer(_ address: String) -> ActivityDrawer? { drawers.first { $0.address == address } }
+        let time = record.at.formatted(date: .omitted, time: .shortened)
+        let code = record.assetCode ?? ""
+        switch kind {
+        case .sent:
+            return ActivityRow(
+                id: record.id, title: String(localized: "You paid \(StellarAddressParser.short(record.to))"),
+                meta: "\(time) · " + String(localized: "from \(drawer(record.from)?.name ?? "")"), stamp: .paid,
+                amount: record.amount.map { amountText($0, code: code, sign: .negative) }, tone: .neutral, record: record
+            )
+        case .received:
+            return ActivityRow(
+                id: record.id, title: String(localized: "\(StellarAddressParser.short(record.from)) paid you"),
+                meta: "\(time) · " + String(localized: "into \(drawer(record.to)?.name ?? "")"), stamp: .gotIt,
+                amount: record.amount.map { amountText($0, code: code, sign: .positive) }, tone: .positive, record: record
+            )
+        case .moved:
+            return ActivityRow(
+                id: record.id, title: String(localized: "Moved to \(drawer(record.to)?.title ?? "")"),
+                meta: "\(time) · \(drawer(record.from)?.name ?? "") → \(drawer(record.to)?.name ?? "")", stamp: .moved,
+                amount: record.amount.map { amountText($0, code: code, sign: nil) }, tone: .neutral, record: record
+            )
+        case .cardAdded:
+            let name = record.cardKey.flatMap(cardName) ?? String(localized: "A new card")
+            let approver = record.approvedBy.flatMap(cardName)
+            return ActivityRow(
+                id: record.id, title: String(localized: "\(name) joined"),
+                meta: "\(time) · " + (approver.map { String(localized: "approved by \($0)") } ?? String(localized: "Main account")),
+                stamp: .newCard, amount: nil, tone: .neutral, record: record
+            )
+        }
+    }
+
+    /// Total du jour de ce qui est affiché : reçu moins envoyé ; un Move compte seulement quand un tiroir est choisi
+    /// (il sort de ce tiroir, ou y entre). En dollars si la journée ne contient **que** de l'USDC, sinon par actif
+    /// (décision de Barth du 2026-09-30 : ce qui a réellement bougé, sans conversion). `nil` : aucun montant ce jour-là.
+    static func net(
+        of records: [ActivityRecord], filter: Filter, addresses: Set<String>, locale: Locale = .autoupdatingCurrent
+    ) -> (text: String, tone: ActivityTone)? {
+        var codes: [String] = []
+        var sums: [String: Decimal] = [:]
+        for record in records {
+            guard let kind = record.kind(drawers: addresses), let code = record.assetCode, let amount = record.amount else { continue }
+            if sums[code] == nil { codes.append(code) }
+            var signed: Decimal = 0
+            switch kind {
+            case .received: signed = amount
+            case .sent: signed = -amount
+            case .moved:
+                if case .drawer(let address) = filter {
+                    signed = record.from == address ? -amount : (record.to == address ? amount : 0)
+                }
+            case .cardAdded: break
+            }
+            sums[code, default: 0] += signed
+        }
+        guard !codes.isEmpty else { return nil }
+        let nonZero = codes.filter { sums[$0] != 0 }
+        let shown = nonZero.isEmpty ? [codes[0]] : nonZero
+        let text = shown.map { code in
+            let sum = sums[code] ?? 0
+            return amountText(abs(sum), code: code, sign: sum > 0 ? .positive : (sum < 0 ? .negative : nil), locale: locale)
+        }.joined(separator: " · ")
+        let total = shown.count == 1 ? sums[shown[0]] ?? 0 : 0
+        let tone: ActivityTone = shown.count > 1 ? .neutral : (total > 0 ? .positive : (total < 0 ? .negative : .neutral))
+        return (text, tone)
+    }
+
+    /// Montant exact de ce qui a bougé : USDC en dollars, tout autre actif dans son unité (« 1,757.5 XLM »). Aucune
+    /// conversion au prix du jour (décision de Barth du 2026-09-30). Signe « + » ou « − » (moins typographique).
+    static func amountText(_ amount: Decimal, code: String, sign: ActivityTone?, locale: Locale = .autoupdatingCurrent) -> String {
+        let prefix = switch sign {
+        case .positive: "+"
+        case .negative: "\u{2212}"
+        default: ""
+        }
+        let body: String = if code == SendAsset.usdc.code {
+            amount.formatted(Decimal.FormatStyle.Currency(code: "USD", locale: locale).presentation(.narrow).precision(.fractionLength(2...7)))
+        } else {
+            "\(amount.formatted(Decimal.FormatStyle(locale: locale).precision(.fractionLength(0...7)))) \(code)"
+        }
+        return prefix + body
+    }
+
+    static func dayTitle(_ day: Date, calendar: Calendar, now: Date) -> String {
+        if calendar.isDate(day, inSameDayAs: now) { return String(localized: "Today") }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(day, inSameDayAs: yesterday) {
+            return String(localized: "Yesterday")
+        }
+        return day.formatted(.dateTime.weekday(.wide))
+    }
+
+    static func dateText(_ day: Date) -> String {
+        day.formatted(.dateTime.month(.abbreviated).day())
+    }
+
+    // MARK: Reçu
+
+    /// Lignes du reçu d'un mouvement (le reçu d'Envoyer, élargi aux montants reçus et aux cartes ajoutées).
+    func receiptItems(for record: ActivityRecord) -> [ChimpDetailItem] {
+        let addresses = Set(drawers.map(\.address))
+        func place(_ address: String) -> ChimpDetailItem.Value {
+            if let drawer = drawers.first(where: { $0.address == address }) { return .text(drawer.title) }
+            return .address(SendReviewView.grouped(address))
+        }
+        var items: [ChimpDetailItem] = []
+        switch record.kind(drawers: addresses) {
+        case .cardAdded:
+            items.append(ChimpDetailItem(id: "card", label: "Card", value: record.cardKey.flatMap { source.cardName(key: $0) } ?? String(localized: "A new card")))
+            items.append(ChimpDetailItem(id: "account", label: "Added to", value: String(localized: "Main account")))
+            if let approver = record.approvedBy.flatMap { source.cardName(key: $0) } {
+                items.append(ChimpDetailItem(id: "approved", label: "Approved by", value: approver))
+            }
+        default:
+            items.append(place(record.from).item(id: "from", label: "From"))
+            items.append(place(record.to).item(id: "to", label: "To"))
+            if let amount = record.amount, let code = record.assetCode {
+                items.append(ChimpDetailItem(id: "amount", label: "Amount", value: "\(amount.formatted(.number.precision(.fractionLength(0...7)))) \(code)"))
+            }
+        }
+        items.append(ChimpDetailItem(id: "date", label: "Date", value: record.at.formatted(date: .abbreviated, time: .shortened)))
+        items.append(ChimpDetailItem(id: "network", label: "Network", value: network.displayName))
+        items.append(ChimpDetailItem(id: "hash", label: "Transaction", value: record.hash, isMonospaced: true))
+        return items
+    }
+
+    /// « Network fees paid by ChimpDAO » : seulement pour ce que ce téléphone a envoyé (on ne sait pas qui a payé le reste).
+    func receiptShowsFees(for record: ActivityRecord) -> Bool {
+        record.isLocal
+    }
+}
+
+private extension ChimpDetailItem {
+    enum Value {
+        case text(String)
+        case address(String)
+
+        func item(id: String, label: LocalizedStringKey) -> ChimpDetailItem {
+            switch self {
+            case .text(let value): ChimpDetailItem(id: id, label: label, value: value)
+            case .address(let value): ChimpDetailItem(id: id, label: label, value: value, isMonospaced: true)
+            }
+        }
+    }
+}

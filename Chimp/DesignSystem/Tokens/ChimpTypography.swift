@@ -65,6 +65,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case sheetTitle    // titre d'une feuille
     case key           // touches du pavé numérique
     case brand         // nom de l'app sur l'accueil (A1)
+    case tabTitle      // titre de l'en-tête d'un onglet (Activity, I1)
     case displayM      // titre de l'en-tête
     case amountS       // montant sur une carte
     case greeting      // accroche de l'en-tête du Wallet (« Hey Léo »)
@@ -78,6 +79,8 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case pill          // pilule « + Add »
     case cardName      // nom sur une Chimp Card
     case tile          // libellés des tuiles d'action
+    case stamp         // tampon d'une ligne du ticket de l'Activity (I1)
+    case seal          // « CHIMPY-CERTIFIED » au pied du ticket (I1)
     // Nunito
     case lead          // phrase principale de la visite guidée (A1·1 à A1·4)
     case fieldL        // saisie du prénom (A4)
@@ -86,6 +89,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case tourBody      // phrase secondaire de la visite guidée
     case bodyM         // bandeau des écrans « tapez la carte » (A2), texte des cartes-choix (A3)
     case rowTitle      // titre d'une ligne
+    case ticketTitle   // titre d'une ligne du ticket (I1)
     case optionTitle   // titre d'une ligne de choix dans une feuille (C3, D1)
     case reviewStep    // étape de la carte « What happens » (C4)
     case body          // texte courant
@@ -101,6 +105,8 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case cardNumber    // « N°0421 » sur une Chimp Card
     case monoValue     // montants des lignes d'actifs
     case mono          // XDR
+    case ticketMeta    // « 14:02 · from Jungle » sur le ticket (I1)
+    case ticketAmount  // montant d'une ligne du ticket (I1)
     case address       // adresse raccourcie dans sa pilule (D1)
 
     var id: String { rawValue }
@@ -109,12 +115,12 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         switch self {
         case .celebration, .amountEntry, .displayXL, .amountL, .welcomeTitle, .tourTitle, .amountM, .displayL, .sheetTitle,
              .key, .brand, .displayM, .amountS, .greeting, .displayS, .pill, .buttonLarge, .button, .buttonSecondary, .tab,
-             .link, .buttonSmall, .cardName, .tile:
+             .link, .buttonSmall, .cardName, .tile, .tabTitle, .stamp, .seal:
             .luckiestGuy
         case .bodyL, .tourBody, .bodyM, .captionS: .nunito(weight: 700)
         case .body, .bodyS, .caption, .captionStrong, .reviewStep: .nunito(weight: 800)
-        case .rowTitle, .optionTitle, .lead, .fieldL, .fieldM: .nunito(weight: 900)
-        case .overline, .labelWide, .label, .labelS, .cardNumber, .monoValue, .address: .spaceMono(bold: true)
+        case .rowTitle, .optionTitle, .lead, .fieldL, .fieldM, .ticketTitle: .nunito(weight: 900)
+        case .overline, .labelWide, .label, .labelS, .cardNumber, .monoValue, .address, .ticketMeta, .ticketAmount: .spaceMono(bold: true)
         case .mono: .spaceMono(bold: false)
         }
     }
@@ -132,6 +138,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .amountM: 26
         case .key, .brand: 24
         case .fieldL: 22
+        case .tabTitle: 28
         case .displayM: 23
         case .amountS: 21
         case .greeting: 20
@@ -141,7 +148,11 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .tab, .link, .buttonSecondary: 15
         case .buttonSmall: 14
         case .pill: 13
-        case .tile: 12
+        case .tile, .stamp: 12
+        case .seal: 11
+        case .ticketTitle: 14
+        case .ticketAmount: 13
+        case .ticketMeta: 11
         case .bodyL, .optionTitle, .reviewStep: 16
         case .rowTitle, .body, .tourBody: 15
         case .bodyS, .bodyM: 14
@@ -159,16 +170,16 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         switch self {
         case .celebration, .amountEntry, .displayXL, .amountL, .welcomeTitle, .tourTitle: .largeTitle
         case .displayL: .title1
-        case .sheetTitle, .key, .brand, .displayM, .amountM: .title2
+        case .sheetTitle, .key, .brand, .displayM, .amountM, .tabTitle: .title2
         case .amountS, .greeting: .title3
         case .displayS, .buttonLarge, .button, .lead, .fieldM: .headline
         case .fieldL: .title3
         case .cardName: .callout
         case .bodyL, .optionTitle, .reviewStep: .callout
-        case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .tourBody, .bodyS, .bodyM, .monoValue: .subheadline
-        case .caption, .pill, .address: .footnote
-        case .tile, .captionS, .captionStrong, .overline, .mono: .caption1
-        case .labelWide, .label, .labelS, .cardNumber: .caption2
+        case .tab, .link, .buttonSecondary, .buttonSmall, .rowTitle, .body, .tourBody, .bodyS, .bodyM, .monoValue, .ticketTitle: .subheadline
+        case .caption, .pill, .address, .ticketAmount: .footnote
+        case .tile, .captionS, .captionStrong, .overline, .mono, .stamp: .caption1
+        case .labelWide, .label, .labelS, .cardNumber, .seal, .ticketMeta: .caption2
         }
     }
 
