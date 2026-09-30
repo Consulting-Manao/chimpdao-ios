@@ -105,17 +105,40 @@ struct SettingsTests {
         #expect(!model.isEditingFirstName)
     }
 
-    @Test("Disconnect this phone : compte, cartes et prénom oubliés ; indices et visite gardés ; l'app revient à A1")
+    @Test("Disconnect this phone : le compte se ferme (l'app revient à A1), mais le prénom et les noms des cartes sont gardés")
     func disconnect() {
         let (session, store) = session(namedWallet)
         let model = SettingsModel(session: session, walletCards: [])
         #expect(!model.hasPendingPayment)
         model.disconnect()
         #expect(store.wallet.account == nil)
-        #expect(store.wallet.firstName == nil)
+        #expect(store.wallet.firstName == "Barth")
+        #expect(store.wallet.disconnectedAccounts == [namedWallet.account!])
         #expect(store.wallet.cardHints == namedWallet.cardHints)
         #expect(store.wallet.tourSeen)
         #expect(session.showsOnboarding)
+    }
+
+    @Test("Reconnexion au compte fermé : toutes ses cartes retrouvent leur nom et leur couleur, le compte fermé est retiré")
+    func reconnectRestoresNames() throws {
+        var wallet = namedWallet
+        wallet.account?.cards.append(SavedCard(publicKey: r1, chip: "duox", tokenID: 913, pocket: "CPOCKET913", name: "Leaf", color: "leaf"))
+        let (session, store) = session(wallet)
+        try session.disconnect()
+        try session.signIn(account: account, card: SavedCard(publicKey: k1, chip: "infineon2Go", tokenID: 7, pocket: "CPOCKET7", name: nil, color: nil))
+        #expect(store.wallet.account == wallet.account)
+        #expect(store.wallet.disconnectedAccounts == nil)
+        #expect(store.wallet.firstName == "Barth")
+    }
+
+    @Test("Reconnexion à un autre compte : ses noms ne viennent pas du compte fermé, qui reste gardé")
+    func otherAccountKeepsDisconnected() throws {
+        let (session, store) = session(namedWallet)
+        try session.disconnect()
+        let other = "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+        try session.signIn(account: other, card: SavedCard(publicKey: r1, chip: "duox", tokenID: 9, pocket: nil, name: "Pinky", color: "pink"))
+        #expect(store.wallet.account?.cards.map(\.name) == ["Pinky"])
+        #expect(store.wallet.disconnectedAccounts == [namedWallet.account!])
     }
 
     @Test("Paiement en attente : la déconnexion est refusée, rien n'est effacé")

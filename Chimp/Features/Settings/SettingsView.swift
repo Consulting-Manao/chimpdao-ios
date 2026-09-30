@@ -169,7 +169,7 @@ struct SettingsView: View {
     private var disconnectMessage: LocalizedStringKey {
         model.hasPendingPayment
             ? "A payment is still being checked. Open Send to see how it ended, then you can disconnect."
-            : "I only forget this phone. Your money stays on your cards, promise. Tap any card of your account to come back."
+            : "I only close your account on this phone. Your money stays on your cards, promise. Tap any card of your account to come back."
     }
 
     // MARK: Prénom

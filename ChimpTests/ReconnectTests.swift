@@ -133,6 +133,24 @@ struct ReconnectTests {
         #expect(store.wallet.account?.cards.first?.name == "Leaf")
     }
 
+    @Test("Téléphone déconnecté de ce compte : ni « Welcome back! » ni noms redemandés, tout est repris")
+    func reconnectAfterDisconnect() async throws {
+        let named = SavedCard(publicKey: MockChipReader.p256Key.hex, chip: "duox", tokenID: 421, pocket: "CPOCKET", name: "Jungle", color: "leaf")
+        let store = InMemoryLocalWalletStore(LocalWallet(
+            firstName: "Barth", tourSeen: true,
+            account: SavedAccount(address: MockOnboardingService.memberAccount, cards: [named])
+        ))
+        let session = AppSession(store: store, network: .testnet)
+        try session.disconnect()
+        let model = await scannedMember(reader: .duox, session: session)
+        #expect(model.reconnection?.needsWelcomeBack == false)
+        #expect(!session.showsOnboarding, "Le compte s'ouvre directement")
+        let card = try #require(store.wallet.account?.cards.first)
+        #expect(store.wallet.account?.cards.count == 1)
+        #expect(card.name == "Jungle" && card.color == "leaf", "Nom et couleur repris ; puce, NFT et wallet relus sur la chaîne")
+        #expect(store.wallet.firstName == "Barth")
+    }
+
     @Test("Écriture impossible : l'erreur s'affiche, le compte n'est pas ouvert")
     func saveFailure() async throws {
         let session = AppSession(store: RefusingStore(), network: .testnet)

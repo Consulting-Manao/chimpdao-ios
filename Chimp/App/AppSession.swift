@@ -56,10 +56,12 @@ final class AppSession {
     /// Carte déjà membre d'un Main account (`signIn` de la résolution) : on ouvre ce compte sur le téléphone.
     /// Comme le terminal : rien n'est signé (une Infineon a d'abord vérifié son PIN, `ReconnectModel`). L'indice
     /// « carte → compte » est mis à jour. `firstName` : prénom redemandé par « Welcome back! » (sinon, celui du téléphone).
+    /// Les noms et couleurs des cartes d'un compte fermé par « Disconnect this phone » sont repris.
     func signIn(account: String, card: SavedCard, firstName: String? = nil, at date: Date = .now) throws {
         var next = wallet
         if let firstName { next.firstName = firstName }
-        var cards = next.account?.address == account ? next.account?.cards ?? [] : []
+        var cards = Self.knownCards(of: account, in: next)
+        next.disconnectedAccounts = Self.removing(account, from: next.disconnectedAccounts)
         if let index = cards.firstIndex(where: { $0.publicKey == card.publicKey }) {
             // Garder le nom et la couleur déjà choisis sur ce téléphone.
             var merged = card
@@ -100,7 +102,10 @@ final class AppSession {
     func completeOnboarding(account: String, card: SavedCard, firstName: String, at date: Date = .now) throws {
         var next = wallet
         next.firstName = firstName
-        next.account = SavedAccount(address: account, cards: [card])
+        // Un compte déjà ouvert puis fermé sur ce téléphone (rejoindre) garde les noms de ses autres cartes.
+        let known = SavedAccount(address: account, cards: Self.knownCards(of: account, in: next))
+        next.account = Self.upserting(card, into: known)
+        next.disconnectedAccounts = Self.removing(account, from: next.disconnectedAccounts)
         next.cardHints = CardHint.adding(CardHint(key: card.publicKey, account: account, at: date), to: next.cardHints)
         isFinishingOnboarding = true
         do {
@@ -176,16 +181,30 @@ final class AppSession {
         try persist(next)
     }
 
-    /// « Disconnect this phone » (I2) : le compte, ses cartes (noms et couleurs) et le prénom sont oubliés ; l'app revient
-    /// à A1. Comme `logout` du terminal, les indices « carte → compte » restent (une carte ajoutée en a besoin pour
-    /// retrouver son compte) ; la visite reste vue. Rien ne change on-chain : un tap d'une carte du compte le rouvre.
+    /// « Disconnect this phone » (I2) : le compte se ferme sur ce téléphone et l'app revient à A1. Comme `logout` du
+    /// terminal, les indices « carte → compte » restent ; la visite reste vue. Le prénom et le compte fermé (avec les noms
+    /// et couleurs de ses cartes) sont **gardés** : une reconnexion au même compte les retrouve, sans « Welcome back! »
+    /// (demande de Barth du 2026-09-30). Rien ne change on-chain : un tap d'une carte du compte le rouvre.
     /// Refusé tant qu'un paiement signé attend son issue.
     func disconnect() throws {
         guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
         var next = wallet
+        if let account = next.account {
+            next.disconnectedAccounts = [account] + (Self.removing(account.address, from: next.disconnectedAccounts) ?? [])
+        }
         next.account = nil
-        next.firstName = nil
         try persist(next)
+    }
+
+    /// Cartes connues de ce téléphone pour ce compte : celles du compte ouvert, sinon celles du compte fermé.
+    private static func knownCards(of account: String, in wallet: LocalWallet) -> [SavedCard] {
+        if wallet.account?.address == account { return wallet.account?.cards ?? [] }
+        return wallet.disconnectedAccount(account)?.cards ?? []
+    }
+
+    private static func removing(_ account: String, from accounts: [SavedAccount]?) -> [SavedAccount]? {
+        let rest = accounts?.filter { $0.address != account } ?? []
+        return rest.isEmpty ? nil : rest
     }
 
     #if DESIGN_CATALOG

@@ -19,6 +19,15 @@ struct LocalWallet: Codable, Equatable {
     /// Tant qu'il est là, Envoyer rouvre son écran d'état au lieu d'un nouvel envoi : jamais de double paiement, même
     /// après un redémarrage de l'app (décision de Barth, DESIGN_NOTES §12 et question 16).
     var pendingSend: PendingSend?
+    /// Comptes fermés par « Disconnect this phone », avec les noms et couleurs de leurs cartes : une reconnexion au même
+    /// compte les retrouve sans rien redemander (demande de Barth du 2026-09-30). Données publiques et noms, comme
+    /// `account`. Optionnel : un fichier écrit avant ce champ reste lisible.
+    var disconnectedAccounts: [SavedAccount]?
+
+    /// Compte fermé sur ce téléphone, s'il y en a un à cette adresse.
+    func disconnectedAccount(_ address: String) -> SavedAccount? {
+        disconnectedAccounts?.first { $0.address == address }
+    }
 
     /// Compte mémorisé pour cette carte, vérifié en premier par la résolution (jamais cru sans `has_card`).
     func hint(for publicKey: ChipPublicKey) -> String? {

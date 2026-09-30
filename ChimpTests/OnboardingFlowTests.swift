@@ -77,7 +77,7 @@ struct OnboardingFlowTests {
         let data = try FileLocalWalletStore.encoder.encode(sampleWallet())
         let keys = allKeys(in: try JSONSerialization.jsonObject(with: data))
         #expect(keys == [
-            "version", "firstName", "tourSeen", "account", "cardHints",
+            "version", "firstName", "tourSeen", "account", "cardHints", "disconnectedAccounts",
             "address", "cards", "publicKey", "chip", "tokenID", "pocket", "name", "color",
             "key", "at",
         ])
@@ -238,7 +238,8 @@ struct OnboardingFlowTests {
         named.name = "Jungle"
         named.color = "jungle"
         return LocalWallet(firstName: "Léo", tourSeen: true, account: SavedAccount(address: accountA, cards: [named]),
-                           cardHints: [CardHint(key: card.publicKey, account: accountA, at: Date(timeIntervalSince1970: 1_700_000_000))])
+                           cardHints: [CardHint(key: card.publicKey, account: accountA, at: Date(timeIntervalSince1970: 1_700_000_000))],
+                           disconnectedAccounts: [SavedAccount(address: accountB, cards: [named])])
     }
 
     private func temporaryDirectory() throws -> URL {
