@@ -58,10 +58,8 @@ final class ReconnectModel {
         needsPIN = inspection.card.kind == .infineon2Go && inspection.card.pinActive
         isPINVerified = !needsPIN
         // Ce que le téléphone sait déjà : le prénom, et le nom et la couleur de la carte, enregistrés pour ce compte (ouvert,
-        // ou fermé par « Disconnect this phone »).
-        let known = session.wallet.account?.address == account
-            ? session.wallet.account
-            : session.wallet.disconnectedAccount(account)
+        // autre compte ouvert, ou fermé par « Disconnect this phone »).
+        let known = session.wallet.knownAccount(account)
         let saved = known?.cards.first { $0.publicKey == inspection.card.publicKey.hex }
         let knownColor = saved?.color.flatMap(ChimpCardColor.init(rawValue:))
         let knownFirstName = session.wallet.firstName(for: account)

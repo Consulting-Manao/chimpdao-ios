@@ -77,6 +77,10 @@ struct OnboardingProblem: Equatable {
         case readFailed
         /// Au tap d'A6, ce n'est pas la carte lue en A2.
         case wrongCard
+        /// « + Add an account » (I6) : la carte n'est dans aucun compte (neuve ou orpheline).
+        case notInAnAccount
+        /// « + Add an account » (I6) : la carte est dans le compte déjà affiché.
+        case alreadyOpen
     }
 
     let kind: Kind
@@ -109,6 +113,16 @@ final class OnboardingModel {
     /// Rejoindre un compte (A3 « Join an account I already have »), `nil` sinon.
     private(set) var join: AddCardModel?
 
+    /// D'où vient le parcours.
+    enum Mode: Equatable {
+        /// Onboarding : A1 à la racine, aucun compte ouvert.
+        case onboarding
+        /// « + Add an account · tap one of its cards » (I6) : A2 à la racine, par-dessus le compte affiché. Seule la
+        /// reconnexion d'une carte déjà dans un compte est proposée (PIN d'une Infineon, puis « Welcome back! »).
+        case addAccount
+    }
+
+    let mode: Mode
     private let session: AppSession
     private let reader: ChipReader
     private let service: OnboardingService
@@ -127,8 +141,10 @@ final class OnboardingModel {
         signer: ChipSigner,
         joinService: AddCardService? = nil,
         oracle: PriceOracle? = nil,
+        mode: Mode = .onboarding,
         makeSetup: @escaping (CardChoice) throws -> AccountSetupModel
     ) {
+        self.mode = mode
         self.oracle = oracle
         self.session = session
         self.reader = reader
@@ -163,7 +179,7 @@ final class OnboardingModel {
     static let tourPageCount = 4
 
     /// H2 · « Look who's back! » : ce téléphone a déjà ouvert un compte, fermé depuis par « Disconnect this phone ».
-    var isReturning: Bool { session.wallet.disconnectedAccounts?.isEmpty == false }
+    var isReturning: Bool { mode == .onboarding && session.wallet.disconnectedAccounts?.isEmpty == false }
 
     var isBusy: Bool { readingState == .scanning || readingState == .checking }
 
@@ -201,9 +217,12 @@ final class OnboardingModel {
     func openReading() {
         readingState = .idle
         reconnection = nil
-        path = [.reading]
+        path = readingPath
         Task { await scan() }
     }
+
+    /// Pile où A2 est au sommet : poussé depuis A1 (onboarding), à la racine pour « + Add an account ».
+    private var readingPath: [OnboardingRoute] { mode == .addAccount ? [] : [.reading] }
 
     /// Lit la carte, puis demande au réseau qui elle est (lecture seule, rien n'est signé ni payé).
     func scan() async {
@@ -238,6 +257,7 @@ final class OnboardingModel {
     }
 
     private func route(_ inspection: CardInspection) throws {
+        if mode == .addAccount { return try routeAddedAccount(inspection) }
         switch inspection.resolution {
         case .enrolled:
             readingState = .idle
@@ -261,6 +281,42 @@ final class OnboardingModel {
             } else {
                 try continueReconnection()
             }
+        }
+    }
+
+    /// « + Add an account » (I6) : seule une carte déjà dans un compte ouvre ce compte. Un compte déjà ouvert sur ce
+    /// téléphone s'affiche directement ; sinon, la reconnexion habituelle (PIN d'une Infineon, « Welcome back! »).
+    private func routeAddedAccount(_ inspection: CardInspection) throws {
+        switch inspection.resolution {
+        case .signIn(let account, _):
+            if session.wallet.account?.address == account {
+                readingState = .failed(OnboardingProblem(kind: .alreadyOpen, technicalDetails: "signIn \(account): already open"))
+                return
+            }
+            if session.wallet.otherAccount(account) != nil {
+                readingState = .idle
+                try session.switchAccount(to: account)
+                return
+            }
+            readingState = .idle
+            let reconnect = ReconnectModel(account: account, inspection: inspection, session: session, signer: signer)
+            reconnection = reconnect
+            if reconnect.needsPIN {
+                path.append(.reconnectPIN)
+            } else {
+                try continueReconnection()
+            }
+        case .enrolled:
+            readingState = .failed(OnboardingProblem(kind: .notInAnAccount, technicalDetails: "resolution: enrolled, no account"))
+        case .orphan(let lastKnown):
+            readingState = .failed(OnboardingProblem(
+                kind: .notInAnAccount, technicalDetails: "resolution: orphan, last known \(lastKnown ?? "none")"
+            ))
+        case .newCard:
+            readingState = .idle
+            path.append(.notAChimpCard)
+        case .unknown(let detail):
+            readingState = .failed(OnboardingProblem(kind: .couldntCheck, technicalDetails: detail))
         }
     }
 
@@ -296,7 +352,7 @@ final class OnboardingModel {
     func cancelReconnection() {
         reconnection = nil
         readingState = .idle
-        path = [.reading]
+        path = readingPath
     }
 
     /// L'écran du PIN (vérifié) ne doit plus être accessible : « Welcome back! » le remplace dans la pile.

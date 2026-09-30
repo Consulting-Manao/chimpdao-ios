@@ -108,12 +108,13 @@ struct OnboardingFlow: View {
 extension OnboardingModel {
     /// Onboarding branché sur la vraie carte (Core NFC) et le testnet. Sur un appareil sans NFC (simulateur), les
     /// builds Debug et Testing prennent une carte et un réseau factices ; en Release, l'erreur « pas de NFC » s'affiche.
-    static func live(session: AppSession) -> OnboardingModel {
+    /// `mode` : `.addAccount` pour « + Add an account » (I6).
+    static func live(session: AppSession, mode: Mode = .onboarding) -> OnboardingModel {
         #if DESIGN_CATALOG
         if !NFCTagReaderSession.readingAvailable {
             return OnboardingModel(
                 session: session, reader: MockChipReader(scenario: .infineon), service: MockOnboardingService(scenario: .fresh),
-                signer: MockChipSigner(), joinService: MockAddCardService(),
+                signer: MockChipSigner(), joinService: MockAddCardService(), mode: mode,
                 makeSetup: { choice in
                     try AccountSetupModel(
                         choice: choice, service: MockAccountSetupService(), creator: AccountCreator(chain: MockAccountCreationChain()),
@@ -125,7 +126,7 @@ extension OnboardingModel {
         #endif
         return OnboardingModel(
             session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: .testnet),
-            signer: NFCChipSigner(), joinService: ChainAddCardService(config: .testnet), oracle: ReflectorPriceOracle(),
+            signer: NFCChipSigner(), joinService: ChainAddCardService(config: .testnet), oracle: ReflectorPriceOracle(), mode: mode,
             makeSetup: { choice in try Self.liveSetup(choice: choice, session: session) }
         )
     }

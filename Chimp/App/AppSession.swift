@@ -68,12 +68,22 @@ final class AppSession {
     /// Carte déjà membre d'un Main account (`signIn` de la résolution) : on ouvre ce compte sur le téléphone.
     /// Comme le terminal : rien n'est signé (une Infineon a d'abord vérifié son PIN, `ReconnectModel`). L'indice
     /// « carte → compte » est mis à jour. `firstName` : prénom redemandé par « Welcome back! » (sinon, celui du téléphone).
-    /// Les noms et couleurs des cartes d'un compte fermé par « Disconnect this phone » sont repris.
+    /// Les noms et couleurs des cartes d'un compte déjà connu (fermé, ou autre compte ouvert) sont repris.
+    /// Un autre compte déjà affiché (« + Add an account », I6) **reste ouvert** : il rejoint les autres comptes du
+    /// téléphone. Refusé si un paiement de ce compte-là attend encore son issue.
     func signIn(account: String, card: SavedCard, firstName: String? = nil, at date: Date = .now) throws {
+        if let current = wallet.account, current.address != account, wallet.pendingSend != nil {
+            throw SettingsError.pendingPayment
+        }
         var next = wallet
-        next.firstName = firstName ?? next.firstName(for: account)
-        var cards = Self.knownCards(of: account, in: next)
+        next.firstName = firstName ?? wallet.firstName(for: account)
+        var cards = Self.knownCards(of: account, in: wallet)
         next.disconnectedAccounts = Self.removing(account, from: next.disconnectedAccounts)
+        next.otherAccounts = Self.removing(account, from: next.otherAccounts)
+        if var previous = wallet.account, previous.address != account {
+            previous.firstName = wallet.firstName
+            next.otherAccounts = [previous] + (next.otherAccounts ?? [])
+        }
         if let index = cards.firstIndex(where: { $0.publicKey == card.publicKey }) {
             // Garder le nom et la couleur déjà choisis sur ce téléphone.
             var merged = card
@@ -85,6 +95,26 @@ final class AppSession {
         }
         next.account = SavedAccount(address: account, cards: cards)
         next.cardHints = CardHint.adding(CardHint(key: card.publicKey, account: account, at: date), to: next.cardHints)
+        try persist(next)
+    }
+
+    // MARK: Plusieurs comptes (I6 « Switch account »)
+
+    /// Passe à un autre compte ouvert sur ce téléphone, **sans carte** (l'app ne garde aucun secret ; la maquette I6 est
+    /// 🔓). Le compte quitté reste ouvert, en tête des autres. Refusé tant qu'un paiement signé attend son issue : il
+    /// appartient au compte affiché.
+    func switchAccount(to address: String) throws {
+        guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
+        guard let current = wallet.account else { throw SettingsError.noAccount }
+        guard current.address != address else { return }
+        guard var target = wallet.otherAccount(address) else { throw SettingsError.unknownAccount }
+        var next = wallet
+        var leaving = current
+        leaving.firstName = wallet.firstName
+        next.otherAccounts = Self.removing(address, from: [leaving] + (wallet.otherAccounts ?? []))
+        next.firstName = target.firstName
+        target.firstName = nil
+        next.account = target
         try persist(next)
     }
 
@@ -118,6 +148,7 @@ final class AppSession {
         let known = SavedAccount(address: account, cards: Self.knownCards(of: account, in: next))
         next.account = Self.upserting(card, into: known)
         next.disconnectedAccounts = Self.removing(account, from: next.disconnectedAccounts)
+        next.otherAccounts = Self.removing(account, from: next.otherAccounts)
         next.cardHints = CardHint.adding(CardHint(key: card.publicKey, account: account, at: date), to: next.cardHints)
         isFinishingOnboarding = true
         do {
@@ -140,11 +171,14 @@ final class AppSession {
         case noAccount
         /// Un paiement signé attend encore son issue : le téléphone doit le garder (garde-fou contre un double envoi).
         case pendingPayment
+        /// Ce compte n'est pas ouvert sur ce téléphone.
+        case unknownAccount
 
         var errorDescription: String? {
             switch self {
             case .noAccount: "No account is open on this phone."
             case .pendingPayment: "A payment is still being checked."
+            case .unknownAccount: "This account isn't open on this phone."
             }
         }
     }
@@ -210,11 +244,12 @@ final class AppSession {
         try persist(next)
     }
 
-    /// « Disconnect this phone » (I2) : le compte se ferme sur ce téléphone et l'app revient à A1. Comme `logout` du
-    /// terminal, les indices « carte → compte » restent ; la visite reste vue. Le prénom et le compte fermé (avec les noms
-    /// et couleurs de ses cartes) sont **gardés** : une reconnexion au même compte les retrouve, sans « Welcome back! »
-    /// (demande de Barth du 2026-09-30). Rien ne change on-chain : un tap d'une carte du compte le rouvre.
-    /// Refusé tant qu'un paiement signé attend son issue.
+    /// « Disconnect this phone » (I2, I6) : le compte affiché se ferme sur ce téléphone. Comme `logout` du terminal, les
+    /// indices « carte → compte » restent ; la visite reste vue. Le prénom et le compte fermé (avec les noms et couleurs
+    /// de ses cartes) sont **gardés** : une reconnexion au même compte les retrouve, sans « Welcome back! » (demande de
+    /// Barth du 2026-09-30). Rien ne change on-chain : un tap d'une carte du compte le rouvre.
+    /// S'il reste un autre compte ouvert, il s'affiche (le plus récemment quitté) ; sinon l'app revient à A1 (décision de
+    /// Barth du 2026-09-30). Refusé tant qu'un paiement signé attend son issue.
     func disconnect() throws {
         guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
         var next = wallet
@@ -222,14 +257,22 @@ final class AppSession {
             account.firstName = next.firstName
             next.disconnectedAccounts = [account] + (Self.removing(account.address, from: next.disconnectedAccounts) ?? [])
         }
-        next.account = nil
-        next.firstName = nil
+        if var following = next.otherAccounts?.first {
+            next.otherAccounts = Self.removing(following.address, from: next.otherAccounts)
+            next.firstName = following.firstName
+            following.firstName = nil
+            next.account = following
+        } else {
+            next.account = nil
+            next.firstName = nil
+        }
         try persist(next)
     }
 
     /// « Erase everything on this phone » (I2, demandé par Barth le 2026-09-30) : pour un téléphone qu'on donne ou qu'on
     /// vend. Tout ce que l'app garde s'en va : compte ouvert, comptes fermés (prénoms, noms et couleurs des cartes), indices
-    /// « carte → compte », visite, historique de l'Activity, réglages du téléphone. L'app revient à A1. Rien ne change on-chain : l'argent reste
+    /// « carte → compte », visite, historique de l'Activity, réglages du téléphone, et tous les comptes ouverts. L'app
+    /// revient à A1. Rien ne change on-chain : l'argent reste
     /// sur les cartes. Refusé tant qu'un paiement signé attend son issue (le téléphone doit le garder).
     func eraseEverything() throws {
         guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
@@ -240,10 +283,9 @@ final class AppSession {
         isFinishingOnboarding = false
     }
 
-    /// Cartes connues de ce téléphone pour ce compte : celles du compte ouvert, sinon celles du compte fermé.
+    /// Cartes connues de ce téléphone pour ce compte : compte affiché, autre compte ouvert, ou compte fermé.
     private static func knownCards(of account: String, in wallet: LocalWallet) -> [SavedCard] {
-        if wallet.account?.address == account { return wallet.account?.cards ?? [] }
-        return wallet.disconnectedAccount(account)?.cards ?? []
+        wallet.knownAccount(account)?.cards ?? []
     }
 
     private static func removing(_ account: String, from accounts: [SavedAccount]?) -> [SavedAccount]? {

@@ -9,6 +9,8 @@ import SwiftUI
 struct CardReadingView: View {
     let state: OnboardingModel.ReadingState
     var isReturning = false
+    /// « + Add an account » (I6) : un lien « Cancel » ramène aux réglages.
+    var onCancel: (() -> Void)?
     let onScan: () -> Void
 
     var body: some View {
@@ -57,10 +59,22 @@ struct CardReadingView: View {
             if showsScanButton {
                 ChimpButton(scanTitle, size: .large, action: onScan)
                     .padding(.horizontal, ChimpSpacing.fullScreenMargin)
-                    .padding(.bottom, ChimpSpacing.lg)
+                    .padding(.bottom, onCancel == nil ? ChimpSpacing.lg : ChimpSpacing.xs)
             }
 
-            if showsReturningText {
+            if let onCancel {
+                // « + Add an account » (I6) : « Cancel » à la place du bandeau (place comptée sur iPhone SE).
+                Button(action: onCancel) {
+                    Text("Cancel")
+                        .chimpFont(.link)
+                        .foregroundStyle(.chimpOnHeaderSecondary)
+                        .frame(maxWidth: .infinity, minHeight: ChimpSize.minimumTouchTarget)
+                }
+                .buttonStyle(ChimpPressableStyle())
+                .opacity(state == .checking || state == .scanning ? 0 : 1)
+                .disabled(state == .checking || state == .scanning)
+                .padding(.bottom, ChimpSpacing.l)
+            } else if showsReturningText {
                 ChimpySays(text: "Just once. After that, peek at your bananas anytime, no card.", pose: .crawl)
                     .padding(.horizontal, ChimpSpacing.fullScreenMargin)
                     .padding(.bottom, ChimpSpacing.xl)
@@ -107,6 +121,8 @@ struct CardReadingView: View {
         case .couldntCheck: "I read the card but couldn't check it online. Check your connection and tap again."
         case .readFailed: "Something went wrong reading the card. Let's try again."
         case .wrongCard: "That's not the card you started with. Tap the same card."
+        case .notInAnAccount: "This card isn't in an account yet. Tap a card that already has one."
+        case .alreadyOpen: "That card belongs to the account you're in. Tap a card of the other account."
         }
     }
 }

@@ -43,8 +43,12 @@ struct ChainWalletDataSource: WalletDataSource {
     }
 
     func fetchWallet() async throws -> WalletSnapshot {
-        let local = session.wallet
-        guard let account = local.account else { throw ReadError.noAccount }
+        guard let account = session.wallet.account else { throw ReadError.noAccount }
+        return try await fetchWallet(for: account)
+    }
+
+    /// Soldes d'un compte ouvert sur ce téléphone, affiché ou non (totaux de I6 « Switch account »).
+    func fetchWallet(for account: SavedAccount) async throws -> WalletSnapshot {
 
         // Lectures indépendantes, lancées ensemble (le terminal fait de même).
         async let membersRead = chain.cards(of: account.address)

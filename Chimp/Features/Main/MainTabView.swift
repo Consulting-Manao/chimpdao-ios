@@ -9,6 +9,7 @@ struct MainTabView: View {
     /// Gardé ici pour que les soldes restent chargés quand on change d'onglet.
     @State private var walletModel: WalletViewModel
     private let session: AppSession
+    private let config: ChimpNetworkConfig
     /// Écrans poussés dans l'onglet Wallet.
     @State private var walletPath: [WalletRoute] = []
     /// Gardé ici pour que l'historique reste affiché quand on change d'onglet.
@@ -24,6 +25,7 @@ struct MainTabView: View {
     /// Le vrai Wallet : soldes lus sur le réseau de l'app (testnet), prix du XLM par l'oracle de mainnet.
     init(session: AppSession, config: ChimpNetworkConfig = .testnet) {
         self.session = session
+        self.config = config
         let wallet = WalletViewModel(dataSource: ChainWalletDataSource(
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle()
         ))
@@ -91,7 +93,10 @@ struct MainTabView: View {
                             }
                         case .settings:
                             // I2 : au retour, le Wallet relit les noms et couleurs des cartes.
-                            SettingsDestination(session: session, walletCards: walletModel.cards, onDeveloper: developerAction) {
+                            SettingsDestination(
+                                session: session, walletCards: walletModel.cards, walletTotal: walletModel.content?.total,
+                                config: config, onDeveloper: developerAction
+                            ) {
                                 walletPath.removeAll()
                                 Task { await walletModel.refresh() }
                             }
@@ -329,8 +334,17 @@ private struct SettingsDestination: View {
     let onDeveloper: (() -> Void)?
     let onExit: () -> Void
 
-    init(session: AppSession, walletCards: [CardBalance], onDeveloper: (() -> Void)?, onExit: @escaping () -> Void) {
-        _model = State(initialValue: SettingsModel(session: session, walletCards: walletCards, oracle: ReflectorPriceOracle()))
+    init(
+        session: AppSession, walletCards: [CardBalance], walletTotal: String?, config: ChimpNetworkConfig,
+        onDeveloper: (() -> Void)?, onExit: @escaping () -> Void
+    ) {
+        let oracle = ReflectorPriceOracle()
+        let summaries = ChainAccountSummaryReader(wallet: ChainWalletDataSource(
+            session: session, chain: ChainWalletReader(config: config), oracle: oracle
+        ))
+        _model = State(initialValue: SettingsModel(
+            session: session, walletCards: walletCards, walletTotal: walletTotal, oracle: oracle, summaries: summaries
+        ))
         self.onDeveloper = onDeveloper
         self.onExit = onExit
     }

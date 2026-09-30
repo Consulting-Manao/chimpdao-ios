@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// I2 · Settings (maquette) : prénom, nom et couleur des cartes, devise (I3), apparence, réseau (affichage seulement), visite,
-/// « Disconnect this phone », « Erase everything on this phone », liens (licences, aide), version. Les lignes de la
-/// maquette pas encore faisables (paranoid mode, shop mode, raw signing) ne sont pas affichées : aucune ligne sans
-/// destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision de Barth du
-/// 2026-09-30). « Network » montre le réseau de la configuration de build, jamais un interrupteur (2026-09-30). En Debug
-/// et Testing, une section « Developer » ouvre le catalogue et le mode admin.
+/// I2 · Settings (maquette) : prénom, changement de compte (I6), nom et couleur des cartes, devise (I3), apparence,
+/// réseau (affichage seulement), visite, « Disconnect », « Erase everything on this phone », liens (licences, aide),
+/// version. Les lignes de la maquette pas encore faisables (paranoid mode, shop mode, raw signing) ne sont pas affichées :
+/// aucune ligne sans destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision
+/// de Barth du 2026-09-30). « Network » montre le réseau de la configuration de build, jamais un interrupteur
+/// (2026-09-30). En Debug et Testing, une section « Developer » ouvre le catalogue et le mode admin.
 struct SettingsView: View {
     @Bindable var model: SettingsModel
     let onBack: () -> Void
@@ -21,8 +21,13 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     sectionLabel("You")
-                    you
-                        .padding(.top, ChimpSpacing.s)
+                    ChimpGroupedBox {
+                        you
+                        ChimpSettingsRow(title: "Switch account", value: model.accountName) {
+                            model.isShowingAccounts = true
+                        }
+                    }
+                    .padding(.top, ChimpSpacing.s)
 
                     sectionLabel("Your cards")
                         .padding(.top, ChimpSpacing.sectionGap)
@@ -79,7 +84,7 @@ struct SettingsView: View {
                             .padding(.top, ChimpSpacing.s)
                     }
 
-                    ChimpButton("Disconnect this phone", kind: .destructive) { model.isConfirmingDisconnect = true }
+                    ChimpButton(disconnectButtonTitle, kind: .destructive) { model.isConfirmingDisconnect = true }
                         .padding(.top, ChimpSpacing.sectionGap)
                     Button { model.isConfirmingErase = true } label: {
                         Text("Erase everything on this phone")
@@ -128,6 +133,18 @@ struct SettingsView: View {
             }
         } message: {
             Text(eraseMessage)
+        }
+        .chimpSheet(isPresented: $model.isShowingAccounts, height: 600, onDismiss: model.accountsSheetDismissed) {
+            AccountsSheet(model: model)
+                .task { await model.loadAccountSummaries() }
+        }
+        .fullScreenCover(isPresented: $model.isAddingAccount) {
+            AddAccountFlow(model: model.makeAddAccountModel()) { model.isAddingAccount = false }
+        }
+        .alert("Not yet", isPresented: $model.isShowingPendingNotice) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("A payment is still being checked. Open Send to see how it ended, then you can switch accounts.")
         }
         .fullScreenCover(isPresented: $model.isReplayingTour) {
             TourReplayView { model.isReplayingTour = false }
@@ -191,9 +208,8 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             ChimpPillButton("Edit", action: model.editFirstName)
         }
-        .padding(.vertical, ChimpSpacing.m + ChimpBorder.regular)
-        .padding(.horizontal, 15 + ChimpBorder.regular)
-        .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.control), fill: Color(.chimpSurface))
+        .padding(.vertical, ChimpSpacing.m)
+        .padding(.horizontal, 15)
         .accessibilityElement(children: .combine)
     }
 
@@ -313,13 +329,29 @@ struct SettingsView: View {
 
     // MARK: Disconnect this phone
 
+    /// « Disconnect this phone » avec un seul compte ; « Disconnect Léo's account » s'il y en a plusieurs (décision de
+    /// Barth du 2026-09-30 : le libellé dit ce qu'il fait).
+    private var disconnectButtonTitle: LocalizedStringKey {
+        Self.disconnectTitle(severalAccounts: model.hasSeveralAccounts, firstName: model.firstName)
+    }
+
+    static func disconnectTitle(severalAccounts: Bool, firstName: String?, asQuestion: Bool = false) -> LocalizedStringKey {
+        guard severalAccounts else { return asQuestion ? "Disconnect this phone?" : "Disconnect this phone" }
+        guard let firstName, !firstName.isEmpty else { return asQuestion ? "Disconnect this account?" : "Disconnect this account" }
+        return asQuestion ? "Disconnect \(firstName)'s account?" : "Disconnect \(firstName)'s account"
+    }
+
     private var disconnectTitle: LocalizedStringKey {
-        model.hasPendingPayment ? "Not yet" : "Disconnect this phone?"
+        if model.hasPendingPayment { return "Not yet" }
+        return Self.disconnectTitle(severalAccounts: model.hasSeveralAccounts, firstName: model.firstName, asQuestion: true)
     }
 
     private var disconnectMessage: LocalizedStringKey {
-        model.hasPendingPayment
-            ? "A payment is still being checked. Open Send to see how it ended, then you can disconnect."
+        if model.hasPendingPayment {
+            return "A payment is still being checked. Open Send to see how it ended, then you can disconnect."
+        }
+        return model.hasSeveralAccounts
+            ? "I only close this account on this phone. Your money stays on its cards, promise. Your other accounts stay open. Tap any card of this account to come back."
             : "I only close your account on this phone. Your money stays on your cards, promise. Tap any card of your account to come back."
     }
 
@@ -366,6 +398,98 @@ struct SettingsView: View {
         }
         .padding(.horizontal, ChimpSpacing.xxl)
         .padding(.bottom, ChimpSpacing.l)
+    }
+}
+
+/// I6 · Switch account (maquette) : les comptes ouverts sur ce téléphone, « + Add an account · tap one of its cards »,
+/// bulle de Chimpy et « Disconnect ». Passer à un autre compte ne demande aucune carte.
+struct AccountsSheet: View {
+    @Bindable var model: SettingsModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Switch account")
+                .chimpFont(.sheetTitle)
+                .foregroundStyle(.chimpTextPrimary)
+                .accessibilityAddTraits(.isHeader)
+            Text("Each account has its own Main and its own cards.")
+                .chimpFont(.bodyM)
+                .foregroundStyle(.chimpTextSecondary)
+                .padding(.top, ChimpSpacing.xxs)
+            ScrollView {
+                VStack(spacing: ChimpSpacing.listGap) {
+                    ForEach(model.accountRows) { row in
+                        accountRow(row)
+                    }
+                    Button(action: model.addAccount) {
+                        Text("+ Add an account · tap one of its cards")
+                            .chimpFont(.buttonSmall)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.chimpTextSecondary)
+                            .frame(maxWidth: .infinity, minHeight: ChimpSize.minimumTouchTarget)
+                            .padding(.horizontal, ChimpSpacing.ml)
+                            .padding(.vertical, ChimpSpacing.xxs)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: ChimpRadius.control)
+                                    .strokeBorder(Color(.chimpTextSecondary), style: StrokeStyle(lineWidth: ChimpBorder.regular, dash: [8, 6]))
+                            )
+                            .contentShape(RoundedRectangle(cornerRadius: ChimpRadius.control))
+                    }
+                    .buttonStyle(ChimpPressableStyle())
+                }
+                .padding(.top, ChimpSpacing.ml)
+                .padding(.bottom, ChimpSpacing.m)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            ChimpySays(text: "I only forget this phone. Your money stays on your cards, promise.", pose: .crawl)
+            ChimpButton(disconnectTitle, kind: .destructive, action: model.disconnectFromAccounts)
+            .padding(.top, ChimpSpacing.m)
+            .padding(.bottom, ChimpSpacing.l)
+        }
+        .padding(.horizontal, ChimpSpacing.xxl)
+    }
+
+    private var disconnectTitle: LocalizedStringKey {
+        SettingsView.disconnectTitle(severalAccounts: model.hasSeveralAccounts, firstName: model.firstName)
+    }
+
+    private func accountRow(_ row: SettingsModel.AccountRow) -> some View {
+        let shape = RoundedRectangle(cornerRadius: ChimpRadius.control)
+        return Button { model.switchAccount(to: row.id) } label: {
+            HStack(spacing: ChimpSpacing.m) {
+                Image(.tileHead)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: row.name)
+                        .chimpFont(.optionTitle)
+                    Text(verbatim: Self.detail(row))
+                        .chimpFont(.captionS)
+                        .foregroundStyle(row.isCurrent ? Color(.chimpOnAccent) : Color(.chimpTextSecondary))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                ChimpRadio(isSelected: row.isCurrent)
+            }
+            .foregroundStyle(row.isCurrent ? Color(.chimpOnAccent) : Color(.chimpTextPrimary))
+            .padding(.vertical, 12 + ChimpBorder.regular)
+            .padding(.horizontal, ChimpSpacing.ml + ChimpBorder.regular)
+        }
+        .buttonStyle(ChimpSurfaceButtonStyle(
+            shape: shape,
+            fill: row.isCurrent ? Color(.chimpAccent) : Color(.chimpSurface),
+            shadow: row.isCurrent ? .tile : ChimpShadow(x: 0, y: 0)
+        ))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(row.isCurrent ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// « 3 cards · $1,485.00 », ou le nombre de cartes seul tant que le total n'est pas lu.
+    static func detail(_ row: SettingsModel.AccountRow) -> String {
+        let cards = row.cardCount == 1 ? String(localized: "1 card") : String(localized: "\(row.cardCount) cards")
+        guard let total = row.total else { return cards }
+        return "\(cards) · \(total)"
     }
 }
 

@@ -40,11 +40,20 @@ final class SettingsModel {
 
     /// Prix de l'oracle Reflector, pour savoir quelles devises de I3 il cote ; `nil` : toutes proposées.
     private let oracle: PriceOracle?
+    /// Total du compte affiché, déjà lu par le Wallet (I6).
+    private let walletTotal: String?
+    /// Résumés des autres comptes ouverts (I6) ; `nil` : seulement le nombre de cartes connu du téléphone.
+    private let summaries: AccountSummaryReader?
 
-    init(session: AppSession, walletCards: [CardBalance], oracle: PriceOracle? = nil) {
+    init(
+        session: AppSession, walletCards: [CardBalance], walletTotal: String? = nil, oracle: PriceOracle? = nil,
+        summaries: AccountSummaryReader? = nil
+    ) {
         self.session = session
         self.walletCards = walletCards
+        self.walletTotal = walletTotal
         self.oracle = oracle
+        self.summaries = summaries
     }
 
     static let maximumCardNameLength = AccountSetupModel.maximumCardNameLength
@@ -159,12 +168,116 @@ final class SettingsModel {
         }
     }
 
+    // MARK: Switch account (I6)
+
+    /// Une ligne de I6 : « Léo's account · 3 cards · $1,485.00 ».
+    struct AccountRow: Identifiable, Equatable {
+        /// Adresse C du Main account.
+        let id: String
+        let name: String
+        let cardCount: Int
+        /// Total lu sur la chaîne ; `nil` tant qu'il n'est pas lu (ou si la lecture a échoué).
+        let total: String?
+        let isCurrent: Bool
+    }
+
+    var isShowingAccounts = false
+    /// « + Add an account » : la reconnexion d'une carte, par-dessus les réglages.
+    var isAddingAccount = false
+    /// Changement de compte refusé : un paiement attend encore son issue.
+    var isShowingPendingNotice = false
+    private(set) var loadedSummaries: [String: AccountSummary] = [:]
+
+    /// Nom du compte affiché (valeur de la ligne « Switch account »).
+    var accountName: String {
+        AccountName.text(firstName: firstName, address: session.wallet.account?.address ?? "")
+    }
+
+    /// Plus d'un compte ouvert sur ce téléphone : « Disconnect » dit alors lequel.
+    var hasSeveralAccounts: Bool { session.wallet.openAccounts.count > 1 }
+
+    /// Comptes ouverts sur ce téléphone : le compte affiché d'abord (total et cartes lus par le Wallet), puis les autres.
+    var accountRows: [AccountRow] {
+        session.wallet.openAccounts.enumerated().map { index, account in
+            let isCurrent = index == 0
+            let summary = loadedSummaries[account.address]
+            return AccountRow(
+                id: account.address,
+                name: AccountName.text(firstName: account.firstName, address: account.address),
+                cardCount: isCurrent ? cards.count : (summary?.cardCount ?? account.cards.count),
+                total: isCurrent ? walletTotal : summary?.total,
+                isCurrent: isCurrent
+            )
+        }
+    }
+
+    /// À l'ouverture de I6 : lit les totaux des autres comptes, ensemble. Une lecture ratée laisse le nombre de cartes seul.
+    func loadAccountSummaries() async {
+        guard let summaries else { return }
+        let others = Array(session.wallet.openAccounts.dropFirst())
+        await withTaskGroup(of: (String, AccountSummary?).self) { group in
+            for account in others {
+                group.addTask { (account.address, try? await summaries.summary(of: account)) }
+            }
+            for await (address, summary) in group {
+                if let summary { loadedSummaries[address] = summary }
+            }
+        }
+    }
+
+    /// Toucher d'un autre compte : il s'affiche (sans carte). Refusé tant qu'un paiement attend son issue.
+    func switchAccount(to address: String) {
+        guard address != session.wallet.account?.address else {
+            isShowingAccounts = false
+            return
+        }
+        guard !hasPendingPayment else {
+            isShowingPendingNotice = true
+            return
+        }
+        do {
+            try session.switchAccount(to: address)
+            saveError = nil
+        } catch {
+            saveError = OnboardingModel.details(error)
+        }
+    }
+
+    /// « + Add an account · tap one of its cards ».
+    func addAccount() {
+        guard !hasPendingPayment else {
+            isShowingPendingNotice = true
+            return
+        }
+        isShowingAccounts = false
+        isAddingAccount = true
+    }
+
+    /// « Disconnect » de I6 : la feuille se ferme d'abord, puis la confirmation s'affiche (une alerte ne peut pas
+    /// s'ouvrir pendant la fermeture de la feuille).
+    func disconnectFromAccounts() {
+        isDisconnectingAfterSheet = true
+        isShowingAccounts = false
+    }
+
+    func accountsSheetDismissed() {
+        guard isDisconnectingAfterSheet else { return }
+        isDisconnectingAfterSheet = false
+        isConfirmingDisconnect = true
+    }
+
+    private var isDisconnectingAfterSheet = false
+
+    func makeAddAccountModel() -> OnboardingModel {
+        .live(session: session, mode: .addAccount)
+    }
+
     // MARK: Disconnect this phone
 
     /// Un paiement signé attend encore son issue : le téléphone doit le garder, la déconnexion est refusée.
     var hasPendingPayment: Bool { session.wallet.pendingSend != nil }
 
-    /// Après confirmation : le compte est oublié sur ce téléphone, l'app revient à A1.
+    /// Après confirmation : le compte affiché est oublié sur ce téléphone ; l'app affiche le compte suivant, ou A1.
     func disconnect() {
         do {
             try session.disconnect()

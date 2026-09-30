@@ -24,10 +24,33 @@ struct LocalWallet: Codable, Equatable {
     /// compte les retrouve sans rien redemander (demande de Barth du 2026-09-30). Données publiques et noms, comme
     /// `account`. Optionnel : un fichier écrit avant ce champ reste lisible.
     var disconnectedAccounts: [SavedAccount]?
+    /// Autres comptes **ouverts** sur ce téléphone (I6 « Switch account »), en plus de `account`, avec leur prénom : on
+    /// passe de l'un à l'autre sans carte (l'app ne garde aucun secret). Le plus récemment quitté d'abord. Un compte fermé
+    /// par « Disconnect » n'y est pas : il faut une de ses cartes pour le rouvrir. Optionnel : un fichier écrit avant ce
+    /// champ reste lisible.
+    var otherAccounts: [SavedAccount]?
 
     /// Compte fermé sur ce téléphone, s'il y en a un à cette adresse.
     func disconnectedAccount(_ address: String) -> SavedAccount? {
         disconnectedAccounts?.first { $0.address == address }
+    }
+
+    /// Autre compte ouvert sur ce téléphone, s'il y en a un à cette adresse.
+    func otherAccount(_ address: String) -> SavedAccount? {
+        otherAccounts?.first { $0.address == address }
+    }
+
+    /// Ce que le téléphone sait d'un compte : ouvert, autre compte ouvert, ou fermé par « Disconnect ».
+    func knownAccount(_ address: String) -> SavedAccount? {
+        if account?.address == address { return account }
+        return otherAccount(address) ?? disconnectedAccount(address)
+    }
+
+    /// Comptes ouverts sur ce téléphone (I6) : le compte affiché d'abord, puis les autres.
+    var openAccounts: [SavedAccount] {
+        guard var current = account else { return [] }
+        current.firstName = firstName
+        return [current] + (otherAccounts ?? [])
     }
 
     /// Prénom connu de ce téléphone pour ce compte : celui du compte ouvert, ou celui gardé avec le compte fermé.
@@ -35,6 +58,7 @@ struct LocalWallet: Codable, Equatable {
     /// au dernier compte fermé, et à lui seul.
     func firstName(for address: String) -> String? {
         if account?.address == address { return firstName }
+        if let other = otherAccount(address) { return other.firstName }
         guard let closed = disconnectedAccount(address) else { return nil }
         if let name = closed.firstName { return name }
         return account == nil && disconnectedAccounts?.first?.address == address ? firstName : nil
@@ -67,7 +91,8 @@ struct SavedAccount: Codable, Equatable {
     /// Adresse C du Main account.
     var address: String
     var cards: [SavedCard]
-    /// Prénom de ce compte, gardé ici seulement quand le compte est fermé (« Disconnect this phone »).
+    /// Prénom de ce compte, gardé ici quand ce n'est pas le compte affiché (autre compte ouvert, ou compte fermé par
+    /// « Disconnect this phone »).
     var firstName: String? = nil
 }
 
