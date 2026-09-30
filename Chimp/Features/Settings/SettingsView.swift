@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// I2 · Settings (maquette) : prénom, nom et couleur des cartes, visite, « Disconnect this phone », « Erase everything on
-/// this phone », liens (licences, aide), version. Les lignes de la maquette pas encore faisables (changer de compte,
-/// paranoid mode, Face ID, devise, apparence, shop mode, raw signing) ne sont pas affichées : aucune ligne sans
+/// I2 · Settings (maquette) : prénom, nom et couleur des cartes, apparence, visite, « Disconnect this phone », « Erase
+/// everything on this phone », liens (licences, aide), version. Les lignes de la maquette pas encore faisables (changer de
+/// compte, paranoid mode, Face ID, devise, shop mode, raw signing) ne sont pas affichées : aucune ligne sans
 /// destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision de Barth du
 /// 2026-09-30). Pas de choix du réseau (décision du 2026-09-28). En Debug et Testing, une section « Developer » ouvre le
 /// catalogue et le mode admin.
@@ -42,13 +42,22 @@ struct SettingsView: View {
                         .padding(.top, ChimpSpacing.s)
                     }
 
+                    sectionLabel("Display")
+                        .padding(.top, ChimpSpacing.sectionGap)
+                    ChimpGroupedBox {
+                        ChimpSettingsControlRow(title: "Look") {
+                            ChimpSegmentedPicker(segments: Self.lookSegments, selection: $model.look)
+                        }
+                    }
+                    .padding(.top, ChimpSpacing.s)
+
                     sectionLabel("More")
                         .padding(.top, ChimpSpacing.sectionGap)
-                    ChimpGroupedList(rows: [
-                        ChimpGroupedRow(id: "tour", title: "How ChimpDAO works", value: String(localized: "Replay the tour")) {
+                    ChimpGroupedBox {
+                        ChimpSettingsRow(title: "How ChimpDAO works", value: String(localized: "Replay the tour")) {
                             model.isReplayingTour = true
-                        },
-                    ])
+                        }
+                    }
                     .padding(.top, ChimpSpacing.s)
 
                     if let onDeveloper {
@@ -131,6 +140,14 @@ struct SettingsView: View {
     }
 
     // MARK: Sections
+
+    /// « Look » : la maquette montre Yellow banana et Jungle night ; « Auto » (comme l'iPhone, par défaut) est ajouté en
+    /// premier (décision de Barth du 2026-09-30).
+    static let lookSegments: [ChimpSegment<ChimpLook>] = [
+        ChimpSegment(value: .auto, title: "Auto", accessibilityTitle: "Same as my iPhone"),
+        ChimpSegment(value: .yellowBanana, title: "Yellow banana"),
+        ChimpSegment(value: .jungleNight, title: "Jungle night"),
+    ]
 
     private func sectionLabel(_ text: LocalizedStringKey) -> some View {
         Text(text)

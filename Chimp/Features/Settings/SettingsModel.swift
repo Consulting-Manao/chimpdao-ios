@@ -184,6 +184,14 @@ final class SettingsModel {
         }
     }
 
+    // MARK: Display
+
+    /// « Look » : comme l'iPhone, Yellow banana (clair) ou Jungle night (sombre). Toute l'app change aussitôt.
+    var look: ChimpLook {
+        get { session.preferences.look }
+        set { session.preferences.look = newValue }
+    }
+
     // MARK: Visite, aide, version
 
     /// « How ChimpDAO works · Replay the tour ».

@@ -15,6 +15,7 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: session.showsOnboarding)
+        .chimpWindowStyle(session.preferences.look.interfaceStyle)
         .environment(session)
     }
 }

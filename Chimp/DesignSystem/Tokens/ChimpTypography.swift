@@ -83,6 +83,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case tile          // libellés des tuiles d'action
     case stamp         // tampon d'une ligne du ticket de l'Activity (I1)
     case seal          // « CHIMPY-CERTIFIED » au pied du ticket (I1)
+    case segment       // segments d'un sélecteur des réglages (« Yellow banana », « Testnet », I2)
     // Nunito
     case lead          // phrase principale de la visite guidée (A1·1 à A1·4)
     case fieldL        // saisie du prénom (A4)
@@ -120,7 +121,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         switch self {
         case .celebration, .amountEntry, .displayXL, .amountL, .welcomeTitle, .tourTitle, .amountM, .displayL, .sheetTitle,
              .key, .brand, .displayM, .amountS, .greeting, .displayS, .pill, .buttonLarge, .button, .buttonSecondary, .tab,
-             .link, .buttonSmall, .cardName, .tile, .tabTitle, .stamp, .seal, .stampL, .receiptTotal:
+             .link, .buttonSmall, .cardName, .tile, .tabTitle, .stamp, .seal, .segment, .stampL, .receiptTotal:
             .luckiestGuy
         case .bodyL, .tourBody, .bodyM, .captionS: .nunito(weight: 700)
         case .body, .bodyS, .caption, .captionStrong, .reviewStep: .nunito(weight: 800)
@@ -156,7 +157,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .buttonSmall: 14
         case .pill: 13
         case .tile, .stamp: 12
-        case .seal: 11
+        case .seal, .segment: 11
         case .ticketTitle: 14
         case .receiptLink, .receiptLabel, .receiptValue: 12
         case .ticketAmount: 13
@@ -188,7 +189,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .receiptLink, .receiptLabel, .receiptValue: .footnote
         case .caption, .pill, .address, .ticketAmount: .footnote
         case .tile, .captionS, .captionStrong, .overline, .mono, .stamp: .caption1
-        case .labelWide, .label, .labelS, .cardNumber, .seal, .ticketMeta: .caption2
+        case .labelWide, .label, .labelS, .cardNumber, .seal, .segment, .ticketMeta: .caption2
         }
     }
 

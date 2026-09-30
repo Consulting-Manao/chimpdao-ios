@@ -111,6 +111,7 @@ private struct CatalogTypographyRow: View {
         case .tabTitle: Text("Activity")
         case .stamp: Text("Paid")
         case .seal: Text("Chimpy-certified")
+        case .segment: Text("Yellow banana")
         case .ticketTitle: Text(verbatim: "You paid GBLW…YEZ6M")
         case .ticketMeta: Text(verbatim: "14:02 · from Jungle")
         case .ticketAmount: Text(verbatim: "−$25.00")

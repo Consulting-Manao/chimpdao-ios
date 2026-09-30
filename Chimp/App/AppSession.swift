@@ -11,12 +11,18 @@ final class AppSession {
     let network: StellarNetwork
     /// Historique (onglet Activity), dans son propre fichier.
     let activity: ActivityStore
+    /// Réglages du téléphone (apparence, devise, Face ID), à part du `LocalWallet`.
+    let preferences: AppPreferences
     private let store: LocalWalletStore
 
-    init(store: LocalWalletStore, network: StellarNetwork, activity: ActivityStore = InMemoryActivityStore()) {
+    init(
+        store: LocalWalletStore, network: StellarNetwork, activity: ActivityStore = InMemoryActivityStore(),
+        preferences: AppPreferences = AppPreferences(store: InMemoryPreferencesStore())
+    ) {
         self.store = store
         self.network = network
         self.activity = activity
+        self.preferences = preferences
         do {
             wallet = try store.load()
         } catch {
@@ -30,10 +36,12 @@ final class AppSession {
         let network = ChimpNetworkConfig.testnet.network
         do {
             let activity: ActivityStore = (try? FileActivityStore(network: network)) ?? InMemoryActivityStore()
-            return AppSession(store: try FileLocalWalletStore(network: network), network: network, activity: activity)
+            return AppSession(
+                store: try FileLocalWalletStore(network: network), network: network, activity: activity, preferences: .live()
+            )
         } catch {
             // Application Support inaccessible : l'app fonctionne, mais sans rien retenir.
-            let session = AppSession(store: InMemoryLocalWalletStore(), network: network)
+            let session = AppSession(store: InMemoryLocalWalletStore(), network: network, preferences: .live())
             session.loadError = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             return session
         }
@@ -221,12 +229,13 @@ final class AppSession {
 
     /// « Erase everything on this phone » (I2, demandé par Barth le 2026-09-30) : pour un téléphone qu'on donne ou qu'on
     /// vend. Tout ce que l'app garde s'en va : compte ouvert, comptes fermés (prénoms, noms et couleurs des cartes), indices
-    /// « carte → compte », visite, historique de l'Activity. L'app revient à A1. Rien ne change on-chain : l'argent reste
+    /// « carte → compte », visite, historique de l'Activity, réglages du téléphone. L'app revient à A1. Rien ne change on-chain : l'argent reste
     /// sur les cartes. Refusé tant qu'un paiement signé attend son issue (le téléphone doit le garder).
     func eraseEverything() throws {
         guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
         try activity.erase()
         try store.erase()
+        preferences.reset()
         wallet = LocalWallet()
         isFinishingOnboarding = false
     }
