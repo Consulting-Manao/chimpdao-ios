@@ -20,8 +20,10 @@ struct ChimpAssetTile: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(bandInk)
-                .padding(.vertical, ChimpSpacing.xs)
-                .padding(.horizontal, ChimpSpacing.m)
+                // Le contour (3 pt) est dessiné par-dessus : il s'ajoute aux marges de la maquette (6 et 12 pt).
+                .padding(.top, ChimpSpacing.xs + ChimpBorder.regular)
+                .padding(.bottom, ChimpSpacing.xs)
+                .padding(.horizontal, ChimpSpacing.m + ChimpBorder.regular)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(bandFill)
                 .overlay(alignment: .bottom) {
@@ -42,8 +44,8 @@ struct ChimpAssetTile: View {
                 }
             }
             .padding(.top, 9)
-            .padding(.bottom, 11)
-            .padding(.horizontal, ChimpSpacing.m)
+            .padding(.bottom, 11 + ChimpBorder.regular)
+            .padding(.horizontal, ChimpSpacing.m + ChimpBorder.regular)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(.chimpSurface))
@@ -54,68 +56,36 @@ struct ChimpAssetTile: View {
     }
 }
 
-/// Plateau des cartes qui peuvent signer pour Main (B2e « key tray ») : fond brun à motif, ombre intérieure, les cartes
-/// en éventail, une phrase dessous. Une carte : au centre ; deux : comme la maquette ; au-delà : réparties et superposées.
-struct ChimpKeyTray: View {
-    struct Card: Identifiable {
-        let id: String
-        let name: String
-        let color: ChimpCardColor
-        let number: String
-    }
-
-    let cards: [Card]
-    let caption: Text
-
-    private let cardWidth: CGFloat = 170
-    private let trayHeight: CGFloat = 118
+/// Une ligne de « LATELY » (B2r) : titre, heure et jour, montant en Space Mono (vert s'il entre). Séparées par un trait
+/// `chimpSurfaceSecondary` de 2 pt, sans fond.
+struct ChimpRecentRow: View {
+    let title: String
+    /// « 11:20 · today ».
+    let meta: String
+    let amount: String?
+    var isIncoming = false
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: ChimpRadius.panel)
-        VStack(spacing: ChimpSpacing.xs) {
-            GeometryReader { proxy in
-                ZStack(alignment: .topLeading) {
-                    ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
-                        ChimpCard(name: card.name, color: card.color, number: card.number)
-                            .frame(width: cardWidth)
-                            .rotationEffect(.degrees(angle(index)))
-                            .offset(x: x(index, width: proxy.size.width), y: index.isMultiple(of: 2) ? 6 : 0)
-                    }
-                }
+        HStack(spacing: ChimpSpacing.sm) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: title)
+                    .chimpFont(.ticketTitle)
+                    .foregroundStyle(.chimpTextPrimary)
+                    .lineLimit(2)
+                Text(verbatim: meta)
+                    .chimpFont(.captionS)
+                    .foregroundStyle(.chimpTextSecondary)
             }
-            .frame(height: trayHeight)
-            caption
-                .chimpFont(.caption)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.chimpOnHeaderSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let amount {
+                Text(verbatim: amount)
+                    .chimpFont(.ticketAmount)
+                    .foregroundStyle(isIncoming ? Color(.chimpPositive) : Color(.chimpTextPrimary))
+            }
         }
-        .padding(.top, ChimpSpacing.lg)
-        .padding(.horizontal, ChimpSpacing.l)
-        .padding(.bottom, ChimpSpacing.m)
-        .background {
-            Color(.chimpCardJungle)
-                .overlay { ChimpPattern(tileWidth: 360) }
-                .overlay(alignment: .top) {
-                    // Ombre intérieure du haut (maquette : `inset 0 6px 0 rgba(0,0,0,.25)`).
-                    Color.black.opacity(0.25).frame(height: 6)
-                }
-        }
-        .clipShape(shape)
-        .overlay { shape.strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.regular) }
+        .padding(.vertical, 9)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-    }
-
-    /// Inclinaison : −7° à gauche, +6° à droite (maquette), −4° pour une carte seule.
-    private func angle(_ index: Int) -> Double {
-        guard cards.count > 1 else { return -4 }
-        return -7 + 13 * Double(index) / Double(cards.count - 1)
-    }
-
-    /// Position : 4 pt des bords pour les cartes extrêmes, les autres réparties entre elles ; au centre pour une seule.
-    private func x(_ index: Int, width: CGFloat) -> CGFloat {
-        let free = max(width - cardWidth - 8, 0)
-        guard cards.count > 1 else { return 4 + free / 2 }
-        return 4 + free * CGFloat(index) / CGFloat(cards.count - 1)
     }
 }
 
@@ -207,10 +177,8 @@ struct ChimpGroupedList: View {
             ChimpSignerChip(name: "Jungle", color: .jungle)
             ChimpSignerChip(name: "Banana", color: .banana)
         }
-        ChimpKeyTray(cards: [
-            .init(id: "j", name: "Jungle", color: .jungle, number: "0421"),
-            .init(id: "b", name: "Banana", color: .banana, number: "0688"),
-        ], caption: Text("Tap either one to sign for Main"))
+        ChimpRecentRow(title: "Moved to Jungle", meta: "11:20 · today", amount: "−$50.00")
+        ChimpRecentRow(title: "Shop sale", meta: "16:05 · yesterday", amount: "+$12.50", isIncoming: true)
         HStack(spacing: ChimpSpacing.m) {
             ChimpAssetTile(band: "USDC · READY", bandFill: Color(.chimpCardLeaf), value: "$620", detail: "620 USDC")
             ChimpAssetTile(band: "XLM · READY", bandFill: Color(.chimpCardBanana), value: "$200", detail: "800 XLM")

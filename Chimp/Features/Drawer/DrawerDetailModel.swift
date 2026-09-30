@@ -34,7 +34,7 @@ struct DrawerDetailContent: Equatable {
         let id: String
         let name: String
         let color: ChimpCardColor
-        /// « 0421 » (plateau de B2e).
+        /// « 0421 ».
         var number: String = "····"
     }
 
@@ -210,6 +210,47 @@ final class DrawerDetailModel {
             address: address,
             isEmpty: lines.isEmpty
         )
+    }
+
+    // MARK: LATELY (B2r)
+
+    /// Une ligne de « LATELY » : les derniers mouvements de Main, du point de vue de Main.
+    struct LatelyRow: Identifiable, Equatable {
+        let id: String
+        let title: String
+        /// « 11:20 · today ».
+        let meta: String
+        /// Signé du point de vue du tiroir (« −$50.00 » pour un Move qui en sort) ; `nil` pour une carte ajoutée.
+        let amount: String?
+        let isIncoming: Bool
+        let record: ActivityRecord
+    }
+
+    /// Les `limit` derniers mouvements de ce tiroir (maquette : deux), titres de l'Activity, montant signé pour ce tiroir.
+    static func lately(
+        records: [ActivityRecord], drawer address: String, drawers: [ActivityDrawer], cardName: (String) -> String?,
+        calendar: Calendar = .current, now: Date = .now, limit: Int = 2
+    ) -> [LatelyRow] {
+        let addresses = Set(drawers.map(\.address))
+        let visible = ActivityViewModel.filtered(records, filter: .drawer(address), drawers: drawers)
+            .sorted { $0.at > $1.at }
+            .prefix(limit)
+        return visible.compactMap { record in
+            guard let row = ActivityViewModel.row(for: record, drawers: drawers, addresses: addresses, cardName: cardName) else { return nil }
+            let incoming = record.event == .transfer && record.to == address
+            let amount = record.event == .cardAdded ? nil : record.amount.map {
+                ActivityViewModel.amountText($0, code: record.assetCode ?? "", sign: incoming ? .positive : .negative)
+            }
+            let time = record.at.formatted(date: .omitted, time: .shortened)
+            let day: String = if calendar.isDate(record.at, inSameDayAs: now) {
+                String(localized: "today")
+            } else if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(record.at, inSameDayAs: yesterday) {
+                String(localized: "yesterday")
+            } else {
+                record.at.formatted(.dateTime.month(.abbreviated).day())
+            }
+            return LatelyRow(id: record.id, title: row.title, meta: "\(time) · \(day)", amount: amount, isIncoming: incoming, record: record)
+        }
     }
 
     /// Valeur d'une tuile : sans centimes si le montant est rond (« $620 »), sinon avec (« $62.50 »), comme la maquette.

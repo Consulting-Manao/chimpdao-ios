@@ -163,6 +163,10 @@ struct MainTabView: View {
             onMove: { walletPath.append(.move($0)) },
             onPayAgain: { walletPath.append(.payAgain($0)) },
             onPending: { walletPath.append(.pendingSend) },
+            onAllActivity: { address in
+                activityModel.filter = .drawer(address)
+                selection = .activity
+            },
             onRemove: { walletPath.append(.removeCard($0, $1)) },
             onAddCard: { walletPath = [.addCard] }
         )

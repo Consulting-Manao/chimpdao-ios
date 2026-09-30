@@ -164,4 +164,26 @@ struct DrawerDetailTests {
         #expect(activity.isEmpty(for: .drawer(ActivityViewModelTests.banana)))
         #expect(!activity.isEmpty(for: .drawer(ActivityViewModelTests.jungle)))
     }
+
+    @Test("LATELY (B2r) : les deux derniers mouvements de Main, signés pour Main, « today » / « yesterday »")
+    func lately() {
+        let t = ActivityViewModelTests.self
+        let records = [
+            t.transfer("old", t.maya, t.main, "USDC", "1", t.at(3, 9)),
+            t.transfer("got", t.maya, t.main, "USDC", "12.5", t.at(1, 16)),
+            t.transfer("move", t.main, t.jungle, "USDC", "50", t.at(0, 11)),
+            t.transfer("other", t.jungle, t.maya, "USDC", "25", t.at(0, 14)),
+        ]
+        let rows = DrawerDetailModel.lately(
+            records: records, drawer: t.main, drawers: t.drawers, cardName: { _ in nil }, calendar: t.calendar, now: t.now
+        )
+        #expect(rows.map(\.id) == ["stellar:move", "stellar:got"], "Main seulement, les plus récents, deux au plus")
+        #expect(rows[0].title == "Moved to Jungle's wallet")
+        #expect(rows[0].amount == ActivityViewModel.amountText(50, code: "USDC", sign: .negative))
+        #expect(!rows[0].isIncoming)
+        #expect(rows[0].meta.hasSuffix("· today"))
+        #expect(rows[1].amount == ActivityViewModel.amountText(Decimal(string: "12.5")!, code: "USDC", sign: .positive))
+        #expect(rows[1].isIncoming)
+        #expect(rows[1].meta.hasSuffix("· yesterday"))
+    }
 }

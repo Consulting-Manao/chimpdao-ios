@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// B2e · Main account (« key tray + tiles ») et B3 · wallet d'une carte (maquettes du 2026-09-30) : le plateau des
-/// cartes qui peuvent signer (Main) ou la pastille de la carte (B3), le total, une tuile par actif, les actions de la
-/// carte (B3), l'historique de ce tiroir, puis Send / Receive / Move depuis ce tiroir.
+/// B2r · Main account (« B2 + tiles ») et B3 · wallet d'une carte (maquettes du 2026-09-30) : le total, les pastilles
+/// des cartes qui peuvent signer, une tuile par actif, « LATELY » (Main) ou les actions de la carte (B3), puis Send /
+/// Receive / Move depuis ce tiroir.
 ///
-/// Écarts avec la maquette (DESIGN_NOTES §12) : l'adresse, « Receive » et l'historique sont ajoutés (demande de Barth) ;
+/// Écarts avec la maquette (DESIGN_NOTES §12) : l'adresse et « Receive » sont ajoutés (demande de Barth) ;
 /// tout ce qui est Grow (tuile « XOXNO · GROWING », « Plant … more », « +$3.51/mo », bouton Grow) est masqué tant que
 /// Grow n'existe pas ; « Give this card away » (G4) aussi, session à part.
 struct DrawerDetailView: View {
@@ -90,26 +90,17 @@ struct DrawerDetailView: View {
 
     private func balances(_ content: DrawerDetailContent) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            if model.isMain {
-                // B2e : le plateau des cartes qui peuvent signer pour Main, puis le total.
-                ChimpKeyTray(
-                    cards: content.signers.map { .init(id: $0.id, name: $0.name, color: $0.color, number: $0.number) },
-                    caption: trayCaption(count: content.signers.count)
-                )
-                total(content)
-                    .padding(.top, ChimpSpacing.lg)
-            } else {
-                // B3 : le total, puis la pastille de la carte.
-                total(content)
-                HStack(spacing: ChimpSpacing.s) {
-                    ForEach(content.signers) { signer in
-                        ChimpSignerChip(name: signer.name, color: signer.color)
-                    }
+            total(content)
+            HStack(spacing: ChimpSpacing.s) {
+                ForEach(content.signers) { signer in
+                    ChimpSignerChip(name: signer.name, color: signer.color)
                 }
-                .padding(.top, ChimpSpacing.m)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(Text("Only this card can sign: \(model.cardName)"))
             }
+            .padding(.top, ChimpSpacing.m)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(model.isMain
+                ? Text("Cards that can sign: \(content.signers.map(\.name).formatted(.list(type: .and)))")
+                : Text("Only this card can sign: \(model.cardName)"))
 
             if let address = content.address {
                 ChimpAddressPill(address: Self.shortAddress(address), isCopied: model.isCopied, action: model.copyAddress)
@@ -150,15 +141,6 @@ struct DrawerDetailView: View {
             .minimumScaleFactor(0.5)
     }
 
-    /// Phrase sous le plateau (maquette : « Tap either one to sign for Main », pour deux cartes).
-    private func trayCaption(count: Int) -> Text {
-        switch count {
-        case 1: Text("Tap it to sign for Main")
-        case 2: Text("Tap either one to sign for Main")
-        default: Text("Tap any of them to sign for Main")
-        }
-    }
-
     /// Couleur du bandeau d'une tuile (maquette : USDC vert, XLM jaune).
     static func bandFill(_ code: String) -> Color {
         code == "USDC" ? Color(.chimpCardLeaf) : Color(.chimpCardBanana)
@@ -192,13 +174,51 @@ struct DrawerDetailView: View {
 
     // MARK: Historique
 
+    /// B2r « LATELY » : les deux derniers mouvements de Main, « All activity » ouvre l'onglet Activity sur Main.
+    /// B3 : rien (maquette).
     @ViewBuilder
     private var history: some View {
-        if let address = model.content?.address {
-            sectionLabel("Activity")
-                .padding(.top, ChimpSpacing.xl)
-            ActivityContent(model: activity, filter: .drawer(address), onPending: actions.onPending)
-                .padding(.top, ChimpSpacing.sm)
+        if model.isMain, let address = model.content?.address {
+            let rows = DrawerDetailModel.lately(
+                records: activity.records, drawer: address, drawers: activity.drawers,
+                cardName: { [source = activity.source] in source.cardName(key: $0) }
+            )
+            HStack(alignment: .firstTextBaseline) {
+                sectionLabel("Lately")
+                Spacer()
+                Button { actions.onAllActivity(address) } label: {
+                    Text("All activity")
+                        .chimpFont(.captionStrong)
+                        .underline()
+                        .foregroundStyle(.chimpTextPrimary)
+                        // Zone de toucher de 44 pt sans écarter la ligne (la maquette la veut serrée).
+                        .padding(ChimpSpacing.m)
+                        .contentShape(Rectangle())
+                        .padding(-ChimpSpacing.m)
+                }
+                .buttonStyle(ChimpPressableStyle())
+            }
+            .padding(.top, ChimpSpacing.xl)
+            .padding(.bottom, ChimpSpacing.xxs)
+            if rows.isEmpty {
+                Text(activity.phase == .loaded && !activity.isSyncing ? "Nothing moved here yet." : "Reading the last 7 days on Stellar…")
+                    .chimpFont(.captionS)
+                    .foregroundStyle(.chimpTextSecondary)
+                    .padding(.vertical, 9)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        if index > 0 {
+                            Rectangle().fill(Color(.chimpSurfaceSecondary)).frame(height: ChimpBorder.thin)
+                        }
+                        Button { activity.selectedRecord = row.record } label: {
+                            ChimpRecentRow(title: row.title, meta: row.meta, amount: row.amount, isIncoming: row.isIncoming)
+                        }
+                        .buttonStyle(ChimpPressableStyle())
+                        .accessibilityHint(Text("Opens the receipt"))
+                    }
+                }
+            }
         }
     }
 
@@ -252,6 +272,8 @@ struct DrawerDetailActions {
     var onPayAgain: (String) -> Void = { _ in }
     /// Paiement en attente touché dans l'historique.
     var onPending: () -> Void = {}
+    /// « All activity » (B2r) : l'onglet Activity, filtré sur ce tiroir (adresse).
+    var onAllActivity: (String) -> Void = { _ in }
     /// G6 (retirer) ou G7 (carte perdue) pour cette carte (clé).
     var onRemove: (RemoveCardModel.Mode, String) -> Void = { _, _ in }
     /// G5 « Add a card ».
