@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// I2 · Settings (maquette) : prénom, changement de compte (I6), nom et couleur des cartes, devise (I3), apparence,
-/// réseau (affichage seulement), visite, « Disconnect », « Erase everything on this phone », liens (licences, aide),
+/// réseau (affichage seulement), Face ID pour ouvrir l'app, visite, « Disconnect », « Erase everything on this phone », liens (licences, aide),
 /// version. Les lignes de la maquette pas encore faisables (paranoid mode, shop mode, raw signing) ne sont pas affichées :
 /// aucune ligne sans destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision
 /// de Barth du 2026-09-30). « Network » montre le réseau de la configuration de build, jamais un interrupteur
@@ -14,6 +14,9 @@ struct SettingsView: View {
     /// Carte dont on change le PIN.
     @State private var pinCard: PINCard?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(AppLock.self) private var lock
+    /// L'activation de Face ID n'a pas abouti (pas de code sur l'iPhone, échec technique). Rien pour une annulation.
+    @State private var lockProblem: (message: LocalizedStringKey, details: String?)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,13 +41,21 @@ struct SettingsView: View {
                         .foregroundStyle(.chimpTextSecondary)
                         .padding(.top, ChimpSpacing.s)
 
-                    if !model.pinCards.isEmpty {
-                        // Maquette : « SAFETY » (paranoid mode et Face ID, masqués) ; on y range le changement de PIN.
-                        sectionLabel("Safety")
-                            .padding(.top, ChimpSpacing.sectionGap)
-                        ChimpGroupedList(rows: model.pinCards.map { card in
-                            ChimpGroupedRow(id: card.id, title: "Change PIN", value: card.name) { pinCard = card }
-                        })
+                    // Maquette : « SAFETY » (paranoid mode masqué, session dédiée) ; on y range aussi le changement de PIN.
+                    sectionLabel("Safety")
+                        .padding(.top, ChimpSpacing.sectionGap)
+                    ChimpGroupedBox {
+                        faceIDRow
+                        ForEach(model.pinCards) { card in
+                            ChimpSettingsRow(title: "Change PIN", value: card.name) { pinCard = card }
+                        }
+                    }
+                    .padding(.top, ChimpSpacing.s)
+                    if let problem = lockProblem {
+                        VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
+                            ChimpFieldMessage(text: problem.message, kind: .error)
+                            if let details = problem.details { ChimpTechnicalDetails(details: details) }
+                        }
                         .padding(.top, ChimpSpacing.s)
                     }
 
@@ -255,6 +266,48 @@ struct SettingsView: View {
                 .foregroundStyle(.chimpTextSecondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: Face ID
+
+    /// « Face ID to open the app » (I2) : activer demande un Face ID réussi ; désactiver est immédiat (l'app est ouverte).
+    private var faceIDRow: some View {
+        Toggle(isOn: Binding(
+            get: { lock.isEnabled },
+            set: { isOn in
+                lockProblem = nil
+                if isOn {
+                    Task {
+                        switch await lock.enable() {
+                        case .enabled, .cancelled: break
+                        case .needsPasscode: lockProblem = ("Set a passcode on your iPhone first.", nil)
+                        case .failed(let details): lockProblem = ("Face ID didn't work. Try again.", details)
+                        }
+                    }
+                } else {
+                    lock.disable()
+                }
+            }
+        )) {
+            Text(verbatim: Self.lockTitle(lock.kind))
+                .chimpFont(.rowTitle)
+                .foregroundStyle(.chimpTextPrimary)
+        }
+        .toggleStyle(ChimpToggleStyle())
+        .disabled(lock.isAuthenticating)
+        .padding(.vertical, 11)
+        .padding(.horizontal, 15)
+        .frame(minHeight: ChimpSize.minimumTouchTarget)
+    }
+
+    /// Libellé selon l'iPhone (maquette : « Face ID to open the app »).
+    static func lockTitle(_ kind: DeviceLockKind) -> String {
+        switch kind {
+        case .faceID, .unavailable: String(localized: "Face ID to open the app")
+        case .touchID: String(localized: "Touch ID to open the app")
+        case .opticID: String(localized: "Optic ID to open the app")
+        case .passcode: String(localized: "Passcode to open the app")
+        }
     }
 
     // MARK: Network

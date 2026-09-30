@@ -252,3 +252,39 @@ struct ChimpRadio: View {
             .accessibilityHidden(true)
     }
 }
+
+/// Interrupteur de la maquette (I2 « Face ID to open the app ») : 44 × 26, contour 3 ; vert feuille quand il est mis,
+/// `chimpSurfaceSecondary` sinon ; rond blanc de 16 pt au contour 2.
+struct ChimpToggleStyle: ToggleStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { configuration.isOn.toggle() }
+        } label: {
+            HStack(spacing: ChimpSpacing.sm) {
+                configuration.label
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Capsule()
+                    .fill(configuration.isOn ? Color(.chimpCardLeaf) : Color(.chimpSurfaceSecondary))
+                    .overlay(Capsule().strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.regular))
+                    .overlay(alignment: configuration.isOn ? .trailing : .leading) {
+                        Circle()
+                            .fill(Color.white)
+                            .overlay(Circle().strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.thin))
+                            .frame(width: 16, height: 16)
+                            .padding(.horizontal, ChimpBorder.regular + 2)
+                    }
+                    .frame(width: 44, height: 26)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ChimpPressableStyle())
+        .opacity(isEnabled ? 1 : ChimpOpacity.disabled)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(configuration.isOn ? Text("On") : Text("Off"))
+        .accessibilityAddTraits(.isToggle)
+    }
+}

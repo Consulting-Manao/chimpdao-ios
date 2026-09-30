@@ -40,8 +40,14 @@ final class AppPreferences {
         didSet { store.set(currency.rawValue, for: .currency) }
     }
 
+    /// « Face ID to open the app » (I2) : **désactivé par défaut** ; activé seulement après un Face ID réussi (`AppLock`).
+    var opensWithFaceID: Bool {
+        didSet { store.set(opensWithFaceID ? "1" : nil, for: .faceID) }
+    }
+
     init(store: PreferencesStore) {
         self.store = store
+        opensWithFaceID = store.string(for: .faceID) == "1"
         look = store.string(for: .look).flatMap(ChimpLook.init(rawValue:)) ?? .auto
         currency = store.string(for: .currency).flatMap(DisplayCurrency.init(rawValue:)) ?? .usd
     }
@@ -55,6 +61,7 @@ final class AppPreferences {
     func reset() {
         look = .auto
         currency = .usd
+        opensWithFaceID = false
         // Après les valeurs par défaut (leur `didSet` les écrit) : rien ne reste dans le stockage.
         store.removeAll()
     }
@@ -64,6 +71,7 @@ final class AppPreferences {
 enum PreferenceKey: String, CaseIterable {
     case look = "chimp.look"
     case currency = "chimp.currency"
+    case faceID = "chimp.faceID"
 }
 
 /// Lecture et écriture des préférences. Implémenté par `UserDefaultsPreferencesStore` et `InMemoryPreferencesStore`.
