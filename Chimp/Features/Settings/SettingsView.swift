@@ -11,6 +11,8 @@ struct SettingsView: View {
     let onBack: () -> Void
     var onDeveloper: (() -> Void)?
     @State private var isShowingLicenses = false
+    /// Carte dont on change le PIN.
+    @State private var pinCard: PINCard?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +31,16 @@ struct SettingsView: View {
                         .chimpFont(.caption)
                         .foregroundStyle(.chimpTextSecondary)
                         .padding(.top, ChimpSpacing.s)
+
+                    if !model.pinCards.isEmpty {
+                        // Maquette : « SAFETY » (paranoid mode et Face ID, masqués) ; on y range le changement de PIN.
+                        sectionLabel("Safety")
+                            .padding(.top, ChimpSpacing.sectionGap)
+                        ChimpGroupedList(rows: model.pinCards.map { card in
+                            ChimpGroupedRow(id: card.id, title: "Change PIN", value: card.name) { pinCard = card }
+                        })
+                        .padding(.top, ChimpSpacing.s)
+                    }
 
                     sectionLabel("More")
                         .padding(.top, ChimpSpacing.sectionGap)
@@ -98,6 +110,9 @@ struct SettingsView: View {
         }
         .fullScreenCover(isPresented: $model.isReplayingTour) {
             TourReplayView { model.isReplayingTour = false }
+        }
+        .navigationDestination(item: $pinCard) { card in
+            ChangePINScreen(card: card) { pinCard = nil }
         }
         .navigationDestination(isPresented: $isShowingLicenses) {
             LicensesView { isShowingLicenses = false }

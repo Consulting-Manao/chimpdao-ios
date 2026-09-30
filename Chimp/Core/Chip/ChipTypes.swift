@@ -98,6 +98,8 @@ enum ChipError: Error, Equatable, Sendable {
     /// Infineon : SET PIN refusé d'avance, la carte a déjà un PIN (rien n'a été envoyé).
     case pinAlreadySet
     /// SET PIN demandé à une puce qui n'a pas de PIN (DUOX).
+    /// CHANGE PIN sur une carte qui n'a pas encore de PIN (`69 85`) : rien n'a changé.
+    case pinNotSet
     case pinUnsupported
     #if CHIMP_ADMIN
     /// Mode admin : génération refusée, la carte a déjà une clé n°1.
@@ -133,6 +135,7 @@ extension ChipError: LocalizedError {
         case .pinRequired: "This card needs its PIN to sign."
         case .pinAlreadySet: "This card already has a PIN. Nothing was changed."
         case .pinUnsupported: "This chip has no PIN."
+        case .pinNotSet: "This card has no PIN yet. Nothing was changed."
         #if CHIMP_ADMIN
         case .keyAlreadyPresent: "This card already has a key in slot 1. Nothing was generated."
         case .keyGenerationUnsupported(let chip): "\(chip) can't generate a key. Nothing was generated."

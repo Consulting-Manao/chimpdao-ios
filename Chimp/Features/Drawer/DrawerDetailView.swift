@@ -155,11 +155,14 @@ struct DrawerDetailView: View {
     // MARK: Cette carte
 
     private var cardRows: [ChimpGroupedRow] {
-        [
-            ChimpGroupedRow(id: "rename", title: "Rename & colour") { renameModel = model.makeRenameModel() },
-            ChimpGroupedRow(id: "remove", title: "Remove from account") { openRemoval(.remove) },
-            ChimpGroupedRow(id: "lost", title: "I lost this card", tone: .destructive) { openRemoval(.lost) },
-        ]
+        var rows = [ChimpGroupedRow(id: "rename", title: "Rename & colour") { renameModel = model.makeRenameModel() }]
+        // Pas dans la maquette : changer le PIN (Infineon seulement ; une DUOX n'a pas de PIN).
+        if model.pinCard != nil, case .card(let key) = model.selection {
+            rows.append(ChimpGroupedRow(id: "pin", title: "Change PIN") { actions.onChangePIN(key) })
+        }
+        rows.append(ChimpGroupedRow(id: "remove", title: "Remove from account") { openRemoval(.remove) })
+        rows.append(ChimpGroupedRow(id: "lost", title: "I lost this card", tone: .destructive) { openRemoval(.lost) })
+        return rows
     }
 
     /// Dernière carte (lue par le Wallet) : G5 tout de suite ; sinon la revue (G6, G7). La revue revérifie sur la chaîne.
@@ -274,6 +277,8 @@ struct DrawerDetailActions {
     var onPending: () -> Void = {}
     /// « All activity » (B2r) : l'onglet Activity, filtré sur ce tiroir (adresse).
     var onAllActivity: (String) -> Void = { _ in }
+    /// Changer le PIN de cette carte (clé).
+    var onChangePIN: (String) -> Void = { _ in }
     /// G6 (retirer) ou G7 (carte perdue) pour cette carte (clé).
     var onRemove: (RemoveCardModel.Mode, String) -> Void = { _, _ in }
     /// G5 « Add a card ».

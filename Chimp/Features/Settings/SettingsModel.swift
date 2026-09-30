@@ -78,6 +78,14 @@ final class SettingsModel {
         return result
     }
 
+    /// Cartes dont on peut changer le PIN : les Infineon (une DUOX n'a pas de PIN).
+    var pinCards: [PINCard] {
+        cards.compactMap { card in
+            guard card.chip == .infineon2Go, let key = try? ChipPublicKey(Data(hex: card.id) ?? Data()) else { return nil }
+            return PINCard(key: key, name: card.displayName, color: card.color, number: card.number)
+        }
+    }
+
     // MARK: Rename & colour
 
     func edit(_ card: SettingsCard) {

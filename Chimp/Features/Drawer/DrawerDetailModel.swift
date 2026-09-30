@@ -170,6 +170,13 @@ final class DrawerDetailModel {
         )
     }
 
+    /// Carte dont on peut changer le PIN : une Infineon (une DUOX n'a pas de PIN). `nil` sinon.
+    var pinCard: PINCard? {
+        guard case .card(let key) = selection, let card, card.chip != .duox,
+              let publicKey = try? ChipPublicKey(Data(hex: key) ?? Data()) else { return nil }
+        return PINCard(key: publicKey, name: cardName, color: cardColor, number: card.number)
+    }
+
     /// Clés de toutes les cartes du compte (dernière lecture), pour la chaîne factice du simulateur.
     var memberKeys: [ChipPublicKey] {
         (wallet.snapshot?.cards ?? []).compactMap { try? ChipPublicKey(Data(hex: $0.id) ?? Data()) }

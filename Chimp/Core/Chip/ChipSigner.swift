@@ -36,6 +36,15 @@ protocol ChipSigner {
     /// Reconnexion d'une Infineon déjà liée à un compte (décision de Barth du 2026-09-29) : la carte vérifie le PIN, rien
     /// n'est signé. Voir `ChipSigning.verifyPIN`.
     func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws
+    /// Changer le PIN d'une Infineon (lecture de la clé, puis CHANGE PIN) ; renvoie le nouveau PUK.
+    func changePIN(expectedKey: ChipPublicKey, currentPIN: String, newPIN: String) async throws -> Data
+}
+
+extension ChipSigner {
+    /// Faux signataires des tests qui ne changent pas de PIN : refus, sans rien envoyer.
+    func changePIN(expectedKey: ChipPublicKey, currentPIN: String, newPIN: String) async throws -> Data {
+        throw ChipError.pinUnsupported
+    }
 }
 
 /// SET PIN a réussi (le PIN est défini sur la carte, pour toujours) mais une signature a échoué juste après
@@ -265,6 +274,15 @@ struct NFCChipSigner: ChipSigner {
             try await ChipSigning.verifyPIN(transport, expectedKey: expectedKey, pin: pin)
         }
     }
+
+    func changePIN(expectedKey: ChipPublicKey, currentPIN: String, newPIN: String) async throws -> Data {
+        try await NFCTagSession.run(
+            alertMessage: String(localized: "Keep your card still until it's done."),
+            successMessage: String(localized: "PIN changed.")
+        ) { transport in
+            try await ChipSigning.changePIN(transport, expectedKey: expectedKey, currentPIN: currentPIN, newPIN: newPIN)
+        }
+    }
 }
 
 /// Faux signataire : renvoie une signature fixe (invalide sur le réseau) pour chaque digest, pour faire tourner l'interface.
@@ -303,5 +321,12 @@ struct MockChipSigner: ChipSigner {
     func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws {
         try await Task.sleep(for: delay)
         _ = try outcome.get()
+    }
+
+    /// Faux changement : PUK factice si `outcome` réussit (même délai qu'un tap).
+    func changePIN(expectedKey: ChipPublicKey, currentPIN: String, newPIN: String) async throws -> Data {
+        try await Task.sleep(for: delay)
+        _ = try outcome.get()
+        return Self.fakePUK
     }
 }

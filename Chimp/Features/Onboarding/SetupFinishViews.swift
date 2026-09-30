@@ -105,6 +105,8 @@ struct UnlockCodeView: View {
     let isRehearsal: Bool
     /// Le PIN était déjà sur la carte (essai précédent) : pas de code à montrer cette fois.
     var isLost = false
+    /// Changement de PIN : l'ancien code de déblocage ne sert plus.
+    var replacesOldCode = false
     let onDone: () -> Void
 
     @Environment(\.scenePhase) private var scenePhase
@@ -164,6 +166,8 @@ struct UnlockCodeView: View {
     private var realBanner: some View {
         if isLost {
             ChimpNoticeBanner(text: "Your PIN is already on the card, but its unlock code couldn't be shown this time. Keep your PIN safe.", marker: .error)
+        } else if replacesOldCode {
+            ChimpNoticeBanner(text: "Your old unlock code no longer works. Keep this one somewhere safe, away from the card. ChimpDAO can't show it again.")
         } else {
             ChimpNoticeBanner(text: "Keep it somewhere safe, away from the card. ChimpDAO can't show it again.")
         }

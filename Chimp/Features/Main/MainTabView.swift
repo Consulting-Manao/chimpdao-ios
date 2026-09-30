@@ -75,6 +75,11 @@ struct MainTabView: View {
                             } onMoveFirst: {
                                 walletPath.append(.move(key))
                             }
+                        case .changePIN(let key):
+                            // Changer le PIN d'une Infineon, depuis sa page (B3).
+                            ChangePINDestination(key: key, wallet: walletModel, session: session) {
+                                if !walletPath.isEmpty { walletPath.removeLast() }
+                            }
                         case .drawer(let selection):
                             // B2 / B3 : le détail d'un tiroir, sur les soldes déjà lus par le Wallet.
                             DrawerDestination(selection: selection, wallet: walletModel, activity: activityModel, session: session, actions: drawerActions)
@@ -167,6 +172,7 @@ struct MainTabView: View {
                 activityModel.filter = .drawer(address)
                 selection = .activity
             },
+            onChangePIN: { walletPath.append(.changePIN($0)) },
             onRemove: { walletPath.append(.removeCard($0, $1)) },
             onAddCard: { walletPath = [.addCard] }
         )
@@ -202,6 +208,8 @@ enum WalletRoute: Hashable {
     case drawer(DrawerSelection)
     /// G6 (retirer) ou G7 (carte perdue), pour la carte de cette clé.
     case removeCard(RemoveCardModel.Mode, String)
+    /// Changer le PIN de la carte de cette clé.
+    case changePIN(String)
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
@@ -267,6 +275,25 @@ private struct RemoveCardDestination: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Changer le PIN, depuis la page d'une carte. Carte inconnue ou DUOX : rien (retour).
+private struct ChangePINDestination: View {
+    let card: PINCard?
+    let onExit: () -> Void
+
+    init(key: String, wallet: WalletViewModel, session: AppSession, onExit: @escaping () -> Void) {
+        card = DrawerDetailModel(selection: .card(key), wallet: wallet, session: session).pinCard
+        self.onExit = onExit
+    }
+
+    var body: some View {
+        if let card {
+            ChangePINScreen(card: card, onExit: onExit)
+        } else {
+            Color(.chimpBackground).onAppear(perform: onExit)
+        }
     }
 }
 
