@@ -46,7 +46,7 @@ final class AdminFundModel {
         defer { isLoadingTargets = false }
         var found = [Target(label: "Main account", address: account.address)]
         do {
-            for key in try await chain.cards(of: account.address) {
+            for key in try await chain.cards(of: account.address).map(\.publicKey) {
                 let saved = account.cards.first { $0.publicKey == key.hex }
                 let pocket: String?
                 if let known = saved?.pocket {

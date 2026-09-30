@@ -1,10 +1,19 @@
 import Foundation
 import stellarsdk
 
+/// Une carte déclarée par le Main account (`cards()` : `CardSigner { curve, key }`).
+struct AccountCard: Equatable, Sendable {
+    let publicKey: ChipPublicKey
+    let curve: ChipCurve
+
+    /// Chaque puce a sa courbe (ARCHITECTURE §0) : secp256k1 = Infineon 2Go, P-256 = DUOX.
+    var chip: ChipKind { curve == .p256 ? .duox : .infineon2Go }
+}
+
 /// Lectures sur la chaîne dont le Wallet a besoin. `ChainWalletReader` (testnet) dans l'app ; un faux dans les tests.
 protocol WalletChain {
-    /// `cards()` du Main account : clés publiques des cartes membres, dans l'ordre du contrat.
-    func cards(of account: String) async throws -> [ChipPublicKey]
+    /// `cards()` du Main account : clé et courbe des cartes membres, dans l'ordre du contrat.
+    func cards(of account: String) async throws -> [AccountCard]
     /// Soldes XLM et USDC d'une adresse (Main account ou Pocket), en unités de l'actif. Une simulation sans valeur est
     /// une erreur, jamais « zéro ».
     func balances(of address: String) async throws -> [AssetAmount]
@@ -43,9 +52,9 @@ struct ChainWalletDataSource: WalletDataSource {
         let mainAssets = try await mainRead
 
         let cards = try await withThrowingTaskGroup(of: (Int, CardBalance).self) { group in
-            for (index, key) in members.enumerated() {
-                let saved = account.cards.first { $0.publicKey == key.hex }
-                group.addTask { (index, try await self.card(key, saved: saved)) }
+            for (index, member) in members.enumerated() {
+                let saved = account.cards.first { $0.publicKey == member.publicKey.hex }
+                group.addTask { (index, try await self.card(member, saved: saved)) }
             }
             var result: [(Int, CardBalance)] = []
             for try await entry in group { result.append(entry) }
@@ -53,7 +62,7 @@ struct ChainWalletDataSource: WalletDataSource {
         }
 
         // `cards()` est la meilleure preuve du lien carte → compte : on la garde comme indice (`rememberCardHint`).
-        session.rememberCards(members.map(\.hex), account: account.address)
+        session.rememberCards(members.map(\.publicKey.hex), account: account.address)
 
         let snapshot = WalletSnapshot(
             currencyCode: "USD",
@@ -71,7 +80,8 @@ struct ChainWalletDataSource: WalletDataSource {
     }
 
     /// Une carte : sa Pocket (mémorisée à l'onboarding, sinon demandée à la factory), ses soldes, son numéro.
-    private func card(_ key: ChipPublicKey, saved: SavedCard?) async throws -> CardBalance {
+    private func card(_ member: AccountCard, saved: SavedCard?) async throws -> CardBalance {
+        let key = member.publicKey
         let pocket: String?
         if let known = saved?.pocket {
             pocket = known
@@ -89,7 +99,9 @@ struct ChainWalletDataSource: WalletDataSource {
             name: saved?.name ?? String(localized: "Card"),
             color: saved?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? .jungle,
             assets: assets,
-            pocket: pocket
+            pocket: pocket,
+            tokenID: tokenID,
+            chip: member.chip
         )
     }
 }
@@ -119,8 +131,9 @@ final class ChainWalletReader: WalletChain {
         return account
     }
 
-    func cards(of account: String) async throws -> [ChipPublicKey] {
-        try await ChimpAccountClient(client: client, config: config).cards(account: account, source: try await source()).map(\.publicKey)
+    func cards(of account: String) async throws -> [AccountCard] {
+        try await ChimpAccountClient(client: client, config: config).cards(account: account, source: try await source())
+            .map { AccountCard(publicKey: $0.publicKey, curve: $0.curve) }
     }
 
     func balances(of address: String) async throws -> [AssetAmount] {

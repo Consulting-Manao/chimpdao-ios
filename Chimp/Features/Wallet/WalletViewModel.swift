@@ -65,6 +65,8 @@ final class WalletViewModel {
     private(set) var content: WalletContent?
     /// Vrai si le dernier rafraîchissement a échoué alors que des soldes plus anciens sont affichés.
     private(set) var isShowingStaleData = false
+    /// Cartes du compte lues au dernier chargement réussi (clé, numéro, puce, wallet) : les réglages s'en servent.
+    private(set) var cards: [CardBalance] = []
 
     /// Actions des tuiles. Pour l'instant les quatre de la maquette ; Swap dépend du périmètre V1.
     let availableActions: [WalletAction] = WalletAction.allCases
@@ -92,6 +94,7 @@ final class WalletViewModel {
         do {
             let snapshot = try await dataSource.fetchWallet()
             content = Self.format(snapshot)
+            cards = snapshot.cards
             isShowingStaleData = false
             phase = .loaded
         } catch is CancellationError {

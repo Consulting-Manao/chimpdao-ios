@@ -116,6 +116,56 @@ final class AppSession {
         isFinishingOnboarding = false
     }
 
+    // MARK: Réglages (I2)
+
+    enum SettingsError: Error, Equatable, LocalizedError {
+        /// Pas de compte ouvert sur ce téléphone.
+        case noAccount
+        /// Un paiement signé attend encore son issue : le téléphone doit le garder (garde-fou contre un double envoi).
+        case pendingPayment
+
+        var errorDescription: String? {
+            switch self {
+            case .noAccount: "No account is open on this phone."
+            case .pendingPayment: "A payment is still being checked."
+            }
+        }
+    }
+
+    /// Nom et couleur d'une carte du compte (données locales, rien on-chain). Une carte que ce téléphone ne connaissait
+    /// pas encore (ajoutée ailleurs, lue par `cards()`) y est enregistrée avec ce que le Wallet a lu d'elle.
+    func renameCard(_ card: SavedCard) throws {
+        guard var account = wallet.account else { throw SettingsError.noAccount }
+        if let index = account.cards.firstIndex(where: { $0.publicKey == card.publicKey }) {
+            account.cards[index].name = card.name
+            account.cards[index].color = card.color
+        } else {
+            account.cards.append(card)
+        }
+        var next = wallet
+        next.account = account
+        try persist(next)
+    }
+
+    /// Prénom de « Hey Léo » (A4 : « you can change it in Settings »).
+    func setFirstName(_ firstName: String) throws {
+        var next = wallet
+        next.firstName = firstName
+        try persist(next)
+    }
+
+    /// « Disconnect this phone » (I2) : le compte, ses cartes (noms et couleurs) et le prénom sont oubliés ; l'app revient
+    /// à A1. Comme `logout` du terminal, les indices « carte → compte » restent (une carte ajoutée en a besoin pour
+    /// retrouver son compte) ; la visite reste vue. Rien ne change on-chain : un tap d'une carte du compte le rouvre.
+    /// Refusé tant qu'un paiement signé attend son issue.
+    func disconnect() throws {
+        guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
+        var next = wallet
+        next.account = nil
+        next.firstName = nil
+        try persist(next)
+    }
+
     #if DESIGN_CATALOG
     /// Mode développeur : oublier le compte de ce téléphone pour refaire l'onboarding. Rien ne change on-chain.
     func forgetAccount() throws {

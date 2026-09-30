@@ -46,6 +46,12 @@ struct MainTabView: View {
                                 walletPath.removeAll()
                                 Task { await walletModel.refresh() }
                             }
+                        case .settings:
+                            // I2 : au retour, le Wallet relit les noms et couleurs des cartes.
+                            SettingsDestination(session: session, walletCards: walletModel.cards, onDeveloper: developerAction) {
+                                walletPath.removeAll()
+                                Task { await walletModel.refresh() }
+                            }
                         }
                     }
                 #if DESIGN_CATALOG
@@ -77,9 +83,13 @@ struct MainTabView: View {
         }
     }
 
-    /// Roue dentée : en attendant les réglages (I2), elle ouvre le catalogue en Debug et Testing,
-    /// et n'est pas affichée en Release.
+    /// Roue dentée : les réglages (I2).
     private var settingsAction: (() -> Void)? {
+        { walletPath.append(.settings) }
+    }
+
+    /// Réglages, section « Developer » (Debug et Testing seulement) : le catalogue et le mode admin.
+    private var developerAction: (() -> Void)? {
         #if DESIGN_CATALOG
         return { isShowingCatalog = true }
         #else
@@ -93,6 +103,7 @@ enum WalletRoute: Hashable {
     case receive
     case send
     case move
+    case settings
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
@@ -106,6 +117,24 @@ private struct ReceiveDestination: View {
 
     var body: some View {
         ReceiveView(model: model, onBack: { dismiss() })
+            .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Réglages (I2) poussés depuis le Wallet : un ViewModel neuf à chaque ouverture.
+private struct SettingsDestination: View {
+    @State private var model: SettingsModel
+    let onDeveloper: (() -> Void)?
+    let onExit: () -> Void
+
+    init(session: AppSession, walletCards: [CardBalance], onDeveloper: (() -> Void)?, onExit: @escaping () -> Void) {
+        _model = State(initialValue: SettingsModel(session: session, walletCards: walletCards))
+        self.onDeveloper = onDeveloper
+        self.onExit = onExit
+    }
+
+    var body: some View {
+        SettingsView(model: model, onBack: onExit, onDeveloper: onDeveloper)
             .toolbar(.hidden, for: .navigationBar)
     }
 }

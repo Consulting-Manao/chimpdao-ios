@@ -48,6 +48,10 @@ struct CardBalance: Equatable, Identifiable {
     var assets: [AssetAmount]
     /// Adresse C du wallet de la carte (sa Pocket), `nil` si elle n'en a pas (ou dans les données factices).
     var pocket: String? = nil
+    /// Numéro du NFT, s'il a pu être lu.
+    var tokenID: UInt32? = nil
+    /// Puce de la carte, d'après la courbe déclarée par le compte ; `nil` dans les données factices.
+    var chip: ChipKind? = nil
 }
 
 /// Source des soldes du Wallet : `ChainWalletDataSource` (testnet) dans l'app, `MockWalletDataSource` dans le catalogue.

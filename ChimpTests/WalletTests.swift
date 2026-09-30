@@ -278,7 +278,7 @@ private final class FakeWalletChain: WalletChain {
     var tokens: [ChipPublicKey: UInt32] = [:]
     private(set) var pocketLookups: [ChipPublicKey] = []
 
-    func cards(of account: String) async throws -> [ChipPublicKey] { members }
+    func cards(of account: String) async throws -> [AccountCard] { members.map { AccountCard(publicKey: $0, curve: .secp256k1) } }
 
     func balances(of address: String) async throws -> [AssetAmount] {
         guard let found = balances[address] else { throw URLError(.timedOut) }

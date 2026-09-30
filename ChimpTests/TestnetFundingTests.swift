@@ -219,7 +219,7 @@ private final class FakeCardsChain: WalletChain {
         self.pockets = pockets
     }
 
-    func cards(of account: String) async throws -> [ChipPublicKey] { members }
+    func cards(of account: String) async throws -> [AccountCard] { members.map { AccountCard(publicKey: $0, curve: .secp256k1) } }
     func balances(of address: String) async throws -> [AssetAmount] { [] }
     func pocket(of card: ChipPublicKey) async throws -> String? { pockets[card] }
     func tokenID(of card: ChipPublicKey) async throws -> UInt32 { 1 }
