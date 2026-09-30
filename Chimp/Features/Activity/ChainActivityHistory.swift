@@ -58,7 +58,10 @@ struct ChainActivityHistory {
         // `latest - LOOKBACK_LEDGERS` : ici `lookbackLedgers` ledgers exactement (12 tranches), jamais avant le ledger 2.
         var floor = latest > Self.lookbackLedgers + 1 ? latest - Self.lookbackLedgers + 1 : 2
         var state = activity
-        if let coverage = state.coverage, coverage.addresses != addresses || coverage.toLedger < floor {
+        // Tout relire si les tiroirs ont changé, si la fenêtre relue est sortie de la mémoire du RPC, ou si une ligne lue
+        // sur la chaîne n'a pas encore son ledger (lignes gardées avant le « N° » du reçu : relue une seule fois).
+        if let coverage = state.coverage,
+           coverage.addresses != addresses || coverage.toLedger < floor || state.records.contains(where: { !$0.isLocal && $0.ledger == nil }) {
             state.coverage = nil
         }
         var coverage = state.coverage ?? ActivityCoverage(addresses: addresses, fromLedger: latest + 1, toLedger: latest)
@@ -68,7 +71,7 @@ struct ChainActivityHistory {
             guard let events = try await scan(groups, start: start, end: end, floor: &floor) else { return false }
             let known = Set(state.records.map(\.hash))
             let rows = Self.records(from: events, account: account, drawers: Set(addresses), assets: assets, known: known)
-            state.records = ActivityLog.merging(state.records, rows)
+            state.records = ActivityLog.merging(Self.withLedgers(state.records, from: events), rows)
             return true
         }
 
@@ -185,16 +188,29 @@ struct ChainActivityHistory {
                       case .i128(let parts)? = decode(event.value) else { return nil }
                 return ActivityRecord(
                     id: id, event: .transfer, hash: event.transactionHash, from: from, to: to, assetCode: code,
-                    amount: SACClient.amount(fromUnits: SACClient.decimal(parts)), at: at, isLocal: false
+                    amount: SACClient.amount(fromUnits: SACClient.decimal(parts)), at: at, isLocal: false, ledger: event.ledger
                 )
             case ("card_added", 1):
                 guard event.contractID == account, let key = cardKey(decode(event.value)) else { return nil }
                 return ActivityRecord(
-                    id: id, event: .cardAdded, hash: event.transactionHash, from: account, to: "", cardKey: key, at: at, isLocal: false
+                    id: id, event: .cardAdded, hash: event.transactionHash, from: account, to: "", cardKey: key, at: at, isLocal: false,
+                    ledger: event.ledger
                 )
             default:
                 return nil
             }
+        }
+    }
+
+    /// Les lignes déjà gardées dont la transaction apparaît dans ces événements reçoivent son ledger (une ligne écrite
+    /// par le téléphone ne le connaît pas encore).
+    static func withLedgers(_ records: [ActivityRecord], from events: [SorobanClient.ContractEvent]) -> [ActivityRecord] {
+        let ledgers = Dictionary(events.map { ($0.transactionHash, $0.ledger) }, uniquingKeysWith: { first, _ in first })
+        return records.map { record in
+            guard record.ledger == nil, let ledger = ledgers[record.hash] else { return record }
+            var filled = record
+            filled.ledger = ledger
+            return filled
         }
     }
 

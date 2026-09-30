@@ -367,52 +367,141 @@ final class ActivityViewModel {
         day.formatted(.dateTime.month(.abbreviated).day())
     }
 
-    // MARK: Reçu
+    // MARK: Reçu (I1.1d)
 
-    /// Lignes du reçu d'un mouvement (le reçu d'Envoyer, élargi aux montants reçus et aux cartes ajoutées).
-    func receiptItems(for record: ActivityRecord) -> [ChimpDetailItem] {
+    /// Le reçu imprimé d'un mouvement (maquette I1.1d, décisions de Barth du 2026-09-30) : « N° » = ledger de la
+    /// transaction ; frais « Paid by ChimpDAO » seulement pour ce que ce téléphone a envoyé ; statut « Confirmed » ;
+    /// « Pay again » seulement pour un envoi.
+    func receipt(for record: ActivityRecord, locale: Locale = .autoupdatingCurrent) -> ActivityReceipt? {
         let addresses = Set(drawers.map(\.address))
-        func place(_ address: String) -> ChimpDetailItem.Value {
-            if let drawer = drawers.first(where: { $0.address == address }) { return .text(drawer.title) }
-            return .address(SendReviewView.grouped(address))
+        guard let kind = record.kind(drawers: addresses),
+              let row = Self.row(for: record, drawers: drawers, addresses: addresses, cardName: { [source] in source.cardName(key: $0) })
+        else { return nil }
+        func place(_ address: String) -> ActivityReceipt.Line.Value {
+            if let drawer = drawers.first(where: { $0.address == address }) {
+                return .drawer(drawer.title, swatch: drawer.isMain ? .main : .card(drawer.color ?? .jungle))
+            }
+            return .text(StellarAddressParser.short(address))
         }
-        var items: [ChimpDetailItem] = []
-        switch record.kind(drawers: addresses) {
+        func card(_ key: String?) -> ActivityReceipt.Line.Value {
+            let name = key.flatMap { source.cardName(key: $0) } ?? String(localized: "A new card")
+            return .drawer(name, swatch: .card(key.flatMap { source.cardColor(key: $0) } ?? .jungle))
+        }
+        var lines: [ActivityReceipt.Line] = []
+        switch kind {
         case .cardAdded:
-            items.append(ChimpDetailItem(id: "card", label: "Card", value: record.cardKey.flatMap { source.cardName(key: $0) } ?? String(localized: "A new card")))
-            items.append(ChimpDetailItem(id: "account", label: "Added to", value: String(localized: "Main account")))
-            if let approver = record.approvedBy.flatMap { source.cardName(key: $0) } {
-                items.append(ChimpDetailItem(id: "approved", label: "Approved by", value: approver))
+            lines.append(.init(id: "card", label: "Card", value: card(record.cardKey)))
+            lines.append(.init(id: "added", label: "Added to", value: .drawer(String(localized: "Main account"), swatch: .main)))
+            if record.approvedBy != nil {
+                lines.append(.init(id: "approved", label: "Approved by", value: card(record.approvedBy)))
             }
-        default:
-            items.append(place(record.from).item(id: "from", label: "From"))
-            items.append(place(record.to).item(id: "to", label: "To"))
+        case .sent, .received, .moved:
+            // Envoyé : à qui d'abord (maquette) ; reçu et Move : d'où d'abord.
+            if kind == .sent {
+                lines.append(.init(id: "to", label: "To", value: place(record.to)))
+                lines.append(.init(id: "from", label: "From", value: place(record.from)))
+            } else {
+                lines.append(.init(id: "from", label: "From", value: place(record.from)))
+                lines.append(.init(id: "to", label: "To", value: place(record.to)))
+            }
             if let amount = record.amount, let code = record.assetCode {
-                items.append(ChimpDetailItem(id: "amount", label: "Amount", value: "\(amount.formatted(.number.precision(.fractionLength(0...7)))) \(code)"))
+                lines.append(.init(id: "amount", label: "Amount", value: .text(Self.exactAmount(amount, code: code, locale: locale))))
             }
         }
-        items.append(ChimpDetailItem(id: "date", label: "Date", value: record.at.formatted(date: .abbreviated, time: .shortened)))
-        items.append(ChimpDetailItem(id: "network", label: "Network", value: network.displayName))
-        items.append(ChimpDetailItem(id: "hash", label: "Transaction", value: record.hash, isMonospaced: true))
-        return items
+        if record.isLocal {
+            lines.append(.init(id: "fee", label: "Fee", value: .text(String(localized: "Paid by ChimpDAO"))))
+        }
+        lines.append(.init(id: "status", label: "Status", value: .positive(String(localized: "Confirmed"))))
+        let date = record.at.formatted(Date.FormatStyle(locale: locale).weekday(.abbreviated).day().month(.abbreviated))
+        let time = record.at.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale))
+        let explorer = source.explorerURL(transactionHash: record.hash)
+        let share = [row.title, row.amount, record.at.formatted(date: .abbreviated, time: .shortened), network.displayName]
+            .compactMap { $0 }.joined(separator: " · ") + (explorer.map { "\n\($0.absoluteString)" } ?? "")
+        return ActivityReceipt(
+            id: record.id,
+            header: "\(date) · \(time)",
+            number: record.ledger.map { "N° \($0)" },
+            title: row.title,
+            lines: lines,
+            hash: record.hash,
+            shortHash: record.hash.count > 12 ? "\(record.hash.prefix(4))…\(record.hash.suffix(4))" : record.hash,
+            total: record.amount.flatMap { amount in
+                record.assetCode.map { code in
+                    Self.amountText(amount, code: code, sign: kind == .sent ? .negative : (kind == .received ? .positive : nil), locale: locale)
+                }
+            },
+            totalTone: row.tone == .positive ? .positive : .neutral,
+            stamp: row.stamp,
+            explorerURL: explorer,
+            shareText: share,
+            payAgainAddress: kind == .sent ? record.to : nil
+        )
     }
 
-    /// « Network fees paid by ChimpDAO » : seulement pour ce que ce téléphone a envoyé (on ne sait pas qui a payé le reste).
-    func receiptShowsFees(for record: ActivityRecord) -> Bool {
-        record.isLocal
+    /// Montant exact dans l'actif, pour la ligne « Amount » : « 25.00 USDC », « 1,757.5 XLM ».
+    static func exactAmount(_ amount: Decimal, code: String, locale: Locale = .autoupdatingCurrent) -> String {
+        let digits = code == SendAsset.usdc.code ? 2...7 : 0...7
+        return "\(amount.formatted(Decimal.FormatStyle(locale: locale).precision(.fractionLength(digits)))) \(code)"
+    }
+
+    // MARK: Copier le hash
+
+    private(set) var copiedHash: String?
+    private(set) var copyCount = 0
+    private var copiedResetTask: Task<Void, Never>?
+    var clipboard: AddressClipboard = SystemAddressClipboard()
+
+    /// « Copy » du reçu : le hash **complet**, « Copied! » pendant 2 s (comme Recevoir).
+    func copyHash(_ hash: String) {
+        clipboard.copy(hash)
+        copiedHash = hash
+        copyCount += 1
+        copiedResetTask?.cancel()
+        copiedResetTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            self?.copiedHash = nil
+        }
     }
 }
 
-private extension ChimpDetailItem {
-    enum Value {
-        case text(String)
-        case address(String)
-
-        func item(id: String, label: LocalizedStringKey) -> ChimpDetailItem {
-            switch self {
-            case .text(let value): ChimpDetailItem(id: id, label: label, value: value)
-            case .address(let value): ChimpDetailItem(id: id, label: label, value: value, isMonospaced: true)
-            }
+/// Le reçu imprimé d'un mouvement, prêt à afficher (I1.1d).
+struct ActivityReceipt: Identifiable, Equatable {
+    struct Line: Identifiable, Equatable {
+        enum Swatch: Equatable {
+            case main
+            case card(ChimpCardColor)
         }
+
+        enum Value: Equatable {
+            case text(String)
+            case drawer(String, swatch: Swatch)
+            case positive(String)
+        }
+
+        let id: String
+        /// En capitales à l'affichage (« TO », « FROM »).
+        let label: LocalizedStringKey
+        let value: Value
+
+        static func == (lhs: Line, rhs: Line) -> Bool { lhs.id == rhs.id && lhs.value == rhs.value }
     }
+
+    let id: String
+    /// « Tue 30 Sep · 14:02 » (capitales à l'affichage).
+    let header: String
+    /// « N° 4935984 » : ledger de la transaction, `nil` tant que le téléphone ne le connaît pas.
+    let number: String?
+    let title: String
+    let lines: [Line]
+    let hash: String
+    let shortHash: String
+    /// Même montant que la ligne de la liste ; `nil` pour une carte ajoutée (pas de TOTAL).
+    let total: String?
+    let totalTone: ActivityTone
+    let stamp: ActivityStamp
+    let explorerURL: URL?
+    let shareText: String
+    /// Envoi : l'adresse à payer de nouveau (C1 prérempli).
+    let payAgainAddress: String?
 }

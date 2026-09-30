@@ -127,6 +127,12 @@
     "Chimpy-certified" : {
 
     },
+    "Confirmed" : {
+
+    },
+    "Copy the transaction" : {
+
+    },
     "Couldn't refresh. Showing what this phone already has." : {
 
     },
@@ -140,6 +146,9 @@
     "Empty" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Fee" : {
+
     },
     "First read that never ends" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -193,6 +202,12 @@
     "Paid" : {
 
     },
+    "Paid by ChimpDAO" : {
+
+    },
+    "Pay again" : {
+
+    },
     "Paying %@" : {
 
     },
@@ -213,7 +228,16 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Share" : {
+
+    },
+    "Status" : {
+
+    },
     "Stellar only keeps about a week of history. What this phone has seen stays here." : {
+
+    },
+    "Thanks for monkeying around" : {
 
     },
     "Today" : {
@@ -222,6 +246,18 @@
     "Today, yesterday and older: paid, got, moved, new card" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Total" : {
+
+    },
+    "Transaction %@" : {
+
+    },
+    "Transaction copied" : {
+
+    },
+    "Tx" : {
+
     },
     "Wait until %@" : {
 

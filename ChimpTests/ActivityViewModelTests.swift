@@ -10,7 +10,7 @@ struct ActivityViewModelTests {
     static let jungle = "CJUNGLE"
     static let banana = "CBANANA"
     static let maya = "GCQF355RQFN77CHM5DHEGK75FWVF26PUES6J6EMQ4U7BAD3E7ORDGXPO"
-    static let drawers: [ActivityDrawer] = [.main(main), .card(jungle, name: "Jungle"), .card(banana, name: "Banana")]
+    static let drawers: [ActivityDrawer] = [.main(main), .card(jungle, name: "Jungle", color: .jungle), .card(banana, name: "Banana", color: .banana)]
     static let addresses = Set(drawers.map(\.address))
     static let us = Locale(identifier: "en_US")
 
@@ -239,6 +239,93 @@ struct ActivityViewModelTests {
     }
 }
 
+extension ActivityViewModelTests {
+    // MARK: Reçu imprimé (I1.1d)
+
+    static let hash = "7b3e" + String(repeating: "0", count: 56) + "a91f"
+
+    private func receiptModel() async -> ActivityViewModel {
+        let source = FakeActivitySource()
+        source.names = ["04aa": ("Leaf", .leaf), "04bb": ("Banana", .banana)]
+        let model = ActivityViewModel(source: source, calendar: Self.calendar, now: { Self.now })
+        await model.refresh()
+        return model
+    }
+
+    @Test("Reçu d'un envoi (maquette I1.1d) : TO, FROM avec la couleur de la carte, montant exact, frais offerts, Confirmed, N° = ledger, Pay again")
+    func sentReceipt() async throws {
+        let model = await receiptModel()
+        var record = Self.transfer("s", Self.jungle, Self.maya, "USDC", "25", Self.at(0, 14), local: true)
+        record.hash = Self.hash
+        record.ledger = 4_935_984
+        let receipt = try #require(model.receipt(for: record, locale: Self.us))
+        #expect(receipt.title == "You paid GCQF…GXPO")
+        #expect(receipt.number == "N° 4935984")
+        #expect(receipt.lines.map(\.id) == ["to", "from", "amount", "fee", "status"])
+        #expect(receipt.lines[0].value == .text("GCQF…GXPO"))
+        #expect(receipt.lines[1].value == .drawer("Jungle's wallet", swatch: .card(.jungle)))
+        #expect(receipt.lines[2].value == .text("25.00 USDC"))
+        #expect(receipt.lines[3].value == .text("Paid by ChimpDAO"))
+        #expect(receipt.lines[4].value == .positive("Confirmed"))
+        #expect(receipt.shortHash == "7b3e…a91f")
+        #expect(receipt.total == "\u{2212}$25.00")
+        #expect(receipt.stamp == .paid)
+        #expect(receipt.payAgainAddress == Self.maya)
+        #expect(receipt.explorerURL?.absoluteString.hasSuffix(Self.hash) == true)
+        #expect(receipt.shareText.contains("You paid GCQF…GXPO"))
+        #expect(receipt.shareText.hasSuffix(Self.hash))
+        #expect(receipt.header.contains(" · "))
+    }
+
+    @Test("Reçu d'un montant reçu : FROM puis TO (Main), pas de frais (pas envoyé par ce téléphone), pas de « Pay again »")
+    func receivedReceipt() async throws {
+        let model = await receiptModel()
+        let receipt = try #require(model.receipt(for: Self.transfer("r", Self.maya, Self.main, "XLM", "1757.5", Self.at(0, 9)), locale: Self.us))
+        #expect(receipt.lines.map(\.id) == ["from", "to", "amount", "status"])
+        #expect(receipt.lines[1].value == .drawer("Main account", swatch: .main))
+        #expect(receipt.lines[2].value == .text("1,757.5 XLM"))
+        #expect(receipt.total == "+1,757.5 XLM")
+        #expect(receipt.totalTone == .positive)
+        #expect(receipt.stamp == .gotIt)
+        #expect(receipt.payAgainAddress == nil)
+        #expect(receipt.number == nil, "Ledger encore inconnu : pas de N°")
+    }
+
+    @Test("Reçu d'un Move : deux tiroirs, pas de « Pay again » ; carte ajoutée : CARD, ADDED TO, APPROVED BY, pas de TOTAL")
+    func moveAndCardReceipts() async throws {
+        let model = await receiptModel()
+        let move = try #require(model.receipt(for: Self.transfer("m", Self.main, Self.banana, "XLM", "2000", Self.at(0, 10)), locale: Self.us))
+        #expect(move.lines[0].value == .drawer("Main account", swatch: .main))
+        #expect(move.lines[1].value == .drawer("Banana's wallet", swatch: .card(.banana)))
+        #expect(move.stamp == .moved)
+        #expect(move.payAgainAddress == nil)
+
+        let card = try #require(model.receipt(for: Self.card("c", Self.at(1, 12)), locale: Self.us))
+        #expect(card.title == "Leaf joined")
+        #expect(card.lines.map(\.id) == ["card", "added", "approved", "fee", "status"])
+        #expect(card.lines[0].value == .drawer("Leaf", swatch: .card(.leaf)))
+        #expect(card.lines[2].value == .drawer("Banana", swatch: .card(.banana)))
+        #expect(card.total == nil)
+        #expect(card.stamp == .newCard)
+    }
+
+    @Test("« Copy » : le hash complet, « Copied! » pour ce reçu")
+    func copyHash() async {
+        let model = await receiptModel()
+        let clipboard = RecordingClipboard()
+        model.clipboard = clipboard
+        model.copyHash(Self.hash)
+        #expect(clipboard.copied == [Self.hash])
+        #expect(model.copiedHash == Self.hash)
+        #expect(model.copyCount == 1)
+    }
+}
+
+final class RecordingClipboard: AddressClipboard, @unchecked Sendable {
+    private(set) var copied: [String] = []
+    func copy(_ text: String) { copied.append(text) }
+}
+
 /// Fausse source de l'Activity.
 final class FakeActivitySource: ActivityDataSource, @unchecked Sendable {
     let network = StellarNetwork.testnet
@@ -252,7 +339,9 @@ final class FakeActivitySource: ActivityDataSource, @unchecked Sendable {
     private(set) var syncCount = 0
 
     func drawers() -> [ActivityDrawer] { ActivityViewModelTests.drawers }
-    func cardName(key: String) -> String? { nil }
+    var names: [String: (String, ChimpCardColor)] = [:]
+    func cardName(key: String) -> String? { names[key]?.0 }
+    func cardColor(key: String) -> ChimpCardColor? { names[key]?.1 }
     func storedActivity() -> AccountActivity { stored }
 
     func sync(onProgress: @escaping (AccountActivity) -> Void) async throws -> AccountActivity {
@@ -264,5 +353,5 @@ final class FakeActivitySource: ActivityDataSource, @unchecked Sendable {
     }
 
     func checkPending(_ pending: PendingSend) async throws -> PaymentCheck { check }
-    func explorerURL(transactionHash: String) -> URL? { nil }
+    func explorerURL(transactionHash: String) -> URL? { URL(string: "https://stellar.expert/explorer/testnet/tx/\(transactionHash)") }
 }

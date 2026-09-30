@@ -30,6 +30,9 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
     var at: Date
     /// Écrite par ce téléphone : elle fait foi sur la ligne lue sur la chaîne pour la même transaction.
     var isLocal: Bool
+    /// Ledger où la transaction a été incluse : « N° » du reçu (I1.1d). Une ligne écrite par ce téléphone le reçoit à
+    /// la lecture suivante de la chaîne. Optionnel : les fichiers écrits avant restent lisibles.
+    var ledger: UInt32? = nil
 
     /// Ce que la ligne représente pour ce compte. `classifyTransfer` du terminal (`lib/chain-history.ts`), sans les
     /// protocoles DeFi (hors V1), plus **Move** : les deux côtés sont des tiroirs du compte (DESIGN_NOTES §13).

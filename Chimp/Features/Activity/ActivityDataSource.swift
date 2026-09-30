@@ -8,6 +8,8 @@ struct ActivityDrawer: Equatable, Identifiable, Sendable {
     /// Nom complet du reçu : « Main account », « Jungle's wallet ».
     let title: String
     let isMain: Bool
+    /// Couleur de la carte (pastille du reçu) ; `nil` pour Main.
+    var color: ChimpCardColor? = nil
 
     var id: String { address }
 
@@ -15,8 +17,8 @@ struct ActivityDrawer: Equatable, Identifiable, Sendable {
         ActivityDrawer(address: address, name: String(localized: "Main"), title: String(localized: "Main account"), isMain: true)
     }
 
-    static func card(_ pocket: String, name: String) -> ActivityDrawer {
-        ActivityDrawer(address: pocket, name: name, title: String(localized: "\(name)'s wallet"), isMain: false)
+    static func card(_ pocket: String, name: String, color: ChimpCardColor? = nil) -> ActivityDrawer {
+        ActivityDrawer(address: pocket, name: name, title: String(localized: "\(name)'s wallet"), isMain: false, color: color)
     }
 }
 
@@ -27,6 +29,8 @@ protocol ActivityDataSource: AnyObject {
     func drawers() -> [ActivityDrawer]
     /// Nom local d'une carte (clé publique en hexadécimal), `nil` si ce téléphone ne la connaît pas.
     func cardName(key: String) -> String?
+    /// Couleur locale d'une carte (clé publique en hexadécimal), `nil` si ce téléphone ne la connaît pas.
+    func cardColor(key: String) -> ChimpCardColor?
     /// Ce que le téléphone a déjà gardé : affiché tout de suite, sans réseau.
     func storedActivity() -> AccountActivity
     /// Relit la chaîne et enregistre ; `onProgress` reçoit l'historique après chaque tranche.
@@ -67,13 +71,19 @@ final class ChainActivityDataSource: ActivityDataSource {
             let fromWallet = read.first { $0.id == key }
             guard let pocket = saved?.pocket ?? fromWallet?.pocket, !seen.contains(pocket) else { continue }
             seen.insert(pocket)
-            drawers.append(.card(pocket, name: saved?.name ?? fromWallet?.name ?? String(localized: "Card")))
+            let color = saved?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? fromWallet?.color
+            drawers.append(.card(pocket, name: saved?.name ?? fromWallet?.name ?? String(localized: "Card"), color: color))
         }
         return drawers
     }
 
     func cardName(key: String) -> String? {
         session.wallet.account?.cards.first { $0.publicKey == key }?.name ?? walletCards().first { $0.id == key }?.name
+    }
+
+    func cardColor(key: String) -> ChimpCardColor? {
+        session.wallet.account?.cards.first { $0.publicKey == key }?.color.flatMap(ChimpCardColor.init(rawValue:))
+            ?? walletCards().first { $0.id == key }?.color
     }
 
     func storedActivity() -> AccountActivity {
@@ -185,13 +195,21 @@ final class MockActivityDataSource: ActivityDataSource {
     }
 
     func drawers() -> [ActivityDrawer] {
-        [.main(Self.main), .card(Self.jungle, name: "Jungle"), .card(Self.banana, name: "Banana")]
+        [.main(Self.main), .card(Self.jungle, name: "Jungle", color: .jungle), .card(Self.banana, name: "Banana", color: .banana)]
     }
 
     func cardName(key: String) -> String? {
         switch key {
         case Self.leafKey: "Leaf"
         case Self.bananaKey: "Banana"
+        default: nil
+        }
+    }
+
+    func cardColor(key: String) -> ChimpCardColor? {
+        switch key {
+        case Self.leafKey: .leaf
+        case Self.bananaKey: .banana
         default: nil
         }
     }
@@ -227,6 +245,16 @@ final class MockActivityDataSource: ActivityDataSource {
         ChimpNetworkConfig.testnet.explorerURL(transactionHash: transactionHash)
     }
 
+    /// Hash et ledger factices, stables (dérivés du libellé de la ligne).
+    static func fakeHash(_ id: String) -> String {
+        let seed = id.utf8.reduce(0) { ($0 &* 31 &+ Int($1)) & 0xFFFF }
+        return "7b3e" + String(repeating: "c0de", count: 14) + String(format: "%04x", seed)
+    }
+
+    static func fakeLedger(_ id: String) -> UInt32 {
+        4_947_000 + UInt32(id.utf8.reduce(0) { ($0 &* 31 &+ Int($1)) & 0x1FF })
+    }
+
     /// Les lignes de la maquette (I1), sur nos tiroirs factices.
     private var records: [ActivityRecord] {
         let calendar = Calendar.current
@@ -237,8 +265,8 @@ final class MockActivityDataSource: ActivityDataSource {
         }
         func transfer(_ id: String, _ from: String, _ to: String, _ code: String, _ amount: String, _ date: Date, local: Bool = false) -> ActivityRecord {
             ActivityRecord(
-                id: "stellar:\(id)", event: .transfer, hash: id, from: from, to: to, assetCode: code,
-                amount: Decimal(string: amount)!, at: date, isLocal: local
+                id: "stellar:\(id)", event: .transfer, hash: Self.fakeHash(id), from: from, to: to, assetCode: code,
+                amount: Decimal(string: amount)!, at: date, isLocal: local, ledger: Self.fakeLedger(id)
             )
         }
         var rows = [
@@ -247,8 +275,8 @@ final class MockActivityDataSource: ActivityDataSource {
             transfer("t3", Self.shop, Self.main, "USDC", "0.12", at(0, 9, 0)),
             transfer("y1", Self.shop, Self.main, "USDC", "12.5", at(1, 16, 5)),
             ActivityRecord(
-                id: "stellar:y2", event: .cardAdded, hash: "y2", from: Self.main, to: "", cardKey: Self.leafKey,
-                approvedBy: Self.bananaKey, at: at(1, 12, 15), isLocal: true
+                id: "stellar:y2", event: .cardAdded, hash: Self.fakeHash("y2"), from: Self.main, to: "", cardKey: Self.leafKey,
+                approvedBy: Self.bananaKey, at: at(1, 12, 15), isLocal: true, ledger: Self.fakeLedger("y2")
             ),
             transfer("o1", Self.maya, Self.banana, "XLM", "1000", at(3, 10, 30)),
         ]

@@ -9,6 +9,10 @@ struct ActivityView: View {
     @Bindable var model: ActivityViewModel
     /// Paiement en attente touché : la coque ouvre l'écran d'état d'Envoyer.
     var onPending: () -> Void = {}
+    /// « Pay again » du reçu : la coque ouvre Envoyer avec cette adresse collée en C1.
+    var onPayAgain: (String) -> Void = { _ in }
+    /// Adresse choisie dans le reçu : Envoyer s'ouvre une fois la feuille refermée.
+    @State private var payAgainAddress: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,12 +28,17 @@ struct ActivityView: View {
         }
         .background(Color(.chimpBackground))
         .task { await model.refresh() }
-        .chimpSheet(isPresented: isReceiptPresented, height: ChimpSize.cardTapSheetHeight) {
-            if let record = model.selectedRecord {
-                ReceiptSheet(
-                    items: model.receiptItems(for: record), showsFees: model.receiptShowsFees(for: record),
-                    explorerURL: model.source.explorerURL(transactionHash: record.hash)
-                )
+        .chimpSheet(isPresented: isReceiptPresented, height: ChimpSize.cardTapSheetHeight, onDismiss: {
+            if let address = payAgainAddress {
+                payAgainAddress = nil
+                onPayAgain(address)
+            }
+        }) {
+            if let record = model.selectedRecord, let receipt = model.receipt(for: record) {
+                ActivityReceiptSheet(receipt: receipt, model: model) { address in
+                    payAgainAddress = address
+                    model.selectedRecord = nil
+                }
             }
         }
     }

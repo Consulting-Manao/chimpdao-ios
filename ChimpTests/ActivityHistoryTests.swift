@@ -184,6 +184,16 @@ struct ActivityHistoryTests {
         #expect(records([elsewhere]).isEmpty)
     }
 
+    @Test("N° du reçu : le ledger ; une ligne du téléphone le reçoit quand la chaîne montre sa transaction")
+    func ledgers() throws {
+        let row = try #require(records([Self.funding]).first)
+        #expect(row.ledger == 4_934_237)
+        let local = Self.record("stellar:\(Self.funding.transactionHash)", hash: Self.funding.transactionHash, isLocal: true)
+        #expect(local.ledger == nil)
+        let filled = ChainActivityHistory.withLedgers([local, Self.record("other")], from: [Self.funding])
+        #expect(filled.map(\.ledger) == [4_934_237, nil])
+    }
+
     // MARK: Stockage (lib/history.ts)
 
     @Test("mergeRecords : une ligne par identifiant, la plus récente d'abord, 200 au plus")
@@ -309,6 +319,21 @@ struct ActivityHistoryTests {
         ) { _ in }
         #expect(source.requests.count == 12)
         #expect(source.requests.first?.end == 200_050)
+    }
+
+    @Test("Lignes gardées sans ledger (avant le N° du reçu) : toute la fenêtre est relue une fois et les complète")
+    func missingLedgersRescan() async throws {
+        let source = FakeEventSource(latest: 200_050, events: [Self.transfer(id: "a", ledger: 150_000, hash: "ha")])
+        let old = Self.record("stellar:ha:a", hash: "ha")
+        let before = AccountActivity(
+            records: [old],
+            coverage: ActivityCoverage(addresses: [Self.account, Self.pocket].sorted(), fromLedger: 80_001, toLedger: 200_000)
+        )
+        let result = try await ChainActivityHistory(source: source, assets: Self.assets).sync(
+            account: Self.account, drawers: [Self.pocket], activity: before
+        ) { _ in }
+        #expect(source.requests.count == 12)
+        #expect(result.records.map(\.ledger) == [150_000])
     }
 
     @Test("Requête refusée par le RPC : retentée (pauses de 1 s puis 2 s), puis la lecture continue")

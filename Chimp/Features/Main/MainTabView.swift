@@ -15,6 +15,8 @@ struct MainTabView: View {
     @State private var activityModel: ActivityViewModel
     /// Écran d'état d'un paiement en attente, ouvert depuis l'Activity.
     @State private var isShowingPendingSend = false
+    /// « Pay again » depuis un reçu de l'Activity : Envoyer avec cette adresse collée en C1.
+    @State private var payAgainAddress: String?
     #if DESIGN_CATALOG
     @State private var isShowingCatalog = false
     #endif
@@ -77,13 +79,19 @@ struct MainTabView: View {
             }
         case .activity:
             NavigationStack {
-                ActivityView(model: activityModel) { isShowingPendingSend = true }
+                ActivityView(model: activityModel, onPending: { isShowingPendingSend = true }, onPayAgain: { payAgainAddress = $0 })
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
                     .navigationDestination(isPresented: $isShowingPendingSend) {
                         // Envoyer rouvre l'état du paiement en attente (« Check again »), jamais un nouvel envoi.
                         SendFlowRoot(service: ChainSendService(session: session)) {
                             isShowingPendingSend = false
+                            Task { await activityModel.refresh() }
+                        }
+                    }
+                    .navigationDestination(item: $payAgainAddress) { address in
+                        SendFlowRoot(service: ChainSendService(session: session), prefilledAddress: address) {
+                            payAgainAddress = nil
                             Task { await activityModel.refresh() }
                         }
                     }

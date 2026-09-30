@@ -114,6 +114,11 @@ private struct CatalogTypographyRow: View {
         case .ticketTitle: Text(verbatim: "You paid GBLW…YEZ6M")
         case .ticketMeta: Text(verbatim: "14:02 · from Jungle")
         case .ticketAmount: Text(verbatim: "−$25.00")
+        case .stampL: Text("Paid")
+        case .receiptTotal: Text(verbatim: "−$25.00")
+        case .receiptLink: Text(verbatim: "Stellar Expert ↗")
+        case .receiptLabel: Text("Amount").textCase(.uppercase)
+        case .receiptValue: Text(verbatim: "25.00 USDC")
         }
     }
 }
