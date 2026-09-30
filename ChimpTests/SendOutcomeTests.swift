@@ -154,25 +154,6 @@ struct SendOutcomeTests {
         #expect(service.submitCount == 0)
     }
 
-    @Test("Carte qui n'est pas du compte : message dans la feuille, on peut retaper, rien d'envoyé")
-    func cardNotAccepted() async throws {
-        let (model, service) = await reviewReady()
-        service.nextSignError = ChipError.cardNotAccepted(tapped: MockChipReader.p256Key)
-        await signWithPIN(model)
-        await waitUntil { model.tapProblem != nil }
-        #expect(model.tapProblem == .cardNotAccepted)
-        #expect(model.signingStage == .waitingForTap(.tapToSign))
-        #expect(service.submitCount == 0)
-
-        // On retape avec la bonne carte : le PIN saisi est toujours là, et il est effacé après la signature.
-        #expect(model.pin == "1234")
-        model.scanCard()
-        await waitUntil { outcome(model) != nil }
-        #expect(service.lastPin == "1234")
-        #expect(service.submitCount == 1)
-        #expect(model.pin.isEmpty)
-    }
-
     @Test("Feuille NFC annulée : retour à la feuille, sans message")
     func nfcCancelled() async {
         let (model, service) = await reviewReady()
@@ -254,7 +235,7 @@ struct SendOutcomeTests {
             ],
             weeklyChange: nil, usdPrices: ["XLM": Decimal(string: "0.23")!], fetchedAt: .now
         )
-        let service = ChainSendService(session: session, wallet: FixedWallet(snapshot: snapshot), signer: MockChipSigner(), reader: MockChipReader())
+        let service = ChainSendService(session: session, wallet: FixedWallet(snapshot: snapshot), signer: MockChipSigner())
         let context = try await service.fetchContext()
         #expect(context.drawers.map(\.address) == ["CMAIN", "CPOCKET1", "CPOCKET2"], "Carte sans wallet : pas de tiroir")
         #expect(context.drawers[0].kind == .main)

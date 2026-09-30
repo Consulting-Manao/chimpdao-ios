@@ -84,6 +84,8 @@ final class SendFlowModel {
     /// Le téléphone n'a pas pu enregistrer le paiement en attente (rare) : l'écran le dit.
     private(set) var pendingSaveFailed = false
     var isReceiptPresented = false
+    /// Pourquoi l'envoi a échoué après la signature (réseau, serveur de frais, refus de Stellar…), pour l'écran d'attente.
+    private(set) var failureReason: SendFailureReason?
     private var waitTask: Task<Void, Never>?
     /// Longueur du PIN des cartes : ⚠️ à confirmer avec Pamphile (le VERIFY PIN Infineon accepte 4 à 62 octets).
     let pinLength = 4
@@ -300,7 +302,7 @@ final class SendFlowModel {
     var isSigningLocked: Bool {
         switch signingStage {
         case .preparing, .scanning, .sending, .checking, .finished: true
-        case .idle, .enteringPin, .waitingForTap: false
+        case .idle, .enteringPin, .waitingForTap, .wrongCard: false
         }
     }
 
@@ -308,7 +310,7 @@ final class SendFlowModel {
     var isSigningSheetPresented: Bool {
         switch signingStage {
         case .enteringPin, .waitingForTap, .scanning: true
-        case .idle, .preparing, .sending, .checking, .finished: false
+        case .idle, .preparing, .sending, .checking, .finished, .wrongCard: false
         }
     }
 
@@ -316,7 +318,7 @@ final class SendFlowModel {
     var showsStatus: Bool {
         switch signingStage {
         case .sending, .checking, .finished: true
-        case .idle, .preparing, .enteringPin, .waitingForTap, .scanning: false
+        case .idle, .preparing, .enteringPin, .waitingForTap, .scanning, .wrongCard: false
         }
     }
 
@@ -339,7 +341,7 @@ final class SendFlowModel {
         switch signingStage {
         case .enteringPin: .pin
         case .waitingForTap(let step), .scanning(let step): step
-        case .idle, .preparing, .sending, .checking, .finished: nil
+        case .idle, .preparing, .sending, .checking, .finished, .wrongCard: nil
         }
     }
 
@@ -390,31 +392,31 @@ final class SendFlowModel {
         tapProblem = nil
         Task {
             do {
+                // Autorisation refaite si elle arrive à expiration (réseau, avant la session NFC).
+                let fresh = try await service.refreshedIfNeeded(current)
+                prepared = fresh
                 switch step {
                 case .tapToRead:
-                    let check = try await service.readCard(for: current)
-                    cardCheck = check
-                    if check.usesPin {
-                        signingStage = .enteringPin
+                    let read = try await service.readCard(for: fresh)
+                    cardCheck = read.check
+                    if let signed = read.signed {
+                        // Carte sans PIN : elle a signé dans le même tap.
+                        pin = ""
+                        self.signed = signed
+                        await send(signed)
                     } else {
-                        try await signAndSend(current, pin: nil)
+                        signingStage = .enteringPin
                     }
                 case .tapToSign, .pin:
-                    try await signAndSend(current, pin: pinForSigning)
+                    let signed = try await service.sign(fresh, pin: pinForSigning, onlyCard: cardCheck?.publicKey)
+                    pin = ""
+                    self.signed = signed
+                    await send(signed)
                 }
             } catch {
                 handleTapError(error, step: step)
             }
         }
-    }
-
-    private func signAndSend(_ current: PreparedSend, pin: String?) async throws {
-        let fresh = try await service.refreshedIfNeeded(current)
-        prepared = fresh
-        let signed = try await service.sign(fresh, pin: pin)
-        self.pin = ""
-        self.signed = signed
-        await send(signed)
     }
 
     /// Échec **avant** toute signature : rien n'est parti. Annulation : retour à la feuille, sans message.
@@ -437,11 +439,36 @@ final class SendFlowModel {
             pin = ""
             pinState = .entering
             signingStage = .enteringPin
+        case ChipError.cardNotAccepted(let tapped):
+            // C7 : rien n'a été envoyé à cette carte après la lecture de sa clé (ni PIN, ni signature).
+            technicalDetails = Self.details(error)
+            signingStage = .wrongCard(wrongCard(tapped: tapped), retry: step == .tapToRead ? .tapToRead : .tapToSign)
         default:
             tapProblem = Self.tapProblem(for: error)
             technicalDetails = Self.details(error)
             signingStage = .waitingForTap(step == .tapToRead ? .tapToRead : .tapToSign)
         }
+    }
+
+    /// C7 : quelle carte a été tapée, laquelle était attendue, et pourquoi elle ne pouvait pas signer.
+    private func wrongCard(tapped: ChipPublicKey) -> WrongCard {
+        let known = service.knownCard(tapped)
+        if let first = cardCheck, first.publicKey != nil, first.publicKey != tapped {
+            // Second tap de l'ordre « tap puis PIN » : le PIN saisi est celui de la carte lue au premier tap.
+            return WrongCard(reason: .notTheSameCard, tapped: known, needed: KnownCard(name: first.cardName, color: first.cardColor))
+        }
+        switch draft?.drawer.kind {
+        case let .card(name, color):
+            return WrongCard(reason: known == nil ? .notYours : .otherWallet, tapped: known, needed: KnownCard(name: name, color: color))
+        case .main, nil:
+            return WrongCard(reason: .notYours, tapped: known, needed: nil)
+        }
+    }
+
+    /// « Try again with your … card » (C7) : retour à la feuille du tap, avec le PIN déjà saisi s'il y en a un.
+    func retryAfterWrongCard() {
+        guard case .wrongCard(_, let retry) = signingStage else { return }
+        signingStage = .waitingForTap(retry)
     }
 
     /// PIN à envoyer : seulement si la carte en a un.
@@ -453,7 +480,7 @@ final class SendFlowModel {
     /// « Cancel » ou feuille fermée : retour à la vérification, rien n'a été signé. Impossible pendant un scan.
     func cancelSigning() {
         switch signingStage {
-        case .enteringPin, .waitingForTap:
+        case .enteringPin, .waitingForTap, .wrongCard:
             pin = ""
             pinState = .entering
             cardCheck = nil
@@ -479,6 +506,7 @@ final class SendFlowModel {
             finish(with: .sent(receipt))
         } catch {
             technicalDetails = Self.details(error)
+            failureReason = SendFailureReason(error)
             guard let failure = error as? PaymentFailure else {
                 // Ne devrait pas arriver (le service rend toujours une trace) : on ne conclut rien.
                 signingStage = .finished(.undetermined)
@@ -576,6 +604,7 @@ final class SendFlowModel {
         prepared = nil
         signed = nil
         technicalDetails = nil
+        failureReason = nil
         summary = nil
         signingStage = .idle
     }
@@ -605,17 +634,59 @@ final class SendFlowModel {
     /// Tap raté, avant toute signature : le genre de problème (le texte est choisi par la vue).
     static func tapProblem(for error: Error) -> TapProblem {
         switch error {
-        case ChipError.cardNotAccepted: .cardNotAccepted
         case let chip as ChipError: .card(AccountSetupModel.problemKind(for: chip))
         default: .network
         }
     }
 }
 
-/// Échec d'un tap, avant toute signature : rien n'est parti.
+/// Pourquoi un envoi n'est pas passé, **après** la signature (l'autorisation a pu sortir du téléphone : on attend
+/// quand même son expiration avant de dire « Nothing was sent »).
+enum SendFailureReason: Equatable {
+    /// Stellar injoignable (réseau, RPC).
+    case network
+    /// Serveur de frais occupé ou en panne.
+    case feeHelperBusy
+    /// Serveur de frais qui refuse.
+    case feeHelperRefused
+    /// Aucun `recovery_id` accepté : la signature de la carte ne correspond pas.
+    case signatureRejected
+    /// Refus de Stellar (simulation, envoi ou transaction échouée).
+    case refused
+
+    init?(_ error: Error) {
+        let underlying = (error as? PaymentFailure)?.underlying ?? error
+        switch underlying {
+        case FeeSignerError.busy, FeeSignerError.unavailable: self = .feeHelperBusy
+        case is FeeSignerError: self = .feeHelperRefused
+        case StellarError.signatureRejected: self = .signatureRejected
+        case StellarError.rpc, StellarError.sendUnanswered, is URLError: self = .network
+        case StellarError.notConfirmed: return nil
+        default: self = .refused
+        }
+    }
+}
+
+/// C7 · Wrong card : la carte tapée, celle qu'il fallait, et pourquoi.
+struct WrongCard: Equatable {
+    enum Reason: Equatable {
+        /// Wallet d'une carte : une autre carte du compte a été tapée (« Wrong banana! »).
+        case otherWallet
+        /// Une carte qui n'est pas du compte.
+        case notYours
+        /// Ordre « tap puis PIN » : au second tap, pas la carte lue au premier (le PIN saisi est le sien).
+        case notTheSameCard
+    }
+
+    let reason: Reason
+    /// Carte tapée, si c'est une carte du compte connue sur ce téléphone.
+    let tapped: KnownCard?
+    /// Carte attendue ; `nil` depuis le Main account (n'importe quelle carte du compte).
+    let needed: KnownCard?
+}
+
+/// Échec d'un tap, avant toute signature : rien n'est parti (la carte refusée a son écran, C7).
 enum TapProblem: Equatable {
-    /// La carte tapée ne peut pas signer ce paiement (C7 complet à l'étape 4).
-    case cardNotAccepted
     /// Erreur NFC ou de la carte : messages de Chimpy de l'onboarding (DESIGN_NOTES §11.2).
     case card(OnboardingProblem.Kind)
     /// Préparation refaite juste avant le tap, ratée (réseau).
@@ -671,6 +742,8 @@ enum SigningStage: Equatable {
     case scanning(SigningStep)
     /// Signé par la carte, envoi en cours (« Sending… »).
     case sending(PaymentProgress)
+    /// C7 : la carte tapée ne peut pas signer ce paiement ; rien n'a été envoyé. `retry` : le tap à refaire.
+    case wrongCard(WrongCard, retry: SigningStep)
     /// Vérification de l'issue (« Check again »).
     case checking
     /// Issue connue ou affichée (C9, incertaine, rien n'est parti).

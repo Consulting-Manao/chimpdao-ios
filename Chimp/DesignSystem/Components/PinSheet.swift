@@ -20,6 +20,8 @@ struct PinSheet: View {
     @Binding var state: ChimpPinState
     /// Paiement : « … Nothing was sent. » après un PIN faux.
     var saysNothingWasSent = false
+    /// Lien « Cancel » sous le pavé (utile quand la carte est bloquée : le pavé ne répond plus).
+    var onCancel: (() -> Void)?
     var onComplete: (String) -> Void = { _ in }
 
     var body: some View {
@@ -41,6 +43,10 @@ struct PinSheet: View {
                     .padding(.top, ChimpSpacing.xxs)
             }
             ChimpPinPad(pin: $pin, length: length, state: $state, saysNothingWasSent: saysNothingWasSent, onComplete: onComplete)
+            if let onCancel {
+                ChimpButton("Cancel", kind: .link, action: onCancel)
+                    .padding(.top, ChimpSpacing.xs)
+            }
         }
         .multilineTextAlignment(.center)
         .padding(.horizontal, ChimpSpacing.xxl)

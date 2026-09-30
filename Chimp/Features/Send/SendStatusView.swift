@@ -99,12 +99,32 @@ struct SendStatusView: View {
             ChimpySays(text: "It was sent, but Stellar hasn't confirmed it yet. Check again in a moment. Don't worry, nothing is sent twice.", pose: .head)
         case .finished(.waiting(let until)):
             waiting(until: until)
+            failureReasonLine
         case .finished(.nothingSent):
             ChimpySays(text: "Your money didn't move. You can try again.", pose: .head)
         case .finished(.undetermined):
             ChimpySays(text: "I can't tell yet if it went through. Don't send it again — tap Check again in a moment.", pose: .head)
+            failureReasonLine
         default:
             EmptyView()
+        }
+    }
+
+    /// Pourquoi l'envoi n'est pas passé (après la signature), en une ligne sous le message principal.
+    @ViewBuilder
+    private var failureReasonLine: some View {
+        if let reason = model.failureReason {
+            ChimpFieldMessage(text: Self.message(for: reason), kind: .info)
+        }
+    }
+
+    static func message(for reason: SendFailureReason) -> LocalizedStringKey {
+        switch reason {
+        case .network: "Stellar couldn't be reached."
+        case .feeHelperBusy: "ChimpDAO's fee helper was busy."
+        case .feeHelperRefused: "ChimpDAO's fee helper said no."
+        case .signatureRejected: "The card's signature didn't check out."
+        case .refused: "Stellar refused it."
         }
     }
 

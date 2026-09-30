@@ -17,6 +17,10 @@ struct SendReviewView: View {
         if model.showsStatus {
             SendStatusView(model: model)
                 .toolbar(.hidden, for: .navigationBar)
+        } else if case .wrongCard(let wrongCard, _) = model.signingStage {
+            WrongCardView(wrongCard: wrongCard, onRetry: model.retryAfterWrongCard, onCancel: model.cancelSigning)
+                .toolbar(.hidden, for: .navigationBar)
+                .blocksSwipeBack(true)
         } else {
             review
         }
@@ -167,6 +171,7 @@ struct SendReviewView: View {
                     length: model.pinLength,
                     state: $model.pinState,
                     saysNothingWasSent: true,
+                    onCancel: { model.cancelSigning() },
                     onComplete: model.pinEntered
                 )
             case .tapToRead, .tapToSign:
@@ -241,7 +246,6 @@ struct SendReviewView: View {
     /// Tap raté, avant toute signature (textes validés ; NFC : messages de Chimpy de l'onboarding).
     static func message(for problem: TapProblem) -> LocalizedStringKey {
         switch problem {
-        case .cardNotAccepted: "That card isn't one of yours. Nothing was sent."
         case .card(let kind): CardReadingView.message(for: kind)
         case .network: "Couldn't get ready to send. Nothing was sent. Check your connection and try again."
         }

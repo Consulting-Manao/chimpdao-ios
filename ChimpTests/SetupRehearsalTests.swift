@@ -367,6 +367,10 @@ final class RecordingSigner: ChipSigner, @unchecked Sendable {
         return CardSignatures(card: ChipKeyInfo(kind: .infineon2Go, publicKey: key, pinActive: pin != nil), signatures: signatures)
     }
 
+    func readOrSign(digests: [Data], acceptedKeys: [ChipPublicKey]) async throws -> ReadOrSign {
+        .signed(try await sign(digests: digests, acceptedKeys: acceptedKeys, pin: nil))
+    }
+
     func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {
         newPINs.append(newPIN)
         if let setPINError { throw setPINError }
@@ -384,6 +388,10 @@ private struct TransportSigner: ChipSigner {
 
     func sign(digests: [Data], acceptedKeys: [ChipPublicKey], pin: String?) async throws -> CardSignatures {
         try await ChipSigning.sign(card, digests: digests, acceptedKeys: acceptedKeys, pin: pin)
+    }
+
+    func readOrSign(digests: [Data], acceptedKeys: [ChipPublicKey]) async throws -> ReadOrSign {
+        try await ChipSigning.readOrSign(card, digests: digests, acceptedKeys: acceptedKeys)
     }
 
     func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {

@@ -9,6 +9,7 @@ struct SendCatalogPage: View {
     @AppStorage(SendMockSettings.signingOrderKey) private var signingOrder = SigningOrder.pinThenTap
     @AppStorage(SendMockSettings.cardSetupKey) private var cardSetup = MockSendService.CardSetup.allWithPin
     @AppStorage(SendMockSettings.resultScenarioKey) private var resultScenario = MockSendService.ResultScenario.sent
+    @AppStorage(SendMockSettings.tapScenarioKey) private var tapScenario = MockSendService.TapScenario.rightCard
     /// Parcours ouvert. Un drapeau et non `@Environment(\.dismiss)` : lu au-dessus du parcours, `dismiss` changeait à
     /// chaque écran poussé et faisait tourner l'app en boucle (même piège que C2 / C4, corrigé au jalon 7).
     @State private var isShowingDemo = false
@@ -63,6 +64,16 @@ struct SendCatalogPage: View {
                         Text("Cards").chimpFont(.rowTitle)
                     }
                     Text(cardSetup.detail)
+                        .chimpFont(.caption)
+                        .foregroundStyle(.chimpTextSecondary)
+                    Picker(selection: $tapScenario) {
+                        ForEach(MockSendService.TapScenario.allCases) { scenario in
+                            Text(scenario.title).tag(scenario)
+                        }
+                    } label: {
+                        Text("Tap").chimpFont(.rowTitle)
+                    }
+                    Text(tapScenario.detail)
                         .chimpFont(.caption)
                         .foregroundStyle(.chimpTextSecondary)
                 } header: {
@@ -149,6 +160,24 @@ private extension SigningOrder {
         switch self {
         case .pinThenTap: "Review, PIN, then one tap that checks the card, sends the PIN and signs."
         case .tapThenPin: "Review, a first tap to read the card, PIN, then a second tap to sign."
+        }
+    }
+}
+
+private extension MockSendService.TapScenario {
+    var title: LocalizedStringKey {
+        switch self {
+        case .rightCard: "Right card"
+        case .otherCard: "Another card first"
+        case .unknownCard: "Unknown card first"
+        }
+    }
+
+    var detail: LocalizedStringKey {
+        switch self {
+        case .rightCard: "The card tapped can sign."
+        case .otherCard: "The first tap is Banana, another card of the account: Wrong banana! (C7). The next tap works."
+        case .unknownCard: "The first tap is a card from another account (C7). The next tap works."
         }
     }
 }

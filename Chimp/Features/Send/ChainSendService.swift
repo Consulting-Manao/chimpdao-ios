@@ -13,7 +13,6 @@ final class ChainSendService: SendService {
     private let wallet: WalletDataSource
     private let payments: PaymentClient
     private let signer: ChipSigner
-    private let reader: ChipReader
     private let feeSigner: FeeSigner
 
     /// Clé publique de chaque tiroir « carte », d'après la dernière lecture (`SendDrawer.id` = clé en hexadécimal).
@@ -24,7 +23,6 @@ final class ChainSendService: SendService {
         config: ChimpNetworkConfig = .testnet,
         wallet: WalletDataSource? = nil,
         signer: ChipSigner = NFCChipSigner(),
-        reader: ChipReader = NFCChipReader(),
         feeSigner: FeeSigner? = nil
     ) {
         self.session = session
@@ -32,7 +30,6 @@ final class ChainSendService: SendService {
         self.wallet = wallet ?? ChainWalletDataSource(session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle())
         payments = PaymentClient(client: SorobanClient(config: config), config: config)
         self.signer = signer
-        self.reader = reader
         self.feeSigner = feeSigner ?? WorkerFeeSigner(url: config.feeSignerURL)
     }
 
@@ -120,19 +117,37 @@ final class ChainSendService: SendService {
 
     // MARK: Le tap
 
-    func readCard(for prepared: PreparedSend) async throws -> CardCheck {
-        let card = try await reader.readKey()
-        guard prepared.payment?.acceptedKeys.contains(card.publicKey) == true else {
-            throw ChipError.cardNotAccepted(tapped: card.publicKey)
+    func readCard(for prepared: PreparedSend) async throws -> CardRead {
+        guard let payment = prepared.payment else { throw SendServiceError.unknownDrawer(prepared.draft.drawer.id) }
+        switch try await signer.readOrSign(digests: [payment.digest], acceptedKeys: payment.acceptedKeys) {
+        case .needsPIN(let card):
+            let local = localCard(card.publicKey)
+            return CardRead(
+                check: CardCheck(cardName: local.name, cardColor: local.color, usesPin: true, publicKey: card.publicKey),
+                signed: nil
+            )
+        case .signed(let signed):
+            let local = localCard(signed.card.publicKey)
+            return CardRead(
+                check: CardCheck(cardName: local.name, cardColor: local.color, usesPin: false, publicKey: signed.card.publicKey),
+                signed: SignedSend(prepared: prepared, cardName: local.name, card: signed)
+            )
         }
-        let local = localCard(card.publicKey)
-        return CardCheck(cardName: local.name, cardColor: local.color, usesPin: card.pinActive)
     }
 
-    func sign(_ prepared: PreparedSend, pin: String?) async throws -> SignedSend {
+    func sign(_ prepared: PreparedSend, pin: String?, onlyCard: ChipPublicKey?) async throws -> SignedSend {
         guard let payment = prepared.payment else { throw SendServiceError.unknownDrawer(prepared.draft.drawer.id) }
-        let signed = try await signer.sign(digests: [payment.digest], acceptedKeys: payment.acceptedKeys, pin: pin)
+        // Second tap de l'ordre « tap puis PIN » : seulement la carte lue au premier tap (si elle peut toujours signer).
+        let keys = onlyCard.map { only in payment.acceptedKeys.filter { $0 == only } } ?? payment.acceptedKeys
+        let signed = try await signer.sign(digests: [payment.digest], acceptedKeys: keys, pin: pin)
         return SignedSend(prepared: prepared, cardName: localCard(signed.card.publicKey).name, card: signed)
+    }
+
+    func knownCard(_ key: ChipPublicKey) -> KnownCard? {
+        let isMember = cardKeys.values.contains(key) || session.wallet.account?.cards.contains { $0.publicKey == key.hex } == true
+        guard isMember else { return nil }
+        let local = localCard(key)
+        return KnownCard(name: local.name, color: local.color)
     }
 
     /// Nom et couleur locaux d'une carte (« Card » et Jungle si ce téléphone ne la connaît pas, comme le Wallet).

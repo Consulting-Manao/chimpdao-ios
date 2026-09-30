@@ -90,13 +90,27 @@ struct PreparedSend: Equatable {
     }
 }
 
-/// Ce qu'apprend une première lecture de la carte, sans signer (ordre « tap puis PIN ») : quelle carte,
-/// et si elle a un PIN. Au jalon 5 : SELECT (octet « PIN actif ») + GET KEY INFO, comparée à la clé attendue.
+/// Ce qu'apprend une première lecture de la carte (ordre « tap puis PIN ») : quelle carte, et si elle a un PIN
+/// (SELECT, octet « PIN actif », + GET KEY INFO, comparée aux cartes qui peuvent signer).
 struct CardCheck: Equatable {
     /// Nom et couleur locaux de la carte tapée.
     let cardName: String
     let cardColor: ChimpCardColor
     let usesPin: Bool
+    /// Clé de la carte lue : le second tap n'accepte **que** cette carte (le PIN saisi est le sien). `nil` : service factice.
+    var publicKey: ChipPublicKey? = nil
+}
+
+/// Premier tap de l'ordre « tap puis PIN » : la carte lue, et sa signature si elle n'a pas de PIN (un seul tap).
+struct CardRead: Equatable {
+    let check: CardCheck
+    let signed: SignedSend?
+}
+
+/// Une carte du compte, connue sur ce téléphone (nom et couleur locaux) : sert à dire quelle carte a été tapée (C7).
+struct KnownCard: Equatable {
+    let name: String
+    let color: ChimpCardColor
 }
 
 /// Envoi signé par la carte, prêt à partir (frais par le serveur de frais, envoi : `SendService.submit`).
@@ -178,12 +192,14 @@ protocol SendService {
     /// Juste avant le tap qui signe (réseau, avant la session NFC) : refait la préparation si l'autorisation n'a plus
     /// 20 ledgers devant elle (`EXPIRATION_MARGIN_LEDGERS`). Sinon, la renvoie telle quelle.
     func refreshedIfNeeded(_ prepared: PreparedSend) async throws -> PreparedSend
-    /// Session NFC de lecture seule (ordre « tap puis PIN ») : quelle carte, avec ou sans PIN. Une carte qui ne peut
-    /// pas signer est refusée (`ChipError.cardNotAccepted`).
-    func readCard(for prepared: PreparedSend) async throws -> CardCheck
+    /// Premier tap de l'ordre « tap puis PIN » : quelle carte, avec ou sans PIN ; sans PIN, elle signe dans le même tap.
+    /// Une carte qui ne peut pas signer est refusée (`ChipError.cardNotAccepted`), sans rien lui envoyer d'autre.
+    func readCard(for prepared: PreparedSend) async throws -> CardRead
     /// Session NFC de signature : clé de la carte vérifiée, puis VERIFY PIN si la carte en a un, puis SIGN.
-    /// Le PIN n'est jamais gardé par le service.
-    func sign(_ prepared: PreparedSend, pin: String?) async throws -> SignedSend
+    /// `onlyCard` : seulement cette carte (second tap de l'ordre « tap puis PIN »). Le PIN n'est jamais gardé.
+    func sign(_ prepared: PreparedSend, pin: String?, onlyCard: ChipPublicKey?) async throws -> SignedSend
+    /// Carte du compte connue sur ce téléphone, `nil` si ce n'est pas une carte du compte.
+    func knownCard(_ key: ChipPublicKey) -> KnownCard?
     /// Après le tap : frais par le serveur de frais, envoi, attente de la confirmation. Toute erreur est un
     /// `PaymentFailure` : l'autorisation signée a pu sortir du téléphone, l'issue se vérifie avec `check`.
     func submit(_ signed: SignedSend, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SendReceipt
@@ -252,9 +268,22 @@ final class MockSendService: SendService {
         var id: String { rawValue }
     }
 
+    /// Carte posée au premier tap qui signe (catalogue : voir C7 sans deuxième carte).
+    enum TapScenario: String, CaseIterable, Identifiable {
+        /// La bonne carte.
+        case rightCard
+        /// Une autre carte du compte (Banana), une fois ; le tap suivant est le bon.
+        case otherCard
+        /// Une carte qui n'est pas du compte, une fois.
+        case unknownCard
+
+        var id: String { rawValue }
+    }
+
     let dataScenario: DataScenario
     let cardSetup: CardSetup
     var resultScenario: ResultScenario
+    var tapScenario: TapScenario = .rightCard
     /// Attente factice de l'expiration de l'autorisation.
     var authorizationWait: Duration = .seconds(15)
     /// Paiement à l'issue incertaine (tests : réglable pour simuler un Envoyer rouvert).
@@ -312,16 +341,55 @@ final class MockSendService: SendService {
         return prepared
     }
 
-    func readCard(for prepared: PreparedSend) async throws -> CardCheck {
-        readCount += 1
-        try await Task.sleep(for: nfcDelay)
-        return tappedCard(for: prepared.draft.drawer)
+    /// Erreur du prochain premier tap (tests : carte refusée…), consommée une fois.
+    var nextReadError: Error?
+    /// Tests : la carte lue au premier tap a-t-elle un PIN (sinon : selon `cardSetup`), et sa clé.
+    var readCardUsesPin: Bool?
+    var readCardKey: ChipPublicKey?
+    /// `onlyCard` reçu par la dernière signature (tests).
+    private(set) var lastOnlyCard: ChipPublicKey?
+    /// Cartes « du compte » connues du téléphone factice (C7) : la clé secp256k1 de test est Banana.
+    var knownCards: [ChipPublicKey: KnownCard] = [MockChipReader.secp256k1Key: KnownCard(name: "Banana", color: .banana)]
+
+    /// Erreur de carte du scénario de tap, une seule fois.
+    private func tapScenarioError() -> Error? {
+        let scenario = tapScenario
+        tapScenario = .rightCard
+        switch scenario {
+        case .rightCard: return nil
+        case .otherCard: return ChipError.cardNotAccepted(tapped: MockChipReader.secp256k1Key)
+        case .unknownCard: return ChipError.cardNotAccepted(tapped: MockChipReader.p256Key)
+        }
     }
 
-    func sign(_ prepared: PreparedSend, pin: String?) async throws -> SignedSend {
+    func readCard(for prepared: PreparedSend) async throws -> CardRead {
+        readCount += 1
+        try await Task.sleep(for: nfcDelay)
+        if let error = tapScenarioError() { throw error }
+        if let error = nextReadError {
+            nextReadError = nil
+            throw error
+        }
+        var check = tappedCard(for: prepared.draft.drawer)
+        if readCardUsesPin != nil || readCardKey != nil {
+            check = CardCheck(
+                cardName: check.cardName, cardColor: check.cardColor,
+                usesPin: readCardUsesPin ?? check.usesPin, publicKey: readCardKey
+            )
+        }
+        guard !check.usesPin else { return CardRead(check: check, signed: nil) }
+        // Carte sans PIN : elle signe dans le même tap.
+        signCount += 1
+        lastPin = nil
+        return CardRead(check: check, signed: SignedSend(prepared: prepared, cardName: check.cardName))
+    }
+
+    func sign(_ prepared: PreparedSend, pin: String?, onlyCard: ChipPublicKey?) async throws -> SignedSend {
         signCount += 1
         lastPin = pin
+        lastOnlyCard = onlyCard
         try await Task.sleep(for: nfcDelay)
+        if let error = tapScenarioError() { throw error }
         if let error = nextSignError {
             nextSignError = nil
             throw error
@@ -380,6 +448,10 @@ final class MockSendService: SendService {
 
     func explorerURL(transactionHash: String) -> URL? {
         ChimpNetworkConfig.testnet.explorerURL(transactionHash: transactionHash)
+    }
+
+    func knownCard(_ key: ChipPublicKey) -> KnownCard? {
+        knownCards[key]
     }
 
     /// Carte posée sur le téléphone : celle du tiroir, ou Jungle pour un envoi depuis Main.

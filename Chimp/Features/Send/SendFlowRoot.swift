@@ -40,6 +40,7 @@ enum SendMockSettings {
     static let cardSetupKey = "sendMockCardSetup"
     static let signingOrderKey = "sendSigningOrder"
     static let resultScenarioKey = "sendMockResultScenario"
+    static let tapScenarioKey = "sendMockTapScenario"
 
     static var dataScenario: MockSendService.DataScenario {
         #if DESIGN_CATALOG
@@ -75,9 +76,19 @@ enum SendMockSettings {
         #endif
     }
 
-    /// Parcours factice du catalogue (données, cartes et issue choisies dans la page « Send »).
+    static var tapScenario: MockSendService.TapScenario {
+        #if DESIGN_CATALOG
+        stored(tapScenarioKey) ?? .rightCard
+        #else
+        .rightCard
+        #endif
+    }
+
+    /// Parcours factice du catalogue (données, cartes, carte tapée et issue choisies dans la page « Send »).
     static func makeService() -> SendService {
-        MockSendService(dataScenario: dataScenario, cardSetup: cardSetup, resultScenario: resultScenario)
+        let service = MockSendService(dataScenario: dataScenario, cardSetup: cardSetup, resultScenario: resultScenario)
+        service.tapScenario = tapScenario
+        return service
     }
 
     private static func stored<Value: RawRepresentable>(_ key: String) -> Value? where Value.RawValue == String {
