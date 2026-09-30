@@ -21,12 +21,19 @@ struct CardMembershipClient {
         /// La carte est encore membre d'un autre compte : elle doit être **donnée** par son titulaire, pas prise
         /// (`assertAddable` : « That card belongs to another account »).
         case belongsToAnotherAccount(String)
+        /// `remove_card` : c'est la dernière carte du compte (`ChimpAccount::LastCard`, `#303`). Le contrat refuse ;
+        /// l'app le vérifie avant tout tap (le terminal masque alors le bouton, `canUnlink`).
+        case lastCard
+        /// `remove_card` : la carte n'est pas (ou plus) dans ce compte : rien à retirer.
+        case notInAccount
 
         var errorDescription: String? {
             switch self {
             case .notEnrolled: "This card has not been set up by ChimpDAO yet."
             case .alreadyInAccount: "This card is already on this account."
             case .belongsToAnotherAccount(let account): "That card belongs to another account (\(account))."
+            case .lastCard: "This is the only card on this account. The account refuses to lose its last card (#303)."
+            case .notInAccount: "This card isn't on this account."
             }
         }
     }
@@ -151,6 +158,103 @@ struct CardMembershipClient {
             envelope: { ChipAuthEncoding.accountAuth(publicKey: signed.card.publicKey, chipAuth: $0) }
         )
         return try await client.refitAndSubmit(transaction, feeSigner: feeSigner)
+    }
+
+    // MARK: remove_card (ordre 2)
+
+    /// Qui signe `remove_card` : la carte retirée elle-même (terminal, `removeCard` : « it signs its own departure »), ou,
+    /// pour une carte **perdue**, une autre carte du compte (le contrat accepte n'importe laquelle de ses cartes ; absent du
+    /// terminal, DESIGN_NOTES §13).
+    enum RemovalSigner: Equatable, Sendable {
+        case theCardItself
+        case anotherCard
+    }
+
+    /// Argument de `remove_card(key: BytesN<65>)` : `scBytes(pubBytesFromHex(key.publicKey))`.
+    static func removeCardArguments(publicKey: ChipPublicKey) -> [SCValXDR] {
+        [.bytes(publicKey.bytes)]
+    }
+
+    /// `remove_card` prêt pour le tap : l'entrée du compte (simulée, vérifiée) et les cartes qui peuvent la signer.
+    struct PreparedRemoveCard {
+        let account: String
+        let removedCard: ChipPublicKey
+        let signer: RemovalSigner
+        let authorization: AuthorizedCall.AccountEntry
+        /// La carte retirée seule (elle-même), ou toutes les autres cartes du compte (carte perdue).
+        let acceptedKeys: [ChipPublicKey]
+
+        var digest: Data { authorization.digest }
+    }
+
+    /// Avant le tap : `cards()` du compte (la carte doit y être, et ne pas être la dernière : `LastCard`), puis simulation
+    /// de `remove_card` (ordre 2, « simuler, puis signer »). Rien n'est signé ni envoyé.
+    func prepareRemoveCard(account: String, card: ChipPublicKey, signer: RemovalSigner) async throws -> PreparedRemoveCard {
+        let source = try await client.account(config.feePayer)
+        let members = try await accounts.cards(account: account, source: try PocketClient.copy(source)).map(\.publicKey)
+        let accepted = try Self.removalSigners(members: members, card: card, signer: signer)
+        let authorization: AuthorizedCall.AccountEntry
+        do {
+            authorization = try await AuthorizedCall.prepareAccountEntry(
+                client: client, source: source, account: account, contract: account, function: "remove_card",
+                arguments: Self.removeCardArguments(publicKey: card), passphrase: config.passphrase
+            )
+        } catch let error as StellarError where Self.isLastCardRefusal(error) {
+            throw MembershipError.lastCard
+        }
+        return PreparedRemoveCard(account: account, removedCard: card, signer: signer, authorization: authorization, acceptedKeys: accepted)
+    }
+
+    /// Cartes qui peuvent signer `remove_card(card)` : la carte elle-même (G6), ou toutes les autres (G7). Refus avant tout
+    /// réseau ou tap : carte absente du compte, ou dernière carte (`LastCard`, comme `canUnlink` du terminal).
+    static func removalSigners(members: [ChipPublicKey], card: ChipPublicKey, signer: RemovalSigner) throws -> [ChipPublicKey] {
+        guard members.contains(card) else { throw MembershipError.notInAccount }
+        guard members.count > 1 else { throw MembershipError.lastCard }
+        switch signer {
+        case .theCardItself: return [card]
+        case .anotherCard: return members.filter { $0 != card }
+        }
+    }
+
+    /// Juste avant le tap : l'autorisation a-t-elle encore 20 ledgers devant elle ? Sinon, la préparer de nouveau.
+    func needsRefresh(_ prepared: PreparedRemoveCard) async throws -> Bool {
+        SorobanAuth.needsRefresh(expirationLedger: prepared.authorization.expirationLedger, currentLedger: try await client.latestLedger())
+    }
+
+    /// Après le tap : `AccountAuth { auth, key: carte qui a signé }` dans l'entrée, simulation (`recovery_id`, refus `#301`),
+    /// frais par le serveur de frais, envoi. Renvoie le hash. Une carte hors de `acceptedKeys` est refusée sans rien envoyer.
+    func submitRemoveCard(_ prepared: PreparedRemoveCard, signed: CardSignatures, feeSigner: FeeSigner) async throws -> String {
+        guard prepared.acceptedKeys.contains(signed.card.publicKey) else {
+            throw ChipError.cardNotAccepted(tapped: signed.card.publicKey)
+        }
+        guard signed.signatures.count == 1, let signature = signed.signatures.first else {
+            throw ChipError.malformedResponse("expected 1 signature, got \(signed.signatures.count)")
+        }
+        do {
+            let transaction = try await AuthorizedCall.assembled(
+                client: client, source: try await client.account(config.feePayer),
+                contract: prepared.account, function: "remove_card",
+                arguments: Self.removeCardArguments(publicKey: prepared.removedCard),
+                entry: prepared.authorization.entry, curve: signed.card.curve, signature: signature,
+                rejectionCode: RecoveryIDSearch.RejectionCode.account,
+                envelope: { ChipAuthEncoding.accountAuth(publicKey: signed.card.publicKey, chipAuth: $0) }
+            )
+            return try await client.refitAndSubmit(transaction, feeSigner: feeSigner)
+        } catch let error as StellarError where Self.isLastCardRefusal(error) {
+            // Le compte a changé entre la préparation et l'envoi (une autre carte retirée ailleurs).
+            throw MembershipError.lastCard
+        }
+    }
+
+    /// `ChimpAccount::LastCard` (`#303`), comme `lib/errors.ts` du terminal (`/error\(contract, #303\)|lastcard/i`).
+    static func isLastCardRefusal(_ error: StellarError) -> Bool {
+        let text: String
+        switch error {
+        case .simulationFailed(let detail), .submitFailed(let detail), .rpc(let detail): text = detail
+        case .transactionFailed(_, let detail): text = detail
+        default: return false
+        }
+        return text.range(of: #"error\(contract, #303\)|lastcard"#, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     // MARK: Relectures

@@ -60,6 +60,21 @@ struct MainTabView: View {
                         case .pendingSend:
                             // Envoyer rouvre l'état du paiement en attente (« Check again »), jamais un nouvel envoi.
                             SendFlowRoot(service: ChainSendService(session: session), onExit: closeFlow)
+                        case .removeCard(let mode, let key):
+                            // G6 / G7 : retirer une carte ou la déclarer perdue (testnet), depuis sa page (B3).
+                            RemoveCardDestination(mode: mode, key: key, wallet: walletModel, session: session) { removed in
+                                if removed {
+                                    walletPath.removeAll()
+                                    Task { await walletModel.refresh() }
+                                    Task { await activityModel.refresh() }
+                                } else if !walletPath.isEmpty {
+                                    walletPath.removeLast()
+                                }
+                            } onAddCard: {
+                                walletPath = [.addCard]
+                            } onMoveFirst: {
+                                walletPath.append(.move(key))
+                            }
                         case .drawer(let selection):
                             // B2 / B3 : le détail d'un tiroir, sur les soldes déjà lus par le Wallet.
                             DrawerDestination(selection: selection, wallet: walletModel, activity: activityModel, session: session, actions: drawerActions)
@@ -147,7 +162,9 @@ struct MainTabView: View {
             onReceive: { walletPath.append(.receive($0)) },
             onMove: { walletPath.append(.move($0)) },
             onPayAgain: { walletPath.append(.payAgain($0)) },
-            onPending: { walletPath.append(.pendingSend) }
+            onPending: { walletPath.append(.pendingSend) },
+            onRemove: { walletPath.append(.removeCard($0, $1)) },
+            onAddCard: { walletPath = [.addCard] }
         )
     }
 
@@ -179,6 +196,8 @@ enum WalletRoute: Hashable {
     case settings
     case addCard
     case drawer(DrawerSelection)
+    /// G6 (retirer) ou G7 (carte perdue), pour la carte de cette clé.
+    case removeCard(RemoveCardModel.Mode, String)
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
@@ -212,6 +231,44 @@ private struct DrawerDestination: View {
         DrawerDetailView(model: model, activity: activity, actions: actions)
             .toolbar(.hidden, for: .navigationBar)
     }
+}
+
+/// Retirer une carte (G6) ou la déclarer perdue (G7) : un ViewModel neuf à chaque ouverture, sur les montants lus par
+/// le Wallet. Carte que le Wallet ne connaît plus : rien (retour).
+private struct RemoveCardDestination: View {
+    @State private var model: RemoveCardModel?
+    let onExit: (Bool) -> Void
+    let onAddCard: () -> Void
+    let onMoveFirst: () -> Void
+
+    init(mode: RemoveCardModel.Mode, key: String, wallet: WalletViewModel, session: AppSession,
+         onExit: @escaping (Bool) -> Void, onAddCard: @escaping () -> Void, onMoveFirst: @escaping () -> Void) {
+        let drawer = DrawerDetailModel(selection: .card(key), wallet: wallet, session: session)
+        _model = State(initialValue: zip2(drawer.removalTarget, session.wallet.account?.address).map { target, account in
+            RemoveCardModel.live(mode: mode, account: account, target: target, members: drawer.memberKeys, session: session)
+        })
+        self.onExit = onExit
+        self.onAddCard = onAddCard
+        self.onMoveFirst = onMoveFirst
+    }
+
+    var body: some View {
+        Group {
+            if let model {
+                RemoveCardFlowView(model: model, onExit: onExit, onAddCard: onAddCard, onMoveFirst: onMoveFirst)
+            } else {
+                ChimpySays(text: "This card isn't on your account anymore.", pose: .crawl)
+                    .padding(ChimpSpacing.xxl)
+                    .onAppear { onExit(false) }
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+private func zip2<A, B>(_ a: A?, _ b: B?) -> (A, B)? {
+    guard let a, let b else { return nil }
+    return (a, b)
 }
 
 /// Ajouter une carte (G1 → G3) : un ViewModel neuf à chaque ouverture, sur la vraie carte et le testnet. Sur un appareil

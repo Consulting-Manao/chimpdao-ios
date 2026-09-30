@@ -161,6 +161,18 @@ final class AppSession {
         try persist(next)
     }
 
+    /// Carte retirée du compte (G6) ou déclarée perdue (G7), **après** confirmation sur la chaîne (`has_card` faux) : elle
+    /// quitte la liste du compte sur ce téléphone, avec son indice « carte → compte » (il désignerait un compte qui ne la
+    /// liste plus ; la résolution la verrait orpheline de toute façon).
+    func removeCard(_ publicKey: String, account address: String) throws {
+        guard var account = wallet.account, account.address == address else { throw SettingsError.noAccount }
+        var next = wallet
+        account.cards.removeAll { $0.publicKey == publicKey }
+        next.account = account
+        next.cardHints.removeAll { $0.key == publicKey && $0.account == address }
+        try persist(next)
+    }
+
     /// Ligne d'historique écrite par ce téléphone (envoi, Move ou carte ajoutée **confirmés**), rangée avec ce compte.
     func recordActivity(_ record: ActivityRecord, account: String) {
         activity.recordLocal(record, account: account)

@@ -158,6 +158,23 @@ final class DrawerDetailModel {
         return settings
     }
 
+    /// De quoi retirer cette carte (G6) ou la déclarer perdue (G7) : ses montants et ceux de Main, déjà formatés.
+    var removalTarget: RemovalTarget? {
+        guard case .card(let key) = selection, let snapshot = wallet.snapshot, let card,
+              let publicKey = try? ChipPublicKey(Data(hex: key) ?? Data()) else { return nil }
+        let wallet = Self.content(assets: card.assets, snapshot: snapshot, signers: [], address: card.pocket)
+        let main = Self.content(assets: snapshot.main.assets, snapshot: snapshot, signers: [], address: nil)
+        return RemovalTarget(
+            key: publicKey, chip: card.chip ?? .infineon2Go, name: cardName, color: cardColor, number: card.number,
+            walletAmount: wallet.total, walletIsEmpty: wallet.isEmpty, mainAmount: main.total
+        )
+    }
+
+    /// Clés de toutes les cartes du compte (dernière lecture), pour la chaîne factice du simulateur.
+    var memberKeys: [ChipPublicKey] {
+        (wallet.snapshot?.cards ?? []).compactMap { try? ChipPublicKey(Data(hex: $0.id) ?? Data()) }
+    }
+
     private func savedCard(_ key: String) -> SavedCard? {
         session.wallet.account?.cards.first { $0.publicKey == key }
     }

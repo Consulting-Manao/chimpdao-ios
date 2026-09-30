@@ -11,6 +11,8 @@ struct DrawerDetailView: View {
     var actions: DrawerDetailActions
 
     @State private var renameModel: SettingsModel?
+    /// G5 : le compte n'a qu'une carte (dernière lecture) ; retirer ou déclarer perdue est refusé avant tout tap.
+    @State private var lastCardMode: RemoveCardModel.Mode?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,6 +54,14 @@ struct DrawerDetailView: View {
         .background(Color(.chimpBackground))
         .task { await activity.refresh() }
         .activityReceiptSheet(model: activity, onPayAgain: actions.onPayAgain)
+        .chimpSheet(isPresented: Binding(get: { lastCardMode != nil }, set: { if !$0 { lastCardMode = nil } }), height: 560, fitsContent: true) {
+            if let mode = lastCardMode {
+                LastCardSheet(mode: mode, name: model.cardName, onAddCard: {
+                    lastCardMode = nil
+                    actions.onAddCard()
+                }, onOK: { lastCardMode = nil })
+            }
+        }
         .navigationDestination(isPresented: Binding(
             get: { renameModel?.editingCard != nil },
             set: { if !$0 { renameModel = nil } }
@@ -133,7 +143,19 @@ struct DrawerDetailView: View {
     private var cardRows: [ChimpGroupedRow] {
         [
             ChimpGroupedRow(id: "rename", title: "Rename & colour") { renameModel = model.makeRenameModel() },
+            ChimpGroupedRow(id: "remove", title: "Remove from account") { openRemoval(.remove) },
+            ChimpGroupedRow(id: "lost", title: "I lost this card", tone: .destructive) { openRemoval(.lost) },
         ]
+    }
+
+    /// Dernière carte (lue par le Wallet) : G5 tout de suite ; sinon la revue (G6, G7). La revue revérifie sur la chaîne.
+    private func openRemoval(_ mode: RemoveCardModel.Mode) {
+        guard case .card(let key) = model.selection else { return }
+        if model.cardCount <= 1 {
+            lastCardMode = mode
+        } else {
+            actions.onRemove(mode, key)
+        }
     }
 
     // MARK: Historique
@@ -198,4 +220,8 @@ struct DrawerDetailActions {
     var onPayAgain: (String) -> Void = { _ in }
     /// Paiement en attente touché dans l'historique.
     var onPending: () -> Void = {}
+    /// G6 (retirer) ou G7 (carte perdue) pour cette carte (clé).
+    var onRemove: (RemoveCardModel.Mode, String) -> Void = { _, _ in }
+    /// G5 « Add a card ».
+    var onAddCard: () -> Void = {}
 }
