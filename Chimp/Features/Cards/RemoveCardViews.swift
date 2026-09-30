@@ -308,8 +308,8 @@ struct LastCardSheet: View {
             }
             .padding(.top, ChimpSpacing.xl)
         }
+        // Pas de marge du bas ici : la feuille met déjà celle de la maquette (42 pt, barre d'accueil comprise).
         .padding(.horizontal, ChimpSpacing.xxl)
-        .padding(.bottom, ChimpSpacing.l)
     }
 
     private func body(for mode: RemoveCardModel.Mode) -> LocalizedStringKey {
