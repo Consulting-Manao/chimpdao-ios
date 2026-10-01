@@ -108,6 +108,7 @@ struct ChimpDrawerPicker: View {
             HStack(spacing: ChimpSpacing.xxs) {
                 Text(verbatim: balance)
                     .foregroundStyle(.chimpTextSecondary)
+                    .chimpRollingNumber(balance)
                 if let balanceAfter {
                     Image(systemName: "arrow.right")
                         .font(.system(size: 11, weight: .black))
@@ -115,6 +116,7 @@ struct ChimpDrawerPicker: View {
                         .accessibilityLabel(Text("then"))
                     Text(verbatim: balanceAfter)
                         .foregroundStyle(.chimpTextPrimary)
+                        .chimpRollingNumber(balanceAfter)
                 }
             }
             .chimpFont(.caption)

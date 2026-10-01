@@ -31,6 +31,7 @@ struct ChimpDrawerCard: View {
                         .foregroundStyle(.chimpTextSecondary)
                     Text(verbatim: amount)
                         .chimpFont(.amountM)
+                        .chimpRollingNumber(amount)
                         .foregroundStyle(.chimpTextPrimary)
                     detail
                 }

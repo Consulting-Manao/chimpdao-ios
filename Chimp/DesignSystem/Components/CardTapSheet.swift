@@ -112,6 +112,7 @@ struct CardTapSheet: View {
             Image(systemName: pinIcon)
                 .fontWeight(.heavy)
                 .foregroundStyle(pinStatus == .ready ? Color(.chimpPositive) : Color(.chimpTextSecondary))
+                .chimpPopIn()
                 .accessibilityHidden(true)
             Text(pinText)
                 .chimpFont(.caption)

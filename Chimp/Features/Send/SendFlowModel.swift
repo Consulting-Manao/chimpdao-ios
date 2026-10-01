@@ -886,6 +886,17 @@ enum SigningStep: Equatable {
 
 /// Où en est la signature.
 enum SigningStage: Equatable {
+    /// Son à jouer en arrivant sur cette étape (`chimpSound`) : la carte vient de signer, l'envoi est arrivé, ou rien
+    /// n'est parti / mauvaise carte.
+    var sound: ChimpSound? {
+        switch self {
+        case .sending: .tap
+        case .finished(.sent): .sent
+        case .finished(.nothingSent), .finished(.waiting), .wrongCard: .error
+        default: nil
+        }
+    }
+
     /// Sur la vérification (C4).
     case idle
     /// Appels réseau avant la session NFC.

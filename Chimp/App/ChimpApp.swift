@@ -10,6 +10,9 @@ struct ChimpApp: App {
         ChimpFonts.register()
         let session = AppSession.live()
         _session = State(initialValue: session)
+        // Réglage « Sounds » (I2) : lu à chaque son, il prend effet aussitôt.
+        let preferences = session.preferences
+        ChimpSoundPlayer.shared.isEnabled = { preferences.soundsEnabled }
         _lock = State(initialValue: AppLock(session: session))
     }
 

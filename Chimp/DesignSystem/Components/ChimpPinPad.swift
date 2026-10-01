@@ -93,6 +93,7 @@ struct ChimpPinPad<Middle: View>: View {
             }
         }
         .sensoryFeedback(.error, trigger: shakeTrigger)
+        .chimpSound(.error, trigger: shakeTrigger)
     }
 
     @ViewBuilder

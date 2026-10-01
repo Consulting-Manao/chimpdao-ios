@@ -9,6 +9,7 @@ struct ChimpSurfaceButtonStyle<S: InsettableShape>: ButtonStyle {
     var shadow: ChimpShadow = .tile
 
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         let isPressed = configuration.isPressed
@@ -21,6 +22,7 @@ struct ChimpSurfaceButtonStyle<S: InsettableShape>: ButtonStyle {
             }
             .contentShape(shape)
             .opacity(isEnabled ? 1 : ChimpOpacity.disabled)
-            .animation(.easeOut(duration: ChimpMotion.Press.duration), value: isPressed)
+            // Enfoncé d'un coup, puis relâché avec un petit rebond (sauf « Réduire les animations »).
+            .animation(isPressed || reduceMotion ? .easeOut(duration: ChimpMotion.Press.duration) : ChimpMotion.Micro.bounce, value: isPressed)
     }
 }

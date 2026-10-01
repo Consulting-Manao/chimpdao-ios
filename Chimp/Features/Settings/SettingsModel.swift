@@ -313,6 +313,15 @@ final class SettingsModel {
     }
 
     /// « Look » : comme l'iPhone, Yellow banana (clair) ou Jungle night (sombre). Toute l'app change aussitôt.
+    /// « Sounds » (I2, non dessiné) : un petit son pour confirmer qu'on vient de l'activer.
+    var soundsEnabled: Bool {
+        get { session.preferences.soundsEnabled }
+        set {
+            session.preferences.soundsEnabled = newValue
+            if newValue { ChimpSoundPlayer.shared.play(.tap) }
+        }
+    }
+
     var look: ChimpLook {
         get { session.preferences.look }
         set { session.preferences.look = newValue }

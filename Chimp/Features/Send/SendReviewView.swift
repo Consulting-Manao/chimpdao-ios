@@ -14,16 +14,24 @@ struct SendReviewView: View {
     @Environment(\.chimpScreenInsets) private var screenInsets
 
     var body: some View {
-        if model.showsStatus {
-            SendStatusView(model: model)
-                .toolbar(.hidden, for: .navigationBar)
-        } else if case .wrongCard(let wrongCard, _) = model.signingStage {
-            WrongCardView(wrongCard: wrongCard, onRetry: model.retryAfterWrongCard, onCancel: model.cancelSigning)
-                .toolbar(.hidden, for: .navigationBar)
-                .blocksSwipeBack(true)
-        } else {
-            review
+        Group {
+            if model.showsStatus {
+                SendStatusView(model: model)
+                    .toolbar(.hidden, for: .navigationBar)
+            } else if case .wrongCard(let wrongCard, _) = model.signingStage {
+                WrongCardView(wrongCard: wrongCard, onRetry: model.retryAfterWrongCard, onCancel: model.cancelSigning)
+                    .toolbar(.hidden, for: .navigationBar)
+                    .blocksSwipeBack(true)
+            } else {
+                review
+            }
         }
+        // Sons : la carte a signé, l'argent est arrivé, ou ça n'a pas marché (tap raté, préparation ratée).
+        .onChange(of: model.signingStage) { old, new in
+            if let sound = new.sound, old.sound != sound { ChimpSoundPlayer.shared.play(sound) }
+        }
+        .chimpSound(.error, trigger: model.tapProblem) { _, new in new != nil }
+        .chimpSound(.error, trigger: model.signingErrorMessage) { _, new in new != nil }
     }
 
     private var review: some View {

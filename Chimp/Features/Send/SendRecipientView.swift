@@ -11,6 +11,8 @@ struct SendRecipientView: View {
     var onBack: (() -> Void)?
 
     @FocusState private var focusedField: Field?
+    /// Bulle de Chimpy tirée au hasard (`ChimpyLines.recipientTips`).
+    @State private var seed = ChimpyLines.seed()
     @Environment(\.chimpScreenInsets) private var screenInsets
 
     private enum Field {
@@ -39,7 +41,7 @@ struct SendRecipientView: View {
                             .padding(.top, ChimpSpacing.l)
                     }
                     recents
-                    ChimpySays(text: "No card needed yet. I'll only ask for it at the very end.", pose: .crawl)
+                    ChimpySays(line: ChimpyLines.pick(ChimpyLines.recipientTips, seed: seed), pose: .crawl)
                         .padding(.top, ChimpSpacing.xl)
                 }
                 .padding(.horizontal, ChimpSpacing.xxl)
@@ -277,7 +279,7 @@ struct SendRecipientView: View {
                 .accessibilityAddTraits(.isHeader)
                 .padding(.top, ChimpSpacing.sectionGap)
             VStack(spacing: ChimpSpacing.listGap) {
-                ForEach(model.recents) { contact in
+                ForEach(Array(model.recents.enumerated()), id: \.element.id) { index, contact in
                     ChimpContactRow(
                         name: contact.name,
                         color: contact.color,
@@ -286,6 +288,7 @@ struct SendRecipientView: View {
                         focusedField = nil
                         model.choose(contact)
                     }
+                    .chimpCascadeAppear(index: index)
                 }
             }
             .padding(.top, ChimpSpacing.sm)

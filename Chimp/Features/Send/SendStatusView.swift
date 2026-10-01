@@ -16,6 +16,7 @@ struct SendStatusView: View {
 
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
+    @State private var seed = ChimpyLines.seed()
 
     var body: some View {
         Group {
@@ -90,6 +91,9 @@ struct SendStatusView: View {
         switch model.signingStage {
         case .sending(let progress):
             ChimpProgressSteps(steps: sendingSteps(progress))
+            Text(ChimpyLines.pick(ChimpyLines.sending, seed: seed))
+                .chimpFont(.caption)
+                .foregroundStyle(.chimpTextSecondary)
         case .checking:
             HStack(spacing: ChimpSpacing.m) {
                 ProgressView()
@@ -207,13 +211,15 @@ struct SendStatusView: View {
 }
 
 /// C9 · « Swoosh! » (maquette) : fond Leaf et motif, Chimpy à la banane, phrase, pastille « From … · heure »,
-/// « Back to my wallet » et « See the receipt ».
+/// « Back to my wallet » et « See the receipt ». Titre et phrase tirés au hasard (`ChimpyLines`), bananes volantes.
 struct SendSentView: View {
     let receipt: SendReceipt
     let onDone: () -> Void
     let onReceipt: () -> Void
 
     @Environment(\.locale) private var locale
+    /// Titre et phrase tirés au hasard (`ChimpyLines`) ; le montant et le destinataire restent exacts.
+    @State private var seed = ChimpyLines.seed()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -225,11 +231,11 @@ struct SendSentView: View {
                     .frame(height: 230)
                     .chimpBob(duration: 3.5)
                     .accessibilityHidden(true)
-                Text("Swoosh!")
+                Text(ChimpyLines.pick(ChimpyLines.sentTitles, seed: seed))
                     .chimpFont(.welcomeTitle)
                     .padding(.top, ChimpSpacing.l)
                     .accessibilityAddTraits(.isHeader)
-                Text("\(receipt.summary.recipientLabel) has the \(receipt.summary.asset.formattedWithCode(receipt.summary.amount, locale: locale)). Faster than a monkey on a vine.")
+                Text("\(receipt.summary.recipientLabel) has the \(receipt.summary.asset.formattedWithCode(receipt.summary.amount, locale: locale)). \(Text(ChimpyLines.pick(ChimpyLines.sentQuips, seed: seed / 7)))")
                     .chimpFont(.lead)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
@@ -265,6 +271,8 @@ struct SendSentView: View {
         .background {
             ChimpCardColor.leaf.fill
                 .overlay { ChimpPattern(opacity: 0.14) }
+                // Des bananes traversent l'écran, une fois, derrière le texte (rien avec « Réduire les animations »).
+                .overlay { ChimpBananaBurst() }
                 .ignoresSafeArea()
         }
     }

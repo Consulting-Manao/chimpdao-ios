@@ -55,6 +55,32 @@ enum ChimpMotion {
         static let duration: Double = 0.1
     }
 
+    /// Micro-animations (non spécifiées par la maquette, retour du call avec Pamphile du 2026-10-01).
+    enum Micro {
+        /// Montant qui défile.
+        static let roll = Animation.snappy(duration: 0.35)
+        /// Fondu qui remplace le mouvement quand « Réduire les animations » est activé.
+        static let fade: Double = 0.2
+        /// Apparition d'une ligne de liste : montée de 8 pt, 40 ms de décalage entre deux lignes.
+        static let cascade = Animation.spring(duration: 0.35, bounce: 0.2)
+        static let cascadeOffset: CGFloat = 8
+        static let cascadeStagger: Double = 0.04
+        /// « Pop » d'un badge ou d'une coche.
+        static let pop = Animation.spring(duration: 0.3, bounce: 0.45)
+        /// Appui sur une tuile : 96 %, puis rebond.
+        static let pressedScale: CGFloat = 0.96
+        static let bounce = Animation.spring(duration: 0.25, bounce: 0.5)
+    }
+
+    /// Bananes qui traversent l'écran de C9 (« Swoosh! »).
+    enum BananaBurst {
+        static let count = 12
+        /// Durée de la traversée.
+        static let duration: Double = 1.6
+        /// Les bananes partent les unes après les autres, sur 0,5 s.
+        static let spread: Double = 0.5
+    }
+
     /// Confirmation « Copied! » (D1, non spécifiée par la maquette) : durée d'affichage, puis retour à « Copy ».
     enum Copied {
         static let display: Duration = .seconds(2)

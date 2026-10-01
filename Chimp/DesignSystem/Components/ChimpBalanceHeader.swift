@@ -49,6 +49,7 @@ struct ChimpBalanceHeader: View {
                     .foregroundStyle(.chimpOnHeaderPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
+                    .chimpRollingNumber(total)
                     .padding(.top, ChimpSpacing.s)
                 if let change {
                     Text(change)

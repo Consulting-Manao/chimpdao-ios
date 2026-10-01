@@ -68,6 +68,7 @@ struct SettingsView: View {
                         ChimpSettingsControlRow(title: "Look") {
                             ChimpSegmentedPicker(segments: Self.lookSegments, selection: $model.look)
                         }
+                        soundsRow
                     }
                     .padding(.top, ChimpSpacing.s)
 
@@ -295,6 +296,24 @@ struct SettingsView: View {
         }
         .toggleStyle(ChimpToggleStyle())
         .disabled(lock.isAuthenticating)
+        .padding(.vertical, 11)
+        .padding(.horizontal, 15)
+        .frame(minHeight: ChimpSize.minimumTouchTarget)
+    }
+
+    /// « Sounds » : petits sons de l'app. Le bouton silencieux de l'iPhone les coupe aussi.
+    private var soundsRow: some View {
+        Toggle(isOn: $model.soundsEnabled) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Sounds")
+                    .chimpFont(.rowTitle)
+                    .foregroundStyle(.chimpTextPrimary)
+                Text("Muted when your iPhone is on silent")
+                    .chimpFont(.captionS)
+                    .foregroundStyle(.chimpTextSecondary)
+            }
+        }
+        .toggleStyle(ChimpToggleStyle())
         .padding(.vertical, 11)
         .padding(.horizontal, 15)
         .frame(minHeight: ChimpSize.minimumTouchTarget)

@@ -42,6 +42,20 @@ struct AddCardFlowView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: model.screen)
         .blocksSwipeBack(true)
+        // Sons : un tap réussi fait avancer le parcours ; carte ajoutée ; problème.
+        .onChange(of: model.screen) { old, new in
+            if let sound = Self.sound(from: old, to: new) { ChimpSoundPlayer.shared.play(sound) }
+        }
+        .chimpSound(.error, trigger: model.problem) { _, new in new != nil }
+    }
+
+    /// Le son d'un passage d'écran : après un tap réussi (lecture ou signature), la carte ajoutée.
+    static func sound(from old: AddCardModel.Screen, to new: AddCardModel.Screen) -> ChimpSound? {
+        switch (old, new) {
+        case (_, .done): .sent
+        case (.tapNew, .nameCard), (.findAccount, .confirm), (.confirm, .unlockCode), (.confirm, .member), (.member, .adding): .tap
+        default: nil
+        }
     }
 
     private func back() {
@@ -179,6 +193,7 @@ private struct NewCardReadyBadge: View {
         .padding(.vertical, ChimpSpacing.xs)
         .padding(.horizontal, ChimpSpacing.m)
         .background(Capsule().fill(Color(.chimpHeaderShade)))
+        .chimpPopIn()
         .accessibilityElement(children: .combine)
     }
 }

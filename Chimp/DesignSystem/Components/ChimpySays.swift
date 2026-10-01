@@ -24,8 +24,19 @@ enum ChimpyPose: String, CaseIterable, Identifiable {
 /// Bulle de Chimpy (« Chimpy Says ») : Chimpy explique une règle au moment où elle compte.
 /// L'image est décorative ; VoiceOver lit « Chimpy » puis le texte.
 struct ChimpySays: View {
-    let text: LocalizedStringKey
+    private let text: Text
     var pose: ChimpyPose = .crawl
+
+    init(text: LocalizedStringKey, pose: ChimpyPose = .crawl) {
+        self.text = Text(text)
+        self.pose = pose
+    }
+
+    /// Texte tiré d'une liste (`ChimpyLines`) : une ressource du String Catalog.
+    init(line: LocalizedStringResource, pose: ChimpyPose = .crawl) {
+        self.text = Text(line)
+        self.pose = pose
+    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: ChimpSpacing.s) {
@@ -52,7 +63,7 @@ struct ChimpySays: View {
                 .chimpFont(.labelS)
                 .textCase(.uppercase)
                 .foregroundStyle(.chimpTextSecondary)
-            Text(text)
+            text
                 .chimpFont(.bodyS)
                 .lineSpacing(4)
                 .foregroundStyle(.chimpTextPrimary)

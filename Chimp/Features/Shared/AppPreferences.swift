@@ -40,10 +40,16 @@ final class AppPreferences {
         didSet { store.set(currency.rawValue, for: .currency) }
     }
 
+    /// Petits sons (tap réussi, envoi réussi, erreur) : activés par défaut ; le bouton silencieux de l'iPhone les coupe aussi.
+    var soundsEnabled: Bool {
+        didSet { store.set(soundsEnabled ? nil : "off", for: .sounds) }
+    }
+
     init(store: PreferencesStore) {
         self.store = store
         look = store.string(for: .look).flatMap(ChimpLook.init(rawValue:)) ?? .auto
         currency = store.string(for: .currency).flatMap(DisplayCurrency.init(rawValue:)) ?? .usd
+        soundsEnabled = store.string(for: .sounds) != "off"
     }
 
     /// Préférences gardées dans `UserDefaults` (l'app) ; en mémoire pour les tests et le catalogue.
@@ -55,6 +61,7 @@ final class AppPreferences {
     func reset() {
         look = .auto
         currency = .usd
+        soundsEnabled = true
         // Après les valeurs par défaut (leur `didSet` les écrit) : rien ne reste dans le stockage.
         store.removeAll()
     }
@@ -64,6 +71,7 @@ final class AppPreferences {
 enum PreferenceKey: String, CaseIterable {
     case look = "chimp.look"
     case currency = "chimp.currency"
+    case sounds = "chimp.sounds"
 }
 
 /// Lecture et écriture des préférences. Implémenté par `UserDefaultsPreferencesStore` et `InMemoryPreferencesStore`.

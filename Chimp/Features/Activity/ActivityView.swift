@@ -94,6 +94,8 @@ struct ActivityContent: View {
     var onPending: () -> Void = {}
 
     private var shownFilter: ActivityViewModel.Filter { filter ?? model.filter }
+    /// Textes de chargement et d'état vide tirés au hasard (`ChimpyLines`).
+    @State private var seed = ChimpyLines.seed()
 
     var body: some View { content }
 
@@ -112,10 +114,15 @@ struct ActivityContent: View {
                     }
                 }
                 if model.isEmpty(for: shownFilter) {
-                    ChimpySays(text: emptyText, pose: .banana)
+                    if case .drawer = shownFilter {
+                        ChimpySays(text: "Nothing moved here yet.", pose: .banana)
+                    } else {
+                        ChimpySays(line: ChimpyLines.pick(ChimpyLines.empty, seed: seed), pose: .banana)
+                    }
                 }
                 ForEach(Array(model.tickets(for: shownFilter).enumerated()), id: \.element.id) { index, ticket in
                     ticketView(ticket, tilt: index.isMultiple(of: 2) ? -0.6 : 0.5)
+                        .chimpCascadeAppear(index: index)
                 }
                 if model.isSyncing {
                     HStack(spacing: ChimpSpacing.s) {
@@ -138,10 +145,6 @@ struct ActivityContent: View {
         }
     }
 
-    private var emptyText: LocalizedStringKey {
-        if case .drawer = shownFilter { return "Nothing moved here yet." }
-        return "Nothing here yet. Payments, moves and new cards will show up here."
-    }
 
     private func ticketView(_ ticket: ActivityTicket, tilt: Double) -> some View {
         ChimpTicket(
@@ -185,7 +188,7 @@ struct ActivityContent: View {
             .accessibilityHidden(true)
             HStack(spacing: ChimpSpacing.s) {
                 ProgressView()
-                Text("Reading the last 7 days on Stellar…")
+                Text(ChimpyLines.pick(ChimpyLines.loading, seed: seed))
                     .chimpFont(.caption)
                     .foregroundStyle(.chimpTextSecondary)
             }

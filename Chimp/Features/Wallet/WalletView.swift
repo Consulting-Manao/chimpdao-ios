@@ -118,6 +118,7 @@ struct WalletView: View {
             ) {
                 if model.content != nil { onOpenDrawer(.main) }
             }
+            .chimpCascadeAppear(index: 0)
             .padding(.top, ChimpSpacing.l)
 
             HStack(alignment: .firstTextBaseline) {
@@ -154,14 +155,15 @@ struct WalletView: View {
                 columns: [GridItem(.flexible(), spacing: ChimpSpacing.m), GridItem(.flexible(), spacing: ChimpSpacing.m)],
                 spacing: ChimpSpacing.m
             ) {
-                ForEach(cards) { card in
+                ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                     Button {
                         if model.content != nil { onOpenDrawer(.card(card.id)) }
                     } label: {
                         // Montants par actif (« 12.5 XLM · 100 USDC ») : « on card » laisse la place au montant.
                         ChimpCard(name: card.name, color: card.color, number: card.number, amount: card.amount, subtitle: perAsset ? nil : "on card")
                     }
-                    .buttonStyle(ChimpPressableStyle())
+                    .buttonStyle(ChimpBouncyPressStyle())
+                    .chimpCascadeAppear(index: index + 1)
                 }
             }
         }
