@@ -46,15 +46,25 @@ struct AddCardFlowView: View {
         .onChange(of: model.screen) { old, new in
             if let sound = Self.sound(from: old, to: new) { ChimpSoundPlayer.shared.play(sound) }
         }
-        .chimpSound(.error, trigger: model.problem) { _, new in new != nil }
+        .onChange(of: model.problem) { _, new in
+            if let new { ChimpSoundPlayer.shared.play(Self.sound(for: new.kind)) }
+        }
     }
 
-    /// Le son d'un passage d'écran : après un tap réussi (lecture ou signature), la carte ajoutée.
+    /// Le son d'un passage d'écran : après un tap réussi (lecture ou signature) et la carte ajoutée.
     static func sound(from old: AddCardModel.Screen, to new: AddCardModel.Screen) -> ChimpSound? {
         switch (old, new) {
-        case (_, .done): .sent
-        case (.tapNew, .nameCard), (.findAccount, .confirm), (.confirm, .unlockCode), (.confirm, .member), (.member, .adding): .tap
+        case (_, .done), (.tapNew, .nameCard), (.findAccount, .confirm), (.confirm, .unlockCode), (.confirm, .member), (.member, .adding):
+            .confirmation
         default: nil
+        }
+    }
+
+    /// Mauvaise carte tapée (hurt) ou souci technique (error).
+    static func sound(for problem: AddCardProblem.Kind) -> ChimpSound {
+        switch problem {
+        case .isTheNewCard, .notTheChosenCard, .notAMember, .alreadyInAccount, .otherAccount, .notAChimpCard: .hurt
+        case .card, .network: .error
         }
     }
 

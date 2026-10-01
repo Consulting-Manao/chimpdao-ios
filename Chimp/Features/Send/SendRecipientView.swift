@@ -63,6 +63,7 @@ struct SendRecipientView: View {
             .background(Color(.chimpBackground))
         }
         .task { await model.loadIfNeeded() }
+        .chimpSound(.error, trigger: model.scanIssue) { _, new in new != nil }
         .fullScreenCover(isPresented: $model.isScannerPresented) {
             QRScannerScreen(onCode: model.scanned) { model.isScannerPresented = false }
         }

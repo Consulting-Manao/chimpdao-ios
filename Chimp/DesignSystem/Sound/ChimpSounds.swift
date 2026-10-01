@@ -1,20 +1,34 @@
 import AVFoundation
 import SwiftUI
 
-/// Les trois petits sons de l'app (retour du call avec Pamphile, 2026-10-01).
+/// Les sons de l'app (retour du call avec Pamphile, 2026-10-01 ; répartition de Barth). Tous de Kenney (CC0), choisis
+/// pour ressembler au plus près aux sons Artlist que Barth avait sélectionnés (timbre, attaque, durée, volume).
 enum ChimpSound: String, CaseIterable {
-    /// Une carte a bien été lue ou a signé (et un code QR lu).
+    /// Touche du pavé du montant : huit variantes, tirées au hasard, jamais deux fois la même de suite.
     case tap
-    /// Un envoi ou un Move est arrivé (C9).
-    case sent
-    /// Quelque chose n'a pas marché (PIN faux, carte refusée, envoi raté).
+    /// Ça a marché : la carte a signé ou a été lue, un QR lu, une étape franchie.
+    case confirmation
+    /// L'argent a bougé : envoi ou Move confirmé (C9).
+    case money
+    /// Ça fait mal : mauvaise carte, PIN faux.
+    case hurt
+    /// Un souci technique : réseau, lecture NFC ratée, code refusé, rien n'est parti.
     case error
+    /// Pour rire : « Sounds » activé dans les réglages.
+    case wood
 
-    /// Fichier du paquet de l'app (`Resources/Sounds/<nom>.caf`). Absent : pas de son, sans erreur.
-    var url: URL? { Bundle.main.url(forResource: rawValue, withExtension: "caf") }
+    /// Fichiers du paquet de l'app (`Resources/Sounds/<nom>.caf`).
+    var fileNames: [String] {
+        self == .tap ? (1...8).map { "tap\($0)" } : [rawValue]
+    }
+
+    /// Absents : pas de son, sans erreur.
+    var urls: [URL] {
+        fileNames.compactMap { Bundle.main.url(forResource: $0, withExtension: "caf") }
+    }
 }
 
-/// Joue les sons de l'app.
+/// Joue les sons de l'app. Leurs volumes relatifs sont dans les fichiers (alignés sur les sons de référence de Barth).
 ///
 /// - **Bouton silencieux de l'iPhone** respecté : catégorie audio `.ambient` (se tait en mode silencieux, ne coupe pas la
 ///   musique de l'utilisateur, s'y mélange).
@@ -27,16 +41,26 @@ final class ChimpSoundPlayer {
     /// Réglage « Sounds ». Par défaut : activé.
     var isEnabled: () -> Bool = { true }
 
-    private var players: [ChimpSound: AVAudioPlayer] = [:]
+    private var players: [String: AVAudioPlayer] = [:]
+    private var lastTap: String?
     private var isSessionReady = false
     private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     func play(_ sound: ChimpSound) {
         guard isEnabled(), !isRunningTests else { return }
         prepareSession()
-        guard let player = player(for: sound) else { return }
+        guard let name = Self.variant(of: sound, after: lastTap), let player = player(named: name) else { return }
+        if sound == .tap { lastTap = name }
         player.currentTime = 0
         player.play()
+    }
+
+    /// Le fichier à jouer : pour les touches, une variante au hasard, différente de la précédente. Le choix ne dépend
+    /// jamais de la touche tapée (aucune information sur ce qui est saisi).
+    static func variant(of sound: ChimpSound, after last: String?) -> String? {
+        let names = sound.fileNames
+        guard names.count > 1 else { return names.first }
+        return names.filter { $0 != last }.randomElement()
     }
 
     private func prepareSession() {
@@ -46,13 +70,15 @@ final class ChimpSoundPlayer {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
     }
 
-    private func player(for sound: ChimpSound) -> AVAudioPlayer? {
-        if let player = players[sound] { return player }
-        guard let url = sound.url, let player = try? AVAudioPlayer(contentsOf: url) else { return nil }
-        // Discrets : sous le volume des autres sons de l'iPhone.
-        player.volume = 0.6
+    private func player(named name: String) -> AVAudioPlayer? {
+        if let player = players[name] { return player }
+        guard let url = Bundle.main.url(forResource: name, withExtension: "caf"),
+              let player = try? AVAudioPlayer(contentsOf: url)
+        else { return nil }
+        // Discrets : sous le volume des autres sons de l'iPhone (l'équilibre entre les sons est dans les fichiers).
+        player.volume = 0.7
         player.prepareToPlay()
-        players[sound] = player
+        players[name] = player
         return player
     }
 }

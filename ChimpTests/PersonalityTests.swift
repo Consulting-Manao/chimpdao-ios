@@ -18,22 +18,46 @@ struct PersonalityTests {
         #expect(store.values.isEmpty)
     }
 
+    @Test("Tous les sons sont dans l'app (.caf), avec la licence de leurs packs")
+    func soundFiles() {
+        for sound in ChimpSound.allCases {
+            #expect(sound.urls.count == sound.fileNames.count, "\(sound.rawValue)")
+        }
+        #expect(ChimpSound.tap.fileNames.count == 8)
+        #expect(ThirdPartyLicense.all.first { $0.id == "kenney-sounds" }?.text()?.contains("Creative Commons Zero") == true)
+    }
+
+    @Test("Touches : une variante au hasard, jamais deux fois la même de suite ; les autres sons : un seul fichier")
+    @MainActor func tapVariants() {
+        var last: String?
+        for _ in 0..<200 {
+            let next = ChimpSoundPlayer.variant(of: .tap, after: last)
+            #expect(next != nil && next != last)
+            last = next
+        }
+        #expect(ChimpSoundPlayer.variant(of: .money, after: "money") == "money")
+    }
+
     @Test("Sons du parcours Envoyer : la carte signe (tap), l'argent arrive (sent), rien n'est parti ou mauvaise carte (error)")
     func signingSounds() {
-        #expect(SigningStage.sending(.checking).sound == .tap)
+        #expect(SigningStage.sending(.checking).sound == .confirmation)
         #expect(SigningStage.finished(.nothingSent).sound == .error)
         #expect(SigningStage.finished(.waiting(until: .now)).sound == .error)
+        #expect(SigningStage.wrongCard(WrongCard(reason: .notYours, tapped: nil, needed: nil), retry: .tapToSign).sound == .hurt)
         #expect(SigningStage.finished(.notConfirmed).sound == nil, "Envoyé, pas encore confirmé : ni victoire ni erreur")
         #expect(SigningStage.idle.sound == nil)
         #expect(SigningStage.enteringPin.sound == nil)
     }
 
-    @Test("Sons de l'ajout de carte : un tap réussi fait avancer, la carte ajoutée, jamais en reculant")
+    @Test("Sons de l'ajout de carte : un tap réussi fait avancer, la carte ajoutée, jamais en reculant ; mauvaise carte ou souci")
     func addCardSounds() {
-        #expect(AddCardFlowView.sound(from: .tapNew, to: .nameCard) == .tap)
-        #expect(AddCardFlowView.sound(from: .confirm, to: .unlockCode) == .tap)
-        #expect(AddCardFlowView.sound(from: .member, to: .adding) == .tap)
-        #expect(AddCardFlowView.sound(from: .adding, to: .done) == .sent)
+        #expect(AddCardFlowView.sound(from: .tapNew, to: .nameCard) == .confirmation)
+        #expect(AddCardFlowView.sound(from: .confirm, to: .unlockCode) == .confirmation)
+        #expect(AddCardFlowView.sound(from: .member, to: .adding) == .confirmation)
+        #expect(AddCardFlowView.sound(from: .adding, to: .done) == .confirmation)
+        #expect(AddCardFlowView.sound(for: .isTheNewCard) == .hurt)
+        #expect(AddCardFlowView.sound(for: .notTheChosenCard("Jungle")) == .hurt)
+        #expect(AddCardFlowView.sound(for: .network) == .error)
         #expect(AddCardFlowView.sound(from: .nameCard, to: .tapNew) == nil)
         #expect(AddCardFlowView.sound(from: .nameCard, to: .pin) == nil)
     }

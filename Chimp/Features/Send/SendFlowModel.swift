@@ -886,13 +886,14 @@ enum SigningStep: Equatable {
 
 /// Où en est la signature.
 enum SigningStage: Equatable {
-    /// Son à jouer en arrivant sur cette étape (`chimpSound`) : la carte vient de signer, l'envoi est arrivé, ou rien
-    /// n'est parti / mauvaise carte.
+    /// Son à jouer en arrivant sur cette étape : la carte vient de signer (confirmation), l'argent est arrivé (money),
+    /// mauvaise carte (hurt), rien n'est parti (error).
     var sound: ChimpSound? {
         switch self {
-        case .sending: .tap
-        case .finished(.sent): .sent
-        case .finished(.nothingSent), .finished(.waiting), .wrongCard: .error
+        case .sending: .confirmation
+        case .finished(.sent): .money
+        case .wrongCard: .hurt
+        case .finished(.nothingSent), .finished(.waiting): .error
         default: nil
         }
     }

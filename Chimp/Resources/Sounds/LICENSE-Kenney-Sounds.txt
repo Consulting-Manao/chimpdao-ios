@@ -1,0 +1,32 @@
+ChimpDAO sounds
+
+tap1 to tap8: wood impacts from "Impact Sounds" by Kenney (www.kenney.nl), Creative Commons Zero (CC0 1.0),
+https://creativecommons.org/publicdomain/zero/1.0/ . Files used: impactWood_light_000, impactWood_light_002,
+impactWood_medium_002, impactWood_medium_004, impactPlank_medium_000, impactPlank_medium_003 (trimmed, sped up, level-matched).
+
+confirmation, money, hurt, error, wood: made for ChimpDAO (synthesized marimba, wood block, coconut and shaker).
+
+==================================================
+	
+
+	Impact Sounds (1.0)
+
+	Created/distributed by Kenney (www.kenney.nl)
+	Creation date: 19-12-2019
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	This content is free to use in personal, educational and commercial projects.
+	Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
+
+			------------------------------
+
+	Donate:   http://support.kenney.nl
+	Request:  http://request.kenney.nl
+	Patreon:  http://patreon.com/kenney/
+
+	Follow on Twitter for updates:
+	http://twitter.com/KenneyNL

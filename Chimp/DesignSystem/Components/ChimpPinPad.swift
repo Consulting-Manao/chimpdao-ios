@@ -93,7 +93,8 @@ struct ChimpPinPad<Middle: View>: View {
             }
         }
         .sensoryFeedback(.error, trigger: shakeTrigger)
-        .chimpSound(.error, trigger: shakeTrigger)
+        // PIN faux ou différent à la confirmation : ça fait mal. Aucun son sur les touches du PIN (rien à entendre).
+        .chimpSound(.hurt, trigger: shakeTrigger)
     }
 
     @ViewBuilder

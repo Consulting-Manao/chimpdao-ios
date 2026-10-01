@@ -57,7 +57,7 @@ struct QRScannerScreen: View {
             }
         }
         .sensoryFeedback(.success, trigger: detected)
-        .chimpSound(.tap, trigger: detected) { _, new in new }
+        .chimpSound(.confirmation, trigger: detected) { _, new in new }
         .task { access = await Self.requestAccess() }
     }
 

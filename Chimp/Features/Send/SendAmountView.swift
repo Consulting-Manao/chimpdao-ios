@@ -155,7 +155,11 @@ struct SendAmountView: View {
     }
 
     private func keypad(isCompact: Bool) -> some View {
-        ChimpKeypad(mode: .amount, isCompact: isCompact) { model.press($0) }
+        ChimpKeypad(mode: .amount, isCompact: isCompact) { key in
+            // Une des huit touches sonores, au hasard (`ChimpSound.tap`).
+            ChimpSoundPlayer.shared.play(.tap)
+            model.press(key)
+        }
             .padding(.horizontal, ChimpSpacing.lg)
     }
 

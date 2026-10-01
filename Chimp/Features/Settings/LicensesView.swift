@@ -12,7 +12,7 @@ struct ThirdPartyLicense: Identifiable, Hashable {
     /// Nom du fichier texte dans le paquet (sans l'extension `.txt`).
     let file: String
 
-    /// Tout ce que l'app embarque : la seule dépendance (le SDK Stellar) et les trois polices.
+    /// Tout ce que l'app embarque : la seule dépendance (le SDK Stellar), les trois polices et les sons.
     static let all: [ThirdPartyLicense] = [
         ThirdPartyLicense(id: "stellar-sdk", name: "stellar-ios-mac-sdk", detail: "Stellar SDK by Soneso",
                           license: "Apache License 2.0", file: "LICENSE-stellar-ios-mac-sdk"),
@@ -22,6 +22,10 @@ struct ThirdPartyLicense: Identifiable, Hashable {
                           license: "SIL Open Font License 1.1", file: "OFL-Nunito"),
         ThirdPartyLicense(id: "space-mono", name: "Space Mono", detail: "Font by Google and Colophon Foundry",
                           license: "SIL Open Font License 1.1", file: "OFL-SpaceMono"),
+        // Sons de l'app : taps en bois de Kenney « Impact Sounds » (CC0, licence du pack recopiée telle quelle) ; les autres
+        // sons sont faits pour ChimpDAO (synthèse).
+        ThirdPartyLicense(id: "kenney-sounds", name: "Sound effects", detail: "Wood taps by Kenney (kenney.nl)",
+                          license: "Creative Commons Zero (CC0)", file: "LICENSE-Kenney-Sounds"),
     ]
 
     /// Texte de la licence, `nil` si le fichier manque au paquet.
