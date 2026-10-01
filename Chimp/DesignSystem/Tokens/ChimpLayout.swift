@@ -79,8 +79,6 @@ enum ChimpRadius {
     static let sheet: CGFloat = 34
     /// Carte blanche du QR code (D1).
     static let qrCard: CGFloat = 24
-    /// Carré jaune au centre du QR code.
-    static let qrBadge: CGFloat = 8
     // Pilules (chips, « + Add », interrupteur) : utiliser `Capsule()`.
 }
 
@@ -179,6 +177,8 @@ enum ChimpSize {
     static let qrCode: CGFloat = 200
     /// Part du côté du QR code couverte par la tête de Chimpy (5 modules sur 25 dans la maquette).
     static let qrBadgeFraction: CGFloat = 0.2
+    /// Hauteur / largeur de la tête de Chimpy seule (`ChimpyHead`, 214 × 167 px) : la zone blanche suit ses proportions.
+    static let qrHeadAspect: CGFloat = 167.0 / 214.0
     /// Icône d'un tiroir dans le sélecteur « INTO » (D1).
     static let drawerPickerIcon: CGFloat = 22
     /// Icône d'un tiroir dans une ligne de choix (C3), contour compris.

@@ -66,7 +66,9 @@ nonisolated struct ChimpQRMatrix: Equatable {
 }
 
 /// QR code de la maquette D1 : modules sombres sur une carte blanche (dans les deux thèmes,
-/// pour que les scanners le lisent bien), tête de Chimpy sur un carré jaune au centre.
+/// pour que les scanners le lisent bien), **tête de Chimpy seule** au centre (décision de Barth du 2026-10-01 : sans le
+/// carré jaune). La tête (`ChimpyHead`, détourée de `tile-head`) est posée sur une petite zone blanche sans modules,
+/// alignée sur la grille ; la correction d'erreur H couvre cette zone (vérifié par décodage, `QRCodeTests`).
 ///
 /// Sans message (`nil`) : la carte vide avec une roue d'attente (chargement).
 struct ChimpQRCode: View {
@@ -117,6 +119,9 @@ struct ChimpQRCode: View {
         // Nombre impair de modules pour que la tête de Chimpy tombe pile au centre du code.
         var badgeModules = Int((CGFloat(matrix.count) * ChimpSize.qrBadgeFraction).rounded())
         if badgeModules % 2 == 0 { badgeModules += 1 }
+        // La tête est plus large que haute : la zone blanche suit ses proportions (moins de modules cachés).
+        var clearRows = Int((CGFloat(badgeModules) * ChimpSize.qrHeadAspect).rounded())
+        if clearRows % 2 == 0 { clearRows += 1 }
 
         return ZStack {
             Canvas { context, _ in
@@ -135,12 +140,16 @@ struct ChimpQRCode: View {
             }
             .frame(width: symbolSide, height: symbolSide)
 
-            Image(.tileHead)
+            Rectangle()
+                .fill(Color(.chimpQRBackground))
+                .frame(width: CGFloat(badgeModules) * moduleSide, height: CGFloat(clearRows) * moduleSide)
+            Image(.chimpyHead)
+                .interpolation(.none)
                 .resizable()
                 .scaledToFit()
-                .padding(CGFloat(badgeModules) * moduleSide * 0.11)
-                .frame(width: CGFloat(badgeModules) * moduleSide, height: CGFloat(badgeModules) * moduleSide)
-                .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.qrBadge), fill: Color(.chimpAccent))
+                // Une demi-marge de module autour de la tête : elle ne touche jamais un module.
+                .padding(moduleSide / 2)
+                .frame(width: CGFloat(badgeModules) * moduleSide, height: CGFloat(clearRows) * moduleSide)
         }
         .accessibilityElement()
         .accessibilityLabel(Text("QR code"))
