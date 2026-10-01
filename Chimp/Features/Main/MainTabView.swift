@@ -16,8 +16,8 @@ struct MainTabView: View {
     @State private var activityModel: ActivityViewModel
     /// Écran d'état d'un paiement en attente, ouvert depuis l'Activity.
     @State private var isShowingPendingSend = false
-    /// « Pay again » depuis un reçu de l'Activity : Envoyer avec cette adresse collée en C1.
-    @State private var payAgainAddress: String?
+    /// « Pay again » ou « Send back » depuis un reçu de l'Activity : Envoyer prérempli.
+    @State private var prefilledSend: SendPrefill?
     #if DESIGN_CATALOG
     @State private var isShowingCatalog = false
     #endif
@@ -56,9 +56,9 @@ struct MainTabView: View {
                         case .move(let drawerID):
                             // E1 : le même parcours, entre ses propres tiroirs (testnet).
                             SendFlowRoot(service: ChainSendService(session: session), kind: .move, fromDrawerID: drawerID, onExit: closeFlow)
-                        case .payAgain(let address):
-                            // « Pay again » d'un reçu ouvert depuis la page d'un tiroir.
-                            SendFlowRoot(service: ChainSendService(session: session), prefilledAddress: address, onExit: closeFlow)
+                        case .prefilledSend(let prefill):
+                            // « Pay again » ou « Send back » d'un reçu ouvert depuis la page d'un tiroir.
+                            SendFlowRoot(service: ChainSendService(session: session), prefill: prefill, onExit: closeFlow)
                         case .pendingSend:
                             // Envoyer rouvre l'état du paiement en attente (« Check again »), jamais un nouvel envoi.
                             SendFlowRoot(service: ChainSendService(session: session), onExit: closeFlow)
@@ -110,7 +110,7 @@ struct MainTabView: View {
             }
         case .activity:
             NavigationStack {
-                ActivityView(model: activityModel, onPending: { isShowingPendingSend = true }, onPayAgain: { payAgainAddress = $0 })
+                ActivityView(model: activityModel, onPending: { isShowingPendingSend = true }, onSendPrefilled: { prefilledSend = $0 })
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
                     .navigationDestination(isPresented: $isShowingPendingSend) {
@@ -120,9 +120,9 @@ struct MainTabView: View {
                             Task { await activityModel.refresh() }
                         }
                     }
-                    .navigationDestination(item: $payAgainAddress) { address in
-                        SendFlowRoot(service: ChainSendService(session: session), prefilledAddress: address) {
-                            payAgainAddress = nil
+                    .navigationDestination(item: $prefilledSend) { prefill in
+                        SendFlowRoot(service: ChainSendService(session: session), prefill: prefill) {
+                            prefilledSend = nil
                             Task { await activityModel.refresh() }
                         }
                     }
@@ -171,7 +171,7 @@ struct MainTabView: View {
             onSend: { walletPath.append(.send($0)) },
             onReceive: { walletPath.append(.receive($0)) },
             onMove: { walletPath.append(.move($0)) },
-            onPayAgain: { walletPath.append(.payAgain($0)) },
+            onSendPrefilled: { walletPath.append(.prefilledSend($0)) },
             onPending: { walletPath.append(.pendingSend) },
             onAllActivity: { address in
                 activityModel.filter = .drawer(address)
@@ -206,7 +206,8 @@ enum WalletRoute: Hashable {
     case send(String?)
     /// Move, depuis un tiroir choisi d'avance ou depuis Main.
     case move(String?)
-    case payAgain(String)
+    /// « Pay again » ou « Send back » d'un reçu.
+    case prefilledSend(SendPrefill)
     case pendingSend
     case settings
     case addCard

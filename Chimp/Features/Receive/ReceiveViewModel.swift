@@ -133,6 +133,28 @@ final class ReceiveViewModel {
         isCopied = false
     }
 
+    // MARK: Partage
+
+    /// Message de « Share my address » pour le tiroir choisi.
+    var shareText: String? {
+        selectedDrawer.map { Self.shareText(address: $0.address, drawerTitle: $0.icon == .main ? nil : $0.title, network: network) }
+    }
+
+    /// Texte validé par Barth le 2026-10-01 : l'adresse **complète**, les actifs acceptés, et sur testnet l'avertissement
+    /// sur le réseau. `drawerTitle` : wallet d'une carte (`nil` pour Main).
+    static func shareText(address: String, drawerTitle: String?, network: StellarNetwork) -> String {
+        let intro = if let drawerTitle {
+            String(localized: "Send me money on \(drawerTitle) (\(network.displayName)):")
+        } else {
+            String(localized: "Send me money on \(network.displayName):")
+        }
+        var lines = [intro, address, "", String(localized: "Accepted: XLM and USDC.")]
+        if network != .mainnet {
+            lines.append(String(localized: "⚠️ \(network.displayName) only. Money sent from another network will be lost."))
+        }
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: Formatage
 
     private static func format(_ drawer: ReceiveDrawer) -> DrawerContent {

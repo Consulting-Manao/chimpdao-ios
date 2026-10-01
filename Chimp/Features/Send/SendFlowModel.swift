@@ -44,7 +44,12 @@ final class SendFlowModel {
 
     /// Texte du champ d'adresse (C1), tel que tapé ou collé.
     var addressText = "" {
-        didSet { if addressText != oldValue { chosenContact = nil } }
+        didSet {
+            if addressText != oldValue {
+                chosenContact = nil
+                scanIssue = nil
+            }
+        }
     }
     /// Memo ID facultatif, seulement pour une adresse G (C1).
     var memoText = ""
@@ -207,6 +212,48 @@ final class SendFlowModel {
 
     func pasteAddress(_ text: String) {
         addressText = StellarAddressParser.clean(text)
+    }
+
+    /// Préremplissage : « Pay again », « Send back » (reçus) ou code QR scanné. Adresse et memo ID en C1, actif et
+    /// montant pour C2 ; un montant que le pavé ne sait pas taper exactement est ignoré (jamais arrondi).
+    func apply(_ prefill: SendPrefill) {
+        pasteAddress(prefill.address)
+        memoText = prefill.memoID.map(String.init) ?? ""
+        if let prefilledAsset = prefill.asset { select(asset: prefilledAsset) }
+        if let value = prefill.amount, value > 0, value == value.truncated(to: asset.maxFractionDigits) {
+            setAmount(value)
+        }
+        prefillOrigin = prefill.origin
+        prefilledAddress = addressText
+    }
+
+    /// D'où vient le préremplissage, tant que l'adresse n'a pas été changée.
+    private var prefillOrigin: SendPrefill.Origin?
+    private var prefilledAddress: String?
+
+    /// « Send back » d'un paiement reçu, adresse inchangée : Chimpy prévient en C1 qu'un exchange peut ne pas le reconnaître.
+    var isSendingBack: Bool { prefillOrigin == .sendBack && addressText == prefilledAddress }
+
+    // MARK: C1 · Code QR
+
+    /// Écran de la caméra (C1 « Scan QR »).
+    var isScannerPresented = false
+    /// Dernier code refusé, affiché sous le champ jusqu'à ce que l'adresse change.
+    private(set) var scanIssue: ScanIssue?
+    /// Réseau et USDC attendus d'un lien de paiement : le testnet de `Config/` (seul réseau de l'app pour l'instant).
+    var scanRules = ScanRules(config: .testnet)
+
+    /// Code lu par la caméra : une adresse (ou un lien SEP-7) remplit C1, et C2 pour l'actif et le montant ; sinon, la
+    /// raison du refus. Rien n'est envoyé : C2 et C4 restent à passer.
+    func scanned(_ payload: String) {
+        isScannerPresented = false
+        switch ScannedCodeParser.parse(payload, rules: scanRules) {
+        case .success(let prefill):
+            apply(prefill)
+            scanIssue = nil
+        case .failure(let issue):
+            scanIssue = issue
+        }
     }
 
     func choose(_ contact: SendContact) {
@@ -698,6 +745,30 @@ final class SendFlowModel {
     func finish() {
         waitTask?.cancel()
         onExit?()
+    }
+
+    // MARK: « Pay again » depuis le reçu de C9
+
+    /// Envoi refait depuis le reçu : la coque repart d'un parcours neuf, prérempli (`SendFlowRoot`).
+    var onSendAgain: ((SendPrefill) -> Void)?
+
+    /// Ce que « Pay again » préremplit après un envoi réussi : la même adresse (le memo ID est dans l'adresse M),
+    /// le même actif, le même montant. Jamais pour un Move.
+    var sendAgainPrefill: SendPrefill? {
+        guard !isMove, case .finished(.sent(let receipt)) = signingStage else { return nil }
+        let summary = receipt.summary
+        return SendPrefill(address: summary.recipientAddress, asset: summary.asset, amount: summary.amount, origin: .payAgain)
+    }
+
+    /// Ferme le reçu, puis repart d'un parcours neuf prérempli (C1, C2 et C4 à refaire).
+    func sendAgain() {
+        guard let prefill = sendAgainPrefill else { return }
+        isReceiptPresented = false
+        Task { @MainActor [weak self] in
+            // Laisse la feuille se fermer avant de remplacer le parcours.
+            try? await Task.sleep(for: .milliseconds(350))
+            self?.onSendAgain?(prefill)
+        }
     }
 
     // MARK: Messages

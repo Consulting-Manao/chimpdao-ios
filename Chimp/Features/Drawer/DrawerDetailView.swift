@@ -55,7 +55,7 @@ struct DrawerDetailView: View {
         }
         .background(Color(.chimpBackground))
         .task { await activity.refresh() }
-        .activityReceiptSheet(model: activity, onPayAgain: actions.onPayAgain)
+        .activityReceiptSheet(model: activity, onSendPrefilled: actions.onSendPrefilled)
         .chimpSheet(isPresented: Binding(get: { lastCardMode != nil }, set: { if !$0 { lastCardMode = nil } }), height: 560, fitsContent: true) {
             if let mode = lastCardMode {
                 LastCardSheet(mode: mode, name: model.cardName, onAddCard: {
@@ -271,8 +271,8 @@ struct DrawerDetailActions {
     var onReceive: (String) -> Void = { _ in }
     /// Move, depuis ce tiroir.
     var onMove: (String) -> Void = { _ in }
-    /// « Pay again » d'un reçu.
-    var onPayAgain: (String) -> Void = { _ in }
+    /// « Pay again » ou « Send back » d'un reçu.
+    var onSendPrefilled: (SendPrefill) -> Void = { _ in }
     /// Paiement en attente touché dans l'historique.
     var onPending: () -> Void = {}
     /// « All activity » (B2r) : l'onglet Activity, filtré sur ce tiroir (adresse).

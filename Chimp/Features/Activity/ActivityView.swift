@@ -9,8 +9,8 @@ struct ActivityView: View {
     @Bindable var model: ActivityViewModel
     /// Paiement en attente touché : la coque ouvre l'écran d'état d'Envoyer.
     var onPending: () -> Void = {}
-    /// « Pay again » du reçu : la coque ouvre Envoyer avec cette adresse collée en C1.
-    var onPayAgain: (String) -> Void = { _ in }
+    /// « Pay again » ou « Send back » du reçu : la coque ouvre Envoyer prérempli.
+    var onSendPrefilled: (SendPrefill) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +26,7 @@ struct ActivityView: View {
         }
         .background(Color(.chimpBackground))
         .task { await model.refresh() }
-        .activityReceiptSheet(model: model, onPayAgain: onPayAgain)
+        .activityReceiptSheet(model: model, onSendPrefilled: onSendPrefilled)
     }
 
     // MARK: Filtres
@@ -52,21 +52,21 @@ struct ActivityView: View {
 /// Reçu d'une ligne touchée (I1.1d), partagé par l'onglet Activity et l'historique d'un tiroir (B2, B3).
 private struct ActivityReceiptSheetModifier: ViewModifier {
     @Bindable var model: ActivityViewModel
-    let onPayAgain: (String) -> Void
-    /// Adresse choisie dans le reçu : Envoyer s'ouvre une fois la feuille refermée.
-    @State private var payAgainAddress: String?
+    let onSendPrefilled: (SendPrefill) -> Void
+    /// Envoi choisi dans le reçu : Envoyer s'ouvre une fois la feuille refermée.
+    @State private var chosenSend: SendPrefill?
 
     func body(content: Content) -> some View {
         content
             .chimpSheet(isPresented: isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true, onDismiss: {
-                if let address = payAgainAddress {
-                    payAgainAddress = nil
-                    onPayAgain(address)
+                if let prefill = chosenSend {
+                    chosenSend = nil
+                    onSendPrefilled(prefill)
                 }
             }) {
                 if let record = model.selectedRecord, let receipt = model.receipt(for: record) {
-                    ActivityReceiptSheet(receipt: receipt, model: model) { address in
-                        payAgainAddress = address
+                    ActivityReceiptSheet(receipt: receipt, model: model) { prefill in
+                        chosenSend = prefill
                         model.selectedRecord = nil
                     }
                 }
@@ -79,9 +79,10 @@ private struct ActivityReceiptSheetModifier: ViewModifier {
 }
 
 extension View {
-    /// Ouvre le reçu de `model.selectedRecord` ; « Pay again » appelle `onPayAgain` une fois la feuille refermée.
-    func activityReceiptSheet(model: ActivityViewModel, onPayAgain: @escaping (String) -> Void) -> some View {
-        modifier(ActivityReceiptSheetModifier(model: model, onPayAgain: onPayAgain))
+    /// Ouvre le reçu de `model.selectedRecord` ; « Pay again » et « Send back » appellent `onSendPrefilled` une fois la
+    /// feuille refermée.
+    func activityReceiptSheet(model: ActivityViewModel, onSendPrefilled: @escaping (SendPrefill) -> Void) -> some View {
+        modifier(ActivityReceiptSheetModifier(model: model, onSendPrefilled: onSendPrefilled))
     }
 }
 

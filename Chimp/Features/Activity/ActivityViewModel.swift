@@ -453,7 +453,8 @@ final class ActivityViewModel {
             stamp: row.stamp,
             explorerURL: explorer,
             shareText: share,
-            payAgainAddress: kind == .sent ? record.to : nil
+            counterparty: Self.counterparty(of: record, kind: kind),
+            send: Self.prefill(for: record, kind: kind)
         )
     }
 
@@ -463,23 +464,62 @@ final class ActivityViewModel {
         return "\(amount.formatted(Decimal.FormatStyle(locale: locale).precision(.fractionLength(digits)))) \(code)"
     }
 
-    // MARK: Copier le hash
+    /// L'autre partie d'un envoi (TO) ou d'un paiement reçu (FROM), pour « Copy » (retour du 2026-10-01). Rien pour un Move
+    /// ou une carte ajoutée : ce sont ses propres tiroirs.
+    static func counterparty(of record: ActivityRecord, kind: ActivityKind) -> ActivityReceipt.Counterparty? {
+        switch kind {
+        case .sent: ActivityReceipt.Counterparty(lineID: "to", address: record.to)
+        case .received: ActivityReceipt.Counterparty(lineID: "from", address: record.from)
+        case .moved, .cardAdded: nil
+        }
+    }
 
-    private(set) var copiedHash: String?
+    /// « Pay again » (envoi) ou « Send back » (paiement reçu) : adresse, actif et montant préremplis (décision de Barth du
+    /// 2026-10-01). Seulement pour un actif qu'on sait envoyer (XLM, USDC).
+    static func prefill(for record: ActivityRecord, kind: ActivityKind) -> SendPrefill? {
+        let asset = record.assetCode.flatMap(SendAsset.init(code:))
+        switch kind {
+        case .sent:
+            return SendPrefill(address: record.to, asset: asset, amount: asset == nil ? nil : record.amount, origin: .payAgain)
+        case .received:
+            guard asset != nil else { return nil }
+            return SendPrefill(address: record.from, asset: asset, amount: record.amount, origin: .sendBack)
+        case .moved, .cardAdded:
+            return nil
+        }
+    }
+
+    // MARK: Copier (hash, adresse de l'autre partie)
+
+    enum Copied: Equatable {
+        case hash(String)
+        case address(String)
+    }
+
+    private(set) var copied: Copied?
     private(set) var copyCount = 0
     private var copiedResetTask: Task<Void, Never>?
     var clipboard: AddressClipboard = SystemAddressClipboard()
 
     /// « Copy » du reçu : le hash **complet**, « Copied! » pendant 2 s (comme Recevoir).
     func copyHash(_ hash: String) {
-        clipboard.copy(hash)
-        copiedHash = hash
+        copy(.hash(hash), text: hash)
+    }
+
+    /// « Copy » de l'autre partie : l'adresse **complète** (la ligne n'en montre que le début et la fin).
+    func copyAddress(_ address: String) {
+        copy(.address(address), text: address)
+    }
+
+    private func copy(_ item: Copied, text: String) {
+        clipboard.copy(text)
+        copied = item
         copyCount += 1
         copiedResetTask?.cancel()
         copiedResetTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
-            self?.copiedHash = nil
+            self?.copied = nil
         }
     }
 }
@@ -521,6 +561,14 @@ struct ActivityReceipt: Identifiable, Equatable {
     let stamp: ActivityStamp
     let explorerURL: URL?
     let shareText: String
-    /// Envoi : l'adresse à payer de nouveau (C1 prérempli).
-    let payAgainAddress: String?
+    /// L'autre partie (adresse complète), copiable depuis sa ligne.
+    let counterparty: Counterparty?
+    /// « Pay again » (envoi) ou « Send back » (paiement reçu) : Envoyer prérempli.
+    let send: SendPrefill?
+
+    struct Counterparty: Equatable {
+        /// Ligne qui l'affiche (« to », « from »).
+        let lineID: String
+        let address: String
+    }
 }

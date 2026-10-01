@@ -7,22 +7,36 @@ import SwiftUI
 struct SendFlowRoot: View {
     @State private var model: SendFlowModel
     let onExit: () -> Void
+    private let service: SendService
+    private let signingOrder: SigningOrder
 
     init(
         service: SendService = SendMockSettings.makeService(),
         signingOrder: SigningOrder = SendMockSettings.signingOrder,
         kind: SendFlowModel.FlowKind = .send,
-        prefilledAddress: String? = nil,
+        prefill: SendPrefill? = nil,
         fromDrawerID: String? = nil,
         onExit: @escaping () -> Void
     ) {
         let model = SendFlowModel(service: service, signingOrder: signingOrder, kind: kind, initialDrawerID: fromDrawerID)
         model.onExit = onExit
-        // « Pay again » (reçu de l'Activity) : l'adresse est collée en C1, comme si on l'avait collée ; tout le reste
-        // (montant, tiroir, vérification, carte) se fait comme pour un nouvel envoi.
-        if let prefilledAddress { model.pasteAddress(prefilledAddress) }
+        // « Pay again » ou « Send back » (reçus) : adresse collée en C1, actif et montant préremplis pour C2 ; le tiroir,
+        // la vérification (C4) et la carte se font comme pour un nouvel envoi.
+        if let prefill { model.apply(prefill) }
         _model = State(initialValue: model)
         self.onExit = onExit
+        self.service = service
+        self.signingOrder = signingOrder
+    }
+
+    /// « Pay again » du reçu de C9 : un parcours neuf, prérempli, à la place de celui qui vient de finir (les écrans
+    /// poussés par l'ancien parcours se referment avec lui).
+    private func startOver(with prefill: SendPrefill) {
+        let fresh = SendFlowModel(service: service, signingOrder: signingOrder, kind: .send)
+        fresh.onExit = onExit
+        fresh.onSendAgain = startOver(with:)
+        fresh.apply(prefill)
+        model = fresh
     }
 
     var body: some View {
@@ -39,6 +53,7 @@ struct SendFlowRoot: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear { model.onSendAgain = startOver(with:) }
     }
 }
 

@@ -100,7 +100,7 @@ struct ReceiveView: View {
 
     private func bottomActions(_ drawer: ReceiveViewModel.DrawerContent?, isLoading: Bool) -> some View {
         VStack(spacing: 11) {
-            ShareLink(item: drawer?.address ?? "") {
+            ShareLink(item: model.shareText ?? "") {
                 Text("Share my address")
             }
             .buttonStyle(ChimpButtonStyle())

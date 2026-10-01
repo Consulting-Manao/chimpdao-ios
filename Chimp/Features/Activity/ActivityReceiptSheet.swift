@@ -1,15 +1,16 @@
 import SwiftUI
 
-/// Détail d'un mouvement (maquette I1.1d, « Details — mix: I1 slip + printed receipt ») : le reçu imprimé, puis
-/// « Pay again » (seulement pour un envoi : Envoyer s'ouvre avec l'adresse collée en C1) et « Share ».
+/// Détail d'un mouvement (maquette I1.1d, « Details — mix: I1 slip + printed receipt ») : le reçu imprimé, l'adresse de
+/// l'autre partie copiable, puis « Pay again » (envoi) ou « Send back » (paiement reçu), qui ouvrent Envoyer prérempli
+/// (adresse, actif, montant ; C4 toujours), et « Share ».
 struct ActivityReceiptSheet: View {
     let receipt: ActivityReceipt
     let model: ActivityViewModel
-    var onPayAgain: (String) -> Void = { _ in }
+    var onSend: (SendPrefill) -> Void = { _ in }
 
     /// La feuille (`chimpSheet(fitsContent:)`) fait défiler le contenu s'il dépasse l'écran.
     var body: some View {
-        ActivityReceiptContent(receipt: receipt, model: model, onPayAgain: onPayAgain)
+        ActivityReceiptContent(receipt: receipt, model: model, onSend: onSend)
             .padding(.horizontal, ChimpSpacing.xxl)
             .padding(.top, ChimpSpacing.xs)
     }
@@ -19,7 +20,7 @@ struct ActivityReceiptSheet: View {
 struct ActivityReceiptContent: View {
     let receipt: ActivityReceipt
     let model: ActivityViewModel
-    var onPayAgain: (String) -> Void = { _ in }
+    var onSend: (SendPrefill) -> Void = { _ in }
 
     @Environment(\.openURL) private var openURL
 
@@ -30,7 +31,10 @@ struct ActivityReceiptContent: View {
         }
         .sensoryFeedback(.success, trigger: model.copyCount)
         .onChange(of: model.copyCount) {
-            AccessibilityNotification.Announcement(String(localized: "Transaction copied")).post()
+            switch model.copied {
+            case .address: AccessibilityNotification.Announcement(String(localized: "Address copied")).post()
+            case .hash, nil: AccessibilityNotification.Announcement(String(localized: "Transaction copied")).post()
+            }
         }
     }
 
@@ -42,13 +46,26 @@ struct ActivityReceiptContent: View {
             onExplorer: receipt.explorerURL.map { url in { openURL(url) } }
         ) {
             ForEach(receipt.lines) { line in
-                ChimpReceiptLine(label: line.label) { value(line.value) }
+                if let counterparty = receipt.counterparty, counterparty.lineID == line.id {
+                    ChimpReceiptLine(label: line.label) {
+                        value(line.value)
+                            .accessibilityLabel(Text(verbatim: counterparty.address))
+                    } accessory: {
+                        copyButton(copied: model.copied == .address(counterparty.address), label: Text("Copy the address")) {
+                            model.copyAddress(counterparty.address)
+                        }
+                    }
+                } else {
+                    ChimpReceiptLine(label: line.label) { value(line.value) }
+                }
             }
             ChimpReceiptLine(label: "Tx") {
                 Text(receipt.shortHash)
                     .accessibilityLabel(Text("Transaction \(receipt.hash)"))
             } accessory: {
-                copyButton
+                copyButton(copied: model.copied == .hash(receipt.hash), label: Text("Copy the transaction")) {
+                    model.copyHash(receipt.hash)
+                }
             }
         }
     }
@@ -71,11 +88,8 @@ struct ActivityReceiptContent: View {
         }
     }
 
-    private var copyButton: some View {
-        let copied = model.copiedHash == receipt.hash
-        return Button {
-            model.copyHash(receipt.hash)
-        } label: {
+    private func copyButton(copied: Bool, label: Text, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Text(copied ? "Copied!" : "Copy")
                 .chimpFont(.receiptLink)
                 .foregroundStyle(Color(.chimpTicketInk))
@@ -86,14 +100,14 @@ struct ActivityReceiptContent: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(ChimpPressableStyle())
-        .accessibilityLabel(copied ? Text("Copied!") : Text("Copy the transaction"))
+        .accessibilityLabel(copied ? Text("Copied!") : label)
     }
 
     @ViewBuilder
     private var buttons: some View {
-        if let address = receipt.payAgainAddress {
+        if let send = receipt.send {
             HStack(spacing: ChimpSpacing.sm) {
-                ChimpButton("Pay again") { onPayAgain(address) }
+                ChimpButton(send.origin == .sendBack ? "Send back" : "Pay again") { onSend(send) }
                 share.frame(width: 96)
             }
         } else {

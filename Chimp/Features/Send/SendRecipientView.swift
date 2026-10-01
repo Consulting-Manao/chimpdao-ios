@@ -3,8 +3,8 @@ import SwiftUI
 /// C1 · « Who's it for? » : adresse collée ou tapée (vérifiée avec sa somme de contrôle), memo ID facultatif,
 /// destinataires récents. Aucune carte demandée ici.
 ///
-/// Pas de « Scan QR » ni de « Show their code » : il faut la clé caméra de l'Info.plist (jalon 4b, ROADMAP).
-/// Pas de « name » ni de « handle » : la fédération (`maya*chimp.xyz`) est hors référence (DESIGN_NOTES §10, point 12).
+/// « Scan QR » (maquette) : la caméra lit une adresse ou un lien de paiement SEP-7 (`ScannedCodeParser`). Pas de
+/// « Show their code » pour l'instant. Pas de « name » ni de « handle » : la fédération (`maya*chimp.xyz`) est hors référence (DESIGN_NOTES §10, point 12).
 struct SendRecipientView: View {
     @Bindable var model: SendFlowModel
     /// Bouton retour affiché seulement si une action est fournie.
@@ -26,6 +26,14 @@ struct SendRecipientView: View {
                     addressField
                     addressMessage
                         .padding(.top, ChimpSpacing.s)
+                    if model.isSendingBack {
+                        // « Send back » : l'expéditeur peut être un exchange, qui ne reconnaîtrait pas l'argent renvoyé.
+                        ChimpySays(
+                            text: "Sending back to where it came from. If it came from an exchange, it may not reach anyone: check with them first.",
+                            pose: .head
+                        )
+                        .padding(.top, ChimpSpacing.m)
+                    }
                     if model.acceptsMemoID {
                         memoField
                             .padding(.top, ChimpSpacing.l)
@@ -53,6 +61,9 @@ struct SendRecipientView: View {
             .background(Color(.chimpBackground))
         }
         .task { await model.loadIfNeeded() }
+        .fullScreenCover(isPresented: $model.isScannerPresented) {
+            QRScannerScreen(onCode: model.scanned) { model.isScannerPresented = false }
+        }
         .navigationDestination(isPresented: $model.isAmountPresented) {
             SendAmountView(model: model)
                 .toolbar(.hidden, for: .navigationBar)
@@ -85,16 +96,19 @@ struct SendRecipientView: View {
             }
         } accessory: {
             if model.addressText.isEmpty {
-                PasteButton(payloadType: String.self) { strings in
-                    guard let text = strings.first else { return }
-                    Task { @MainActor in
-                        model.pasteAddress(text)
-                        focusedField = nil
+                HStack(spacing: ChimpSpacing.xs) {
+                    PasteButton(payloadType: String.self) { strings in
+                        guard let text = strings.first else { return }
+                        Task { @MainActor in
+                            model.pasteAddress(text)
+                            focusedField = nil
+                        }
                     }
+                    .labelStyle(.titleOnly)
+                    .buttonBorderShape(.capsule)
+                    .tint(Color(.chimpOutline))
+                    scanButton
                 }
-                .labelStyle(.titleOnly)
-                .buttonBorderShape(.capsule)
-                .tint(Color(.chimpOutline))
             } else {
                 Button {
                     model.addressText = ""
@@ -110,16 +124,45 @@ struct SendRecipientView: View {
         }
     }
 
+    /// « Scan QR » de la maquette : petite pastille jaune dans le champ.
+    private var scanButton: some View {
+        Button {
+            focusedField = nil
+            model.isScannerPresented = true
+        } label: {
+            Text("Scan QR")
+                .chimpFont(.buttonSmall)
+                .foregroundStyle(.chimpOnAccent)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color(.chimpAccent)))
+                .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.thin) }
+                .frame(minHeight: ChimpSize.minimumTouchTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(ChimpPressableStyle())
+        .accessibilityLabel(Text("Scan a QR code"))
+    }
+
     /// Erreur, ou confirmation de l'adresse reconnue. Pendant la frappe, une erreur n'apparaît qu'une fois
     /// l'adresse complète (56 caractères) ou le champ quitté, pour ne pas crier à chaque lettre.
     @ViewBuilder
     private var addressMessage: some View {
+        if let issue = model.scanIssue {
+            ChimpFieldMessage(text: Self.message(for: issue, network: model.scanRules), kind: .error)
+        } else {
+            recipientMessage
+        }
+    }
+
+    @ViewBuilder
+    private var recipientMessage: some View {
         switch model.recipientState {
         case .empty:
             ChimpFieldMessage(text: "Paste it from the app or exchange you're paying. Check the first and last characters.")
         case .invalid(let issue):
             if showsIssueWhileTyping(issue) {
-                ChimpFieldMessage(text: message(for: issue), kind: .error)
+                ChimpFieldMessage(text: Self.message(for: issue), kind: .error)
             }
         case .valid(let recipient):
             ChimpFieldMessage(text: confirmation(for: recipient), kind: .success)
@@ -136,7 +179,23 @@ struct SendRecipientView: View {
         }
     }
 
-    private func message(for issue: RecipientIssue) -> LocalizedStringKey {
+    /// Code QR refusé (textes proposés le 2026-10-01).
+    static func message(for issue: ScanIssue, network rules: ScanRules) -> LocalizedStringKey {
+        switch issue {
+        case .address(let issue): message(for: issue)
+        case .signRequest: "This code asks to sign something. ChimpDAO only reads addresses from codes."
+        case .callback: "This code wants to hand the payment to a website. ChimpDAO only pays addresses directly."
+        case .otherNetwork: rules.isPublicNetwork
+            ? "This code is for another Stellar network. Ask for a Stellar address."
+            : "This code is for another Stellar network. Ask for a Stellar Testnet address."
+        case .wordMemo: "This code needs a word memo. A word memo can't be sent from ChimpDAO."
+        case .conflictingMemo: "This code has two different memos. Ask for a new code."
+        case .unsupportedAsset(let code): "This code asks for \(code). ChimpDAO sends XLM and USDC only."
+        case .notAPaymentCode: "That code isn't a Stellar address."
+        }
+    }
+
+    static func message(for issue: RecipientIssue) -> LocalizedStringKey {
         switch issue {
         case .secretKey:
             "That's a secret key, not an address! Never share it with anyone. Delete it and ask for their address."

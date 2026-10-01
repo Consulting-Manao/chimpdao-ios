@@ -279,14 +279,15 @@ extension ActivityViewModelTests {
         #expect(receipt.shortHash == "7b3e…a91f")
         #expect(receipt.total == "\u{2212}$25.00")
         #expect(receipt.stamp == .paid)
-        #expect(receipt.payAgainAddress == Self.maya)
+        #expect(receipt.send == SendPrefill(address: Self.maya, asset: .usdc, amount: 25, origin: .payAgain), "Pay again : adresse, actif et montant")
+        #expect(receipt.counterparty == ActivityReceipt.Counterparty(lineID: "to", address: Self.maya))
         #expect(receipt.explorerURL?.absoluteString.hasSuffix(Self.hash) == true)
         #expect(receipt.shareText.contains("You paid GCQF…GXPO"))
         #expect(receipt.shareText.hasSuffix(Self.hash))
         #expect(receipt.header.contains(" · "))
     }
 
-    @Test("Reçu d'un montant reçu : FROM puis TO (Main), pas de frais (pas envoyé par ce téléphone), pas de « Pay again »")
+    @Test("Reçu d'un montant reçu : FROM puis TO (Main), pas de frais (pas envoyé par ce téléphone), « Send back »")
     func receivedReceipt() async throws {
         let model = await receiptModel()
         let receipt = try #require(model.receipt(for: Self.transfer("r", Self.maya, Self.main, "XLM", "1757.5", Self.at(0, 9)), locale: Self.us))
@@ -296,7 +297,9 @@ extension ActivityViewModelTests {
         #expect(receipt.total == "+1,757.5 XLM")
         #expect(receipt.totalTone == .positive)
         #expect(receipt.stamp == .gotIt)
-        #expect(receipt.payAgainAddress == nil)
+        #expect(receipt.send == SendPrefill(address: Self.maya, asset: .xlm, amount: Decimal(string: "1757.5")!, origin: .sendBack),
+                "Send back : renvoyer à l'expéditeur, même actif et même montant")
+        #expect(receipt.counterparty == ActivityReceipt.Counterparty(lineID: "from", address: Self.maya))
         #expect(receipt.number == nil, "Ledger encore inconnu : pas de N°")
     }
 
@@ -307,7 +310,8 @@ extension ActivityViewModelTests {
         #expect(move.lines[0].value == .drawer("Main account", swatch: .main))
         #expect(move.lines[1].value == .drawer("Banana's wallet", swatch: .card(.banana)))
         #expect(move.stamp == .moved)
-        #expect(move.payAgainAddress == nil)
+        #expect(move.send == nil)
+        #expect(move.counterparty == nil, "Un Move ne va que vers ses propres tiroirs")
 
         let card = try #require(model.receipt(for: Self.card("c", Self.at(1, 12)), locale: Self.us))
         #expect(card.title == "Leaf joined")
@@ -325,8 +329,21 @@ extension ActivityViewModelTests {
         model.clipboard = clipboard
         model.copyHash(Self.hash)
         #expect(clipboard.copied == [Self.hash])
-        #expect(model.copiedHash == Self.hash)
+        #expect(model.copied == .hash(Self.hash))
         #expect(model.copyCount == 1)
+        model.copyAddress(Self.maya)
+        #expect(clipboard.copied.last == Self.maya, "L'adresse complète, pas « GCQF…GXPO »")
+        #expect(model.copied == .address(Self.maya))
+        #expect(model.copyCount == 2)
+    }
+
+    @Test("Send back d'un actif qu'on ne sait pas envoyer : pas de bouton ; Pay again : adresse seule")
+    func unknownAssetPrefill() async throws {
+        let model = await receiptModel()
+        let received = try #require(model.receipt(for: Self.transfer("e", Self.maya, Self.main, "EURC", "3", Self.at(0, 9)), locale: Self.us))
+        #expect(received.send == nil)
+        let sent = try #require(model.receipt(for: Self.transfer("f", Self.main, Self.maya, "EURC", "3", Self.at(0, 9)), locale: Self.us))
+        #expect(sent.send == SendPrefill(address: Self.maya, origin: .payAgain))
     }
 }
 

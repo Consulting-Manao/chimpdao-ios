@@ -22,7 +22,7 @@ struct SendStatusView: View {
             if case .finished(.sent(let receipt)) = model.signingStage {
                 SendSentView(receipt: receipt, onDone: model.finish, onReceipt: { model.isReceiptPresented = true })
                     .chimpSheet(isPresented: $model.isReceiptPresented, height: ChimpSize.cardTapSheetHeight) {
-                        SendReceiptSheet(receipt: receipt)
+                        SendReceiptSheet(receipt: receipt, onSendAgain: model.sendAgainPrefill == nil ? nil : { model.sendAgain() })
                     }
             } else {
                 statusScreen
@@ -274,11 +274,16 @@ struct SendSentView: View {
 /// identifiant de la transaction (sélectionnable, donc copiable) et lien vers Stellar Expert.
 struct SendReceiptSheet: View {
     let receipt: SendReceipt
+    /// « Pay again » : Envoyer de nouveau, prérempli (`nil` pour un Move).
+    var onSendAgain: (() -> Void)?
 
     @Environment(\.locale) private var locale
 
     var body: some View {
-        ReceiptSheet(items: items, showsFees: true, explorerURL: receipt.explorerURL)
+        ReceiptSheet(
+            items: items, showsFees: true, explorerURL: receipt.explorerURL,
+            copyAddress: onSendAgain == nil ? nil : receipt.summary.recipientAddress, onSendAgain: onSendAgain
+        )
     }
 
     private var items: [ChimpDetailItem] {
@@ -309,8 +314,15 @@ struct ReceiptSheet: View {
     let items: [ChimpDetailItem]
     let showsFees: Bool
     let explorerURL: URL?
+    /// Adresse de l'autre partie, copiée **en entier** par « Copy address ».
+    var copyAddress: String?
+    /// « Pay again ».
+    var onSendAgain: (() -> Void)?
+    var clipboard: AddressClipboard = SystemAddressClipboard()
 
     @Environment(\.openURL) private var openURL
+    @State private var copyCount = 0
+    @State private var isShowingCopied = false
 
     var body: some View {
         ScrollView {
@@ -325,12 +337,34 @@ struct ReceiptSheet: View {
                         .chimpFont(.caption)
                         .foregroundStyle(.chimpTextSecondary)
                 }
+                if copyAddress != nil || onSendAgain != nil {
+                    HStack(spacing: ChimpSpacing.sm) {
+                        if let copyAddress {
+                            ChimpButton(isShowingCopied ? "Copied!" : "Copy address", kind: .secondary) { copy(copyAddress) }
+                        }
+                        if let onSendAgain {
+                            ChimpButton("Pay again", action: onSendAgain)
+                        }
+                    }
+                }
                 if let explorerURL {
                     ChimpButton("View on Stellar Expert", kind: .secondary) { openURL(explorerURL) }
                 }
             }
             .padding(.horizontal, ChimpSpacing.fullScreenMargin)
             .padding(.vertical, ChimpSpacing.l)
+        }
+        .sensoryFeedback(.success, trigger: copyCount)
+    }
+
+    private func copy(_ address: String) {
+        clipboard.copy(address)
+        copyCount += 1
+        withAnimation(.easeInOut(duration: ChimpMotion.Copied.transition)) { isShowingCopied = true }
+        AccessibilityNotification.Announcement(String(localized: "Address copied")).post()
+        Task {
+            try? await Task.sleep(for: ChimpMotion.Copied.display)
+            withAnimation(.easeInOut(duration: ChimpMotion.Copied.transition)) { isShowingCopied = false }
         }
     }
 }
