@@ -14,15 +14,15 @@ struct AddCardFlowView: View {
             case .tapNew:
                 AddCardTapScreen(model: model, target: .newCard, onScan: { Task { await model.scanNewCard() } }, onCancel: onExit)
             case .firstName:
-                YourNameView(model: model, step: 1, steps: 3, onBack: back, onContinue: model.continueFromName)
+                YourNameView(model: model, step: step(.firstName), steps: steps, onBack: back, onContinue: model.continueFromName)
             case .nameCard:
                 NameYourCardView(
                     model: model, title: "Name your new card", subtitle: "Before you let it in",
-                    step: model.isJoining ? 2 : 0, steps: model.isJoining ? 3 : 0, onBack: back, onContinue: model.continueFromCard
+                    step: step(.nameCard), steps: steps, onBack: back, onContinue: model.continueFromCard
                 )
             case .pin:
-                PickPINView(model: model, step: model.isJoining ? 3 : 0, steps: model.isJoining ? 3 : 0, continueTitle: "Next",
-                            onBack: back, onContinue: model.continueFromPIN)
+                PickPINView(model: model, step: step(.pin), steps: steps, subtitle: "For \(model.displayCardName), the new card",
+                            continueTitle: "Next", onBack: back, onContinue: model.continueFromPIN)
             case .findAccount:
                 AddCardTapScreen(model: model, target: .accountCard, onScan: { Task { await model.scanForAccount() } }, onCancel: back)
             case .confirm:
@@ -48,12 +48,13 @@ struct AddCardFlowView: View {
         if !model.back() { onExit() }
     }
 
-    /// « Tap 2 of 3 » : où en sont les taps. Wallet : nouvelle carte (lecture), nouvelle carte (signature), carte du
-    /// compte. Rejoindre : A2 (lecture), carte du compte (lecture), nouvelle carte (signature), carte du compte.
-    static func tapLabel(_ model: AddCardModel, at screen: AddCardModel.Screen) -> LocalizedStringKey {
-        let order: [AddCardModel.Screen] = model.isJoining ? [.nameCard, .findAccount, .confirm, .member] : [.tapNew, .confirm, .member]
-        guard let index = order.firstIndex(of: screen) else { return "Tap" }
-        return "Tap \(index + 1) of \(order.count)"
+    private func step(_ screen: AddCardModel.Screen) -> Int { model.progress(at: screen)?.step ?? 0 }
+    private var steps: Int { model.progressScreens.count }
+
+    /// « Step 4 of 5 » : la même numérotation sur tous les écrans du parcours (`AddCardModel.progressScreens`).
+    static func stepLabel(_ model: AddCardModel, at screen: AddCardModel.Screen) -> LocalizedStringKey {
+        guard let progress = model.progress(at: screen) else { return "Tap" }
+        return "Step \(progress.step) of \(progress.of)"
     }
 
     /// Messages de Chimpy (textes proposés, DESIGN_NOTES §12).
@@ -65,6 +66,7 @@ struct AddCardFlowView: View {
         case .otherAccount: "That card is still in another account. Its owner has to give it away first."
         case .notAMember: "That card isn't in the account. Tap one of its cards."
         case .isTheNewCard: "That's the new card. A card can't invite itself: tap one of the account's cards."
+        case .notTheChosenCard(let name): "That's another card of your account. Tap \(name), the one you picked, or pick this one instead."
         case .network: "I couldn't check this online. Check your connection and try again."
         }
     }
@@ -85,7 +87,7 @@ struct AddCardTapScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: ChimpSpacing.s) {
-                Text(AddCardFlowView.tapLabel(model, at: target == .newCard ? .tapNew : .findAccount))
+                Text(AddCardFlowView.stepLabel(model, at: target == .newCard ? .tapNew : .findAccount))
                     .chimpFont(.labelWide)
                     .textCase(.uppercase)
                     .foregroundStyle(.chimpOnHeaderAccent)
@@ -94,18 +96,19 @@ struct AddCardTapScreen: View {
                     .foregroundStyle(.chimpOnHeaderPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
+                Text(which)
+                    .chimpFont(.bodyS)
+                    .foregroundStyle(.chimpOnHeaderSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .multilineTextAlignment(.center)
             .padding(.top, ChimpSpacing.xxxl)
             .padding(.horizontal, 30)
 
+            // La carte attendue, pas la tête de Chimpy (retour du 2026-10-01 : on ne savait pas quelle carte taper).
             ChimpNFCRings(config: ChimpMotion.Ring.fullScreen, size: 260) {
-                Image(.tileHead)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 130)
-                    .shadow(color: .black.opacity(0.3), radius: 0, x: 5, y: 6)
-                    .accessibilityHidden(true)
+                ChimpCardThumbnail(color: nil, badge: target == .newCard ? "New" : nil)
+                    .scaleEffect(1.25)
             }
             .frame(maxHeight: .infinity)
             .layoutPriority(-1)
@@ -140,6 +143,14 @@ struct AddCardTapScreen: View {
         switch target {
         case .newCard: return "Hold the new card to your phone"
         case .accountCard: return "Now tap a card from that account"
+        }
+    }
+
+    /// Quelle carte poser, en une phrase.
+    private var which: LocalizedStringKey {
+        switch target {
+        case .newCard: "The card you're adding, not one that's already in your account."
+        case .accountCard: "Any card already in the account you're joining. Not \(model.displayCardName)."
         }
     }
 
@@ -180,7 +191,11 @@ struct AddCardConfirmView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(title: "Let \(model.displayCardName) in?", onBack: model.isLocked ? nil : onBack)
+            ChimpHeader(
+                title: "Let \(model.displayCardName) in?",
+                step: model.progress(at: .confirm)?.step ?? 0, steps: model.progressScreens.count,
+                onBack: model.isLocked ? nil : onBack
+            )
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.l) {
                     ChimpReviewSteps(steps: steps)
@@ -208,9 +223,11 @@ struct AddCardConfirmView: View {
             CardTapSheet(
                 cardName: model.displayCardName,
                 cardColor: model.cardColor,
-                stepLabel: AddCardFlowView.tapLabel(model, at: .confirm),
+                cardBadge: "New",
+                stepLabel: AddCardFlowView.stepLabel(model, at: .confirm),
+                title: "Hold \(model.displayCardName), the new card, to your phone",
                 what: "\(model.displayCardName) signs its link to your account.",
-                who: model.pinMode == .choose ? "The card receives your PIN, then signs." : nil,
+                who: model.pinMode == .choose ? "\(model.displayCardName) receives the PIN you just picked, then signs." : nil,
                 pinStatus: model.pinMode == .none ? .notNeeded : .ready,
                 isScanning: model.isBusy,
                 problem: sheetProblem,
@@ -251,7 +268,7 @@ struct AddCardMemberView: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: ChimpSpacing.s) {
-                Text(AddCardFlowView.tapLabel(model, at: .member))
+                Text(AddCardFlowView.stepLabel(model, at: .member))
                     .chimpFont(.labelWide)
                     .textCase(.uppercase)
                     .foregroundStyle(.chimpOnHeaderAccent)
@@ -260,30 +277,37 @@ struct AddCardMemberView: View {
                     .foregroundStyle(.chimpOnHeaderPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
+                Text("A card already in your account, not \(model.displayCardName). It vouches for the new one.")
+                    .chimpFont(.bodyS)
+                    .foregroundStyle(.chimpOnHeaderSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .multilineTextAlignment(.center)
             .padding(.top, ChimpSpacing.xxxl)
             .padding(.horizontal, 30)
 
-            ChimpNFCRings(config: ChimpMotion.Ring.fullScreen, size: 260) {
-                Image(.tileHead)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 130)
-                    .shadow(color: .black.opacity(0.3), radius: 0, x: 5, y: 6)
-                    .accessibilityHidden(true)
+            // La carte attendue (sa couleur) ; grise tant qu'on ne sait pas laquelle.
+            ChimpNFCRings(config: ChimpMotion.Ring.fullScreen, size: 230) {
+                ChimpCardThumbnail(color: model.expectedMemberColor)
+                    .scaleEffect(1.25)
             }
             .frame(maxHeight: .infinity)
             .layoutPriority(-1)
 
-            NewCardReadyBadge(name: model.displayCardName, number: model.cardNumber)
-                .padding(.bottom, ChimpSpacing.m)
+            if model.member == nil, model.memberCandidates.count > 1 {
+                memberChoice
+                    .padding(.bottom, ChimpSpacing.m)
+            } else {
+                NewCardReadyBadge(name: model.displayCardName, number: model.cardNumber)
+                    .padding(.bottom, ChimpSpacing.m)
+            }
 
             ChimpySays(text: "A card can't invite itself. One of the gang has to vouch for it.", pose: .banana)
                 .padding(.horizontal, ChimpSpacing.fullScreenMargin)
                 .padding(.bottom, ChimpSpacing.m)
 
             ChimpButton("Scan my card", size: .large, isLoading: model.isBusy, action: model.startMemberStep)
+                .disabled(model.needsMemberChoice)
                 .padding(.horizontal, ChimpSpacing.fullScreenMargin)
             ChimpButton("Not now", kind: .linkOnHeader, action: onCancel)
                 .disabled(model.isBusy)
@@ -300,9 +324,9 @@ struct AddCardMemberView: View {
         ) {
             if model.isShowingMemberPINSheet {
                 PinSheet(
-                    stepLabel: "PIN",
+                    stepLabel: AddCardFlowView.stepLabel(model, at: .member),
                     title: pinTitle,
-                    subtitle: "Letting \(model.displayCardName) in",
+                    subtitle: pinSubtitle,
                     pin: $model.memberPIN,
                     length: AddCardModel.pinLength,
                     state: $model.memberPINState,
@@ -312,11 +336,10 @@ struct AddCardMemberView: View {
             } else {
                 CardTapSheet(
                     cardName: model.expectedMemberName ?? "",
-                    cardColor: .banana,
-                    stepLabel: AddCardFlowView.tapLabel(model, at: .member),
+                    cardColor: model.expectedMemberColor,
+                    stepLabel: AddCardFlowView.stepLabel(model, at: .member),
                     title: tapTitle,
                     what: "Letting \(model.displayCardName) into your account.",
-                    who: model.member == nil ? "Any card of your account can say yes." : "Use the same card as before: your PIN is for it.",
                     pinStatus: model.memberUsesPIN ? .ready : .notNeeded,
                     isScanning: model.isBusy,
                     problem: model.problem.map { AddCardFlowView.message(for: $0.kind) },
@@ -328,20 +351,98 @@ struct AddCardMemberView: View {
         }
     }
 
+    /// « Which card says yes? » : les cartes du compte (sauf la nouvelle), avec leur couleur. Le PIN demandé ensuite
+    /// est celui de la carte choisie, et seule elle est acceptée au tap.
+    private var memberChoice: some View {
+        VStack(spacing: ChimpSpacing.xs) {
+            Text("Which card says yes?")
+                .chimpFont(.labelWide)
+                .textCase(.uppercase)
+                .foregroundStyle(.chimpOnHeaderSecondary)
+            // Centrées si elles tiennent, sinon elles défilent.
+            ViewThatFits(in: .horizontal) {
+                memberChips
+                    .padding(.horizontal, ChimpSpacing.fullScreenMargin)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    memberChips
+                        .padding(.horizontal, ChimpSpacing.fullScreenMargin)
+                        .padding(.vertical, ChimpSpacing.xxs)
+                }
+            }
+        }
+    }
+
+    private var memberChips: some View {
+        HStack(spacing: ChimpSpacing.s) {
+            ForEach(model.memberCandidates) { card in
+                MemberCardChip(
+                    name: card.name ?? String(localized: "Card N°\(card.tokenID.map { String(format: "%04u", $0) } ?? "····")"),
+                    color: card.color.flatMap(ChimpCardColor.init(rawValue:)),
+                    isSelected: model.chosenMember?.publicKey == card.publicKey
+                ) {
+                    model.chooseMember(card.publicKey)
+                }
+            }
+        }
+    }
+
     private var title: LocalizedStringKey {
         if model.member != nil { return "Now tap that account's card again" }
+        if let name = model.expectedMemberName { return "Now tap \(name)" }
         return "Now tap one of your cards"
     }
 
+    /// À qui est ce PIN : jamais celui de la nouvelle carte.
     private var pinTitle: LocalizedStringKey {
         if let name = model.expectedMemberName { return "\(name)'s PIN" }
-        return "Your card's PIN"
+        return "PIN of the card you'll tap"
+    }
+
+    private var pinSubtitle: LocalizedStringKey {
+        if let name = model.expectedMemberName {
+            return "\(name) is already in your account. Not \(model.displayCardName)'s PIN."
+        }
+        return "A card already in your account. Not \(model.displayCardName)'s PIN."
     }
 
     private var tapTitle: LocalizedStringKey {
-        if let name = model.expectedMemberName { return "Tap your \(name) card again" }
+        if let name = model.expectedMemberName {
+            return model.member == nil ? "Hold \(name) to your phone" : "Tap your \(name) card again"
+        }
         if model.member != nil { return "Tap the same card again" }
         return "Tap any of your cards"
+    }
+}
+
+/// Une carte du compte à choisir (G2) : pastille de sa couleur et son nom ; la carte choisie est jaune.
+private struct MemberCardChip: View {
+    let name: String
+    let color: ChimpCardColor?
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: ChimpSpacing.xs) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(color?.fill ?? Color(.chimpSurfaceSecondary))
+                    .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.thin) }
+                    .frame(width: 22, height: 15)
+                Text(verbatim: name)
+                    .chimpFont(.rowTitle)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isSelected ? Color(.chimpOnAccent) : Color(.chimpTextPrimary))
+            .padding(.vertical, ChimpSpacing.s)
+            .padding(.horizontal, ChimpSpacing.m)
+            .frame(minHeight: ChimpSize.minimumTouchTarget)
+        }
+        .buttonStyle(ChimpSurfaceButtonStyle(
+            shape: Capsule(),
+            fill: isSelected ? Color(.chimpAccent) : Color(.chimpSurface),
+            shadow: isSelected ? .tile : ChimpShadow(x: 0, y: 0)
+        ))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

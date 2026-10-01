@@ -346,18 +346,30 @@ final class ActivityViewModel {
         return (text, tone)
     }
 
-    /// Montant exact de ce qui a bougé : USDC en dollars, tout autre actif dans son unité (« 1,757.5 XLM »). Aucune
+    /// Montant de ce qui a bougé : USDC en dollars, tout autre actif dans son unité (« 1,757.5 XLM »). Aucune
     /// conversion au prix du jour (décision de Barth du 2026-09-30). Signe « + » ou « − » (moins typographique).
-    static func amountText(_ amount: Decimal, code: String, sign: ActivityTone?, locale: Locale = .autoupdatingCurrent) -> String {
+    /// Lignes de la liste : 2 décimales au plus, tronquées, « < 0.01 » (`SendAsset.displayed`, décision du 2026-10-01) ;
+    /// reçu (`exact`) : le montant exact, 7 décimales au plus.
+    static func amountText(_ amount: Decimal, code: String, sign: ActivityTone?, exact: Bool = false, locale: Locale = .autoupdatingCurrent) -> String {
         let prefix = switch sign {
         case .positive: "+"
         case .negative: "\u{2212}"
         default: ""
         }
-        let body: String = if code == SendAsset.usdc.code {
-            amount.formatted(Decimal.FormatStyle.Currency(code: "USD", locale: locale).presentation(.narrow).precision(.fractionLength(2...7)))
+        let isUSDC = code == SendAsset.usdc.code
+        let body: String
+        if exact {
+            body = isUSDC
+                ? amount.formatted(Decimal.FormatStyle.Currency(code: "USD", locale: locale).presentation(.narrow).precision(.fractionLength(2...7)))
+                : "\(amount.formatted(Decimal.FormatStyle(locale: locale).precision(.fractionLength(0...7)))) \(code)"
+        } else if isUSDC {
+            let shown = SendAsset.displayed(amount, code: code, locale: locale)
+            // « $< 0.01 » se lit mal : « < $0.01 ».
+            body = shown.hasPrefix("<")
+                ? "< " + SendAsset.smallestDisplayed.formatted(Decimal.FormatStyle.Currency(code: "USD", locale: locale).presentation(.narrow))
+                : amount.truncated(to: 2).formatted(Decimal.FormatStyle.Currency(code: "USD", locale: locale).presentation(.narrow).precision(.fractionLength(2)))
         } else {
-            "\(amount.formatted(Decimal.FormatStyle(locale: locale).precision(.fractionLength(0...7)))) \(code)"
+            body = "\(SendAsset.displayed(amount, code: code, locale: locale)) \(code)"
         }
         return prefix + body
     }
@@ -434,7 +446,7 @@ final class ActivityViewModel {
             shortHash: record.hash.count > 12 ? "\(record.hash.prefix(4))…\(record.hash.suffix(4))" : record.hash,
             total: record.amount.flatMap { amount in
                 record.assetCode.map { code in
-                    Self.amountText(amount, code: code, sign: kind == .sent ? .negative : (kind == .received ? .positive : nil), locale: locale)
+                    Self.amountText(amount, code: code, sign: kind == .sent ? .negative : (kind == .received ? .positive : nil), exact: true, locale: locale)
                 }
             },
             totalTone: row.tone == .positive ? .positive : .neutral,

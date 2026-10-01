@@ -123,6 +123,87 @@ struct AddCardTests {
         #expect(rows.first?.id == "stellar:\(rows.first?.hash ?? "")")
     }
 
+    // MARK: Clarté (retour du call avec Pamphile, 2026-10-01)
+
+    @Test("« Step x of y » : Wallet en 5 étapes (4 pour une DUOX), rejoindre en 6 ; le code de déblocage reste à l'étape du tap")
+    func progressSteps() async {
+        let model = AddCardModel(entry: .wallet(account: account), session: walletSession().0,
+                                 reader: MockChipReader(scenario: .infineon, delay: .zero), signer: RecordingSigner(),
+                                 service: MockAddCardService(delay: .zero))
+        #expect(model.progress(at: .tapNew)! == (1, 5), "Avant la lecture : on compte l'étape du PIN")
+        await model.scanNewCard()
+        #expect(model.progress(at: .nameCard)! == (2, 5))
+        #expect(model.progress(at: .pin)! == (3, 5))
+        #expect(model.progress(at: .confirm)! == (4, 5))
+        #expect(model.progress(at: .unlockCode)! == (4, 5))
+        #expect(model.progress(at: .member)! == (5, 5))
+        #expect(model.progress(at: .adding) == nil)
+
+        let duox = AddCardModel(entry: .wallet(account: account), session: walletSession().0,
+                                reader: MockChipReader(scenario: .duox, delay: .zero), signer: RecordingSigner(),
+                                service: MockAddCardService(delay: .zero))
+        await duox.scanNewCard()
+        #expect(duox.progress(at: .confirm)! == (3, 4), "Pas de PIN sur une DUOX")
+        #expect(duox.progress(at: .pin) == nil)
+
+        let join = AddCardModel(entry: .join, session: walletSession().0, reader: MockChipReader(scenario: .infineon, delay: .zero),
+                                signer: RecordingSigner(), service: MockAddCardService(delay: .zero),
+                                newCard: ChipKeyInfo(kind: .infineon2Go, publicKey: k1, pinActive: false), tokenID: 913)
+        #expect(join.progress(at: .firstName)! == (1, 6))
+        #expect(join.progress(at: .findAccount)! == (4, 6))
+        #expect(join.progress(at: .member)! == (6, 6))
+    }
+
+    @Test("Plusieurs cartes dans le compte : on choisit d'abord celle qui dit oui ; PIN et tap sont pour elle seule")
+    func chooseTheMemberCard() async throws {
+        let jungleKey = "04" + String(repeating: "ab", count: 64)
+        let store = InMemoryLocalWalletStore(LocalWallet(
+            firstName: "Barth", tourSeen: true,
+            account: SavedAccount(address: account, cards: [
+                SavedCard(publicKey: r1.hex, chip: "infineon2Go", tokenID: 7, pocket: "CPOCKET7", name: "Banana", color: "banana"),
+                SavedCard(publicKey: jungleKey, chip: "duox", tokenID: 8, pocket: "CPOCKET8", name: "Jungle", color: "jungle"),
+            ])
+        ))
+        let service = MockAddCardService(delay: .zero)
+        let signer = MemberTapSigner(newCard: k1, member: r1)
+        let model = AddCardModel(entry: .wallet(account: account), session: AppSession(store: store, network: .testnet),
+                                 reader: MockChipReader(scenario: .infineonWithPIN, delay: .zero), signer: signer, service: service)
+        await model.scanNewCard()
+        model.cardName = "Leaf"
+        model.continueFromCard()
+        model.pinCompleted("1234")
+        model.continueFromPIN()
+        model.openTapSheet()
+        await model.scanNewCardToSign()
+        #expect(model.screen == .member)
+
+        #expect(model.memberCandidates.map(\.name) == ["Banana", "Jungle"], "Jamais la nouvelle carte")
+        #expect(model.needsMemberChoice)
+        model.startMemberStep()
+        #expect(!model.isShowingMemberPINSheet && !model.isShowingMemberTapSheet, "Rien avant le choix")
+
+        // Jungle (DUOX) choisie : pas de PIN ; mais c'est Banana qui est tapée → refus, rien d'envoyé.
+        model.chooseMember(jungleKey)
+        #expect(model.expectedMemberName == "Jungle")
+        #expect(model.expectedMemberColor == .jungle)
+        #expect(!model.memberUsesPIN)
+        await model.scanMember()
+        #expect(model.problem?.kind == .notTheChosenCard("Jungle"))
+        #expect(service.addCount == 0)
+
+        // Banana choisie : son PIN, puis le tap de Banana.
+        model.chooseMember(r1.hex)
+        #expect(model.problem == nil)
+        #expect(model.memberUsesPIN)
+        model.startMemberStep()
+        #expect(model.isShowingMemberPINSheet)
+        model.memberPINEntered("4321")
+        await model.scanMember()
+        #expect(signer.memberAccepted == [r1], "Seule la carte choisie est acceptée")
+        #expect(signer.memberPIN == "4321")
+        #expect(model.screen == .done)
+    }
+
     @Test("Nouvelle carte refusée : déjà dans le compte, dans un autre compte, jamais enregistrée ; on reste sur G1")
     func refusedNewCards() async {
         let cases: [(MockAddCardService.Scenario, AddCardProblem.Kind)] = [
@@ -348,6 +429,41 @@ private final class TappingSigner: ChipSigner, @unchecked Sendable {
         guard acceptedKeys.contains(tapped) else { throw ChipError.cardNotAccepted(tapped: tapped) }
         return CardSignatures(card: ChipKeyInfo(kind: .infineon2Go, publicKey: tapped, pinActive: true),
                               signatures: try await sign(digests: digests, expectedKey: tapped, pin: pin))
+    }
+
+    func readOrSign(digests: [Data], acceptedKeys: [ChipPublicKey]) async throws -> ReadOrSign {
+        .signed(try await sign(digests: digests, acceptedKeys: acceptedKeys, pin: nil))
+    }
+
+    func setPINAndSign(digests: [Data], expectedKey: ChipPublicKey, newPIN: String) async throws -> PINSetupSignatures {
+        PINSetupSignatures(puk: nil, signatures: try await sign(digests: digests, expectedKey: expectedKey, pin: newPIN))
+    }
+
+    func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws {}
+}
+
+/// Signe avec la nouvelle carte quand on l'attend, puis tape toujours `member` à l'étape d'une carte du compte.
+private final class MemberTapSigner: ChipSigner, @unchecked Sendable {
+    let newCard: ChipPublicKey
+    let member: ChipPublicKey
+    private(set) var memberAccepted: [ChipPublicKey] = []
+    private(set) var memberPIN: String?
+
+    init(newCard: ChipPublicKey, member: ChipPublicKey) {
+        self.newCard = newCard
+        self.member = member
+    }
+
+    func sign(digests: [Data], expectedKey: ChipPublicKey, pin: String?) async throws -> [ChipSignedDigest] {
+        digests.map { _ in .secp256k1(signature: Data(repeating: 0x11, count: 64)) }
+    }
+
+    func sign(digests: [Data], acceptedKeys: [ChipPublicKey], pin: String?) async throws -> CardSignatures {
+        guard acceptedKeys.contains(member) else { throw ChipError.cardNotAccepted(tapped: member) }
+        memberAccepted = acceptedKeys
+        memberPIN = pin
+        return CardSignatures(card: ChipKeyInfo(kind: .infineon2Go, publicKey: member, pinActive: true),
+                              signatures: try await sign(digests: digests, expectedKey: member, pin: pin))
     }
 
     func readOrSign(digests: [Data], acceptedKeys: [ChipPublicKey]) async throws -> ReadOrSign {

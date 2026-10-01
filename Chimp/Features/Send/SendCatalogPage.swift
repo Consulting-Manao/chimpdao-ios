@@ -239,6 +239,7 @@ private extension MockSendService.DataScenario {
         case .noRecents: "No recents"
         case .loadingForever: "Loading"
         case .networkError: "Network error"
+        case .longDecimals: "7-digit balances"
         }
     }
 
@@ -250,6 +251,7 @@ private extension MockSendService.DataScenario {
         case .noRecents: "The Recent section is hidden."
         case .loadingForever: "Balances never arrive."
         case .networkError: "Balances can't be loaded (Try again on C2)."
+        case .longDecimals: "Main holds 999.6196784 XLM, Banana 0.0000042 XLM: 2 decimals at most on screen."
         }
     }
 }

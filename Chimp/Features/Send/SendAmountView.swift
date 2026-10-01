@@ -195,12 +195,8 @@ struct SendAmountView: View {
                 amountText(style: layout == .regular ? .amountEntry : .amountL)
             }
 
-            if let usd = model.usdEquivalent {
-                Text("≈ \(usd)")
-                    .chimpFont(.captionStrong)
-                    .foregroundStyle(.chimpTextSecondary)
-                    .padding(.top, ChimpSpacing.xxs)
-            }
+            usdLine
+                .padding(.top, ChimpSpacing.xxs)
 
             if layout != .tight {
                 assetPill
@@ -210,14 +206,38 @@ struct SendAmountView: View {
             quickAmounts
                 .padding(.top, layout == .regular ? ChimpSpacing.l : gap)
 
-            amountMessage
-                .padding(.top, gap)
+            // Place de deux lignes toujours réservée : le message n'apparaît pas en poussant le reste (retour du
+            // 2026-10-01, le montant et le tiroir bougeaient pendant la saisie).
+            ZStack(alignment: .top) {
+                Text(verbatim: "\n ")
+                    .chimpFont(.caption)
+                    .hidden()
+                    .accessibilityHidden(true)
+                amountMessage
+            }
+            .padding(.top, gap)
         }
         .padding(.vertical, gap)
     }
 
+    /// « ≈ $6.25 » pour un actif à prix variable ; sinon la même ligne, vide, pour que rien ne bouge.
+    @ViewBuilder
+    private var usdLine: some View {
+        if let usd = model.usdEquivalent {
+            Text("≈ \(usd)")
+                .chimpFont(.captionStrong)
+                .foregroundStyle(.chimpTextSecondary)
+                .monospacedDigit()
+        } else {
+            Text(verbatim: " ")
+                .chimpFont(.captionStrong)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// Montant saisi, chiffres de même largeur (`ChimpTabularText`) : il ne tremble pas à chaque touche.
     private func amountText(style: ChimpTextStyle) -> some View {
-        Text(verbatim: model.amount.displayText(locale: locale))
+        ChimpTabularText.text(model.amount.displayText(locale: locale), style: style, dynamicTypeSize: dynamicTypeSize)
             .chimpFont(style)
             .foregroundStyle(model.amount.isEmpty ? Color(.chimpTextSecondary) : Color(.chimpTextPrimary))
             .lineLimit(1)
@@ -283,7 +303,7 @@ struct SendAmountView: View {
                     ChimpDrawerOptionRow(
                         icon: drawer.icon,
                         title: drawer.title,
-                        subtitle: model.asset.formattedWithCode(drawer.balance(of: model.asset), locale: locale),
+                        subtitle: model.asset.displayedWithCode(drawer.balance(of: model.asset), locale: locale),
                         isSelected: drawer.id == model.selectedDrawer?.id
                     ) {
                         model.select(drawerID: drawer.id)
@@ -315,7 +335,7 @@ struct SendAmountView: View {
                     ChimpDrawerOptionRow(
                         icon: drawer.icon,
                         title: drawer.title,
-                        subtitle: model.asset.formattedWithCode(drawer.balance(of: model.asset), locale: locale),
+                        subtitle: model.asset.displayedWithCode(drawer.balance(of: model.asset), locale: locale),
                         isSelected: drawer.id == model.destinationDrawer?.id
                     ) {
                         model.selectDestination(drawerID: drawer.id)
@@ -366,7 +386,7 @@ struct SendAmountView: View {
 
     private func assetSubtitle(_ asset: SendAsset) -> String? {
         guard let drawer = model.selectedDrawer else { return nil }
-        let balance = asset.formattedWithCode(drawer.balance(of: asset), locale: locale)
+        let balance = asset.displayedWithCode(drawer.balance(of: asset), locale: locale)
         return String(localized: "\(balance) in \(drawer.title)")
     }
 

@@ -56,7 +56,15 @@ struct ChimpNFCRings<Center: View>: View {
 
 /// Vignette de carte au centre des anneaux : couleur de la carte, contour épais, logo.
 struct ChimpCardThumbnail: View {
-    let color: ChimpCardColor
+    /// Couleur de la carte attendue ; `nil` : carte pas encore nommée (gris, logo estompé).
+    let color: ChimpCardColor?
+    /// Petit badge en bas à droite (« NEW ») : dit **quelle** carte poser (retour du 2026-10-01).
+    var badge: LocalizedStringKey?
+
+    init(color: ChimpCardColor?, badge: LocalizedStringKey? = nil) {
+        self.color = color
+        self.badge = badge
+    }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: ChimpRadius.tab)
@@ -64,8 +72,22 @@ struct ChimpCardThumbnail: View {
             .resizable()
             .scaledToFit()
             .frame(width: ChimpSize.cardThumbnailLogo)
+            .opacity(color == nil ? 0.45 : 1)
             .frame(width: ChimpSize.cardThumbnail.width, height: ChimpSize.cardThumbnail.height)
-            .cartoonSurface(shape, fill: color.fill, border: ChimpBorder.thick, shadow: .card)
+            .cartoonSurface(shape, fill: color?.fill ?? Color(.chimpSurfaceSecondary), border: ChimpBorder.thick, shadow: .card)
+            .overlay(alignment: .bottomTrailing) {
+                if let badge {
+                    Text(badge)
+                        .chimpFont(.labelS)
+                        .textCase(.uppercase)
+                        .foregroundStyle(.chimpOnAccent)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color(.chimpAccent)))
+                        .overlay { Capsule().strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.thin) }
+                        .offset(x: 8, y: 8)
+                }
+            }
             .accessibilityHidden(true)
     }
 }

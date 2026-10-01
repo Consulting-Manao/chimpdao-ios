@@ -236,6 +236,8 @@ final class MockSendService: SendService {
         case loadingForever
         /// Erreur réseau au chargement des soldes.
         case networkError
+        /// Soldes XLM à 7 décimales (capture de Barth du 2026-10-01 : « 999,6196784 »).
+        case longDecimals
 
         var id: String { rawValue }
     }
@@ -497,6 +499,9 @@ final class MockSendService: SendService {
             banana.balances = [:]
         case .noRecents:
             recents = []
+        case .longDecimals:
+            main.balances[.xlm] = Decimal(string: "999.6196784")!
+            banana.balances[.xlm] = Decimal(string: "0.0000042")!
         default:
             break
         }

@@ -170,7 +170,7 @@ final class WalletViewModel {
         }
         let parts = codes.compactMap { code -> String? in
             guard let sum = sums[code], sum != 0 else { return nil }
-            return "\(sum.formatted(.number.precision(.fractionLength(0...2)))) \(code)"
+            return "\(SendAsset.displayed(sum, code: code)) \(code)"
         }
         return parts.isEmpty ? 0.formatted() : parts.joined(separator: " · ")
     }

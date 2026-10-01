@@ -173,4 +173,30 @@ struct AmountEntryTests {
         #expect(SendAsset.xlm.formatted(Decimal(string: "1250.5", locale: Locale(identifier: "en_US_POSIX"))!, locale: english) == "1,250.5")
         #expect(SendAsset.usdc.formattedWithCode(Decimal(string: "62.5", locale: Locale(identifier: "en_US_POSIX"))!, locale: french) == "62,50 USDC")
     }
+
+    @Test("Soldes affichés : 2 décimales au plus, tronquées vers le bas, « < 0.01 » pour un solde minuscule")
+    func displayedBalances() {
+        let posix = Locale(identifier: "en_US_POSIX")
+        let value = { (text: String) in Decimal(string: text, locale: posix)! }
+        // Capture de Barth : « 999,6196784 » illisible.
+        #expect(SendAsset.xlm.displayed(value("999.6196784"), locale: french) == "999,61")
+        #expect(SendAsset.xlm.displayedWithCode(value("994.6196784"), locale: english) == "994.61 XLM")
+        // Jamais arrondi au-dessus.
+        #expect(SendAsset.xlm.displayed(value("0.0199999"), locale: english) == "0.01")
+        #expect(SendAsset.xlm.displayed(value("1999.9999999"), locale: english) == "1,999.99")
+        // Décimales utiles seulement pour XLM, 0 ou 2 pour USDC.
+        #expect(SendAsset.xlm.displayed(value("1250.5"), locale: english) == "1,250.5")
+        #expect(SendAsset.xlm.displayed(1000, locale: english) == "1,000")
+        #expect(SendAsset.usdc.displayed(720, locale: english) == "720")
+        #expect(SendAsset.usdc.displayed(value("62.5"), locale: english) == "62.50")
+        #expect(SendAsset.usdc.displayed(value("62.509"), locale: english) == "62.50")
+        // Non nul mais sous 0,01 : jamais « 0 ».
+        #expect(SendAsset.xlm.displayedWithCode(value("0.0000001"), locale: french) == "< 0,01 XLM")
+        #expect(SendAsset.usdc.displayed(value("0.009"), locale: english) == "< 0.01")
+        #expect(SendAsset.xlm.displayed(0, locale: english) == "0")
+        // Actif hors liste : même règle.
+        #expect(SendAsset.displayed(value("3.14159"), code: "EURC", locale: english) == "3.14")
+        // La valeur exacte reste disponible (Max, montant signé, reçus).
+        #expect(SendAsset.xlm.formatted(value("999.6196784"), locale: english) == "999.6196784")
+    }
 }

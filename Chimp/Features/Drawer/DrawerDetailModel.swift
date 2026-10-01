@@ -206,7 +206,7 @@ final class DrawerDetailModel {
             let value = money.value([AssetAmount(code: code, amount: amount)]).map { money.text($0, style: .wholeWhenRound) }
             return DrawerDetailContent.Asset(
                 code: code,
-                amount: known?.formattedWithCode(amount) ?? "\(amount) \(code)",
+                amount: known?.displayedWithCode(amount) ?? "\(SendAsset.displayed(amount, code: code)) \(code)",
                 value: value
             )
         }

@@ -8,6 +8,8 @@ struct PickPINView<Model: CardPINChoosing>: View {
     @Bindable var model: Model
     var step = 3
     var steps = 3
+    /// Sous-titre de l'en-tête : à quelle carte est ce PIN (ajout d'une carte : « For Banana, the new card »).
+    var subtitle: LocalizedStringKey?
     /// Bouton de fin ; par défaut « Hold your {carte} card to finish » (A6).
     var continueTitle: LocalizedStringKey?
     let onBack: () -> Void
@@ -15,7 +17,7 @@ struct PickPINView<Model: CardPINChoosing>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(title: title, step: step, steps: steps, onBack: backAction)
+            ChimpHeader(title: title, subtitle: subtitle, step: step, steps: steps, onBack: backAction)
             entry
             finishButtons
         }

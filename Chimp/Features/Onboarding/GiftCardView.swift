@@ -58,7 +58,7 @@ final class GiftCardModel {
             let known = SendAsset.allCases.first { $0.code == asset.code }
             return Line(
                 code: asset.code,
-                amount: known?.formattedWithCode(asset.amount) ?? "\(asset.amount) \(asset.code)",
+                amount: known?.displayedWithCode(asset.amount) ?? "\(SendAsset.displayed(asset.amount, code: asset.code)) \(asset.code)",
                 value: prices[asset.code].map { NetWorth.truncatedToCents(asset.amount * $0).formatted(currency) }
             )
         }

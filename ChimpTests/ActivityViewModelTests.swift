@@ -37,14 +37,23 @@ struct ActivityViewModelTests {
 
     // MARK: Montants
 
-    @Test("USDC en dollars, XLM en XLM, montant exact (7 décimales au plus), « + » et « − » typographique")
+    @Test("Lignes : USDC en dollars, XLM en XLM, 2 décimales au plus (tronquées), « + » et « − » typographique")
     func amounts() {
         #expect(ActivityViewModel.amountText(25, code: "USDC", sign: .negative, locale: Self.us) == "\u{2212}$25.00")
         #expect(ActivityViewModel.amountText(Decimal(string: "0.12")!, code: "USDC", sign: .positive, locale: Self.us) == "+$0.12")
-        #expect(ActivityViewModel.amountText(Decimal(string: "0.1234567")!, code: "USDC", sign: nil, locale: Self.us) == "$0.1234567")
+        #expect(ActivityViewModel.amountText(Decimal(string: "0.1299999")!, code: "USDC", sign: nil, locale: Self.us) == "$0.12")
+        #expect(ActivityViewModel.amountText(Decimal(string: "0.0012")!, code: "USDC", sign: .positive, locale: Self.us) == "+< $0.01")
         #expect(ActivityViewModel.amountText(Decimal(string: "1757.5")!, code: "XLM", sign: .positive, locale: Self.us) == "+1,757.5 XLM")
-        #expect(ActivityViewModel.amountText(Decimal(string: "0.0000001")!, code: "XLM", sign: nil, locale: Self.us) == "0.0000001 XLM")
+        #expect(ActivityViewModel.amountText(Decimal(string: "994.6196784")!, code: "XLM", sign: .negative, locale: Self.us) == "\u{2212}994.61 XLM")
+        #expect(ActivityViewModel.amountText(Decimal(string: "0.0000001")!, code: "XLM", sign: nil, locale: Self.us) == "< 0.01 XLM")
         #expect(ActivityViewModel.amountText(1000, code: "XLM", sign: nil, locale: Self.us) == "1,000 XLM")
+    }
+
+    @Test("Reçu : montant exact (7 décimales au plus)")
+    func exactAmounts() {
+        #expect(ActivityViewModel.amountText(Decimal(string: "0.1234567")!, code: "USDC", sign: nil, exact: true, locale: Self.us) == "$0.1234567")
+        #expect(ActivityViewModel.amountText(Decimal(string: "0.0000001")!, code: "XLM", sign: nil, exact: true, locale: Self.us) == "0.0000001 XLM")
+        #expect(ActivityViewModel.amountText(Decimal(string: "994.6196784")!, code: "XLM", sign: .negative, exact: true, locale: Self.us) == "\u{2212}994.6196784 XLM")
     }
 
     @Test("Total du jour : que de l'USDC → en dollars ; sinon par actif ; un Move ne compte pas pour tous les tiroirs")

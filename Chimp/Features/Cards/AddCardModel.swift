@@ -17,6 +17,8 @@ struct AddCardProblem: Equatable {
         case notAMember
         /// La nouvelle carte a été tapée à la place d'une carte du compte (« a card can't invite itself »).
         case isTheNewCard
+        /// Une autre carte du compte que celle choisie pour dire oui (son PIN a été saisi pour celle-là).
+        case notTheChosenCard(String)
         /// Réseau (avant toute signature) : réessayer.
         case network
     }
@@ -498,22 +500,82 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         Task { await runAdding() }
     }
 
-    /// Un PIN est-il à demander avant le tap ? Rejoindre : la carte lue en A8 (on sait si elle a un PIN). Wallet : au moins
-    /// une carte du compte en a un (le PIN n'est envoyé qu'à une carte qui en a un actif), comme un envoi depuis Main.
+    /// Un PIN est-il à demander avant le tap ? Rejoindre : la carte lue en A8 (on sait si elle a un PIN). Wallet : la
+    /// carte choisie pour dire oui ; sans choix, au moins une carte du compte en a un (le PIN n'est envoyé qu'à une
+    /// carte qui en a un actif), comme un envoi depuis Main.
     var memberUsesPIN: Bool {
         if let member { return member.kind == .infineon2Go && member.pinActive }
+        if let chosenMember { return chosenMember.chip != ChipKind.duox.rawValue }
         return session.wallet.account?.cards.contains { $0.chip != ChipKind.duox.rawValue } ?? true
     }
 
-    /// Nom local de la carte lue en A8, s'il est connu.
+    /// Nom local de la carte qui doit dire oui : lue en A8 (rejoindre) ou choisie (Wallet), s'il est connu.
     var expectedMemberName: String? {
-        guard let member else { return nil }
-        return session.wallet.account?.cards.first { $0.publicKey == member.publicKey.hex }?.name
+        if let member { return session.wallet.account?.cards.first { $0.publicKey == member.publicKey.hex }?.name }
+        return chosenMember?.name
+    }
+
+    /// Couleur locale de cette carte, pour sa vignette.
+    var expectedMemberColor: ChimpCardColor? {
+        let key = member?.publicKey.hex ?? chosenMember?.publicKey
+        return session.wallet.account?.cards.first { $0.publicKey == key }?.color.flatMap(ChimpCardColor.init(rawValue:))
+    }
+
+    // MARK: G2 · Quelle carte dit oui ? (retour du call avec Pamphile, 2026-10-01)
+
+    /// Cartes du compte qui peuvent dire oui (Wallet) : toutes, sauf la nouvelle.
+    var memberCandidates: [SavedCard] {
+        guard !isJoining else { return [] }
+        return session.wallet.account?.cards.filter { $0.publicKey != newCard?.publicKey.hex } ?? []
+    }
+
+    /// Carte choisie pour dire oui. Avant, le PIN était demandé « pour votre carte » sans dire laquelle : on choisit
+    /// d'abord la carte, puis son PIN, puis on tape **cette** carte (seule sa clé est acceptée). Une seule carte :
+    /// choisie d'office.
+    private(set) var chosenMemberKey: String?
+
+    var chosenMember: SavedCard? {
+        let candidates = memberCandidates
+        if let chosenMemberKey { return candidates.first { $0.publicKey == chosenMemberKey } }
+        return candidates.count == 1 ? candidates.first : nil
+    }
+
+    /// Plusieurs cartes possibles et aucune choisie : « Scan my card » attend le choix.
+    var needsMemberChoice: Bool {
+        member == nil && memberCandidates.count > 1 && chosenMember == nil
+    }
+
+    func chooseMember(_ key: String) {
+        guard member == nil, !isBusy, memberCandidates.contains(where: { $0.publicKey == key }) else { return }
+        if chosenMemberKey != key { memberPIN = "" }
+        chosenMemberKey = key
+        problem = nil
+    }
+
+    // MARK: Étapes affichées (« Step x of y »)
+
+    /// Écrans où l'on agit, dans l'ordre : la barre « Step x of y » les compte tous, pas seulement les taps (retour du
+    /// 2026-10-01 : on ne savait pas où on en était). Avant la lecture de la nouvelle carte, on compte l'étape du PIN
+    /// (Infineon) ; une DUOX, sans PIN, en a une de moins.
+    var progressScreens: [Screen] {
+        let needsPIN = newCard == nil || (pinMode != .none && addable?.needsLink != false)
+        let start: [Screen] = isJoining ? [.firstName, .nameCard] : [.tapNew, .nameCard]
+        let middle: [Screen] = needsPIN ? [.pin] : []
+        let end: [Screen] = isJoining ? [.findAccount, .confirm, .member] : [.confirm, .member]
+        return start + middle + end
+    }
+
+    /// (étape, nombre d'étapes) d'un écran ; le code de déblocage fait partie du tap de la nouvelle carte.
+    func progress(at screen: Screen) -> (step: Int, of: Int)? {
+        let screens = progressScreens
+        let target = screen == .unlockCode ? .confirm : screen
+        guard let index = screens.firstIndex(of: target) else { return nil }
+        return (index + 1, screens.count)
     }
 
     /// « Scan my card » de G2 : le PIN d'abord s'il en faut un (« PIN puis tap »), puis la feuille du tap.
     func startMemberStep() {
-        guard !isBusy else { return }
+        guard !isBusy, !needsMemberChoice else { return }
         problem = nil
         if memberUsesPIN, memberPIN.count != Self.pinLength {
             memberPIN = ""
@@ -556,7 +618,13 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             return
         }
         guard let prepared else { return }
-        let accepted = member.map { only in prepared.acceptedKeys.filter { $0 == only.publicKey } } ?? prepared.acceptedKeys
+        let accepted: [ChipPublicKey] = if let member {
+            prepared.acceptedKeys.filter { $0 == member.publicKey }
+        } else if let chosenMember {
+            prepared.acceptedKeys.filter { $0.hex == chosenMember.publicKey }
+        } else {
+            prepared.acceptedKeys
+        }
         do {
             let signed = try await signer.sign(digests: [prepared.digest], acceptedKeys: accepted, pin: memberPIN.isEmpty ? nil : memberPIN)
             memberSignature = signed
@@ -577,7 +645,14 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             memberPINFailed(.entering)
         } catch ChipError.cardNotAccepted(let tapped) {
             // Rien n'a été envoyé à cette carte après la lecture de sa clé (ni PIN, ni signature).
-            problem = AddCardProblem(kind: tapped == newCard.publicKey ? .isTheNewCard : .notAMember, technicalDetails: tapped.hex)
+            let kind: AddCardProblem.Kind = if tapped == newCard.publicKey {
+                .isTheNewCard
+            } else if let chosen = chosenMember, prepared.acceptedKeys.contains(tapped) {
+                .notTheChosenCard(chosen.name ?? String(localized: "the card you picked"))
+            } else {
+                .notAMember
+            }
+            problem = AddCardProblem(kind: kind, technicalDetails: tapped.hex)
         } catch let error as ChipError {
             problem = AddCardProblem(kind: .card(AccountSetupModel.problemKind(for: error)), technicalDetails: OnboardingModel.details(error))
         } catch {

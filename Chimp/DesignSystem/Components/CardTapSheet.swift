@@ -20,7 +20,10 @@ enum CardTapPinStatus {
 struct CardTapSheet: View {
     /// Nom de la carte qui doit signer (donnée locale, affichée telle quelle).
     let cardName: String
-    let cardColor: ChimpCardColor
+    /// Couleur de la carte attendue ; `nil` : n'importe laquelle des cartes du compte (vignette grise).
+    let cardColor: ChimpCardColor?
+    /// Badge sur la vignette (« NEW » pour la carte qu'on ajoute).
+    var cardBadge: LocalizedStringKey?
     /// Libellé d'étape (« Last step », « Step 1 of 2 »), en majuscules.
     var stepLabel: LocalizedStringKey?
     /// Titre ; par défaut « Hold your <carte> card to your phone ».
@@ -60,7 +63,7 @@ struct CardTapSheet: View {
 
             Spacer(minLength: ChimpSpacing.s)
             ChimpNFCRings {
-                ChimpCardThumbnail(color: cardColor)
+                ChimpCardThumbnail(color: cardColor, badge: cardBadge)
             }
             .accessibilityHidden(true)
             Spacer(minLength: ChimpSpacing.s)
@@ -74,7 +77,7 @@ struct CardTapSheet: View {
                 .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.control), fill: Color(.chimpSurface))
 
             if let who {
-                ChimpNoticeBanner(text: who, marker: .card(cardColor))
+                ChimpNoticeBanner(text: who, marker: cardColor.map { .card($0) } ?? .info)
                     .padding(.top, ChimpSpacing.sm)
             }
 

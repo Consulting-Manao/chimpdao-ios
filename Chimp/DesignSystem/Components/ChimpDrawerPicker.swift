@@ -35,7 +35,7 @@ struct ChimpDrawerIconView: View {
 
 /// Sélecteur de tiroir en haut d'un écran (« INTO Main account ▾ », D1 ; « FROM Main account $820 → $770 ▾ », C2) :
 /// fond `chimpSurfaceSecondary`, contour 3, rayon 16. Sans action (un seul tiroir possible), la flèche disparaît
-/// et la ligne n'est plus un bouton. Si le solde ne tient pas sur la ligne, il passe dessous.
+/// et la ligne n'est plus un bouton. Le solde (« avant → après ») est toujours sous le nom, sur une seule ligne.
 struct ChimpDrawerPicker: View {
     /// Libellé court en majuscules (« Into », « From »).
     let label: LocalizedStringKey
@@ -73,20 +73,13 @@ struct ChimpDrawerPicker: View {
                 border: ChimpBorder.thin,
                 cornerRadius: 4
             )
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: ChimpSpacing.sm) {
-                    titleText
-                        .fixedSize()
-                    Spacer(minLength: 0)
-                    balanceText
-                        .fixedSize()
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    titleText
-                    balanceText
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Avec un solde : toujours deux lignes, le solde sur une seule (réduit s'il le faut). La hauteur ne change
+            // donc jamais pendant la saisie du montant (retour du 2026-10-01 : la ligne passait de 1 à 3 lignes).
+            VStack(alignment: .leading, spacing: 2) {
+                titleText
+                balanceText
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             if showsChevron {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 13, weight: .black))
@@ -125,6 +118,8 @@ struct ChimpDrawerPicker: View {
                 }
             }
             .chimpFont(.caption)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
         }
     }
 }

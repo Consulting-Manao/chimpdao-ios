@@ -236,7 +236,7 @@ final class SendFlowModel {
 
     var amountIssue: AmountIssue? {
         guard let drawer = selectedDrawer, amount.value > available else { return nil }
-        return .insufficient(drawer: drawer.title, available: asset.formattedWithCode(available))
+        return .insufficient(drawer: drawer.title, available: asset.displayedWithCode(available))
     }
 
     var canReview: Bool {
@@ -272,8 +272,8 @@ final class SendFlowModel {
     var destinationBalanceLine: (before: String, after: String?) {
         let held = destinationDrawer?.balance(of: asset) ?? 0
         let value = amount.value
-        guard value > 0, value <= available else { return (asset.formattedWithCode(held), nil) }
-        return (asset.formatted(held), asset.formattedWithCode(held + value))
+        guard value > 0, value <= available else { return (asset.displayedWithCode(held), nil) }
+        return (asset.displayed(held), asset.displayedWithCode(held + value))
     }
 
     func showDestinationSheet() {
@@ -298,8 +298,8 @@ final class SendFlowModel {
     /// Solde du tiroir choisi, puis solde après l'envoi s'il y a un montant valide (« 720 → 695 USDC »).
     var balanceLine: (before: String, after: String?) {
         let value = amount.value
-        guard value > 0, value <= available else { return (asset.formattedWithCode(available), nil) }
-        return (asset.formatted(available), asset.formattedWithCode(available - value))
+        guard value > 0, value <= available else { return (asset.displayedWithCode(available), nil) }
+        return (asset.displayed(available), asset.displayedWithCode(available - value))
     }
 
     /// Équivalent en dollars pour un actif à prix variable (« ≈ $6.25 »), si un prix est connu.

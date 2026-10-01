@@ -65,6 +65,36 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     func formattedWithCode(_ amount: Decimal, locale: Locale = .autoupdatingCurrent) -> String {
         "\(formatted(amount, locale: locale)) \(code)"
     }
+
+    // MARK: Soldes affichés
+
+    /// Solde **affiché** (décision de Barth du 2026-10-01) : 2 décimales au plus, toujours tronquées vers zéro, jamais
+    /// arrondies au-dessus (« 999.6196784 » → « 999.61 ») ; « < 0.01 » pour un montant non nul plus petit, pour ne jamais
+    /// faire croire à un solde vide. USDC : 0 ou 2 décimales (« 720 », « 62.50 »).
+    /// Affichage seulement : Max, montant saisi, montant signé et reçus gardent la valeur exacte (`formatted`).
+    func displayed(_ amount: Decimal, locale: Locale = .autoupdatingCurrent) -> String {
+        Self.displayed(amount, code: code, locale: locale)
+    }
+
+    /// Solde affiché avec le code : « 994.61 XLM ».
+    func displayedWithCode(_ amount: Decimal, locale: Locale = .autoupdatingCurrent) -> String {
+        "\(displayed(amount, locale: locale)) \(code)"
+    }
+
+    /// Plus petit montant affiché : 0.01.
+    static let smallestDisplayed = Decimal(sign: .plus, exponent: -2, significand: 1)
+
+    /// Même règle pour un actif désigné par son code (actifs hors `SendAsset` : 0 à 2 décimales).
+    static func displayed(_ amount: Decimal, code: String, locale: Locale = .autoupdatingCurrent) -> String {
+        let magnitude = abs(amount)
+        if magnitude > 0, magnitude < smallestDisplayed {
+            let floor = smallestDisplayed.formatted(.number.locale(locale).precision(.fractionLength(2)))
+            return "< \(floor)"
+        }
+        let cents = amount.truncated(to: 2)
+        let fraction: ClosedRange<Int> = code == SendAsset.usdc.code ? (cents.isWhole ? 0...0 : 2...2) : 0...2
+        return cents.formatted(.number.locale(locale).precision(.fractionLength(fraction)))
+    }
 }
 
 extension Decimal {

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// C4 · « Here's what happens » : ce qui va se passer (maquette), puis **exactement** ce que la carte signera
-/// (destinataire complet, memo ID, tiroir source, montant exact, réseau), avant toute session NFC (règle 8).
+/// C4 · « Here's what happens » : un seul résumé de **exactement** ce que la carte signera (montant exact, destinataire
+/// complet, memo ID, tiroir source, réseau, frais offerts), avant toute session NFC (règle 8).
 /// « Looks good » prépare l'envoi (réseau, règle 9), puis ouvre les feuilles de signature (C5, C6) dans
 /// l'ordre choisi (`SigningOrder`).
 ///
@@ -73,27 +73,26 @@ struct SendReviewView: View {
 
     // MARK: Vérification
 
+    /// Un seul résumé (retour du call avec Pamphile, 2026-10-01 : la même information apparaissait trois fois) :
+    /// le montant exact, puis la liste de ce que la carte signe (destinataire complet, memo ID, tiroir source, réseau,
+    /// frais offerts), puis qui peut signer. Move garde ses étapes : elles disent que rien ne quitte le compte.
     private func content(_ draft: SendDraft) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ChimpReviewSteps(steps: [
-                Text("\(amountText(draft)) leaves \(draft.drawer.title)"),
-                draft.isMove
-                    ? Text("\(recipientLabel(draft)) gets it in about 5 seconds. Nothing leaves your account.")
-                    : Text("\(recipientLabel(draft)) gets it in about 5 seconds"),
-                Text("Network fees paid by ChimpDAO"),
-            ])
-
-            signerBanner(draft)
-                .padding(.top, ChimpSpacing.l)
-
-            Text("What your card signs")
-                .chimpFont(.label)
-                .textCase(.uppercase)
-                .foregroundStyle(.chimpTextSecondary)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.top, ChimpSpacing.sectionGap)
-            ChimpDetailList(items: details(draft))
-                .padding(.top, ChimpSpacing.sm)
+            if draft.isMove {
+                ChimpReviewSteps(steps: [
+                    Text("\(amountText(draft)) leaves \(draft.drawer.title)"),
+                    Text("\(recipientLabel(draft)) gets it in about 5 seconds. Nothing leaves your account."),
+                    Text("Network fees paid by ChimpDAO"),
+                ])
+                signerBanner(draft)
+                    .padding(.top, ChimpSpacing.l)
+            } else {
+                amountHeader(draft)
+                ChimpDetailList(items: details(draft))
+                    .padding(.top, ChimpSpacing.l)
+                signerBanner(draft)
+                    .padding(.top, ChimpSpacing.m)
+            }
 
             if let message = model.signingErrorMessage {
                 VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
@@ -105,6 +104,28 @@ struct SendReviewView: View {
                 .padding(.top, ChimpSpacing.m)
             }
         }
+    }
+
+    /// « YOU SEND · 25.5 XLM · ≈ $6.37 » : le montant exact signé, en grand.
+    private func amountHeader(_ draft: SendDraft) -> some View {
+        VStack(spacing: ChimpSpacing.xxs) {
+            Text("You send")
+                .chimpFont(.label)
+                .textCase(.uppercase)
+                .foregroundStyle(.chimpTextSecondary)
+            Text(verbatim: draft.asset.formattedWithCode(draft.amount, locale: locale))
+                .chimpFont(.amountL)
+                .foregroundStyle(.chimpTextPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            if let usd = model.usdEquivalent(of: draft) {
+                Text("≈ \(usd)")
+                    .chimpFont(.captionStrong)
+                    .foregroundStyle(.chimpTextSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 
     /// Montant exact et son code (« 25.5 XLM »), plus l'équivalent en dollars pour un actif à prix variable.
@@ -133,8 +154,8 @@ struct SendReviewView: View {
             items.append(ChimpDetailItem(id: "memo", label: "Memo ID", value: String(memoID), isMonospaced: true))
         }
         items.append(ChimpDetailItem(id: "from", label: "From", value: draft.drawer.title))
-        items.append(ChimpDetailItem(id: "amount", label: "Amount", value: draft.asset.formattedWithCode(draft.amount, locale: locale)))
         items.append(ChimpDetailItem(id: "network", label: "Network", value: draft.network.displayName))
+        items.append(ChimpDetailItem(id: "fees", label: "Fees", value: String(localized: "Paid by ChimpDAO")))
         return items
     }
 
@@ -184,7 +205,6 @@ struct SendReviewView: View {
                     stepLabel: stepLabel(for: step),
                     title: tapTitle(draft, step: step),
                     what: whatIsSigned(draft),
-                    who: tapWho(draft),
                     pinStatus: pinStatus(for: step),
                     isScanning: model.isSigningLocked,
                     problem: model.tapProblem.map(Self.message(for:)),
@@ -196,14 +216,14 @@ struct SendReviewView: View {
         }
     }
 
-    /// Rappel de ce qui est signé, dans la feuille du PIN et celle du tap (règle 8) : « Paying Maya 25 USDC », ou pour un
+    /// Rappel de ce qui est signé, dans la feuille du PIN et celle du tap (règle 8) : « Paying 25 USDC to Maya », ou pour un
     /// Move « Moving 50 USDC from Main account to Jungle's wallet » (maquette E2).
     private func whatIsSigned(_ draft: SendDraft) -> LocalizedStringKey {
         let amount = draft.asset.formattedWithCode(draft.amount, locale: locale)
         if draft.isMove {
             return "Moving \(amount) from \(draft.drawer.title) to \(recipientLabel(draft))"
         }
-        return "Paying \(recipientLabel(draft)) \(amount)"
+        return "Paying \(amount) to \(recipientLabel(draft))"
     }
 
     /// « Step 1 of 2 · PIN », « Step 3 of 3 · Tap », ou « Last step · Tap » s'il n'y a qu'une étape.
@@ -220,16 +240,18 @@ struct SendReviewView: View {
         if let check = model.cardCheck { return "\(check.cardName)'s PIN" }
         switch draft.drawer.kind {
         case .card(let name, _): return "\(name)'s PIN"
-        case .main: return "Your card's PIN"
+        // Depuis Main, n'importe quelle carte signe : le PIN est celui de la carte qu'on va poser.
+        case .main: return "PIN of the card you'll tap"
         }
     }
 
     /// Carte dessinée au centre des anneaux : celle du tiroir, celle lue au premier tap, ou « n'importe laquelle ».
-    private func tapCard(_ draft: SendDraft) -> (name: String, color: ChimpCardColor) {
+    private func tapCard(_ draft: SendDraft) -> (name: String, color: ChimpCardColor?) {
         if let check = model.cardCheck { return (check.cardName, check.cardColor) }
         switch draft.drawer.kind {
         case let .card(name, color): return (name, color)
-        case .main: return ("", .banana)
+        // N'importe quelle carte du compte : vignette grise.
+        case .main: return ("", nil)
         }
     }
 
@@ -241,18 +263,6 @@ struct SendReviewView: View {
             return "Tap any of your cards"
         }
         return nil
-    }
-
-    private func tapWho(_ draft: SendDraft) -> LocalizedStringKey {
-        if let check = model.cardCheck {
-            return "Use the same card: your PIN is for \(check.cardName)."
-        }
-        switch draft.drawer.kind {
-        case .card:
-            return "It's from \(draft.drawer.title), so only that card works."
-        case .main:
-            return "It's from Main, so any of your cards works."
-        }
     }
 
     /// Tap raté, avant toute signature (textes validés ; NFC : messages de Chimpy de l'onboarding).
