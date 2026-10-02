@@ -27,6 +27,7 @@ struct ChimpTabBar: View {
         HStack(spacing: ChimpSpacing.sm) {
             ForEach(ChimpTab.allCases) { tab in
                 ChimpTabButton(tab: tab, isSelected: tab == selection) {
+                    if tab != selection { ChimpSoundPlayer.shared.rustle() }
                     selection = tab
                 }
             }

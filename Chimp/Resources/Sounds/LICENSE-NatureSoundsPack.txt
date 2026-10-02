@@ -1,0 +1,8 @@
+"Nature Sounds Pack" by Antoine Goumain (Antoinemax), https://opengameart.org/content/nature-sounds-pack
+Portfolio: https://antoinegoumain.fr/
+
+Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/
+
+Used in ChimpDAO as leaves1 to leaves6 (navigation rustles), from Foliage01 to Foliage06.
+Changes: trimmed to about 0.6 s, low frequencies filtered, peaks limited, levels matched, faded out, converted to CAF.

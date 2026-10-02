@@ -301,7 +301,7 @@ struct SettingsView: View {
         .frame(minHeight: ChimpSize.minimumTouchTarget)
     }
 
-    /// « Sounds » : la tête de Chimpy fait office d'interrupteur (singe joyeux : activés ; singe « chut » : coupés). Toute
+    /// « Sounds » : la tête de Chimpy, à gauche, fait office d'interrupteur (singe joyeux : activés ; singe « chut » : coupés). Toute
     /// la ligne se touche. Pour VoiceOver, c'est un interrupteur : « Sounds, activé ». Le bouton silencieux de l'iPhone
     /// coupe aussi les sons.
     private var soundsRow: some View {
@@ -309,6 +309,7 @@ struct SettingsView: View {
             model.soundsEnabled.toggle()
         } label: {
             HStack(spacing: ChimpSpacing.m) {
+                ChimpSoundHead(isOn: model.soundsEnabled)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Sounds")
                         .chimpFont(.rowTitle)
@@ -319,7 +320,6 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                ChimpSoundHead(isOn: model.soundsEnabled)
             }
             .padding(.vertical, ChimpSpacing.s)
             .padding(.horizontal, 15)

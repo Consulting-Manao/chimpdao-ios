@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Tête de Chimpy du réglage « Sounds » (I2, demande de Barth du 2026-10-02) : le singe joyeux quand les sons sont
-/// activés, le singe qui fait « chut » quand ils sont coupés. Rond « sticker » : fond crème fixe, contour de 3 pt,
-/// petite ombre. Au changement, la tête rebondit en changeant d'image ; avec « Réduire les animations », un fondu.
+/// activés, le singe qui fait « chut » quand ils sont coupés. La tête seule, sans fond ni contour (retour de Barth).
+/// Au changement, elle rebondit en changeant d'image ; avec « Réduire les animations », un fondu.
 /// Décorative : la ligne qui la contient porte le libellé et l'état pour VoiceOver.
 struct ChimpSoundHead: View {
     let isOn: Bool
@@ -19,8 +19,7 @@ struct ChimpSoundHead: View {
                 .id(isOn)
                 .transition(reduceMotion ? .opacity : .scale(scale: 0.4).combined(with: .opacity))
         }
-        .frame(width: ChimpSize.soundHeadButton, height: ChimpSize.soundHeadButton)
-        .cartoonSurface(Circle(), fill: Color(.chimpStickerFill), shadow: .tile)
+        .frame(width: ChimpSize.soundHead, height: ChimpSize.soundHead)
         .animation(reduceMotion ? .easeInOut(duration: ChimpMotion.Micro.fade) : ChimpMotion.Micro.pop, value: isOn)
         .accessibilityHidden(true)
     }

@@ -1,8 +1,8 @@
 import AVFoundation
 import SwiftUI
 
-/// Les sons de l'app (retour du call avec Pamphile, 2026-10-01 ; répartition de Barth). Tous de Kenney (CC0), choisis
-/// pour ressembler au plus près aux sons Artlist que Barth avait sélectionnés (timbre, attaque, durée, volume).
+/// Les sons de l'app (répartition de Barth, 2026-10-01 et 2026-10-02). Thème bois et jungle : taps en bois (Kenney, CC0),
+/// sons synthétisés pour ChimpDAO, et vrais enregistrements de jungle (feuillages, oiseaux, ruisseau : voir Licenses).
 enum ChimpSound: String, CaseIterable {
     /// Touche du pavé du montant : huit variantes, tirées au hasard, jamais deux fois la même de suite.
     case tap
@@ -16,10 +16,26 @@ enum ChimpSound: String, CaseIterable {
     case error
     /// Pour rire : « Sounds » activé dans les réglages.
     case wood
+    /// Froissement de feuillage en naviguant (nouvel écran, retour, onglet, feuille) : quinze variantes.
+    case leaves
+    /// Un oiseau au loin, à la place d'un froissement de temps en temps : quatre variantes.
+    case bird
+    /// Branche qu'on secoue : « tirer pour rafraîchir ».
+    case branch
 
     /// Fichiers du paquet de l'app (`Resources/Sounds/<nom>.caf`).
     var fileNames: [String] {
-        self == .tap ? (1...8).map { "tap\($0)" } : [rawValue]
+        switch self {
+        case .tap: (1...8).map { "tap\($0)" }
+        case .leaves: (1...15).map { "leaves\($0)" }
+        case .bird: (1...4).map { "bird\($0)" }
+        default: [rawValue]
+        }
+    }
+
+    /// Son d'ambiance (feuillages, oiseaux, branche) : il ne couvre jamais un son utile.
+    var isAmbient: Bool {
+        self == .leaves || self == .bird || self == .branch
     }
 
     /// Absents : pas de son, sans erreur.
@@ -42,20 +58,47 @@ final class ChimpSoundPlayer {
     var isEnabled: () -> Bool = { true }
 
     private var players: [String: AVAudioPlayer] = [:]
-    private var lastTap: String?
+    /// Dernière variante jouée, par son : jamais deux fois la même de suite.
+    private var lastVariant: [ChimpSound: String] = [:]
+    /// Dernier son utile (tap, confirmation, money…) et dernier froissement : les froissements s'effacent devant eux.
+    private var lastUsefulSound = Date.distantPast
+    private var lastRustle = Date.distantPast
     private var isSessionReady = false
-    private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
+    var canPlay: Bool { isEnabled() && !isRunningTests }
 
     func play(_ sound: ChimpSound) {
-        guard isEnabled(), !isRunningTests else { return }
+        guard canPlay else { return }
+        if !sound.isAmbient { lastUsefulSound = .now }
         prepareSession()
-        guard let name = Self.variant(of: sound, after: lastTap), let player = player(named: name) else { return }
-        if sound == .tap { lastTap = name }
+        guard let name = Self.variant(of: sound, after: lastVariant[sound]), let player = player(named: name) else { return }
+        lastVariant[sound] = name
         player.currentTime = 0
         player.play()
     }
 
-    /// Le fichier à jouer : pour les touches, une variante au hasard, différente de la précédente. Le choix ne dépend
+    /// Froissement de feuillage en naviguant (retour de Barth du 2026-10-02 : « l'impression de naviguer dans la
+    /// jungle ») ; une fois sur 25, un oiseau au loin à la place. Au plus un toutes les 0,4 s, et jamais dans les 0,8 s qui
+    /// suivent un son utile : la jungle reste en fond.
+    func rustle(now: Date = .now) {
+        guard Self.allowsRustle(now: now, lastRustle: lastRustle, lastUseful: lastUsefulSound) else { return }
+        lastRustle = now
+        play(Self.rustleSound(roll: Int.random(in: 0..<Self.birdOdds)))
+    }
+
+    /// Un oiseau une fois sur 25.
+    static let birdOdds = 25
+
+    static func rustleSound(roll: Int) -> ChimpSound {
+        roll == 0 ? .bird : .leaves
+    }
+
+    static func allowsRustle(now: Date, lastRustle: Date, lastUseful: Date) -> Bool {
+        now.timeIntervalSince(lastRustle) >= 0.4 && now.timeIntervalSince(lastUseful) >= 0.8
+    }
+
+    /// Le fichier à jouer : une variante au hasard, différente de la précédente. Pour les touches, le choix ne dépend
     /// jamais de la touche tapée (aucune information sur ce qui est saisi).
     static func variant(of sound: ChimpSound, after last: String?) -> String? {
         let names = sound.fileNames
@@ -90,6 +133,49 @@ extension View {
     ) -> some View {
         onChange(of: trigger) { old, new in
             if condition(old, new) { ChimpSoundPlayer.shared.play(sound) }
+        }
+    }
+}
+
+/// Easter egg (demande de Barth du 2026-10-02) : un petit ruisseau qui coule en boucle sur la page Licenses, où personne ne
+/// va. Il arrive en fondu et repart en fondu ; même règles que les autres sons (réglage « Sounds », bouton silencieux).
+@MainActor
+final class ChimpAmbience {
+    static let shared = ChimpAmbience()
+
+    private var player: AVAudioPlayer?
+    private var stopTask: Task<Void, Never>?
+
+    func startStream() {
+        guard ChimpSoundPlayer.shared.canPlay else { return }
+        stopTask?.cancel()
+        if player == nil {
+            guard let url = Bundle.main.url(forResource: "stream", withExtension: "caf"),
+                  let looping = try? AVAudioPlayer(contentsOf: url)
+            else { return }
+            looping.numberOfLoops = -1
+            looping.volume = 0
+            player = looping
+        }
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        player?.play()
+        // Discret (retour de Barth du 2026-10-02) : environ 3 dB sous la première version.
+        player?.setVolume(0.42, fadeDuration: 1.5)
+    }
+
+    /// Arrêt en fondu, un peu différé : passer de la liste des licences à un texte de licence (puis revenir) ne coupe
+    /// pas le ruisseau, `startStream` annule l'arrêt.
+    func stopStream() {
+        guard player != nil else { return }
+        stopTask?.cancel()
+        stopTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(0.3))
+            guard !Task.isCancelled else { return }
+            self?.player?.setVolume(0, fadeDuration: 1)
+            try? await Task.sleep(for: .seconds(1.1))
+            guard !Task.isCancelled else { return }
+            self?.player?.stop()
+            self?.player = nil
         }
     }
 }

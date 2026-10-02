@@ -22,7 +22,10 @@ struct ActivityView: View {
                     .padding(.bottom, ChimpSpacing.xl)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .refreshable { await model.refresh() }
+            .refreshable {
+                ChimpSoundPlayer.shared.play(.branch)
+                await model.refresh()
+            }
         }
         .background(Color(.chimpBackground))
         .task { await model.refresh() }

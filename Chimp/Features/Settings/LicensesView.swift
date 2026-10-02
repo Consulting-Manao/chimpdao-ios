@@ -22,10 +22,12 @@ struct ThirdPartyLicense: Identifiable, Hashable {
                           license: "SIL Open Font License 1.1", file: "OFL-Nunito"),
         ThirdPartyLicense(id: "space-mono", name: "Space Mono", detail: "Font by Google and Colophon Foundry",
                           license: "SIL Open Font License 1.1", file: "OFL-SpaceMono"),
-        // Sons de l'app : taps en bois de Kenney « Impact Sounds » (CC0, licence du pack recopiée telle quelle) ; les autres
-        // sons sont faits pour ChimpDAO (synthèse).
-        ThirdPartyLicense(id: "kenney-sounds", name: "Sound effects", detail: "Wood taps by Kenney (kenney.nl)",
-                          license: "Creative Commons Zero (CC0)", file: "LICENSE-Kenney-Sounds"),
+        // Sons de l'app : taps en bois (Kenney), feuillages, oiseaux et ruisseau (CC0), sons faits pour ChimpDAO.
+        ThirdPartyLicense(id: "sounds", name: "Sound effects", detail: "Kenney, qubodup, BigSoundBank, isaiah658, syncopika",
+                          license: "Creative Commons Zero (CC0)", file: "LICENSE-Sounds"),
+        // Feuillages leaves1 à leaves6 : CC BY 4.0, le crédit à l'auteur est obligatoire.
+        ThirdPartyLicense(id: "nature-sounds-pack", name: "Nature Sounds Pack", detail: "Foliage by Antoine Goumain",
+                          license: "CC BY 4.0", file: "LICENSE-NatureSoundsPack"),
     ]
 
     /// Texte de la licence, `nil` si le fichier manque au paquet.
@@ -38,6 +40,7 @@ struct ThirdPartyLicense: Identifiable, Hashable {
 struct LicensesView: View {
     let onBack: () -> Void
     @State private var selected: ThirdPartyLicense?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(spacing: 0) {
@@ -79,6 +82,14 @@ struct LicensesView: View {
         .navigationDestination(item: $selected) { item in
             LicenseTextView(item: item) { selected = nil }
                 .toolbar(.hidden, for: .navigationBar)
+        }
+        // Easter egg (demande de Barth du 2026-10-02) : un petit ruisseau coule ici, là où personne ne vient. Il continue
+        // sur le texte d'une licence, reprend au retour dans l'app, et s'éteint en fondu en quittant la page.
+        .onAppear { ChimpAmbience.shared.startStream() }
+        .onDisappear { if selected == nil { ChimpAmbience.shared.stopStream() } }
+        .onChange(of: selected) { _, new in if new == nil { ChimpAmbience.shared.startStream() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { ChimpAmbience.shared.startStream() } else { ChimpAmbience.shared.stopStream() }
         }
     }
 }

@@ -195,9 +195,8 @@ enum ChimpSize {
     static let reviewStepBadge: CGFloat = 36
     /// Bouton radio d'une ligne de choix, contour compris.
     static let radio: CGFloat = 24
-    /// Bouton « Sounds » des réglages : rond, contour compris, et la tête de Chimpy dedans.
-    static let soundHeadButton: CGFloat = 56
-    static let soundHead: CGFloat = 40
+    /// Tête de Chimpy du réglage « Sounds » (sans fond, à gauche de la ligne).
+    static let soundHead: CGFloat = 44
 }
 
 /// Opacités (0 à 1).

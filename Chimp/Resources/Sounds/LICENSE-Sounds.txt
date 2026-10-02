@@ -1,0 +1,40 @@
+ChimpDAO sounds
+
+Public domain (Creative Commons Zero, CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/):
+- tap1 to tap8: "Impact Sounds" by Kenney (www.kenney.nl): impactWood_light_000, impactWood_light_002, impactWood_medium_002,
+  impactWood_medium_004, impactPlank_medium_000, impactPlank_medium_003 (trimmed, sped up, level-matched).
+- leaves7 to leaves15, branch: "20 Rustles of dry leaves" by qubodup, https://opengameart.org/content/20-rustles-dry-leaves
+  (rustle01-06, 10, 12, 20: trimmed, softened, level-matched).
+- stream: "Forest and Stream #1" by Pierre Sibanarco, BigSoundBank (LaSonotheque), https://bigsoundbank.com/foret-et-ruisseau-1-s2713.html
+  (22-second excerpt, looped, peaks limited).
+- bird1 to bird3: "Ambient Bird Sounds" by isaiah658, https://opengameart.org/content/ambient-bird-sounds (excerpts).
+- bird4: "Bird chirping sounds" by syncopika, https://opengameart.org/content/bird-chirping-sounds
+
+Made for ChimpDAO: confirmation, money, hurt, error, wood (synthesized marimba, wood block, coconut and shaker).
+
+leaves1 to leaves6: see "Nature Sounds Pack" (CC BY 4.0) in Licenses.
+
+==================================================
+	
+
+	Impact Sounds (1.0)
+
+	Created/distributed by Kenney (www.kenney.nl)
+	Creation date: 19-12-2019
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	This content is free to use in personal, educational and commercial projects.
+	Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
+
+			------------------------------
+
+	Donate:   http://support.kenney.nl
+	Request:  http://request.kenney.nl
+	Patreon:  http://patreon.com/kenney/
+
+	Follow on Twitter for updates:
+	http://twitter.com/KenneyNL

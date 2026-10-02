@@ -47,7 +47,11 @@ struct WalletView: View {
             }
         }
         .scrollBounceBehavior(.basedOnSize)
-        .refreshable { await model.refresh() }
+        .refreshable {
+            // Tirer pour rafraîchir : on secoue la branche.
+            ChimpSoundPlayer.shared.play(.branch)
+            await model.refresh()
+        }
         // Tiré vers le bas, le haut de l'écran garde la couleur de l'en-tête.
         .background(alignment: .top) {
             Color(.chimpHeader).frame(height: 320)

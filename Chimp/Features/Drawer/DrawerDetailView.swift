@@ -47,6 +47,7 @@ struct DrawerDetailView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .refreshable {
+                ChimpSoundPlayer.shared.play(.branch)
                 async let wallet: Void = model.refresh()
                 async let history: Void = activity.refresh()
                 _ = await (wallet, history)

@@ -24,7 +24,40 @@ struct PersonalityTests {
             #expect(sound.urls.count == sound.fileNames.count, "\(sound.rawValue)")
         }
         #expect(ChimpSound.tap.fileNames.count == 8)
-        #expect(ThirdPartyLicense.all.first { $0.id == "kenney-sounds" }?.text()?.contains("Creative Commons Zero") == true)
+        #expect(ChimpSound.leaves.fileNames.count == 15, "Au moins 10 à 15 froissements (demande de Barth)")
+        #expect(ChimpSound.bird.fileNames.count == 4)
+        #expect(Bundle.main.url(forResource: "stream", withExtension: "caf") != nil, "Le ruisseau de la page Licenses")
+        #expect(ThirdPartyLicense.all.first { $0.id == "sounds" }?.text()?.contains("Creative Commons Zero") == true)
+        let attribution = ThirdPartyLicense.all.first { $0.id == "nature-sounds-pack" }?.text() ?? ""
+        #expect(attribution.contains("Antoine Goumain") && attribution.contains("CC BY 4.0") && attribution.contains("Changes"),
+                "CC BY 4.0 : l'auteur, la licence et les modifications sont cités")
+    }
+
+    @Test("Froissements : au plus un toutes les 0,4 s, jamais dans les 0,8 s après un son utile ; un oiseau une fois sur 25")
+    func rustleRules() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        #expect(ChimpSoundPlayer.allowsRustle(now: now, lastRustle: .distantPast, lastUseful: .distantPast))
+        #expect(!ChimpSoundPlayer.allowsRustle(now: now, lastRustle: now.addingTimeInterval(-0.2), lastUseful: .distantPast))
+        #expect(ChimpSoundPlayer.allowsRustle(now: now, lastRustle: now.addingTimeInterval(-0.45), lastUseful: .distantPast))
+        #expect(!ChimpSoundPlayer.allowsRustle(now: now, lastRustle: .distantPast, lastUseful: now.addingTimeInterval(-0.5)),
+                "Un froissement ne couvre jamais money, error, une touche…")
+        #expect(ChimpSoundPlayer.rustleSound(roll: 0) == .bird)
+        #expect((1..<ChimpSoundPlayer.birdOdds).allSatisfy { ChimpSoundPlayer.rustleSound(roll: $0) == .leaves })
+        #expect(ChimpSound.leaves.isAmbient && ChimpSound.bird.isAmbient && ChimpSound.branch.isAmbient)
+        #expect(!ChimpSound.money.isAmbient && !ChimpSound.tap.isAmbient)
+    }
+
+    @Test("Feuillages : une variante au hasard, jamais la même deux fois de suite")
+    @MainActor func leavesVariants() {
+        var last: String?
+        var seen = Set<String>()
+        for _ in 0..<300 {
+            let next = ChimpSoundPlayer.variant(of: .leaves, after: last)
+            #expect(next != nil && next != last)
+            last = next
+            seen.insert(next ?? "")
+        }
+        #expect(seen.count == 15, "Les quinze finissent toutes par sortir")
     }
 
     @Test("Touches : une variante au hasard, jamais deux fois la même de suite ; les autres sons : un seul fichier")

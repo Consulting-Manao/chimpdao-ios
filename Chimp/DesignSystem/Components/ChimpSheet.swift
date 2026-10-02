@@ -55,6 +55,8 @@ struct ChimpSheetContainer<Content: View>: View {
         VStack(spacing: 0) {
             Capsule()
                 .fill(Color(.chimpSurfaceSecondary))
+                // Une feuille qui s'ouvre : un froissement de feuillage (retour du 2026-10-02).
+                .onAppear { ChimpSoundPlayer.shared.rustle() }
                 .frame(width: ChimpSize.sheetHandle.width, height: ChimpSize.sheetHandle.height)
                 .padding(.top, ChimpSpacing.lg)
                 .padding(.bottom, handleSpacing)
