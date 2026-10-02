@@ -32,6 +32,8 @@ import SwiftUI
 //                                             bouton secondaire sur l'en-tête (noir 22 %, fusion du 20 % du bouton)
 //   chimpHeaderBannerBorder                   bord haut du bandeau bas des écrans pleins
 //   chimpIllustrationShadow                   ombre des illustrations de Chimpy
+//   chimpStickerFill                          fond crème (#F6EFE3) des boutons « sticker » (tête de Chimpy de « Sounds »),
+//                                             dans les deux thèmes : la tête noire resterait invisible sur le vert sombre
 //   chimpQRBackground / chimpQRModule         fond blanc et modules sombres du QR code, dans les deux thèmes
 //                                             (un QR clair sur fond sombre se scanne mal)
 //   chimpCard* / chimpOnCard*                 couleurs des cartes et leur texte

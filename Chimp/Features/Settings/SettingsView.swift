@@ -301,22 +301,38 @@ struct SettingsView: View {
         .frame(minHeight: ChimpSize.minimumTouchTarget)
     }
 
-    /// « Sounds » : petits sons de l'app. Le bouton silencieux de l'iPhone les coupe aussi.
+    /// « Sounds » : la tête de Chimpy fait office d'interrupteur (singe joyeux : activés ; singe « chut » : coupés). Toute
+    /// la ligne se touche. Pour VoiceOver, c'est un interrupteur : « Sounds, activé ». Le bouton silencieux de l'iPhone
+    /// coupe aussi les sons.
     private var soundsRow: some View {
-        Toggle(isOn: $model.soundsEnabled) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Sounds")
-                    .chimpFont(.rowTitle)
-                    .foregroundStyle(.chimpTextPrimary)
-                Text("Muted when your iPhone is on silent")
-                    .chimpFont(.captionS)
-                    .foregroundStyle(.chimpTextSecondary)
+        Button {
+            model.soundsEnabled.toggle()
+        } label: {
+            HStack(spacing: ChimpSpacing.m) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Sounds")
+                        .chimpFont(.rowTitle)
+                        .foregroundStyle(.chimpTextPrimary)
+                    Text(model.soundsEnabled ? "On · muted when your iPhone is on silent" : "Off")
+                        .chimpFont(.captionS)
+                        .foregroundStyle(.chimpTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                ChimpSoundHead(isOn: model.soundsEnabled)
             }
+            .padding(.vertical, ChimpSpacing.s)
+            .padding(.horizontal, 15)
+            .frame(minHeight: ChimpSize.minimumTouchTarget)
+            .contentShape(Rectangle())
         }
-        .toggleStyle(ChimpToggleStyle())
-        .padding(.vertical, 11)
-        .padding(.horizontal, 15)
-        .frame(minHeight: ChimpSize.minimumTouchTarget)
+        .buttonStyle(ChimpPressableStyle())
+        .sensoryFeedback(.selection, trigger: model.soundsEnabled)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Sounds"))
+        .accessibilityValue(model.soundsEnabled ? Text("On") : Text("Off"))
+        .accessibilityHint(Text("Muted when your iPhone is on silent"))
+        .accessibilityAddTraits(.isToggle)
     }
 
     /// Libellé selon l'iPhone (maquette : « Face ID to open the app »).

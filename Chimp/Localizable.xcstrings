@@ -1735,6 +1735,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "On · muted when your iPhone is on silent" : {
+
+    },
     "on %@" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -2291,6 +2294,10 @@
     },
     "Sounds" : {
 
+    },
+    "Sounds head (Settings)" : {
+      "comment" : "Catalogue du design system (Debug et Testing uniquement).",
+      "extractionState" : "manual"
     },
     "Spacing" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",

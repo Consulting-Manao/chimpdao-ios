@@ -1,10 +1,11 @@
 #if DESIGN_CATALOG
 import SwiftUI
 
-/// Bulle de Chimpy dans ses 5 poses, flottement et anneaux NFC.
+/// Bulle de Chimpy dans ses poses, tête du réglage « Sounds », flottement et anneaux NFC.
 struct CatalogChimpyPage: View {
     let settings: CatalogSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var soundsOn = true
 
     var body: some View {
         CatalogPage("Chimpy and motion", settings: settings) {
@@ -27,6 +28,24 @@ struct CatalogChimpyPage: View {
                     text: "You'll type it each time the card signs. I don't keep a copy, so pick one you won't forget.",
                     pose: .banana
                 )
+            }
+
+            VStack(alignment: .leading, spacing: ChimpSpacing.l) {
+                CatalogSectionTitle("Sounds head (Settings)")
+                HStack(spacing: ChimpSpacing.xl) {
+                    VStack(spacing: ChimpSpacing.xs) {
+                        ChimpSoundHead(isOn: true)
+                        Text(verbatim: "On").chimpFont(.captionS).foregroundStyle(.chimpTextSecondary)
+                    }
+                    VStack(spacing: ChimpSpacing.xs) {
+                        ChimpSoundHead(isOn: false)
+                        Text(verbatim: "Off").chimpFont(.captionS).foregroundStyle(.chimpTextSecondary)
+                    }
+                    Button { soundsOn.toggle() } label: { ChimpSoundHead(isOn: soundsOn) }
+                        .buttonStyle(ChimpPressableStyle())
+                        .accessibilityLabel(Text(verbatim: "Toggle sample"))
+                }
+                .frame(maxWidth: .infinity)
             }
 
             VStack(alignment: .leading, spacing: ChimpSpacing.l) {

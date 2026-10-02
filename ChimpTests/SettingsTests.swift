@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 @testable import ChimpDAO
 
 /// Réglages de base (I2) : nom et couleur des cartes, prénom, « Disconnect this phone ». Données du téléphone seulement.
@@ -42,6 +43,20 @@ struct SettingsTests {
         #expect(model.cards.map(\.id) == [r1, k1])
         #expect(model.cards[0].displayName == "Card")
         #expect(model.cards[1].displayName == "Banana" && model.cards[1].color == .banana)
+    }
+
+    @Test("« Sounds » (tête de Chimpy) : un toucher coupe, un autre réactive ; gardé dans les préférences ; les deux têtes sont dans l'app")
+    func soundsSetting() {
+        let (session, _) = session(namedWallet)
+        let model = SettingsModel(session: session, walletCards: [])
+        #expect(model.soundsEnabled)
+        model.soundsEnabled.toggle()
+        #expect(!model.soundsEnabled)
+        #expect(!session.preferences.soundsEnabled)
+        model.soundsEnabled.toggle()
+        #expect(session.preferences.soundsEnabled)
+        #expect(UIImage(named: "ChimpySoundOn") != nil)
+        #expect(UIImage(named: "ChimpySoundOff") != nil)
     }
 
     @Test("Wallet pas encore chargé : les cartes enregistrées sur le téléphone")
