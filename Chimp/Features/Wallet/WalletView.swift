@@ -15,6 +15,9 @@ struct WalletView: View {
     /// Main ou une carte touchée : son détail (B2, B3).
     var onOpenDrawer: (DrawerSelection) -> Void = { _ in }
 
+    /// De combien l'en-tête est tiré vers le bas (« tirer pour rafraîchir »).
+    @State private var pull = WalletPull()
+
     var body: some View {
         // Le défilement passe sous la barre d'état : l'en-tête comble lui-même la zone sûre du haut,
         // pour que son fond et son motif montent sans coupure (voir ChimpBalanceHeader).
@@ -29,6 +32,8 @@ struct WalletView: View {
         ScrollView {
             VStack(spacing: 0) {
                 header(topSafeArea: topSafeArea)
+                    // Seulement quand on tire vers le bas : 0 au repos et pendant le défilement normal (aucune mise à jour).
+                    .onGeometryChange(for: CGFloat.self) { max(0, $0.frame(in: .global).minY) } action: { pull.distance = $0 }
                 VStack(alignment: .leading, spacing: 0) {
                     switch model.phase {
                     case .failed:
@@ -52,9 +57,9 @@ struct WalletView: View {
             ChimpSoundPlayer.shared.play(.branch)
             await model.refresh()
         }
-        // Tiré vers le bas, le haut de l'écran garde la couleur de l'en-tête.
+        // Tiré vers le bas, le haut de l'écran garde la couleur et le motif de l'en-tête (retour de Barth, 2026-10-02).
         .background(alignment: .top) {
-            Color(.chimpHeader).frame(height: 320)
+            WalletPullBackground(pull: pull)
         }
         .ignoresSafeArea(edges: .top)
     }
@@ -217,4 +222,30 @@ extension WalletAction {
         WalletView(model: WalletViewModel(dataSource: MockWalletDataSource(scenario: .networkError)))
     }
     .preferredColorScheme(.dark)
+}
+
+/// Distance tirée, dans un objet à part : seul le fond la lit, le Wallet n'est pas recalculé pendant le geste.
+@Observable
+private final class WalletPull {
+    var distance: CGFloat = 0
+}
+
+/// Fond révélé au-dessus de l'en-tête quand on tire pour rafraîchir : la couleur de l'en-tête et son motif, décalé
+/// de la distance tirée pour continuer exactement celui de l'en-tête (pas de raccord visible). Derrière le défilement,
+/// donc sous la roue de chargement.
+private struct WalletPullBackground: View {
+    let pull: WalletPull
+    private let height: CGFloat = 320
+
+    var body: some View {
+        let tile = ChimpPattern.tileHeight
+        Color(.chimpHeader)
+            .overlay(alignment: .top) {
+                ChimpPattern()
+                    .frame(height: height + tile)
+                    .offset(y: pull.distance.truncatingRemainder(dividingBy: tile) - tile)
+            }
+            .frame(height: height)
+            .clipped()
+    }
 }

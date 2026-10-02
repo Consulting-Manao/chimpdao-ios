@@ -7,6 +7,12 @@ struct ChimpPattern: View {
     var tileWidth: CGFloat = ChimpSize.patternTile
     var opacity: Double = ChimpOpacity.pattern
 
+    /// Hauteur d'une tuile pour la largeur par défaut (420 pt) : le motif se répète tous les `tileHeight` points.
+    static let tileHeight: CGFloat = {
+        let size = UIImage(resource: .pattern).size
+        return size.width > 0 ? ChimpSize.patternTile * size.height / size.width : 251
+    }()
+
     var body: some View {
         GeometryReader { proxy in
             // L'image fait 420 pt de large : on la répète, puis on la réduit pour obtenir la taille de tuile voulue.
