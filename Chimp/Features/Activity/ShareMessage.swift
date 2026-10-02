@@ -1,0 +1,75 @@
+import Foundation
+
+/// Message de « Share » d'un reçu (Activity et C9), dans le ton de Chimpy : textes validés par Barth le 2026-10-02.
+///
+/// Il garde les faits utiles (montant exact, autre partie en court, date, réseau, lien Stellar Expert comme preuve) et
+/// ajoute une petite chute tirée dans une liste. Le tirage dépend de la transaction : le même reçu donne toujours le même
+/// texte. Sur testnet, « (play money) » : personne ne doit croire à de vrais fonds.
+enum ShareMessage {
+    enum Story: Equatable {
+        /// Envoi vers une adresse (déjà raccourcie).
+        case sent(to: String)
+        /// Paiement reçu d'une adresse, dans un tiroir (« Main account »).
+        case received(from: String, into: String)
+        /// Move entre deux tiroirs.
+        case moved(from: String, to: String)
+        /// Carte ajoutée, et la carte qui a dit oui si on la connaît.
+        case cardAdded(card: String, approvedBy: String?)
+    }
+
+    static let sentPunchlines: [LocalizedStringResource] = [
+        "Tap. Sign. Swing. Done.",
+        "Faster than a monkey on a vine.",
+        "No banana was harmed.",
+    ]
+
+    static let receivedPunchlines: [LocalizedStringResource] = [
+        "Chimpy is doing his happy dance.",
+        "The jungle provides.",
+        "Ripe and ready.",
+    ]
+
+    static func text(_ story: Story, amount: String?, date: String, network: StellarNetwork, explorerURL: URL?, hash: String) -> String {
+        let networkName = network == .mainnet ? network.displayName : String(localized: "\(network.displayName) (play money)")
+        let amount = amount ?? ""
+        let proof = explorerURL.map { String(localized: "Proof, straight from the jungle: \($0.absoluteString)") }
+        var lines: [String]
+        switch story {
+        case .sent(let to):
+            lines = [
+                String(localized: "🍌 Swoosh! I just sent \(amount) to \(to) with ChimpDAO."),
+                String(localized: pick(sentPunchlines, hash: hash)),
+                "\(networkName) · \(date)",
+            ]
+            if let proof { lines.append(proof) }
+        case let .received(from, into):
+            lines = [
+                String(localized: "🐵 Bananas incoming! \(from) sent me \(amount)."),
+                String(localized: pick(receivedPunchlines, hash: hash)),
+                String(localized: "Landed in my \(into) · \(networkName) · \(date)"),
+            ]
+            if let proof { lines.append(proof) }
+        case let .moved(from, to):
+            lines = [
+                String(localized: "🌴 Moved \(amount) from \(from) to \(to)."),
+                String(localized: "Same jungle, different branch."),
+                "\(networkName) · \(date)",
+            ]
+        case let .cardAdded(card, approvedBy):
+            lines = [
+                approvedBy.map { String(localized: "🃏 \(card) just joined my jungle! \($0) said yes.") }
+                    ?? String(localized: "🃏 \(card) just joined my jungle!"),
+                String(localized: "The gang keeps growing."),
+                "\(networkName) · \(date)",
+            ]
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Chute choisie par la transaction : toujours la même pour un même hash (somme des caractères, pas `hashValue`, qui
+    /// change à chaque lancement de l'app).
+    static func pick(_ lines: [LocalizedStringResource], hash: String) -> LocalizedStringResource {
+        let seed = hash.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
+        return lines[seed % lines.count]
+    }
+}

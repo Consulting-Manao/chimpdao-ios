@@ -434,8 +434,24 @@ final class ActivityViewModel {
         let date = record.at.formatted(Date.FormatStyle(locale: locale).weekday(.abbreviated).day().month(.abbreviated))
         let time = record.at.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale))
         let explorer = source.explorerURL(transactionHash: record.hash)
-        let share = [row.title, row.amount, record.at.formatted(date: .abbreviated, time: .shortened), network.displayName]
-            .compactMap { $0 }.joined(separator: " · ") + (explorer.map { "\n\($0.absoluteString)" } ?? "")
+        func title(_ address: String) -> String {
+            drawers.first { $0.address == address }?.title ?? StellarAddressParser.short(address)
+        }
+        let story: ShareMessage.Story = switch kind {
+        case .sent: .sent(to: StellarAddressParser.short(record.to))
+        case .received: .received(from: StellarAddressParser.short(record.from), into: title(record.to))
+        case .moved: .moved(from: title(record.from), to: title(record.to))
+        case .cardAdded: .cardAdded(
+            card: record.cardKey.flatMap { source.cardName(key: $0) } ?? String(localized: "A new card"),
+            approvedBy: record.approvedBy.flatMap { source.cardName(key: $0) }
+        )
+        }
+        let share = ShareMessage.text(
+            story,
+            amount: record.amount.flatMap { amount in record.assetCode.map { Self.exactAmount(amount, code: $0, locale: locale) } },
+            date: record.at.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, locale: locale)),
+            network: network, explorerURL: explorer, hash: record.hash
+        )
         return ActivityReceipt(
             id: record.id,
             header: "\(date) · \(time)",

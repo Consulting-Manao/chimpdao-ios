@@ -282,8 +282,8 @@ extension ActivityViewModelTests {
         #expect(receipt.send == SendPrefill(address: Self.maya, asset: .usdc, amount: 25, origin: .payAgain), "Pay again : adresse, actif et montant")
         #expect(receipt.counterparty == ActivityReceipt.Counterparty(lineID: "to", address: Self.maya))
         #expect(receipt.explorerURL?.absoluteString.hasSuffix(Self.hash) == true)
-        #expect(receipt.shareText.contains("You paid GCQF…GXPO"))
-        #expect(receipt.shareText.hasSuffix(Self.hash))
+        #expect(receipt.shareText.hasPrefix("🍌 Swoosh! I just sent 25.00 USDC to GCQF…GXPO with ChimpDAO."))
+        #expect(receipt.shareText.hasSuffix(Self.hash), "Le lien Stellar Expert en dernier, comme preuve")
         #expect(receipt.header.contains(" · "))
     }
 
