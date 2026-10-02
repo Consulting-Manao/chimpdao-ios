@@ -108,6 +108,8 @@ struct MainTabView: View {
                     }
                 #endif
             }
+            // « See the receipt » d'Envoyer (C9) ouvre le reçu de l'Activity.
+            .environment(activityModel)
         case .activity:
             NavigationStack {
                 ActivityView(model: activityModel, onPending: { isShowingPendingSend = true }, onSendPrefilled: { prefilledSend = $0 })
@@ -127,6 +129,7 @@ struct MainTabView: View {
                         }
                     }
             }
+            .environment(activityModel)
         case .grow:
             NavigationStack {
                 PlaceholderTabView(tab: selection)

@@ -133,6 +133,12 @@ struct ScanAndPrefillTests {
             try? await Task.sleep(for: .milliseconds(10))
         }
         #expect(model.sendAgainPrefill == SendPrefill(address: maya, asset: .usdc, amount: 25, origin: .payAgain))
+        if case .finished(.sent(let receipt)) = model.signingStage {
+            #expect(receipt.activityRecord.from == MockReceiveDataSource.mainAddress, "Reçu de C9 : parti de Main")
+            #expect(receipt.activityRecord.to == maya)
+        } else {
+            Issue.record("Envoi non confirmé")
+        }
 
         let move = SendFlowModel(service: MockSendService(delay: .zero), kind: .move)
         #expect(move.sendAgainPrefill == nil)

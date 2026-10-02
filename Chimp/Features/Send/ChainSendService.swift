@@ -163,16 +163,15 @@ final class ChainSendService: SendService {
             throw SendServiceError.unknownDrawer(signed.prepared.draft.drawer.id)
         }
         let hash = try await payments.submit(payment, signed: card, feeSigner: feeSigner, onProgress: onProgress)
-        let draft = signed.prepared.draft
-        if let account = session.wallet.account?.address {
-            session.recordActivity(.payment(
-                hash: hash, from: draft.drawer.address, to: draft.recipient.address, assetCode: draft.asset.code, amount: draft.amount
-            ), account: account)
-        }
-        return SendReceipt(
+        let receipt = SendReceipt(
             summary: SendSummary(signed.prepared.draft), transactionHash: hash, sentAt: .now,
             explorerURL: explorerURL(transactionHash: hash)
         )
+        // La ligne d'historique est celle du reçu : C9 et l'Activity montrent le même reçu.
+        if let account = session.wallet.account?.address {
+            session.recordActivity(receipt.activityRecord, account: account)
+        }
+        return receipt
     }
 
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck {

@@ -16,14 +16,21 @@ struct SendStatusView: View {
 
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
+    /// L'historique de l'app (onglet Activity) : « See the receipt » ouvre le même reçu imprimé (I1.1d).
+    @Environment(ActivityViewModel.self) private var appActivity: ActivityViewModel?
+    /// Catalogue et aperçus, sans historique de l'app : l'historique factice, aux mêmes adresses que l'envoi factice.
+    @State private var mockActivity = ActivityViewModel(source: MockActivityDataSource(scenario: .standard))
     @State private var seed = ChimpyLines.seed()
 
     var body: some View {
         Group {
             if case .finished(.sent(let receipt)) = model.signingStage {
                 SendSentView(receipt: receipt, onDone: model.finish, onReceipt: { model.isReceiptPresented = true })
-                    .chimpSheet(isPresented: $model.isReceiptPresented, height: ChimpSize.cardTapSheetHeight) {
-                        SendReceiptSheet(receipt: receipt, onSendAgain: model.sendAgainPrefill == nil ? nil : { model.sendAgain() })
+                    .chimpSheet(isPresented: $model.isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true) {
+                        if let printed = activity.receipt(forSent: receipt.activityRecord, locale: locale) {
+                            // « Pay again » (envoi seulement, comme dans l'Activity) : un parcours neuf, prérempli.
+                            ActivityReceiptSheet(receipt: printed, model: activity) { _ in model.sendAgain() }
+                        }
                     }
             } else {
                 statusScreen
@@ -31,6 +38,8 @@ struct SendStatusView: View {
         }
         .blocksSwipeBack(true)
     }
+
+    private var activity: ActivityViewModel { appActivity ?? mockActivity }
 
     // MARK: Écran d'état
 
@@ -274,105 +283,6 @@ struct SendSentView: View {
                 // Des bananes traversent l'écran, une fois, derrière le texte (rien avec « Réduire les animations »).
                 .overlay { ChimpBananaBurst() }
                 .ignoresSafeArea()
-        }
-    }
-}
-
-/// Reçu (non dessiné, textes validés) : destinataire complet, memo ID, From, montant, date, réseau, frais offerts,
-/// identifiant de la transaction (sélectionnable, donc copiable) et lien vers Stellar Expert.
-struct SendReceiptSheet: View {
-    let receipt: SendReceipt
-    /// « Pay again » : Envoyer de nouveau, prérempli (`nil` pour un Move).
-    var onSendAgain: (() -> Void)?
-
-    @Environment(\.locale) private var locale
-
-    var body: some View {
-        ReceiptSheet(
-            items: items, showsFees: true, explorerURL: receipt.explorerURL,
-            copyAddress: onSendAgain == nil ? nil : receipt.summary.recipientAddress, onSendAgain: onSendAgain
-        )
-    }
-
-    private var items: [ChimpDetailItem] {
-        let summary = receipt.summary
-        var items: [ChimpDetailItem] = []
-        if let name = summary.recipientName {
-            items.append(ChimpDetailItem(id: "name", label: "To", value: name))
-        }
-        items.append(ChimpDetailItem(
-            id: "address", label: summary.recipientName == nil ? "To" : "Address",
-            value: SendReviewView.grouped(summary.recipientAddress), isMonospaced: true
-        ))
-        if let memoID = summary.memoID {
-            items.append(ChimpDetailItem(id: "memo", label: "Memo ID", value: String(memoID), isMonospaced: true))
-        }
-        items.append(ChimpDetailItem(id: "from", label: "From", value: summary.drawerTitle))
-        items.append(ChimpDetailItem(id: "amount", label: "Amount", value: summary.asset.formattedWithCode(summary.amount, locale: locale)))
-        items.append(ChimpDetailItem(id: "date", label: "Date", value: receipt.sentAt.formatted(date: .abbreviated, time: .shortened)))
-        items.append(ChimpDetailItem(id: "network", label: "Network", value: summary.network.displayName))
-        items.append(ChimpDetailItem(id: "hash", label: "Transaction", value: receipt.transactionHash, isMonospaced: true))
-        return items
-    }
-}
-
-/// Feuille « Receipt » : détails, frais offerts (pour ce que ChimpDAO a payé), lien vers Stellar Expert. Partagée par
-/// Envoyer (C9) et l'onglet Activity (détail d'un mouvement).
-struct ReceiptSheet: View {
-    let items: [ChimpDetailItem]
-    let showsFees: Bool
-    let explorerURL: URL?
-    /// Adresse de l'autre partie, copiée **en entier** par « Copy address ».
-    var copyAddress: String?
-    /// « Pay again ».
-    var onSendAgain: (() -> Void)?
-    var clipboard: AddressClipboard = SystemAddressClipboard()
-
-    @Environment(\.openURL) private var openURL
-    @State private var copyCount = 0
-    @State private var isShowingCopied = false
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: ChimpSpacing.m) {
-                Text("Receipt")
-                    .chimpFont(.sheetTitle)
-                    .foregroundStyle(.chimpTextPrimary)
-                    .accessibilityAddTraits(.isHeader)
-                ChimpDetailList(items: items)
-                if showsFees {
-                    Text("Network fees paid by ChimpDAO")
-                        .chimpFont(.caption)
-                        .foregroundStyle(.chimpTextSecondary)
-                }
-                if copyAddress != nil || onSendAgain != nil {
-                    HStack(spacing: ChimpSpacing.sm) {
-                        if let copyAddress {
-                            ChimpButton(isShowingCopied ? "Copied!" : "Copy address", kind: .secondary) { copy(copyAddress) }
-                        }
-                        if let onSendAgain {
-                            ChimpButton("Pay again", action: onSendAgain)
-                        }
-                    }
-                }
-                if let explorerURL {
-                    ChimpButton("View on Stellar Expert", kind: .secondary) { openURL(explorerURL) }
-                }
-            }
-            .padding(.horizontal, ChimpSpacing.fullScreenMargin)
-            .padding(.vertical, ChimpSpacing.l)
-        }
-        .sensoryFeedback(.success, trigger: copyCount)
-    }
-
-    private func copy(_ address: String) {
-        clipboard.copy(address)
-        copyCount += 1
-        withAnimation(.easeInOut(duration: ChimpMotion.Copied.transition)) { isShowingCopied = true }
-        AccessibilityNotification.Announcement(String(localized: "Address copied")).post()
-        Task {
-            try? await Task.sleep(for: ChimpMotion.Copied.display)
-            withAnimation(.easeInOut(duration: ChimpMotion.Copied.transition)) { isShowingCopied = false }
         }
     }
 }

@@ -287,6 +287,45 @@ extension ActivityViewModelTests {
         #expect(receipt.header.contains(" · "))
     }
 
+    @Test("C9 « See the receipt » : la ligne d'historique de l'envoi, et le même reçu imprimé que dans l'Activity")
+    func sentPaymentReceipt() async throws {
+        let sent = SendReceipt(
+            summary: SendSummary(
+                recipientAddress: Self.maya, recipientName: nil, drawerTitle: "Jungle's wallet", fromAddress: Self.jungle,
+                asset: .usdc, amount: 25, network: .testnet
+            ),
+            transactionHash: Self.hash, sentAt: Self.at(0, 14), explorerURL: nil
+        )
+        let record = sent.activityRecord
+        #expect(record == .payment(hash: Self.hash, from: Self.jungle, to: Self.maya, assetCode: "USDC", amount: 25, at: Self.at(0, 14)))
+
+        // Onglet jamais ouvert : les tiroirs sont lus sur le téléphone, sans réseau.
+        let source = FakeActivitySource()
+        let fresh = ActivityViewModel(source: source, calendar: Self.calendar, now: { Self.now })
+        let printed = try #require(fresh.receipt(forSent: record, locale: Self.us))
+        #expect(source.syncCount == 0)
+        let fromActivity = try #require(await receiptModel().receipt(for: record, locale: Self.us))
+        #expect(printed == fromActivity)
+        #expect(printed.stamp == .paid)
+        #expect(printed.send == SendPrefill(address: Self.maya, asset: .usdc, amount: 25, origin: .payAgain))
+
+        // La ligne gardée par le téléphone fait foi : elle a son N° une fois la chaîne relue.
+        var stored = record
+        stored.ledger = 4_935_984
+        source.stored = AccountActivity(records: [stored])
+        #expect(fresh.receipt(forSent: record, locale: Self.us)?.number == "N° 4935984")
+
+        // Move : le même reçu que l'Activity, sans « Pay again ».
+        let move = SendReceipt(
+            summary: SendSummary(
+                recipientAddress: Self.jungle, recipientName: nil, drawerTitle: "Main account", fromAddress: Self.main,
+                asset: .xlm, amount: 5, network: .testnet
+            ),
+            transactionHash: "m0ve" + String(repeating: "0", count: 60), sentAt: Self.at(0, 15), explorerURL: nil
+        )
+        #expect(try #require(fresh.receipt(forSent: move.activityRecord, locale: Self.us)).send == nil)
+    }
+
     @Test("Reçu d'un montant reçu : FROM puis TO (Main), pas de frais (pas envoyé par ce téléphone), « Send back »")
     func receivedReceipt() async throws {
         let model = await receiptModel()

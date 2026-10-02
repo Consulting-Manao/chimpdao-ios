@@ -458,6 +458,15 @@ final class ActivityViewModel {
         )
     }
 
+    /// Reçu d'un envoi qui vient de partir (C9 « See the receipt ») : le même reçu que sa ligne de l'Activity. La ligne
+    /// gardée par le téléphone fait foi (elle a son « N° » une fois la chaîne relue) ; les tiroirs sont lus sur le
+    /// téléphone, sans réseau, si l'onglet ne les a pas encore chargés.
+    func receipt(forSent record: ActivityRecord, locale: Locale = .autoupdatingCurrent) -> ActivityReceipt? {
+        if drawers.isEmpty { drawers = source.drawers() }
+        let stored = source.storedActivity().records.first { $0.id == record.id }
+        return receipt(for: stored ?? record, locale: locale)
+    }
+
     /// Montant exact dans l'actif, pour la ligne « Amount » : « 25.00 USDC », « 1,757.5 XLM ».
     static func exactAmount(_ amount: Decimal, code: String, locale: Locale = .autoupdatingCurrent) -> String {
         let digits = code == SendAsset.usdc.code ? 2...7 : 0...7

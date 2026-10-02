@@ -140,6 +140,15 @@ struct SendReceipt: Equatable {
     let sentAt: Date
     /// Page de la transaction dans l'explorateur (Stellar Expert).
     let explorerURL: URL?
+
+    /// La ligne que ce téléphone écrit dans son historique pour cet envoi (`recordPayment`) : « See the receipt » (C9)
+    /// ouvre le même reçu imprimé que cette ligne dans l'Activity (I1.1d).
+    var activityRecord: ActivityRecord {
+        .payment(
+            hash: transactionHash, from: summary.fromAddress, to: summary.recipientAddress, assetCode: summary.asset.code,
+            amount: summary.amount, at: sentAt
+        )
+    }
 }
 
 /// Ce qui a été signé, tel qu'on le réaffiche après coup (envoi en cours, C9, reçu, issue incertaine), y compris
@@ -149,14 +158,20 @@ struct SendSummary: Equatable {
     let recipientAddress: String
     let recipientName: String?
     let drawerTitle: String
+    /// Adresse du tiroir de départ (Main account ou wallet d'une carte).
+    let fromAddress: String
     let asset: SendAsset
     let amount: Decimal
     let network: StellarNetwork
 
-    init(recipientAddress: String, recipientName: String?, drawerTitle: String, asset: SendAsset, amount: Decimal, network: StellarNetwork) {
+    init(
+        recipientAddress: String, recipientName: String?, drawerTitle: String, fromAddress: String, asset: SendAsset, amount: Decimal,
+        network: StellarNetwork
+    ) {
         self.recipientAddress = recipientAddress
         self.recipientName = recipientName
         self.drawerTitle = drawerTitle
+        self.fromAddress = fromAddress
         self.asset = asset
         self.amount = amount
         self.network = network
@@ -165,14 +180,14 @@ struct SendSummary: Equatable {
     init(_ draft: SendDraft) {
         self.init(
             recipientAddress: draft.recipient.address, recipientName: draft.recipientName, drawerTitle: draft.drawer.title,
-            asset: draft.asset, amount: draft.amount, network: draft.network
+            fromAddress: draft.drawer.address, asset: draft.asset, amount: draft.amount, network: draft.network
         )
     }
 
     init(_ pending: PendingSend, network: StellarNetwork) {
         self.init(
             recipientAddress: pending.recipient, recipientName: pending.recipientName, drawerTitle: pending.drawerTitle,
-            asset: SendAsset(rawValue: pending.asset) ?? .xlm, amount: pending.amount, network: network
+            fromAddress: pending.trace.from, asset: SendAsset(rawValue: pending.asset) ?? .xlm, amount: pending.amount, network: network
         )
     }
 
