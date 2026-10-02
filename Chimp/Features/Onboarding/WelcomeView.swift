@@ -24,7 +24,7 @@ struct WelcomeView: View {
                     ChimpHeaderSettingsButton(action: onDeveloper)
                 }
             }
-            .padding(.top, ChimpSpacing.s)
+            .padding(.top, ChimpSpacing.s + ChimpSpacing.headerTopBreathing)
             .padding(.horizontal, ChimpSpacing.fullScreenMargin)
 
             (Text("Your wallet") + Text(verbatim: "\n") + Text("is a card.").foregroundColor(Color(.chimpAccent)))

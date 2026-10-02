@@ -86,8 +86,8 @@ struct ChimpHeaderBackButton: View {
     }
 }
 
-/// Bouton réglages de l'en-tête : la roue dentée en bois (2026-10-02), même traitement que le retour, décalée de 6 pt
-/// vers la droite (miroir du retour, décision de Barth).
+/// Bouton réglages de l'en-tête : la roue dentée en bois (2026-10-02), même traitement que le retour, décalée de 2 pt
+/// vers la droite (6 pt la collaient au coin, retour de Barth).
 struct ChimpHeaderSettingsButton: View {
     let action: () -> Void
 
@@ -115,7 +115,7 @@ private struct ChimpHeaderImageButton: View {
         }
         .buttonStyle(ChimpPressableStyle())
         .fixedSize()
-        .padding(edge == .leading ? .leading : .trailing, -ChimpSize.headerButtonEdgeOffset)
+        .padding(edge == .leading ? .leading : .trailing, edge == .leading ? -ChimpSize.headerBackEdgeOffset : -ChimpSize.headerSettingsEdgeOffset)
     }
 
     /// Ce que la zone tactile ajoute autour de l'image, retiré de la mise en page (comme `expandedTouchTarget`).

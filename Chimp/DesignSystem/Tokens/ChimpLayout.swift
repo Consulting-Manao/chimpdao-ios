@@ -38,12 +38,18 @@ enum ChimpSpacing {
     /// Sans barre d'état haute (iPhone SE) : écart entre la barre d'état et le contenu de l'en-tête,
     /// repris de la maquette (texte de la barre d'état jusqu'à 43 pt, contenu à 58 pt).
     static let statusBarGap: CGFloat = 15
+    /// Air ajouté en haut des en-têtes et de la première rangée d'A1 (retour de Barth, 2026-10-02 : le contenu était
+    /// un peu trop collé au haut de l'écran).
+    static let headerTopBreathing: CGFloat = 6
     /// Sans barre d'accueil (iPhone SE) : marge sous les onglets.
     static let tabBarBottomWithoutHomeIndicator: CGFloat = 16
 
     /// Marges de l'en-tête (Chimp Top), mesurées depuis le bas de la zone sûre du haut.
     static func header(for screen: EdgeInsets, bottom: CGFloat = 18) -> EdgeInsets {
-        EdgeInsets(top: screen.hasTallStatusBar ? -chromeSafeAreaOverlap : statusBarGap, leading: 20, bottom: bottom, trailing: 20)
+        EdgeInsets(
+            top: (screen.hasTallStatusBar ? -chromeSafeAreaOverlap : statusBarGap) + headerTopBreathing,
+            leading: 20, bottom: bottom, trailing: 20
+        )
     }
 
     /// Marges de la barre d'onglets (Chimp Nav), mesurées depuis le haut de la zone sûre du bas.
@@ -122,8 +128,10 @@ enum ChimpSize {
     static let minimumTouchTarget: CGFloat = 44
     /// Boutons de l'en-tête (retour en bambou, roue dentée en bois) : hauteur de l'image.
     static let headerButton: CGFloat = 40
-    /// Décalage des boutons de l'en-tête vers le bord de l'écran, pour qu'ils paraissent alignés sur la marge.
-    static let headerButtonEdgeOffset: CGFloat = 6
+    /// Décalage des boutons de l'en-tête vers le bord de l'écran, pour qu'ils paraissent alignés sur la marge :
+    /// 6 pt pour le retour (à gauche), 2 pt pour les réglages (à droite, moins collés au coin, retour de Barth).
+    static let headerBackEdgeOffset: CGFloat = 6
+    static let headerSettingsEdgeOffset: CGFloat = 2
     /// Hauteur d'un segment de la barre d'étapes, contour de 2 pt compris (7 + 2 × 2 dans la maquette).
     static let stepSegmentHeight: CGFloat = 11
     /// Chimpy dans sa bulle.
