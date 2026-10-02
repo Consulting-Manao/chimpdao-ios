@@ -118,7 +118,7 @@ struct UnlockCodeView: View {
             ChimpHeader(title: "Your unlock code")
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.l) {
-                    ChimpySays(text: "If you ever forget your PIN, this code unlocks the card. It's shown only once: write it down.", pose: .stand)
+                    ChimpySays(text: "If you ever forget your PIN, this code unlocks the card. It's shown only once: write it down.", pose: .teacher)
                     Text(verbatim: displayedCode)
                         .chimpFont(.amountS)
                         .monospaced()
@@ -290,6 +290,7 @@ struct JungleWelcomeView: View {
                         ChimpNoticeBanner(text: untranslated("Practice run: nothing was created. Let's swing takes you back to the start."))
                     }
                     #endif
+                    if !isRehearsal { newAccountCheer }
                     drawers
                     VStack(alignment: .leading, spacing: ChimpSpacing.m) {
                         numbered(1, "Main is shared by all your cards. Each card also has its own wallet that only it can spend.")
@@ -303,7 +304,7 @@ struct JungleWelcomeView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             VStack(spacing: ChimpSpacing.ml) {
-                ChimpySays(text: "Nothing moves between drawers on its own. You do it with Move.", pose: .crawl)
+                ChimpySays(text: "Nothing moves between drawers on its own. You do it with Move.", pose: .armsCrossed)
                 ChimpButton("Let's swing", action: onFinish)
             }
             .padding(.horizontal, ChimpSpacing.xxl)
@@ -312,6 +313,23 @@ struct JungleWelcomeView: View {
         }
         .background(Color(.chimpBackground))
         .blocksSwipeBack(true)
+    }
+
+    /// Le compte vient d'être créé (demande de Barth, 2026-10-02) : Chimpy « mewing » et sa bulle, comme A1.
+    /// Absent de la répétition à blanc, où rien n'est créé.
+    private var newAccountCheer: some View {
+        VStack(spacing: ChimpSpacing.lg) {
+            ChimpSpeechBubble(text: "New account created. You're now part of the jungle giga chads. Stop mewing and go stack some bananas.")
+            Image(.chimpyMewing)
+                .resizable()
+                .scaledToFit()
+                // 170 pt, réduit sur petit écran (iPhone SE) pour que « Main account » reste visible sans défiler.
+                .containerRelativeFrame(.vertical) { length, _ in min(170, length * 0.3) }
+                .chimpBob(duration: 4)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, ChimpSpacing.l)
+        .frame(maxWidth: .infinity)
     }
 
     private var drawers: some View {

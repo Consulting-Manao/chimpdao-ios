@@ -142,7 +142,7 @@ struct ReceiveView: View {
 
             ChimpySays(
                 text: "Main is the easy pick. Money sent to a card's wallet can only be spent with that exact card.",
-                pose: .crawl
+                pose: .unsure
             )
             .padding(.top, ChimpSpacing.l)
         }

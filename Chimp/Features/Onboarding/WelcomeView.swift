@@ -40,7 +40,7 @@ struct WelcomeView: View {
             VStack(spacing: ChimpSpacing.lg) {
                 Spacer(minLength: ChimpSpacing.l)
                 ChimpSpeechBubble(text: "Hi, I'm Chimpy! Ready to swing into your jungle?")
-                Image(.chimpyStand)
+                Image(.chimpyWave)
                     .resizable()
                     .scaledToFit()
                     .frame(maxHeight: 330)

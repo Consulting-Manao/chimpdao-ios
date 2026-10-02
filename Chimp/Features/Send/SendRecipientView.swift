@@ -41,7 +41,7 @@ struct SendRecipientView: View {
                             .padding(.top, ChimpSpacing.l)
                     }
                     recents
-                    ChimpySays(line: ChimpyLines.pick(ChimpyLines.recipientTips, seed: seed), pose: .crawl)
+                    ChimpySays(line: ChimpyLines.pick(ChimpyLines.recipientTips, seed: seed), pose: tipPose)
                         .padding(.top, ChimpSpacing.xl)
                 }
                 .padding(.horizontal, ChimpSpacing.xxl)
@@ -170,6 +170,13 @@ struct SendRecipientView: View {
         case .valid(let recipient):
             ChimpFieldMessage(text: confirmation(for: recipient), kind: .success)
         }
+    }
+
+    /// Bulle du bas : le professeur donne son conseil ; il sort le bâton quand l'adresse ou le code est refusé.
+    private var tipPose: ChimpyPose {
+        if model.scanIssue != nil { return .stick }
+        if case .invalid(let issue) = model.recipientState, showsIssueWhileTyping(issue) { return .stick }
+        return .teacher
     }
 
     private func showsIssueWhileTyping(_ issue: RecipientIssue) -> Bool {

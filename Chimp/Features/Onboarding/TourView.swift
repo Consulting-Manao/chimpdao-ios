@@ -151,9 +151,9 @@ private struct TourPage: View {
 
     private var pose: ChimpyPose {
         switch index {
-        case 0: .head
+        case 0: .teacher
         case 1: .banana
-        case 2: .crawl
+        case 2: .teacher
         default: .stand
         }
     }

@@ -105,7 +105,7 @@ struct SendStatusView: View {
             waiting(until: until)
             failureReasonLine
         case .finished(.nothingSent):
-            ChimpySays(text: "Your money didn't move. You can try again.", pose: .head)
+            ChimpySays(text: "Your money didn't move. You can try again.", pose: .peel)
         case .finished(.undetermined):
             ChimpySays(text: "I can't tell yet if it went through. Don't send it again — tap Check again in a moment.", pose: .head)
             failureReasonLine
@@ -225,7 +225,7 @@ struct SendSentView: View {
         VStack(spacing: 0) {
             Spacer(minLength: ChimpSpacing.l)
             VStack(spacing: 0) {
-                Image(.chimpyBanana)
+                Image(.chimpyPlane)
                     .resizable()
                     .scaledToFit()
                     .frame(height: 230)

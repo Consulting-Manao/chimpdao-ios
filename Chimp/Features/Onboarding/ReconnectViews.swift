@@ -73,7 +73,7 @@ struct WelcomeBackView: View {
             ChimpHeader(title: "Welcome back!", subtitle: "Your account is open again", onBack: onBack)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    ChimpySays(text: "Your money never left your cards. Names stay on each phone, so tell me again.", pose: .banana)
+                    ChimpySays(text: "Your money never left your cards. Names stay on each phone, so tell me again.", pose: .armsCrossed)
 
                     if model.asksFirstName {
                         label("Your name")

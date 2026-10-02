@@ -7,6 +7,16 @@ enum ChimpyPose: String, CaseIterable, Identifiable {
     case stand
     case hamac
     case head
+    // Chimpy v2 (2026-10-02) : une pose par humeur.
+    case wave        // salut, clin d'œil : accueil
+    case armsCrossed // bras croisés, sûr de lui : ce qu'il faut savoir
+    case teacher     // professeur : visite, conseils
+    case plant       // plante une pousse : tiroir vide
+    case stop        // nez bouché, main tendue : action refusée
+    case stick       // bâton et banane pourrie : adresse ou code refusé
+    case peel        // peau de banane : rien n'est parti
+    case unsure      // hésite entre deux bananes : choix d'un tiroir ou d'un compte
+    case sniff       // caleçon, odeur de banane : carte toute neuve
 
     var id: String { rawValue }
 
@@ -17,6 +27,15 @@ enum ChimpyPose: String, CaseIterable, Identifiable {
         case .stand: .chimpyStand
         case .hamac: .chimpyHamac
         case .head: .tileHead
+        case .wave: .chimpyWave
+        case .armsCrossed: .chimpyArmsCrossed
+        case .teacher: .chimpyTeacher
+        case .plant: .chimpyPlant
+        case .stop: .chimpyStop
+        case .stick: .chimpyStick
+        case .peel: .chimpyPeel
+        case .unsure: .chimpyUnsure
+        case .sniff: .chimpySniff
         }
     }
 }

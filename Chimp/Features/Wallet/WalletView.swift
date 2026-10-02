@@ -106,7 +106,7 @@ struct WalletView: View {
             }
 
             if content.isZeroBalance {
-                ChimpySays(text: "Your jungle is empty. Tap Receive to get your first bananas.", pose: .banana)
+                ChimpySays(text: "Your jungle is empty. Tap Receive to get your first bananas.", pose: .wave)
                     .padding(.top, ChimpSpacing.l)
             }
 

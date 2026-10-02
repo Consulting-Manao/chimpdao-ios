@@ -13,7 +13,7 @@ struct WrongCardView: View {
         VStack(spacing: 0) {
             Spacer(minLength: ChimpSpacing.l)
             VStack(spacing: 0) {
-                Image(.chimpyStand)
+                Image(.chimpyUnsure)
                     .resizable()
                     .scaledToFit()
                     .frame(height: 230)

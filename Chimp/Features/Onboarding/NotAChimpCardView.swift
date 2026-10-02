@@ -9,7 +9,7 @@ struct NotAChimpCardView: View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
                 Spacer(minLength: ChimpSpacing.l)
-                Image(.chimpyStand)
+                Image(.chimpyStink)
                     .resizable()
                     .scaledToFit()
                     .frame(maxHeight: 230)

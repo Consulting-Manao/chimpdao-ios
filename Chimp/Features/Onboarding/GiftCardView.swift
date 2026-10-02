@@ -134,7 +134,7 @@ struct GiftCardView: View {
             }
             .foregroundStyle(Color(.chimpOnCardBright))
             .frame(maxWidth: .infinity, alignment: .leading)
-            Image(.chimpyBanana)
+            Image(.chimpyHearts)
                 .resizable()
                 .scaledToFit()
                 .frame(height: 100)

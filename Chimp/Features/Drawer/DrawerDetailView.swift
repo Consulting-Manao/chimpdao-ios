@@ -113,7 +113,7 @@ struct DrawerDetailView: View {
             }
 
             if content.isEmpty {
-                ChimpySays(text: emptyText, pose: .banana)
+                ChimpySays(text: emptyText, pose: .plant)
                     .padding(.top, ChimpSpacing.xl)
             } else {
                 LazyVGrid(

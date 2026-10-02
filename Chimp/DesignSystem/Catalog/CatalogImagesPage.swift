@@ -13,6 +13,20 @@ struct CatalogImagesPage: View {
         ("ChimpyBanana", .chimpyBanana, 230),
         ("ChimpyHamac", .chimpyHamac, 169),
         ("ChimpyCrawl", .chimpyCrawl, 180),
+        // Chimpy v2 : grande taille d'affichage dans l'app (68 pt de large pour les poses réservées aux bulles).
+        ("ChimpyWave", .chimpyWave, 330),
+        ("ChimpyPlane", .chimpyPlane, 230),
+        ("ChimpyUnsure", .chimpyUnsure, 230),
+        ("ChimpyStink", .chimpyStink, 230),
+        ("ChimpyMewing", .chimpyMewing, 170),
+        ("ChimpyHearts", .chimpyHearts, 170),
+        ("ChimpyStop", .chimpyStop, 150),
+        ("ChimpyArmsCrossed", .chimpyArmsCrossed, 80),
+        ("ChimpyTeacher", .chimpyTeacher, 72),
+        ("ChimpySniff", .chimpySniff, 80),
+        ("ChimpyPlant", .chimpyPlant, 67),
+        ("ChimpyStick", .chimpyStick, 47),
+        ("ChimpyPeel", .chimpyPeel, 43),
     ]
 
     var body: some View {

@@ -318,7 +318,7 @@ struct SendAmountView: View {
 
             ChimpySays(
                 text: "Main is the easy pick. Paying from a card's wallet means that exact card has to be in your hand.",
-                pose: .crawl
+                pose: .unsure
             )
             .padding(.top, ChimpSpacing.l)
         }
@@ -350,7 +350,7 @@ struct SendAmountView: View {
 
             ChimpySays(
                 text: "Money in a card's wallet can only be spent with that card. Main works with any of your cards.",
-                pose: .crawl
+                pose: .unsure
             )
             .padding(.top, ChimpSpacing.l)
         }

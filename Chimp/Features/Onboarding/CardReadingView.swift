@@ -75,7 +75,7 @@ struct CardReadingView: View {
                 .disabled(state == .checking || state == .scanning)
                 .padding(.bottom, ChimpSpacing.l)
             } else if showsReturningText {
-                ChimpySays(text: "Just once. After that, peek at your bananas anytime, no card.", pose: .crawl)
+                ChimpySays(text: "Just once. After that, peek at your bananas anytime, no card.", pose: .wave)
                     .padding(.horizontal, ChimpSpacing.fullScreenMargin)
                     .padding(.bottom, ChimpSpacing.xl)
             } else {

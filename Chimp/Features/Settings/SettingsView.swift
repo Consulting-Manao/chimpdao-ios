@@ -512,7 +512,7 @@ struct AccountsSheet: View {
                 .padding(.bottom, ChimpSpacing.m)
             }
             .scrollBounceBehavior(.basedOnSize)
-            ChimpySays(text: "I only forget this phone. Your money stays on your cards, promise.", pose: .crawl)
+            ChimpySays(text: "I only forget this phone. Your money stays on your cards, promise.", pose: .unsure)
             ChimpButton(disconnectTitle, kind: .destructive, action: model.disconnectFromAccounts)
             .padding(.top, ChimpSpacing.m)
             .padding(.bottom, ChimpSpacing.l)

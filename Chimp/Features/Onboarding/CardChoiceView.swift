@@ -48,7 +48,7 @@ struct CardChoiceView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
 
-            ChimpySays(text: chimpy, pose: .crawl)
+            ChimpySays(text: chimpy, pose: choice.kind == .fresh ? .sniff : .crawl)
                 .padding(.horizontal, ChimpSpacing.xxl)
                 .padding(.top, ChimpSpacing.ml)
                 .padding(.bottom, ChimpSpacing.l)

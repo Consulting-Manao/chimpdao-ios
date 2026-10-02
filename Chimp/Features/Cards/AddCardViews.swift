@@ -81,6 +81,11 @@ struct AddCardFlowView: View {
         return "Step \(progress.step) of \(progress.of)"
     }
 
+    /// Carte refusée : Chimpy se bouche le nez ; souci technique : la tête, comme les autres erreurs.
+    static func pose(for kind: AddCardProblem.Kind) -> ChimpyPose {
+        sound(for: kind) == .hurt ? .stop : .head
+    }
+
     /// Messages de Chimpy (textes proposés, DESIGN_NOTES §12).
     static func message(for kind: AddCardProblem.Kind) -> LocalizedStringKey {
         switch kind {
@@ -144,7 +149,7 @@ struct AddCardTapScreen: View {
 
             VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
                 if let problem = model.problem {
-                    ChimpySays(text: AddCardFlowView.message(for: problem.kind), pose: .head)
+                    ChimpySays(text: AddCardFlowView.message(for: problem.kind), pose: AddCardFlowView.pose(for: problem.kind))
                     ChimpTechnicalDetails(details: problem.technicalDetails, onDarkBackground: true)
                 } else {
                     ChimpySays(text: chimpy, pose: .banana)
@@ -229,7 +234,7 @@ struct AddCardConfirmView: View {
                     }
                     if let problem = model.problem {
                         VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
-                            ChimpySays(text: AddCardFlowView.message(for: problem.kind), pose: .head)
+                            ChimpySays(text: AddCardFlowView.message(for: problem.kind), pose: AddCardFlowView.pose(for: problem.kind))
                             ChimpTechnicalDetails(details: problem.technicalDetails)
                         }
                     }
@@ -562,7 +567,7 @@ struct CardAddedView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: ChimpSpacing.l) {
-                    Image(.chimpyBanana)
+                    Image(.chimpyHearts)
                         .resizable()
                         .scaledToFit()
                         .frame(height: 170)

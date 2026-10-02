@@ -142,7 +142,7 @@ struct RemoveCardReviewView: View {
             .scrollBounceBehavior(.basedOnSize)
             VStack(spacing: ChimpSpacing.m) {
                 if !model.target.walletIsEmpty {
-                    ChimpySays(text: "Want the \(model.target.walletAmount) back in Main? Move it before you remove \(model.target.name).", pose: .crawl)
+                    ChimpySays(text: "Want the \(model.target.walletAmount) back in Main? Move it before you remove \(model.target.name).", pose: .teacher)
                 }
                 ChimpButton("Looks good", isLoading: model.isBusy) { Task { await model.start() } }
                 if !model.target.walletIsEmpty, let onMoveFirst {
@@ -282,7 +282,7 @@ struct LastCardSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Image(.chimpyStand)
+            Image(.chimpyStop)
                 .resizable()
                 .scaledToFit()
                 .frame(height: 150)
