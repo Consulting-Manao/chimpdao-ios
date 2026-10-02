@@ -120,10 +120,10 @@ struct ChimpShadow: Equatable {
 enum ChimpSize {
     /// Zone tactile minimale (recommandation Apple).
     static let minimumTouchTarget: CGFloat = 44
-    /// Bouton rond de l'en-tête (retour).
+    /// Boutons de l'en-tête (retour en bambou, roue dentée en bois) : hauteur de l'image.
     static let headerButton: CGFloat = 40
-    /// Bouton rond de l'en-tête (réglages).
-    static let headerGearButton: CGFloat = 42
+    /// Décalage des boutons de l'en-tête vers le bord de l'écran, pour qu'ils paraissent alignés sur la marge.
+    static let headerButtonEdgeOffset: CGFloat = 6
     /// Hauteur d'un segment de la barre d'étapes, contour de 2 pt compris (7 + 2 × 2 dans la maquette).
     static let stepSegmentHeight: CGFloat = 11
     /// Chimpy dans sa bulle.

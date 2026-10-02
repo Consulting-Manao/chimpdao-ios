@@ -23,7 +23,6 @@ import SwiftUI
 //   chimpAccent / chimpOnAccent               jaune banane et texte posé dessus
 //   chimpOnHeaderPrimary / …Secondary         titres et sous-titres sur l'en-tête
 //   chimpOnHeaderAccent                       libellé « STEP 2 OF 3 » (#FFD42B au lieu de #FFD11E, contraste)
-//   chimpHeaderButtonFill                     boutons ronds de l'en-tête
 //   chimpOutlineOnHeader                      contours posés sur l'en-tête : segments d'étape, onglet actif
 //                                             (#201C1A dans les deux thèmes, comme la maquette)
 //   chimpStepSegmentInactive                  segments d'étape non atteints

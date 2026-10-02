@@ -23,12 +23,7 @@ struct ChimpHeader: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: ChimpSpacing.m) {
                 if let onBack {
-                    ChimpHeaderRoundButton(size: ChimpSize.headerButton, action: onBack) {
-                        ChimpBackChevron()
-                            .stroke(Color(.chimpOnHeaderPrimary), style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
-                            .frame(width: 12, height: 20)
-                    }
-                    .accessibilityLabel(Text("Back"))
+                    ChimpHeaderBackButton(action: onBack)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -75,38 +70,56 @@ struct ChimpHeader: View {
                 .overlay { ChimpPattern() }
                 .ignoresSafeArea(edges: .top)
         }
+        // Un écran apparaît (en avançant comme en revenant) : un froissement de feuillage (retour du 2026-10-02).
+        .onAppear { ChimpSoundPlayer.shared.rustle() }
     }
 }
 
-/// Bouton réglages (roue dentée) de l'en-tête : rond de 42 pt, zone tactile de 44 pt.
+/// Bouton retour de l'en-tête : le disque en bois et sa flèche en bambou (2026-10-02), sans fond, contour ni ombre.
+/// Décalé de 6 pt vers la gauche pour paraître aligné sur le bord.
+struct ChimpHeaderBackButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        ChimpHeaderImageButton(image: .headerBack, edge: .leading, action: action)
+            .accessibilityLabel(Text("Back"))
+    }
+}
+
+/// Bouton réglages de l'en-tête : la roue dentée en bois (2026-10-02), même traitement que le retour, décalée de 6 pt
+/// vers la droite (miroir du retour, décision de Barth).
 struct ChimpHeaderSettingsButton: View {
     let action: () -> Void
 
     var body: some View {
-        ChimpHeaderRoundButton(size: ChimpSize.headerGearButton, action: action) {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 22, weight: .heavy))
-                .foregroundStyle(.chimpOnHeaderPrimary)
-        }
-        .accessibilityLabel(Text("Settings"))
+        ChimpHeaderImageButton(image: .headerSettings, edge: .trailing, action: action)
+            .accessibilityLabel(Text("Settings"))
     }
 }
 
-/// Bouton rond de l'en-tête (retour, réglages) : visuel de 40–42 pt, zone tactile de 44 pt.
-struct ChimpHeaderRoundButton<Content: View>: View {
-    let size: CGFloat
+/// L'image est le bouton entier. Elle s'affiche à sa taille (40 pt de haut, `ChimpSize.headerButton`) et ne rétrécit
+/// jamais, même avec un titre long ; zone tactile d'au moins 44 × 44 pt, sans changer la mise en page.
+private struct ChimpHeaderImageButton: View {
+    let image: ImageResource
+    /// Bord de l'écran vers lequel l'image est décalée.
+    let edge: HorizontalEdge
     let action: () -> Void
-    @ViewBuilder let content: Content
 
     var body: some View {
         Button(action: action) {
-            content
-                .frame(width: size, height: size)
-                .background(Circle().fill(Color(.chimpHeaderButtonFill)))
+            Image(image)
+                .fixedSize()
+                .frame(minWidth: ChimpSize.minimumTouchTarget, minHeight: ChimpSize.minimumTouchTarget)
+                .contentShape(Rectangle())
+                .padding(-touchInset)
         }
         .buttonStyle(ChimpPressableStyle())
-        .expandedTouchTarget(visualSize: size)
+        .fixedSize()
+        .padding(edge == .leading ? .leading : .trailing, -ChimpSize.headerButtonEdgeOffset)
     }
+
+    /// Ce que la zone tactile ajoute autour de l'image, retiré de la mise en page (comme `expandedTouchTarget`).
+    private var touchInset: CGFloat { max(0, (ChimpSize.minimumTouchTarget - ChimpSize.headerButton) / 2) }
 }
 
 /// Appui sur un élément sans ombre : il pâlit (non spécifié par la maquette).
@@ -114,18 +127,6 @@ struct ChimpPressableStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? ChimpOpacity.pressed : 1)
-    }
-}
-
-/// Chevron « retour » de la maquette : tracé `M10 2 L2 10 L10 18` dans un cadre de 12 × 20.
-struct ChimpBackChevron: Shape {
-    func path(in rect: CGRect) -> Path {
-        let sx = rect.width / 12, sy = rect.height / 20
-        var path = Path()
-        path.move(to: CGPoint(x: 10 * sx, y: 2 * sy))
-        path.addLine(to: CGPoint(x: 2 * sx, y: 10 * sy))
-        path.addLine(to: CGPoint(x: 10 * sx, y: 18 * sy))
-        return path
     }
 }
 

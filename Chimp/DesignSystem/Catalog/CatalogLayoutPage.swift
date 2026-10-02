@@ -30,7 +30,7 @@ struct CatalogLayoutPage: View {
     private static let sizes: [(String, String)] = [
         ("minimumTouchTarget", "\(ChimpSize.minimumTouchTarget)"),
         ("headerButton", "\(ChimpSize.headerButton)"),
-        ("headerGearButton", "\(ChimpSize.headerGearButton)"),
+        ("headerButtonEdgeOffset", "\(ChimpSize.headerButtonEdgeOffset)"),
         ("stepSegmentHeight", "\(ChimpSize.stepSegmentHeight)"),
         ("chimpyThumbnail", "\(ChimpSize.chimpyThumbnail)"),
         ("pinDot", "\(ChimpSize.pinDot)"),
