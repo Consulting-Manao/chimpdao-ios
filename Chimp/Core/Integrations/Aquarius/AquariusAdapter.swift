@@ -40,15 +40,14 @@ final class AquariusAdapter: SwapAdapter {
         let tokenIn = request.assetIn.contract, tokenOut = request.assetOut.contract
         guard request.amountIn > 0, tokenIn != tokenOut else { return nil }
 
-        // Aucun montant 128 bits n'est passé en paramètre d'une fonction `async` : Swift 6.3 le corrompt (DESIGN_NOTES §13,
-        // 2026-10-14). Les montants partent déjà encodés, les calculs restent dans du code synchrone.
+        // Montants en `TokenAmount` à travers les fonctions `async` (règle de l'app, `TokenAmount`).
         var routes: [(hops: [(hop: SwapHop, out: Int128)], out: Int128)] = []
-        if let direct = try await bestHop(from: tokenIn, to: tokenOut, units: try AquariusCalls.u128(request.amountIn)) {
+        if let direct = try await bestHop(from: tokenIn, to: tokenOut, amount: TokenAmount(request.amountIn)) {
             routes.append(([direct], direct.out))
         }
         if let hub, hub != tokenIn, hub != tokenOut,
-           let first = try await bestHop(from: tokenIn, to: hub, units: try AquariusCalls.u128(request.amountIn)),
-           let second = try await bestHop(from: hub, to: tokenOut, units: try AquariusCalls.u128(first.out)) {
+           let first = try await bestHop(from: tokenIn, to: hub, amount: TokenAmount(request.amountIn)),
+           let second = try await bestHop(from: hub, to: tokenOut, amount: TokenAmount(first.out)) {
             routes.append(([first, second], second.out))
         }
         guard let best = routes.reduce(nil, { (best: (hops: [(hop: SwapHop, out: Int128)], out: Int128)?, route) in
@@ -60,7 +59,7 @@ final class AquariusAdapter: SwapAdapter {
         var impacts: [Int?] = []
         for (hop, out) in best.hops {
             let small = amountIn / 1_000
-            let reference = try await spotReference(of: hop, smallUnits: small > 0 ? try AquariusCalls.u128(small) : nil)
+            let reference = try await spotReference(of: hop, small: small > 0 ? TokenAmount(small) : nil)
             impacts.append(reference.flatMap {
                 Slippage.priceImpactBasisPoints(amountIn: amountIn, amountOut: out, reserveIn: $0.reserveIn, reserveOut: $0.reserveOut)
             })
@@ -75,10 +74,10 @@ final class AquariusAdapter: SwapAdapter {
         )
     }
 
-    /// Le pool direct qui rend le plus pour `units` (montant donné, déjà en `u128`), `nil` s'il n'y en a aucun. Les devis
-    /// des pools partent ensemble.
-    private func bestHop(from tokenIn: String, to tokenOut: String, units: SCValXDR) async throws -> (hop: SwapHop, out: Int128)? {
+    /// Le pool direct qui rend le plus pour `amount`, `nil` s'il n'y en a aucun. Les devis des pools partent ensemble.
+    private func bestHop(from tokenIn: String, to tokenOut: String, amount: TokenAmount) async throws -> (hop: SwapHop, out: Int128)? {
         let tokens = try AquariusCalls.sortedTokens(tokenIn, tokenOut)
+        let units = try AquariusCalls.u128(amount.units)
         let candidates = try await poolsOf(tokens)
         let estimates = try candidates.map { candidate in
             let arguments = try Self.estimateArguments(tokens: tokens, from: tokenIn, to: tokenOut, poolHash: candidate.hash, units: units)
@@ -124,9 +123,9 @@ final class AquariusAdapter: SwapAdapter {
     }
 
     /// Le prix « spot » d'un saut, sous forme de deux quantités (`reserveIn` donne `reserveOut`) : les réserves du pool à
-    /// produit constant (comme Soroswap), sinon le devis d'un montant mille fois plus petit (`smallUnits`). `nil` si on ne
+    /// produit constant (comme Soroswap), sinon le devis d'un montant mille fois plus petit (`small`). `nil` si on ne
     /// peut pas le connaître.
-    private func spotReference(of hop: SwapHop, smallUnits: SCValXDR?) async throws -> (reserveIn: Int128, reserveOut: Int128)? {
+    private func spotReference(of hop: SwapHop, small: TokenAmount?) async throws -> (reserveIn: Int128, reserveOut: Int128)? {
         guard let tokenIn = hop.tokenIn else { return nil }
         if try await poolType(of: hop) == "constant_product" {
             let reserves = try Self.reserves(try await reader.readValue(
@@ -135,11 +134,11 @@ final class AquariusAdapter: SwapAdapter {
             ))
             return hop.tokens[0] == tokenIn ? (reserves.0, reserves.1) : (reserves.1, reserves.0)
         }
-        guard let smallUnits, let small = AquariusCalls.int128(smallUnits) else { return nil }
+        guard let small else { return nil }
         let smallOut = try await estimate(try Self.estimateArguments(
-            tokens: hop.tokens, from: tokenIn, to: hop.tokenOut, poolHash: hop.poolHash, units: smallUnits
+            tokens: hop.tokens, from: tokenIn, to: hop.tokenOut, poolHash: hop.poolHash, units: try AquariusCalls.u128(small.units)
         ))
-        return (small, smallOut)
+        return (small.units, smallOut)
     }
 
     private func poolType(of hop: SwapHop) async throws -> String? {

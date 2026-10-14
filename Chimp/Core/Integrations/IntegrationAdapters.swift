@@ -126,10 +126,11 @@ protocol YieldAdapter {
     func venues() -> [YieldVenue]
     /// Les positions de `holder` chez ce protocole, lues sur la chaîne. Les pannes réseau remontent.
     func discover(holder: String) async throws -> [YieldPosition]
-    /// Dépôt de `amount` (unités on-chain de l'actif du lieu) au nom de `authorizer`.
-    func depositCall(venue: YieldVenue, amount: Int128, authorizer: String) async throws -> ContractCall
+    /// Dépôt de `amount` (unités on-chain de l'actif du lieu) au nom de `authorizer`. `TokenAmount`, jamais `Int128`, en
+    /// paramètre d'une fonction `async` (défaut de Swift 6.3, `TokenAmount`).
+    func depositCall(venue: YieldVenue, amount: TokenAmount, authorizer: String) async throws -> ContractCall
     /// Retrait de `amount` de l'actif (ou de toute la position si `all`), minimum signé compris.
-    func withdrawCall(position: YieldPosition, amount: Int128, all: Bool) async throws -> ContractCall
+    func withdrawCall(position: YieldPosition, amount: TokenAmount, all: Bool) async throws -> ContractCall
     func authShape() -> any AuthShape
     func terms(of call: ContractCall) throws -> SignedTerms
 }

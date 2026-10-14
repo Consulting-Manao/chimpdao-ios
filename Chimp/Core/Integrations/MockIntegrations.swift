@@ -86,12 +86,13 @@ struct MockYieldAdapter: YieldAdapter {
         return positions.filter { $0.holder == holder }
     }
 
-    func depositCall(venue: YieldVenue, amount: Int128, authorizer: String) async throws -> ContractCall {
-        try DeFindexCalls.deposit(vault: venue.id, from: authorizer, units: amount)
+    func depositCall(venue: YieldVenue, amount: TokenAmount, authorizer: String) async throws -> ContractCall {
+        try DeFindexCalls.deposit(vault: venue.id, from: authorizer, units: amount.units)
     }
 
     /// Parts au prorata de la valeur (`dfAmountFor` sans la marge de poussière), minimum = valeur − 0,5 %.
-    func withdrawCall(position: YieldPosition, amount: Int128, all: Bool) async throws -> ContractCall {
+    func withdrawCall(position: YieldPosition, amount: TokenAmount, all: Bool) async throws -> ContractCall {
+        let amount = amount.units
         let shares = all || position.value <= 0 ? position.shares : position.shares * amount / position.value
         let expected = all ? position.value : amount
         return try DeFindexCalls.withdraw(
