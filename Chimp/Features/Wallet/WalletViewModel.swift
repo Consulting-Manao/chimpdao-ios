@@ -71,7 +71,8 @@ final class WalletViewModel {
     private(set) var snapshot: WalletSnapshot?
 
     /// Actions des tuiles. Swap (E3) est masqué tant qu'il n'existe pas : aucune tuile sans destination.
-    let availableActions: [WalletAction] = [.send, .receive, .move]
+    /// B1 : Send, Receive, Move et Swap (tuile Swap réactivée avec la tranche 2, phase 2).
+    let availableActions: [WalletAction] = [.send, .receive, .move, .swap]
 
     private let dataSource: WalletDataSource
     private var hasLoaded = false

@@ -106,6 +106,7 @@ private struct CatalogTypographyRow: View {
         case .labelS: Text(verbatim: "CHIMPY")
         case .cardNumber: Text(verbatim: "N°0421")
         case .monoValue: Text(verbatim: "820.00 USDC")
+        case .monoAmount: Text(verbatim: "99.1816000")
         case .mono: Text(verbatim: "AAAAAgAAAACHm2nUx0FH")
         case .address: Text(verbatim: "CAIO2SJ6…AZVOX2")
         case .tabTitle: Text("Activity")

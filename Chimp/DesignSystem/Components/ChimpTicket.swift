@@ -174,7 +174,7 @@ struct ChimpTicketRow: View {
     /// Second montant, sous le premier (swap, maquette I1s : « −400 XLM » puis « +99.71 USDC »).
     var secondaryAmount: String?
     var secondaryAmountColor: Color = Color(.chimpStampReceived)
-    /// Fond de la ligne (swap : `chimpTicketSwap`), sinon le papier du ticket.
+    /// Fond de la ligne (swap : `chimpActivitySwap`), sinon le papier du ticket.
     var background: Color?
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize

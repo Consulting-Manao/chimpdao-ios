@@ -18,6 +18,8 @@ struct MainTabView: View {
     @State private var isShowingPendingSend = false
     /// « Pay again » ou « Send back » depuis un reçu de l'Activity : Envoyer prérempli.
     @State private var prefilledSend: SendPrefill?
+    /// « Swap again » depuis un reçu de l'Activity : Swap prérempli.
+    @State private var prefilledSwap: SwapPrefill?
     #if DESIGN_CATALOG
     @State private var isShowingCatalog = false
     #endif
@@ -51,17 +53,42 @@ struct MainTabView: View {
                         case .receive(let drawerID):
                             ReceiveDestination(session: session, initialDrawerID: drawerID)
                         case .send(let drawerID):
-                            // Le vrai envoi (testnet) ; au retour, les soldes du Wallet sont relus.
-                            SendFlowRoot(service: ChainSendService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
+                            // Le vrai envoi (testnet) ; au retour, les soldes du Wallet sont relus. Un swap en attente :
+                            // son état d'abord (une seule opération à l'issue incertaine à la fois).
+                            if hasPendingSwap {
+                                SwapFlowRoot(service: ChainSwapService(session: session), onExit: closeFlow)
+                            } else {
+                                SendFlowRoot(service: ChainSendService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
+                            }
                         case .move(let drawerID):
                             // E1 : le même parcours, entre ses propres tiroirs (testnet).
-                            SendFlowRoot(service: ChainSendService(session: session), kind: .move, fromDrawerID: drawerID, onExit: closeFlow)
+                            if hasPendingSwap {
+                                SwapFlowRoot(service: ChainSwapService(session: session), onExit: closeFlow)
+                            } else {
+                                SendFlowRoot(service: ChainSendService(session: session), kind: .move, fromDrawerID: drawerID, onExit: closeFlow)
+                            }
                         case .prefilledSend(let prefill):
                             // « Pay again » ou « Send back » d'un reçu ouvert depuis la page d'un tiroir.
-                            SendFlowRoot(service: ChainSendService(session: session), prefill: prefill, onExit: closeFlow)
+                            if hasPendingSwap {
+                                SwapFlowRoot(service: ChainSwapService(session: session), onExit: closeFlow)
+                            } else {
+                                SendFlowRoot(service: ChainSendService(session: session), prefill: prefill, onExit: closeFlow)
+                            }
                         case .pendingSend:
-                            // Envoyer rouvre l'état du paiement en attente (« Check again »), jamais un nouvel envoi.
-                            SendFlowRoot(service: ChainSendService(session: session), onExit: closeFlow)
+                            // L'état de l'opération en attente (« Check again »), jamais une nouvelle : un swap s'ouvre
+                            // dans Swap, un envoi ou un Move dans Envoyer.
+                            if hasPendingSwap {
+                                SwapFlowRoot(service: ChainSwapService(session: session), onExit: closeFlow)
+                            } else {
+                                SendFlowRoot(service: ChainSendService(session: session), onExit: closeFlow)
+                            }
+                        case .swap(let drawerID):
+                            // E3 : le vrai swap (testnet), dans le tiroir choisi d'avance ou dans Main. Un envoi en
+                            // attente : E3f (« Check again » à la place du bouton).
+                            SwapFlowRoot(service: ChainSwapService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
+                        case .prefilledSwap(let prefill):
+                            // « Swap again » d'un reçu ouvert depuis la page d'un tiroir.
+                            SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill, onExit: closeFlow)
                         case .removeCard(let mode, let key):
                             // G6 / G7 : retirer une carte ou la déclarer perdue (testnet), depuis sa page (B3).
                             RemoveCardDestination(mode: mode, key: key, wallet: walletModel, session: session) { removed in
@@ -112,14 +139,31 @@ struct MainTabView: View {
             .environment(activityModel)
         case .activity:
             NavigationStack {
-                ActivityView(model: activityModel, onPending: { isShowingPendingSend = true }, onSendPrefilled: { prefilledSend = $0 })
+                ActivityView(
+                    model: activityModel, onPending: { isShowingPendingSend = true }, onSendPrefilled: { prefilledSend = $0 },
+                    onSwapPrefilled: { prefilledSwap = $0 }
+                )
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
                     .navigationDestination(isPresented: $isShowingPendingSend) {
-                        // Envoyer rouvre l'état du paiement en attente (« Check again »), jamais un nouvel envoi.
-                        SendFlowRoot(service: ChainSendService(session: session)) {
-                            isShowingPendingSend = false
+                        // L'état de l'opération en attente (« Check again »), jamais une nouvelle : Swap ou Envoyer.
+                        if hasPendingSwap {
+                            SwapFlowRoot(service: ChainSwapService(session: session)) {
+                                isShowingPendingSend = false
+                                Task { await activityModel.refresh() }
+                            }
+                        } else {
+                            SendFlowRoot(service: ChainSendService(session: session)) {
+                                isShowingPendingSend = false
+                                Task { await activityModel.refresh() }
+                            }
+                        }
+                    }
+                    .navigationDestination(item: $prefilledSwap) { prefill in
+                        SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill) {
+                            prefilledSwap = nil
                             Task { await activityModel.refresh() }
+                            Task { await walletModel.refresh() }
                         }
                     }
                     .navigationDestination(item: $prefilledSend) { prefill in
@@ -148,10 +192,12 @@ struct MainTabView: View {
         case .move:
             walletPath.append(.move(nil))
         case .swap:
-            // TODO(jalon 4b) : Swap (E3), selon le périmètre V1.
-            break
+            walletPath.append(.swap(nil))
         }
     }
+
+    /// Une opération signée attend son issue, et c'est un swap : Envoyer et Move ouvrent son état.
+    private var hasPendingSwap: Bool { session.wallet.pendingSend?.swap != nil }
 
     /// Fin d'un parcours (Send, Move…) : retour à la page du tiroir d'où il est parti, sinon au Wallet ; soldes et
     /// historique relus.
@@ -174,7 +220,9 @@ struct MainTabView: View {
             onSend: { walletPath.append(.send($0)) },
             onReceive: { walletPath.append(.receive($0)) },
             onMove: { walletPath.append(.move($0)) },
+            onSwap: { walletPath.append(.swap($0)) },
             onSendPrefilled: { walletPath.append(.prefilledSend($0)) },
+            onSwapPrefilled: { walletPath.append(.prefilledSwap($0)) },
             onPending: { walletPath.append(.pendingSend) },
             onAllActivity: { address in
                 activityModel.filter = .drawer(address)
@@ -212,6 +260,10 @@ enum WalletRoute: Hashable {
     /// « Pay again » ou « Send back » d'un reçu.
     case prefilledSend(SendPrefill)
     case pendingSend
+    /// Swap (E3), dans un tiroir choisi d'avance ou dans Main.
+    case swap(String?)
+    /// « Swap again » d'un reçu.
+    case prefilledSwap(SwapPrefill)
     case settings
     case addCard
     case drawer(DrawerSelection)

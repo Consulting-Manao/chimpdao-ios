@@ -24,6 +24,9 @@ final class MockSwapService: SwapService {
     /// Délai simulé du réseau.
     var delay: Duration
 
+    /// « Price moves before signing » : le prix a baissé une fois (la préparation suivante passe, au nouveau prix).
+    private var priceHasMoved = false
+
     private(set) var quoteCount = 0
     private(set) var prepareCount = 0
     private(set) var signCount = 0
@@ -62,7 +65,8 @@ final class MockSwapService: SwapService {
         case .normal, .bigImpact, .priceMovesBeforeSigning: break
         }
         let units = try SwapUnits.units(of: amount, asset: given)
-        let out = units * (Self.rates[given] ?? 0) / 1_000_000
+        var out = units * (Self.rates[given] ?? 0) / 1_000_000
+        if priceHasMoved { out = out * 994 / 1000 }
         return SwapQuoteSummary(
             protocolID: "mock", protocolName: "Soroswap", given: given, received: received, amountIn: amount,
             expectedOutUnits: out, route: [given, received], routeContracts: [given.rawValue, received.rawValue],
@@ -76,7 +80,10 @@ final class MockSwapService: SwapService {
         if draft.amount > draft.drawer.balance(of: draft.given) {
             throw PaymentClient.PaymentError.insufficientBalance(held: draft.drawer.balance(of: draft.given))
         }
-        if quoteScenario == .priceMovesBeforeSigning { throw SwapError.slippageExceeded }
+        if quoteScenario == .priceMovesBeforeSigning, !priceHasMoved {
+            priceHasMoved = true
+            throw SwapError.slippageExceeded
+        }
         return PreparedSwap(draft: draft, firstHopVenue: "mock-pair", contract: "mock-router")
     }
 

@@ -20,6 +20,9 @@ struct ChimpApp: App {
         WindowGroup {
             RootView(session: session, lock: lock)
                 .chimpReadsScreenInsets()
+            #if DESIGN_CATALOG
+                .modifier(SwapDemoLaunch())
+            #endif
         }
     }
 }

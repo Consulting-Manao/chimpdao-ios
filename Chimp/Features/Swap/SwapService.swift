@@ -113,6 +113,8 @@ struct SwapCardRead: Equatable {
 /// attente gardé sur le téléphone.
 struct SwapSummary: Equatable {
     let drawerTitle: String
+    /// « Main » pour le Main account (maquette E5 « In Main »), sinon le titre du wallet.
+    let drawerShortTitle: String
     let fromAddress: String
     let given: SendAsset
     let amountIn: Decimal
@@ -124,6 +126,7 @@ struct SwapSummary: Equatable {
 
     init(_ draft: SwapDraft) {
         drawerTitle = draft.drawer.title
+        drawerShortTitle = if case .main = draft.drawer.kind { String(localized: "Main") } else { draft.drawer.title }
         fromAddress = draft.drawer.address
         given = draft.given
         amountIn = draft.amount
@@ -138,6 +141,7 @@ struct SwapSummary: Equatable {
     init?(_ pending: PendingSend, network: StellarNetwork) {
         guard let swap = pending.swap else { return nil }
         drawerTitle = pending.drawerTitle
+        drawerShortTitle = pending.drawerTitle == String(localized: "Main account") ? String(localized: "Main") : pending.drawerTitle
         fromAddress = pending.trace.from
         given = SendAsset(rawValue: pending.asset) ?? .xlm
         amountIn = pending.amount

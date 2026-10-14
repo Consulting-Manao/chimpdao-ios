@@ -11,6 +11,8 @@ struct ActivityView: View {
     var onPending: () -> Void = {}
     /// « Pay again » ou « Send back » du reçu : la coque ouvre Envoyer prérempli.
     var onSendPrefilled: (SendPrefill) -> Void = { _ in }
+    /// « Swap again » du reçu : la coque ouvre Swap prérempli.
+    var onSwapPrefilled: (SwapPrefill) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +31,7 @@ struct ActivityView: View {
         }
         .background(Color(.chimpBackground))
         .task { await model.refresh() }
-        .activityReceiptSheet(model: model, onSendPrefilled: onSendPrefilled)
+        .activityReceiptSheet(model: model, onSendPrefilled: onSendPrefilled, onSwapPrefilled: onSwapPrefilled)
     }
 
     // MARK: Filtres
@@ -177,7 +179,7 @@ struct ActivityContent: View {
                         stampTilt: row.stamp == .swapped ? -4 : (index.isMultiple(of: 2) ? -3 : 2.5), amount: row.amount,
                         amountColor: color(row.tone), secondaryAmount: row.secondaryAmount,
                         secondaryAmountColor: Color(.chimpStampReceived),
-                        background: row.isHighlighted ? Color(.chimpTicketSwap) : nil
+                        background: row.isHighlighted ? Color(.chimpActivitySwap) : nil
                     )
                 }
                 .buttonStyle(ChimpPressableStyle())

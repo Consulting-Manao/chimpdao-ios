@@ -56,7 +56,7 @@ struct DrawerDetailView: View {
         }
         .background(Color(.chimpBackground))
         .task { await activity.refresh() }
-        .activityReceiptSheet(model: activity, onSendPrefilled: actions.onSendPrefilled)
+        .activityReceiptSheet(model: activity, onSendPrefilled: actions.onSendPrefilled, onSwapPrefilled: actions.onSwapPrefilled)
         .chimpSheet(isPresented: Binding(get: { lastCardMode != nil }, set: { if !$0 { lastCardMode = nil } }), height: 560, fitsContent: true) {
             if let mode = lastCardMode {
                 LastCardSheet(mode: mode, name: model.cardName, onAddCard: {
@@ -238,6 +238,9 @@ struct DrawerDetailView: View {
                 .disabled(model.content == nil)
             ChimpButton("Move", kind: .secondary, size: .compact) { actions.onMove(id) }
                 .disabled(isEmpty)
+            // Maquette B2 / B3 « with Swap » : Swap s'ouvre avec ce tiroir déjà choisi.
+            ChimpButton("Swap", kind: .secondary, size: .compact) { actions.onSwap(id) }
+                .disabled(isEmpty)
         }
         .padding(ChimpSpacing.bottomBar)
         .background(Color(.chimpBackground))
@@ -272,8 +275,12 @@ struct DrawerDetailActions {
     var onReceive: (String) -> Void = { _ in }
     /// Move, depuis ce tiroir.
     var onMove: (String) -> Void = { _ in }
+    /// Swap, dans ce tiroir.
+    var onSwap: (String) -> Void = { _ in }
     /// « Pay again » ou « Send back » d'un reçu.
     var onSendPrefilled: (SendPrefill) -> Void = { _ in }
+    /// « Swap again » d'un reçu.
+    var onSwapPrefilled: (SwapPrefill) -> Void = { _ in }
     /// Paiement en attente touché dans l'historique.
     var onPending: () -> Void = {}
     /// « All activity » (B2r) : l'onglet Activity, filtré sur ce tiroir (adresse).

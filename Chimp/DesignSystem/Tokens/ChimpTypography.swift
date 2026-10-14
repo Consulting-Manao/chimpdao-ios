@@ -108,6 +108,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     case labelS        // « CHIMPY »
     case cardNumber    // « N°0421 » sur une Chimp Card
     case monoValue     // montants des lignes d'actifs
+    case monoAmount    // minimum reçu signé, exact (vérification du swap, E4)
     case mono          // XDR
     case ticketMeta    // « 14:02 · from Jungle » sur le ticket (I1)
     case ticketAmount  // montant d'une ligne du ticket (I1)
@@ -126,7 +127,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .bodyL, .tourBody, .bodyM, .captionS: .nunito(weight: 700)
         case .body, .bodyS, .caption, .captionStrong, .reviewStep: .nunito(weight: 800)
         case .rowTitle, .optionTitle, .lead, .fieldL, .fieldM, .ticketTitle, .receiptLink: .nunito(weight: 900)
-        case .overline, .labelWide, .label, .labelS, .cardNumber, .monoValue, .address, .ticketMeta, .ticketAmount, .receiptLabel, .receiptValue: .spaceMono(bold: true)
+        case .overline, .labelWide, .label, .labelS, .cardNumber, .monoValue, .address, .ticketMeta, .ticketAmount, .receiptLabel, .receiptValue, .monoAmount: .spaceMono(bold: true)
         case .mono: .spaceMono(bold: false)
         }
     }
@@ -170,6 +171,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .labelWide, .label: 11
         case .labelS, .cardNumber: 10
         case .monoValue: 14
+        case .monoAmount: 26
         case .mono: 12
         }
     }
@@ -179,7 +181,7 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         switch self {
         case .celebration, .amountEntry, .displayXL, .amountL, .welcomeTitle, .tourTitle: .largeTitle
         case .displayL: .title1
-        case .sheetTitle, .key, .brand, .displayM, .amountM, .tabTitle, .stampL, .receiptTotal: .title2
+        case .sheetTitle, .key, .brand, .displayM, .amountM, .tabTitle, .stampL, .receiptTotal, .monoAmount: .title2
         case .amountS, .greeting: .title3
         case .displayS, .buttonLarge, .button, .lead, .fieldM: .headline
         case .fieldL: .title3
