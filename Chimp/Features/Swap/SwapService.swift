@@ -44,6 +44,20 @@ struct SwapQuoteSummary: Equatable {
 
     var expectedOut: Decimal { SwapUnits.amount(fromUnits: expectedOutUnits) }
 
+    /// Ce que la ligne discrète sous le taux dit de la comparaison des protocoles.
+    enum Comparison: Equatable {
+        /// « Best price from Soroswap and Aquarius ».
+        case best(among: [String])
+        /// « Soroswap isn't answering · price from Aquarius ».
+        case fallback(unavailable: [String], used: String)
+    }
+
+    /// `nil` quand un seul protocole a été interrogé : rien à dire.
+    var comparison: Comparison? {
+        if !unavailableProtocols.isEmpty { return .fallback(unavailable: unavailableProtocols, used: protocolName) }
+        return comparedProtocols.count > 1 ? .best(among: comparedProtocols) : nil
+    }
+
     /// Au-delà de 5 % d'impact : avertissement fort (principe 5).
     var needsPriceImpactWarning: Bool {
         priceImpactBasisPoints.map(Slippage.needsPriceImpactWarning) ?? false

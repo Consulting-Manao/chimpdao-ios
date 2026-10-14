@@ -281,7 +281,7 @@ struct SwapAmountView: View {
         switch model.quoteState {
         case .loading:
             HStack {
-                Text("Asking Soroswap for a price…")
+                Text("Comparing Soroswap and Aquarius…")
                     .chimpFont(.caption)
                     .foregroundStyle(.chimpTextSecondary)
                 Spacer(minLength: ChimpSpacing.s)
@@ -290,11 +290,16 @@ struct SwapAmountView: View {
         case .quoted where model.currentQuote != nil && !(model.currentQuote?.needsPriceImpactWarning ?? false):
             HStack(spacing: ChimpSpacing.s) {
                 if let rate = model.rate, let quote = model.currentQuote {
-                    Text("1 \(quote.given.code) ≈ \(rate.formatted(.number.locale(locale).precision(.fractionLength(0...4)))) \(quote.received.code) · via \(quote.protocolName)")
-                        .chimpFont(.caption)
-                        .foregroundStyle(.chimpTextPrimary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("1 \(quote.given.code) ≈ \(rate.formatted(.number.locale(locale).precision(.fractionLength(0...4)))) \(quote.received.code) · via \(quote.protocolName)")
+                            .chimpFont(.caption)
+                            .foregroundStyle(.chimpTextPrimary)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                        if let comparison = quote.comparison {
+                            comparisonLine(comparison)
+                        }
+                    }
                 }
                 Spacer(minLength: ChimpSpacing.s)
                 slippageChip
@@ -302,6 +307,22 @@ struct SwapAmountView: View {
         default:
             EmptyView()
         }
+    }
+
+    /// Ligne discrète sous le taux : les protocoles comparés, ou celui qui ne répond pas.
+    private func comparisonLine(_ comparison: SwapQuoteSummary.Comparison) -> some View {
+        Group {
+            switch comparison {
+            case .best(let names):
+                Text("Best price from \(names.formatted(.list(type: .and).locale(locale)))")
+            case .fallback(let unavailable, let used):
+                Text("\(unavailable.formatted(.list(type: .and).locale(locale))) \(unavailable.count > 1 ? "aren't" : "isn't") answering · price from \(used)")
+            }
+        }
+        .chimpFont(.caption)
+        .foregroundStyle(.chimpTextSecondary)
+        .lineLimit(2)
+        .minimumScaleFactor(0.8)
     }
 
     private var slippageChip: some View {

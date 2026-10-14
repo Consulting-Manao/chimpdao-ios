@@ -102,6 +102,28 @@ struct SwapFlowTests {
         }
     }
 
+    @Test("Comparaison des protocoles : « Best price from … », ou celui qui ne répond pas et celui qui sert ; protocole retenu jusqu'à la vérification")
+    func protocolComparison() async {
+        let expectations: [(MockSwapService.QuoteScenario, SwapQuoteSummary.Comparison?, String)] = [
+            (.normal, .best(among: ["Soroswap", "Aquarius"]), "Soroswap"),
+            (.aquariusBest, .best(among: ["Soroswap", "Aquarius"]), "Aquarius"),
+            (.soroswapDown, .fallback(unavailable: ["Soroswap"], used: "Aquarius"), "Aquarius"),
+        ]
+        for (scenario, comparison, used) in expectations {
+            let (model, _) = await model(scenario)
+            await quoted(model, 10)
+            #expect(model.currentQuote?.comparison == comparison)
+            #expect(model.currentQuote?.protocolName == used)
+            model.continueToReview()
+            #expect(model.draft?.quote.protocolName == used)
+        }
+        let single = SwapQuoteSummary(
+            protocolID: "soroswap", protocolName: "Soroswap", given: .xlm, received: .usdc, amountIn: 1,
+            expectedOutUnits: 1, route: [.xlm, .usdc], routeContracts: [], priceImpactBasisPoints: nil, comparedProtocols: ["Soroswap"]
+        )
+        #expect(single.comparison == nil)
+    }
+
     @Test("Solde insuffisant : signalé, vérification impossible")
     func insufficientBalance() async {
         let (model, _) = await model()
