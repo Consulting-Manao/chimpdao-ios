@@ -61,7 +61,7 @@ struct ActivitySwapTests {
 
     // MARK: Ligne (I1s)
 
-    @Test("Ligne : « Swapped XLM for USDC », « in Main », tampon SWAPPED, −400 XLM et +99.71 USDC en quantités, sur fond swap")
+    @Test("Ligne : « Swapped XLM for USDC », « in Main », tampon SWAPPED, −400 XLM et +99.71 USDC en quantités (fond normal, retour de Barth du 2026-10-14)")
     func row() throws {
         let row = try #require(ActivityViewModel.row(for: localSwap, drawers: drawers, addresses: addresses, cardName: { _ in nil }))
         #expect(row.title == "Swapped XLM for USDC")
@@ -69,7 +69,6 @@ struct ActivitySwapTests {
         #expect(row.stamp == .swapped)
         #expect(row.amount == "\u{2212}\(SendAsset.displayed(400, code: "XLM")) XLM")
         #expect(row.secondaryAmount == "+\(SendAsset.displayed(Decimal(string: "99.71")!, code: "USDC")) USDC", "Tronqué à 2 décimales, jamais en dollars")
-        #expect(row.isHighlighted)
     }
 
     @Test("Total du jour : les deux actifs du swap (ce qui sort, ce qui entre), par actif")

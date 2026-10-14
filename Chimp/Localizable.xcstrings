@@ -30,6 +30,36 @@
     "%@ (play money)" : {
 
     },
+    "%@ %@ %@ %@ in %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ %3$@ %4$@ in %5$@"
+          }
+        }
+      }
+    },
+    "%@ %@ answering · price from %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ answering · price from %3$@"
+          }
+        }
+      }
+    },
+    "%@ %@ unavailable right now" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ unavailable right now"
+          }
+        }
+      }
+    },
     "%@ already points to your account." : {
 
     },
@@ -59,6 +89,9 @@
     "%@ growing" : {
 
     },
+    "%@ has no route for this pair right now. Nothing was signed." : {
+
+    },
     "%@ has the %@. %@" : {
 
     },
@@ -75,6 +108,9 @@
 
     },
     "%@ is removed from your account" : {
+
+    },
+    "%@ is unavailable right now. Nothing was signed. Try again in a minute." : {
 
     },
     "%@ is your only card" : {
@@ -175,9 +211,35 @@
     "🐵 Bananas incoming! %@ sent me %@." : {
 
     },
+    "🔄 Swapped %@ for %@ with ChimpDAO." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "🔄 Swapped %1$@ for %2$@ with ChimpDAO."
+          }
+        }
+      }
+    },
+    "🔄 Swapped %@ with ChimpDAO." : {
+
+    },
     "$820 ready · $500 growing" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "0.5% is right almost every time. Go higher only if swaps keep stopping." : {
+
+    },
+    "1 %@ ≈ %@ %@ · via %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "1 %1$@ ≈ %2$@ %3$@ · via %4$@"
+          }
+        }
+      }
     },
     "1 card" : {
 
@@ -199,6 +261,9 @@
     "25 USDC leaves Jungle's wallet" : {
 
     },
+    "A bit more room" : {
+
+    },
     "A card already in your account, not %@. It vouches for the new one." : {
 
     },
@@ -211,10 +276,19 @@
     "A first name or a nickname. It's only used to say hi, and you can change it in Settings." : {
 
     },
+    "A hair under the quote, still above your minimum." : {
+
+    },
+    "A little more than the quote, lucky monkey." : {
+
+    },
     "A Main account,\nplus one per card" : {
 
     },
     "A new card" : {
+
+    },
+    "A payment is still being checked. Check it first." : {
 
     },
     "A payment is still being checked. Open Send to see how it ended, then try again." : {
@@ -229,9 +303,15 @@
     "A payment is still being checked. Open Send to see how it ended, then you can switch accounts." : {
 
     },
+    "A payment is still pending (E3f)" : {
+
+    },
     "A signed payment not confirmed yet, on top" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "about" : {
+
     },
     "Accepted: XLM and USDC." : {
 
@@ -333,6 +413,9 @@
     "Any card already in the account you're joining. Not %@." : {
 
     },
+    "Any of your cards can sign. The %@ is in Main." : {
+
+    },
     "Any of your cards can spend it" : {
 
     },
@@ -358,6 +441,15 @@
     "Asking the jungle…" : {
 
     },
+    "At least" : {
+
+    },
+    "at least %@" : {
+
+    },
+    "At least what you agreed to." : {
+
+    },
     "Auto" : {
 
     },
@@ -381,6 +473,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Balances" : {
+
+    },
     "Balances and recents" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -397,6 +492,12 @@
 
     },
     "Before you let it in" : {
+
+    },
+    "Before: %@" : {
+
+    },
+    "Best price from %@" : {
 
     },
     "Between your own drawers" : {
@@ -426,6 +527,9 @@
     "Buttons" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Came in" : {
+
     },
     "Can't tell" : {
 
@@ -476,6 +580,9 @@
     "Change PIN" : {
 
     },
+    "Change the amount" : {
+
+    },
     "Change the PIN" : {
 
     },
@@ -489,6 +596,9 @@
 
     },
     "Check with my new PIN" : {
+
+    },
+    "Check your connection. Nothing moved." : {
 
     },
     "Checking it's really your card" : {
@@ -558,6 +668,9 @@
     "Chimpy: %@" : {
 
     },
+    "Choose the drawer for this swap" : {
+
+    },
     "Choose what to send" : {
 
     },
@@ -589,6 +702,9 @@
       "extractionState" : "manual"
     },
     "Coming soon" : {
+
+    },
+    "Comparing Soroswap and Aquarius…" : {
 
     },
     "Completed PINs: %lld. The PIN is only kept in this screen's memory." : {
@@ -646,6 +762,9 @@
 
     },
     "Couldn't get ready to send. Nothing was sent. Check your connection and try again." : {
+
+    },
+    "Couldn't get ready to swap. Nothing was signed. Check your connection and try again." : {
 
     },
     "Couldn't refresh. Balances from %@." : {
@@ -864,6 +983,16 @@
     "Found your account! Type this card's PIN, then tap the card once more." : {
 
     },
+    "Fresh %@ in %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Fresh %1$@ in %2$@. %3$@"
+          }
+        }
+      }
+    },
     "Fresh card!" : {
 
     },
@@ -898,9 +1027,21 @@
     "From your account" : {
 
     },
+    "Gave" : {
+
+    },
     "Generated on the phone by Core Image, error correction H. White in both themes." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Getting a price" : {
+
+    },
+    "Getting a price…" : {
+
+    },
+    "Got" : {
+
     },
     "Got it" : {
 
@@ -1007,10 +1148,16 @@
     "How much for %@?" : {
 
     },
+    "How much less than the quote you accept" : {
+
+    },
     "How much to send?" : {
 
     },
     "How much, from where" : {
+
+    },
+    "I can't reach the exchanges" : {
 
     },
     "I can't reach the jungle right now, so I can't see your balances. Check your connection." : {
@@ -1031,6 +1178,9 @@
     "I couldn't check this online. Check your connection and try again." : {
       "comment" : "Error message when the app can't check the card's status online.",
       "isCommentAutoGenerated" : true
+    },
+    "I couldn't get the new price. Check your connection and try again." : {
+
     },
     "I couldn't reach Stellar. Check your connection and try again: I'll pick up where I stopped." : {
 
@@ -1078,6 +1228,35 @@
     "Images" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "In" : {
+
+    },
+    "in %@" : {
+
+    },
+    "In %@" : {
+
+    },
+    "In %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "In %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "In my %@ · %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "In my %1$@ · %2$@ · %3$@"
+          }
+        }
+      }
     },
     "In progress" : {
 
@@ -1336,6 +1515,9 @@
     "Lose your phone and nothing is lost. No card, no payment." : {
 
     },
+    "Lots of room" : {
+
+    },
     "Main" : {
 
     },
@@ -1395,9 +1577,15 @@
     "Memo ID, optional" : {
 
     },
+    "Min. guaranteed" : {
+
+    },
     "Minimum for text: 4.5:1 (WCAG AA). Left: mockup. Right: proposed value, now used by the token." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Minimum received" : {
+
     },
     "Mixed" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1558,6 +1746,9 @@
     "No account yet. What's in its wallet is still on the card." : {
 
     },
+    "No amount yet" : {
+
+    },
     "No banana was harmed." : {
 
     },
@@ -1609,6 +1800,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "No route for this pair" : {
+
+    },
     "No Testnet badge." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1633,6 +1827,19 @@
     },
     "Not confirmed, then sent" : {
 
+    },
+    "Not enough %@" : {
+
+    },
+    "Not enough %@ in %@. Nothing was signed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Not enough %1$@ in %2$@. Nothing was signed."
+          }
+        }
+      }
     },
     "Not enough in %@. %@ available." : {
 
@@ -1662,6 +1869,15 @@
     "Not started" : {
 
     },
+    "Not sure yet" : {
+
+    },
+    "Not swapped" : {
+
+    },
+    "Not swapped. Please wait until %@ before trying again." : {
+
+    },
     "Not yet" : {
 
     },
@@ -1689,6 +1905,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Nothing moved. Try again in a minute." : {
+
+    },
     "Nothing moves between drawers on its own. You do it with Move." : {
 
     },
@@ -1701,6 +1920,9 @@
     "Nothing was sent" : {
       "comment" : "Title of the screen when the user has sent money but Stellar hasn't confirmed it.",
       "isCommentAutoGenerated" : true
+    },
+    "Nothing was swapped" : {
+
     },
     "Notice banner" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1716,6 +1938,9 @@
 
     },
     "Now tap that account's card again" : {
+
+    },
+    "Now: %@" : {
 
     },
     "Numbers only. A word memo can't be sent from ChimpDAO." : {
@@ -1749,6 +1974,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "On us" : {
+
+    },
     "Onboarding" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -1771,10 +1999,23 @@
     "Only %@ can sign its own removal." : {
 
     },
+    "Only %@ in %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Only %1$@ in %2$@"
+          }
+        }
+      }
+    },
     "Only changes how numbers look. Your coins stay the same." : {
 
     },
     "Only for the flow opened here. The Send tile of the Wallet sends for real on testnet." : {
+
+    },
+    "Only for the flow opened here. The Swap tile of the Wallet swaps for real on testnet." : {
 
     },
     "Only if they gave you one" : {
@@ -1796,6 +2037,16 @@
     "Only this card can spend it" : {
 
     },
+    "Only your %@ card can sign. The %@ is in its own wallet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Only your %1$@ card can sign. The %2$@ is in its own wallet."
+          }
+        }
+      }
+    },
     "Ooh, a fresh one. It still smells like banana." : {
 
     },
@@ -1813,10 +2064,10 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
-    "Opens the payment's status" : {
+    "Opens the receipt" : {
 
     },
-    "Opens the receipt" : {
+    "Opens the status" : {
 
     },
     "Optic ID to open the app" : {
@@ -1952,12 +2203,38 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Price impact %@" : {
+
+    },
+    "Price impact %@ · 1 %@ ≈ %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Price impact %1$@ · 1 %2$@ ≈ %3$@ %4$@"
+          }
+        }
+      }
+    },
     "Prices are unavailable right now, so amounts are shown per asset." : {
 
+    },
+    "Prices swing faster than I do. Nothing was signed, and your %@ is still in %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Prices swing faster than I do. Nothing was signed, and your %1$@ is still in %2$@."
+          }
+        }
+      }
     },
     "Prices unavailable" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Prices wiggle while your swap travels. Slippage is how much less than the quote you're OK getting. If it would slip more, the swap stops and your %@ stays put." : {
+
     },
     "Primary" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -1981,6 +2258,9 @@
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
     },
+    "Protocol" : {
+
+    },
     "Put it in my jungle" : {
 
     },
@@ -1991,6 +2271,9 @@
 
     },
     "QR code unavailable" : {
+
+    },
+    "Quote" : {
 
     },
     "Radii" : {
@@ -2097,12 +2380,18 @@
     "Right card" : {
 
     },
+    "Right on the quote." : {
+
+    },
     "Ripe and ready." : {
 
     },
     "Risk" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Route" : {
+
     },
     "Safe" : {
 
@@ -2115,6 +2404,12 @@
       "extractionState" : "manual"
     },
     "Same as my iPhone" : {
+
+    },
+    "Same drawer, different coin" : {
+
+    },
+    "Same drawer, different coin." : {
 
     },
     "Same jungle, different branch." : {
@@ -2158,6 +2453,9 @@
     "Secret key (fake)" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "See new price" : {
+
     },
     "See the receipt" : {
       "comment" : "A button to see the receipt.",
@@ -2273,9 +2571,25 @@
     "Skip" : {
 
     },
+    "Slippage" : {
+
+    },
+    "Slippage %@" : {
+
+    },
     "Small" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
+    },
+    "Small pool: you get a lot less %@ per %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Small pool: you get a lot less %1$@ per %2$@."
+          }
+        }
+      }
     },
     "Smooth as a ripe banana." : {
 
@@ -2380,7 +2694,67 @@
     "Swap" : {
 
     },
+    "Swap again" : {
+
+    },
+    "Swap anyway" : {
+
+    },
     "Swap From and To" : {
+
+    },
+    "Swap in %@" : {
+
+    },
+    "Swap the two coins" : {
+
+    },
+    "Swapped" : {
+
+    },
+    "Swapped %@ for %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swapped %1$@ for %2$@"
+          }
+        }
+      }
+    },
+    "Swapped!" : {
+
+    },
+    "Swapping" : {
+
+    },
+    "Swapping %@ for %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swapping %1$@ for %2$@"
+          }
+        }
+      }
+    },
+    "Swapping %@ for at least %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swapping %1$@ for at least %2$@"
+          }
+        }
+      }
+    },
+    "Swapping…" : {
+
+    },
+    "Swaps can't be undone once signed." : {
+
+    },
+    "Swaps everything in this drawer" : {
 
     },
     "Swinging it over…" : {
@@ -2625,6 +2999,9 @@
     "The card's signature is too old now. Tap your card once more to finish." : {
 
     },
+    "The coins stay in the same drawer. Swapping in a card's wallet means that exact card has to be in your hand." : {
+
+    },
     "The decimal key follows the phone's language." : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
       "extractionState" : "manual"
@@ -2649,6 +3026,12 @@
 
     },
     "The PINs don't match. Start again." : {
+
+    },
+    "The price moved" : {
+
+    },
+    "The price moved. Nothing was signed." : {
 
     },
     "The Recent section is hidden." : {
@@ -2752,6 +3135,12 @@
     "This iPhone can't read cards. You'll need an iPhone that can tap cards." : {
 
     },
+    "This is what your card signs." : {
+
+    },
+    "This is what your card signs. If less would arrive, the swap stops and nothing moves." : {
+
+    },
     "This isn't a Stellar address. It should start with G, C or M." : {
 
     },
@@ -2767,6 +3156,19 @@
     "This phone couldn't save this payment. Don't send it again before you've checked it." : {
       "comment" : "Error message displayed when the user's phone can't save the payment.",
       "isCommentAutoGenerated" : true
+    },
+    "This phone couldn't save this swap. Don't swap again before you've checked it." : {
+
+    },
+    "This pool is small, so your swap pushes its price. You get a lot less %@ per %@ than the going rate." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This pool is small, so your swap pushes its price. You get a lot less %1$@ per %2$@ than the going rate."
+          }
+        }
+      }
     },
     "this week" : {
       "comment" : "Catalogue du design system (Debug et Testing uniquement).",
@@ -2828,6 +3230,9 @@
 
     },
     "Try another card" : {
+
+    },
+    "Try another coin." : {
 
     },
     "Try it" : {
@@ -2951,6 +3356,9 @@
         }
       }
     },
+    "We couldn't confirm the swap. Your %@ may already be swapped. Check again before trying anything else." : {
+
+    },
     "Welcome back!" : {
 
     },
@@ -2960,7 +3368,16 @@
     "Welcome to the jungle!" : {
 
     },
+    "Went out" : {
+
+    },
     "What ChimpDAO is built with" : {
+
+    },
+    "What do you want to get?" : {
+
+    },
+    "What do you want to give?" : {
 
     },
     "What do you want to move?" : {
@@ -2988,6 +3405,9 @@
 
     },
     "Where should it land?" : {
+
+    },
+    "Where should it swap?" : {
 
     },
     "Which card can pay?" : {
@@ -3088,6 +3508,15 @@
     "You" : {
 
     },
+    "You get" : {
+
+    },
+    "You get at least %@" : {
+
+    },
+    "You give" : {
+
+    },
     "You paid %@" : {
 
     },
@@ -3136,6 +3565,9 @@
 
     },
     "Your %@ card is lost" : {
+
+    },
+    "Your %@ didn't move. You can try again." : {
 
     },
     "Your 4-digit PIN is written on the card. It'll ask for it every time it signs." : {

@@ -218,7 +218,6 @@ struct MainTabView: View {
                 if !walletPath.isEmpty { walletPath.removeLast() }
             },
             onSend: { walletPath.append(.send($0)) },
-            onReceive: { walletPath.append(.receive($0)) },
             onMove: { walletPath.append(.move($0)) },
             onSwap: { walletPath.append(.swap($0)) },
             onSendPrefilled: { walletPath.append(.prefilledSend($0)) },

@@ -55,7 +55,6 @@ enum CatalogColors {
         .init(name: "chimpActivityPaid", resource: .chimpActivityPaid),
         .init(name: "chimpActivityMoved", resource: .chimpActivityMoved),
         .init(name: "chimpActivityReceived", resource: .chimpActivityReceived),
-        .init(name: "chimpActivitySwap", resource: .chimpActivitySwap),
         .init(name: "chimpActivityCard", resource: .chimpActivityCard),
     ]
 

@@ -175,10 +175,9 @@ struct ActivityContent: View {
                 } label: {
                     ChimpTicketRow(
                         title: row.title, meta: row.meta, stamp: row.stamp.text, stampColor: row.stamp.color,
-                        stampTilt: row.stamp == .swapped ? -4 : (index.isMultiple(of: 2) ? -3 : 2.5), amount: row.amount,
+                        stampTilt: index.isMultiple(of: 2) ? -3 : 2.5, amount: row.amount,
                         amountColor: color(row.tone), secondaryAmount: row.secondaryAmount,
-                        secondaryAmountColor: Color(.chimpStampReceived),
-                        background: row.isHighlighted ? Color(.chimpActivitySwap) : nil
+                        secondaryAmountColor: Color(.chimpStampReceived)
                     )
                 }
                 .buttonStyle(ChimpPressableStyle())

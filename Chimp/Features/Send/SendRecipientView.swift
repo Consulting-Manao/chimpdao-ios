@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// C1 · « Who's it for? » : adresse collée ou tapée (vérifiée avec sa somme de contrôle), memo ID facultatif,
 /// destinataires récents. Aucune carte demandée ici.
@@ -32,7 +33,7 @@ struct SendRecipientView: View {
                         // « Send back » : l'expéditeur peut être un exchange, qui ne reconnaîtrait pas l'argent renvoyé.
                         ChimpySays(
                             text: "Sending back to where it came from. If it came from an exchange, it may not reach anyone: check with them first.",
-                            pose: .head
+                            pose: .teacher
                         )
                         .padding(.top, ChimpSpacing.m)
                     }
@@ -41,8 +42,11 @@ struct SendRecipientView: View {
                             .padding(.top, ChimpSpacing.l)
                     }
                     recents
-                    ChimpySays(line: ChimpyLines.pick(ChimpyLines.recipientTips, seed: seed), pose: tipPose)
-                        .padding(.top, ChimpSpacing.xl)
+                    // En « Send back », une seule bulle : l'avertissement ci-dessus (retour de Barth, 2026-10-14).
+                    if !model.isSendingBack {
+                        ChimpySays(line: ChimpyLines.pick(ChimpyLines.recipientTips, seed: seed), pose: tipPose)
+                            .padding(.top, ChimpSpacing.xl)
+                    }
                 }
                 .padding(.horizontal, ChimpSpacing.xxl)
                 .padding(.top, ChimpSpacing.xl)
@@ -100,16 +104,7 @@ struct SendRecipientView: View {
         } accessory: {
             if model.addressText.isEmpty {
                 HStack(spacing: ChimpSpacing.xs) {
-                    PasteButton(payloadType: String.self) { strings in
-                        guard let text = strings.first else { return }
-                        Task { @MainActor in
-                            model.pasteAddress(text)
-                            focusedField = nil
-                        }
-                    }
-                    .labelStyle(.titleOnly)
-                    .buttonBorderShape(.capsule)
-                    .tint(Color(.chimpOutline))
+                    pasteButton
                     scanButton
                 }
             } else {
@@ -125,6 +120,28 @@ struct SendRecipientView: View {
                 .accessibilityLabel(Text("Clear address"))
             }
         }
+    }
+
+    /// « Paste » : pastille claire, même forme que « Scan QR » (retour de Barth du 2026-10-14 : le `PasteButton` d'iOS, gris
+    /// et en police système, jurait). Lire le presse-papiers soi-même fait afficher par iOS sa demande d'autorisation.
+    private var pasteButton: some View {
+        Button {
+            guard let text = UIPasteboard.general.string else { return }
+            model.pasteAddress(text)
+            focusedField = nil
+        } label: {
+            Text("Paste")
+                .chimpFont(.buttonSmall)
+                .foregroundStyle(.chimpTextPrimary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color(.chimpSurface)))
+                .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.thin) }
+                .frame(minHeight: ChimpSize.minimumTouchTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(ChimpPressableStyle())
+        .accessibilityLabel(Text("Paste the address"))
     }
 
     /// « Scan QR » de la maquette : petite pastille jaune dans le champ.

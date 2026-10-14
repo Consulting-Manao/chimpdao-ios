@@ -2,9 +2,10 @@ import SwiftUI
 
 /// B2r · Main account (« B2 + tiles ») et B3 · wallet d'une carte (maquettes du 2026-09-30) : le total, les pastilles
 /// des cartes qui peuvent signer, une tuile par actif, « LATELY » (Main) ou les actions de la carte (B3), puis Send /
-/// Receive / Move depuis ce tiroir.
+/// Move / Swap depuis ce tiroir.
 ///
-/// Écarts avec la maquette (DESIGN_NOTES §12) : l'adresse et « Receive » sont ajoutés (demande de Barth) ;
+/// Écarts avec la maquette (DESIGN_NOTES §12) : l'adresse est ajoutée (demande de Barth) ; « Receive » a été retiré de la
+/// barre du bas le 2026-10-14 (quatre boutons coupaient « Receive » ; la place ira à Grow) : l'adresse copiable suffit ;
 /// tout ce qui est Grow (tuile « XOXNO · GROWING », « Plant … more », « +$3.51/mo », bouton Grow) est masqué tant que
 /// Grow n'existe pas ; « Give this card away » (G4) aussi, session à part.
 struct DrawerDetailView: View {
@@ -149,8 +150,8 @@ struct DrawerDetailView: View {
 
     private var emptyText: LocalizedStringKey {
         model.isMain
-            ? "Main is empty. Tap Receive to get your first bananas."
-            : "\(model.cardName)'s wallet is empty. Tap Receive or Move to fill it."
+            ? "Main is empty. Share its address above to get your first bananas."
+            : "\(model.cardName)'s wallet is empty. Share its address above, or tap Move to fill it."
     }
 
     // MARK: Cette carte
@@ -234,8 +235,6 @@ struct DrawerDetailView: View {
         return HStack(spacing: ChimpSpacing.sm) {
             ChimpButton("Send", size: .compact) { actions.onSend(id) }
                 .disabled(isEmpty)
-            ChimpButton("Receive", kind: .secondary, size: .compact) { actions.onReceive(id) }
-                .disabled(model.content == nil)
             ChimpButton("Move", kind: .secondary, size: .compact) { actions.onMove(id) }
                 .disabled(isEmpty)
             // Maquette B2 / B3 « with Swap » : Swap s'ouvre avec ce tiroir déjà choisi.
@@ -271,8 +270,6 @@ struct DrawerDetailActions {
     var onBack: () -> Void = {}
     /// Envoyer, avec ce tiroir en « From » (identifiant du tiroir).
     var onSend: (String) -> Void = { _ in }
-    /// Recevoir, sur ce tiroir.
-    var onReceive: (String) -> Void = { _ in }
     /// Move, depuis ce tiroir.
     var onMove: (String) -> Void = { _ in }
     /// Swap, dans ce tiroir.

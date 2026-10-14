@@ -34,8 +34,6 @@ struct ActivityRow: Identifiable, Equatable {
     let record: ActivityRecord?
     /// Swap : ce qui est arrivé (« +99.71 USDC »), sous ce qui est parti.
     var secondaryAmount: String? = nil
-    /// Fond de la ligne (maquette I1s : un swap sur fond #F9CFA0).
-    var isHighlighted = false
 }
 
 /// Un ticket : une journée (ou le paiement en attente, en haut).
@@ -319,8 +317,7 @@ final class ActivityViewModel {
                 id: record.id, title: String(localized: "Swapped \(code) for \(received)"),
                 meta: "\(time) · " + String(localized: "in \(drawer(record.from)?.name ?? "")"), stamp: .swapped,
                 amount: record.amount.map { quantityText($0, code: code, sign: .negative) }, tone: .neutral, record: record,
-                secondaryAmount: record.receivedAmount.map { quantityText($0, code: received, sign: .positive) },
-                isHighlighted: true
+                secondaryAmount: record.receivedAmount.map { quantityText($0, code: received, sign: .positive) }
             )
         case .cardAdded:
             let name = record.cardKey.flatMap(cardName) ?? String(localized: "A new card")

@@ -36,7 +36,7 @@ struct SwapAmountView: View {
         .chimpSheet(isPresented: $model.isDrawerSheetPresented, height: CGFloat(250 + 76 * model.drawers.count)) {
             drawerSheet
         }
-        .chimpSheet(isPresented: $model.isSlippageSheetPresented, height: 600) {
+        .chimpSheet(isPresented: $model.isSlippageSheetPresented, height: 600, fitsContent: true) {
             slippageSheet
         }
         .chimpSheet(
@@ -156,16 +156,9 @@ struct SwapAmountView: View {
                     .accessibilityValue(Text(verbatim: "\(model.amount.displayText(locale: locale)) \(model.given.code)"))
                 Spacer(minLength: ChimpSpacing.s)
                 ChimpAssetPill(glyph: model.given.glyph, title: model.given.code) { assetSheetSide = .given }
-            }
-            HStack(spacing: ChimpSpacing.s) {
-                if isShort {
-                    Text("Only \(model.given.displayedWithCode(model.available, locale: locale)) in \(drawerName)")
-                        .chimpFont(.captionStrong)
-                        .foregroundStyle(Color(.chimpNegative))
-                } else {
-                    balanceLine(before: model.givenBalanceLine.before, after: model.givenBalanceLine.after, asset: model.given, afterColor: .chimpTextPrimary)
-                }
-                Spacer(minLength: ChimpSpacing.xs)
+                    .fixedSize()
+                // « Max » à droite de l'actif (retour de Barth, 2026-10-14), plus sous la ligne du solde. La pastille et
+                // « Max » gardent leur taille : c'est le montant qui rétrécit (`minimumScaleFactor`).
                 Button("Max") { model.setMax() }
                     .chimpFont(.buttonSmall)
                     .foregroundStyle(Color(isShort ? .chimpOnAccent : .chimpTextPrimary))
@@ -173,8 +166,16 @@ struct SwapAmountView: View {
                     .padding(.vertical, 3)
                     .cartoonSurface(Capsule(), fill: isShort ? Color(.chimpAccent) : Color(.chimpSurfaceSecondary), border: ChimpBorder.thin)
                     .buttonStyle(ChimpPressableStyle())
+                    .fixedSize()
                     .disabled(model.available <= 0)
                     .accessibilityHint(Text("Swaps everything in this drawer"))
+            }
+            if isShort {
+                Text("Only \(model.given.displayedWithCode(model.available, locale: locale)) in \(drawerName)")
+                    .chimpFont(.captionStrong)
+                    .foregroundStyle(Color(.chimpNegative))
+            } else {
+                balanceLine(before: model.givenBalanceLine.before, after: model.givenBalanceLine.after, asset: model.given, afterColor: .chimpTextPrimary)
             }
         }
         .padding(.horizontal, ChimpSpacing.l)
@@ -211,7 +212,8 @@ struct SwapAmountView: View {
                 .contentShape(Circle())
         }
         .buttonStyle(ChimpPressableStyle())
-        .padding(.vertical, -ChimpSpacing.s)
+        // Retour de Barth (2026-10-14) : de l'air au-dessus et au-dessous de ⇅, plus collé aux deux cartes.
+        .padding(.vertical, ChimpSpacing.xxs)
         .zIndex(1)
         .accessibilityLabel(Text("Swap the two coins"))
     }

@@ -174,8 +174,6 @@ struct ChimpTicketRow: View {
     /// Second montant, sous le premier (swap, maquette I1s : « −400 XLM » puis « +99.71 USDC »).
     var secondaryAmount: String?
     var secondaryAmountColor: Color = Color(.chimpStampReceived)
-    /// Fond de la ligne (swap : `chimpActivitySwap`), sinon le papier du ticket.
-    var background: Color?
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -198,11 +196,7 @@ struct ChimpTicketRow: View {
                 }
             }
         }
-        .padding(.vertical, background == nil ? ChimpSpacing.xs : ChimpSpacing.s)
-        .padding(.horizontal, background == nil ? 0 : 10)
-        .background {
-            if let background { RoundedRectangle(cornerRadius: 8).fill(background) }
-        }
+        .padding(.vertical, ChimpSpacing.xs)
         .contentShape(Rectangle())
     }
 
