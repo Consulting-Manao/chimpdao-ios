@@ -41,6 +41,8 @@ struct SwapQuoteSummary: Equatable {
     var comparedProtocols: [String] = []
     /// Les protocoles qui n'ont pas répondu : le devis vient des autres, et l'écran le dit.
     var unavailableProtocols: [String] = []
+    /// Debug seulement : le protocole a été forcé dans le catalogue (`SwapProtocolOverride`), E3 le dit.
+    var isForcedForDebug = false
 
     var expectedOut: Decimal { SwapUnits.amount(fromUnits: expectedOutUnits) }
 
@@ -50,10 +52,13 @@ struct SwapQuoteSummary: Equatable {
         case best(among: [String])
         /// « Soroswap is unavailable, using Aquarius » (un seul protocole en panne : pas d'écran d'erreur).
         case fallback(unavailable: [String], used: String)
+        /// Debug : « Soroswap only (debug setting) ».
+        case forced(String)
     }
 
     /// `nil` quand un seul protocole a été interrogé : rien à dire.
     var comparison: Comparison? {
+        if isForcedForDebug { return .forced(protocolName) }
         if !unavailableProtocols.isEmpty { return .fallback(unavailable: unavailableProtocols, used: protocolName) }
         return comparedProtocols.count > 1 ? .best(among: comparedProtocols) : nil
     }

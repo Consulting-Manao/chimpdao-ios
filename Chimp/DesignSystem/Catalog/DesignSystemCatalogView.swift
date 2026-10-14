@@ -10,6 +10,9 @@ struct DesignSystemCatalogView: View {
     @Environment(AppSession.self) private var session: AppSession?
     @State private var isConfirmingForget = false
     @State private var forgetError: String?
+    #if DEBUG
+    @State private var swapProtocol = SwapProtocolOverride.current
+    #endif
 
     var body: some View {
         CatalogPage("Design System", settings: settings, scrolls: false) {
@@ -33,6 +36,21 @@ struct DesignSystemCatalogView: View {
                     if let forgetError {
                         Text(verbatim: forgetError).chimpFont(.caption).foregroundStyle(.chimpNegative)
                     }
+                    #if DEBUG
+                    // Forcer un protocole d'échange (preuve d'un swap Soroswap sur testnet, où Aquarius gagne toujours).
+                    Picker(selection: $swapProtocol) {
+                        ForEach(SwapProtocolOverride.allCases) { option in
+                            Text(verbatim: option.title).tag(option)
+                        }
+                    } label: {
+                        Label {
+                            Text(verbatim: "Swap protocol").chimpFont(.rowTitle)
+                        } icon: {
+                            Image(systemName: "arrow.left.arrow.right").fontWeight(.heavy)
+                        }
+                    }
+                    .onChange(of: swapProtocol) { _, new in SwapProtocolOverride.current = new }
+                    #endif
                 } header: {
                     Text(verbatim: "Admin")
                 }

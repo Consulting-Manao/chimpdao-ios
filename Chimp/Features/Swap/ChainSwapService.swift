@@ -63,7 +63,13 @@ final class ChainSwapService: SwapService {
     }
 
     func quote(given: SendAsset, received: SendAsset, amount: Decimal) async throws -> SwapQuoteSummary {
-        let comparison = await registry.bestQuote(try request(given: given, received: received, amount: amount))
+        var comparing = registry
+        #if DEBUG
+        // Réglage caché du catalogue (Debug) : le devis d'un seul protocole (`SwapProtocolOverride`).
+        let forced = SwapProtocolOverride.current.protocolID
+        if let forced { comparing = IntegrationRegistry(swapAdapters: registry.swapAdapters.filter { $0.id == forced }, yieldAdapters: []) }
+        #endif
+        let comparison = await comparing.bestQuote(try request(given: given, received: received, amount: amount))
         let unavailable = comparison.failures.map { name(of: $0.protocolID) }
         guard let best = comparison.best else {
             if comparison.failures.isEmpty { throw SwapError.noRoute }
@@ -74,6 +80,9 @@ final class ChainSwapService: SwapService {
         var summary = try summary(of: best, given: given, received: received, amount: amount)
         summary.comparedProtocols = comparison.answered.map(name(of:))
         summary.unavailableProtocols = unavailable
+        #if DEBUG
+        summary.isForcedForDebug = forced != nil
+        #endif
         return summary
     }
 

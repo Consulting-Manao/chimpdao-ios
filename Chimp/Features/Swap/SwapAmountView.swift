@@ -283,7 +283,7 @@ struct SwapAmountView: View {
         switch model.quoteState {
         case .loading:
             HStack {
-                Text("Comparing Soroswap and Aquarius…")
+                Text(loadingText)
                     .chimpFont(.caption)
                     .foregroundStyle(.chimpTextSecondary)
                 Spacer(minLength: ChimpSpacing.s)
@@ -313,12 +313,24 @@ struct SwapAmountView: View {
         }
     }
 
+    /// Pendant le devis : les deux protocoles comparés, ou celui que le réglage de Debug impose.
+    private var loadingText: LocalizedStringKey {
+        #if DEBUG
+        if SwapProtocolOverride.current != .automatic {
+            return "Asking \(SwapProtocolOverride.current == .soroswap ? "Soroswap" : "Aquarius") for a price…"
+        }
+        #endif
+        return "Comparing Soroswap and Aquarius…"
+    }
+
     /// Ligne discrète sous le taux : les protocoles comparés, ou celui qui ne répond pas.
     private func comparisonLine(_ comparison: SwapQuoteSummary.Comparison) -> some View {
         Group {
             switch comparison {
             case .best(let names):
                 Text("Best price from \(names.formatted(.list(type: .and).locale(locale)))")
+            case .forced(let name):
+                Text(verbatim: "\(name) only (debug setting)")
             case .fallback(let unavailable, let used):
                 Text("\(unavailable.formatted(.list(type: .and).locale(locale))) \(unavailable.count > 1 ? "are" : "is") unavailable, using \(used)")
             }
