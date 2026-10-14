@@ -42,6 +42,16 @@ final class SwapFlowModel {
         case insufficient(drawer: String, available: Decimal, asset: SendAsset)
     }
 
+    /// E4p · Le prix a bougé : rien n'a été signé. L'ancien minimum, et le nouveau devis dès qu'il est arrivé.
+    struct PriceMoved: Equatable {
+        let oldMinimum: Decimal
+        let received: SendAsset
+        /// Le nouveau brouillon (nouveau devis, même tolérance) ; `nil` tant qu'il n'est pas arrivé, ou s'il n'a pas pu l'être.
+        var newDraft: SwapDraft?
+        /// Le nouveau devis n'a pas pu être lu : « Try again ».
+        var failed = false
+    }
+
     /// Préparation ratée (avant la carte) : rien n'a été signé.
     enum PreparationIssue: Equatable {
         /// Le prix a bougé sous le minimum affiché : nouveau devis à revoir.
@@ -82,6 +92,8 @@ final class SwapFlowModel {
     private var prepared: PreparedSwap?
     private(set) var signed: SignedSwap?
     private(set) var preparationIssue: PreparationIssue?
+    /// E4p, affiché par-dessus la vérification.
+    private(set) var priceMoved: PriceMoved?
     private(set) var tapProblem: TapProblem?
     private(set) var technicalDetails: String?
 
@@ -110,13 +122,25 @@ final class SwapFlowModel {
         service: SwapService,
         signingOrder: SigningOrder = .pinThenTap,
         initialDrawerID: String? = nil,
+        prefill: SwapPrefill? = nil,
         quoteDebounce: Duration = .milliseconds(400)
     ) {
         self.service = service
         self.signingOrder = signingOrder
         self.quoteDebounce = quoteDebounce
         if let initialDrawerID { selectedDrawerID = initialDrawerID }
+        if let prefill {
+            selectedDrawerID = prefill.drawerID
+            given = prefill.given
+            received = prefill.received
+            if let value = prefill.amount, value > 0, value == value.truncated(to: prefill.given.maxFractionDigits) {
+                amount = AmountEntry(value, maxFractionDigits: prefill.given.maxFractionDigits, minFractionDigits: prefill.given == .usdc ? 2 : 0)
+            }
+        }
     }
+
+    /// Préremplissage demandé (« Swap again ») : le devis est demandé dès que les tiroirs sont lus.
+    private var needsInitialQuote: Bool { amount.value > 0 && quoteState == .idle }
 
     // MARK: Chargement
 
@@ -126,8 +150,9 @@ final class SwapFlowModel {
         if let waiting = service.pendingSend {
             pending = waiting
             guard let swap = SwapSummary(waiting, network: context?.network ?? .testnet) else {
-                // Un envoi attend son issue : on n'en signe pas un autre (Envoyer le montre).
+                // Un envoi attend son issue : l'écran s'affiche (E3f), mais aucun swap ne se signe avant.
                 blockedByPendingPayment = true
+                await load()
                 return
             }
             summary = swap
@@ -147,9 +172,36 @@ final class SwapFlowModel {
                 selectedDrawerID = context.drawers.first?.id ?? "main"
             }
             loadPhase = context.drawers.isEmpty ? .failed : .loaded
+            if loadPhase == .loaded, needsInitialQuote { await refreshQuote() }
         } catch is CancellationError {
         } catch {
             loadPhase = .failed
+        }
+    }
+
+    // MARK: E3f · Un envoi attend son issue
+
+    /// Vérification en cours de l'envoi en attente (E3f « Check again »).
+    private(set) var isCheckingPendingPayment = false
+
+    /// E3f « Check again » : vérifie l'envoi en attente. Issue certaine (parti, ou rien n'est parti) : il est effacé, et le
+    /// swap redevient possible. Sinon le bandeau reste (Envoyer montre le détail).
+    func checkPendingPayment() async {
+        guard blockedByPendingPayment, let waiting = pending, !isCheckingPendingPayment else { return }
+        isCheckingPendingPayment = true
+        defer { isCheckingPendingPayment = false }
+        do {
+            switch try await service.check(waiting.trace) {
+            case .sent, .nothingSent:
+                try? service.setPendingSend(nil)
+                pending = nil
+                blockedByPendingPayment = false
+                if context == nil { await load() }
+            case .pending, .waiting, .undetermined:
+                break
+            }
+        } catch {
+            technicalDetails = SendFlowModel.details(error)
         }
     }
 
@@ -217,11 +269,40 @@ final class SwapFlowModel {
         amountChanged()
     }
 
+    /// E3s : les trois tolérances proposées (maquette), 0,5 % par défaut. Pas de saisie libre.
+    static let slippageOptions = [50, 100, 300]
+    var isSlippageSheetPresented = false
+
+    /// Minimum reçu pour une tolérance donnée, au devis affiché (E3s : « You get at least 98.68 USDC »).
+    func minimum(atSlippage basisPoints: Int) -> Decimal? {
+        currentQuote.map { SwapUnits.amount(fromUnits: Slippage.minimum(of: $0.expectedOutUnits, basisPoints: basisPoints)) }
+    }
+
+    /// Taux du devis affiché, en quantités : « 1 XLM ≈ 0.2492 USDC » (4 décimales, tronqué). Jamais de dollars.
+    var rate: Decimal? {
+        guard let quote = currentQuote, quote.amountIn > 0 else { return nil }
+        return (quote.expectedOut / quote.amountIn).truncated(to: 4)
+    }
+
+    /// Solde de l'actif reçu, puis après le swap (au devis) : « 620 → 719.68 USDC in Main ».
+    var receivedBalanceLine: (before: Decimal, after: Decimal?) {
+        let held = selectedDrawer?.balance(of: received) ?? 0
+        return (held, currentQuote.map { held + $0.expectedOut })
+    }
+
+    /// Solde de l'actif donné, puis après le swap : « 800 → 400 XLM in Main » (`nil` après si le montant dépasse).
+    var givenBalanceLine: (before: Decimal, after: Decimal?) {
+        let value = amount.value
+        guard value > 0, value <= available else { return (available, nil) }
+        return (available, available - value)
+    }
+
     /// Choisit la tolérance de slippage (en points de base). Refusée au-delà de 3 % : la valeur précédente reste.
     @discardableResult
     func setSlippage(_ basisPoints: Int) -> Bool {
         guard let checked = try? Slippage.checked(basisPoints) else { return false }
         slippageBasisPoints = checked
+        isSlippageSheetPresented = false
         return true
     }
 
@@ -336,8 +417,13 @@ final class SwapFlowModel {
                 beginSigning()
             } catch {
                 stage = .idle
-                preparationIssue = Self.preparationIssue(for: error)
                 technicalDetails = SendFlowModel.details(error)
+                let issue = Self.preparationIssue(for: error)
+                if issue == .priceMoved {
+                    await priceDidMove()
+                } else {
+                    preparationIssue = issue
+                }
             }
         }
     }
@@ -352,19 +438,44 @@ final class SwapFlowModel {
         }
     }
 
-    /// « Le prix a bougé » : nouveau devis pour le même swap ; la vérification montre les nouveaux chiffres, à revoir
-    /// avant de signer. Rien n'a été signé.
-    func requoteAfterPriceMoved() async {
-        guard stage == .idle, let draft else { return }
+    /// E4p : le prix a bougé sous le minimum signé. Rien n'a été signé ; un nouveau devis est demandé tout de suite pour
+    /// montrer le nouveau minimum (décision de Barth du 2026-10-14).
+    private func priceDidMove() async {
+        guard let draft else { return }
+        priceMoved = PriceMoved(oldMinimum: draft.minimumOut, received: draft.received)
+        await fetchNewPrice()
+    }
+
+    /// Nouveau devis pour le même swap (même tiroir, mêmes actifs, même montant, même tolérance).
+    func fetchNewPrice() async {
+        guard let draft, var moved = priceMoved else { return }
+        moved.failed = false
+        moved.newDraft = nil
+        priceMoved = moved
         do {
             let quote = try await service.quote(given: draft.given, received: draft.received, amount: draft.amount)
-            self.draft = SwapDraft(drawer: draft.drawer, quote: quote, slippageBasisPoints: draft.slippageBasisPoints, network: draft.network)
-            quoteState = .quoted(quote)
-            preparationIssue = nil
+            moved.newDraft = SwapDraft(drawer: draft.drawer, quote: quote, slippageBasisPoints: draft.slippageBasisPoints, network: draft.network)
         } catch {
             technicalDetails = SendFlowModel.details(error)
-            preparationIssue = Self.preparationIssue(for: error)
+            moved.failed = true
         }
+        if priceMoved != nil { priceMoved = moved }
+    }
+
+    /// « See new price » : retour à une vérification **complète** (E4) avec les nouvelles bornes ; jamais une signature
+    /// directe (décision de Barth du 2026-10-14). Il faudra appuyer de nouveau sur « Looks good ».
+    func acceptNewPrice() {
+        guard stage == .idle, let newDraft = priceMoved?.newDraft else { return }
+        draft = newDraft
+        quoteState = .quoted(newDraft.quote)
+        priceMoved = nil
+        preparationIssue = nil
+    }
+
+    /// E4i « Change the amount » : retour à la saisie (E3).
+    func changeAmount() {
+        guard stage == .idle else { return }
+        isReviewPresented = false
     }
 
     private func beginSigning() {
@@ -439,8 +550,12 @@ final class SwapFlowModel {
         case ChipError.cardNotAccepted(let tapped):
             technicalDetails = SendFlowModel.details(error)
             stage = .wrongCard(wrongCard(tapped: tapped), retry: step == .tapToRead ? .tapToRead : .tapToSign)
-        case SwapError.slippageExceeded, SwapError.deadlineExpired, SwapError.noRoute, SwapError.insufficientLiquidity,
-             PaymentClient.PaymentError.insufficientBalance:
+        case SwapError.slippageExceeded, SwapError.deadlineExpired:
+            // La préparation refaite juste avant le tap a trouvé un prix plus bas : E4p, rien n'a été signé.
+            resetSigning()
+            technicalDetails = SendFlowModel.details(error)
+            Task { await priceDidMove() }
+        case SwapError.noRoute, SwapError.insufficientLiquidity, PaymentClient.PaymentError.insufficientBalance:
             resetSigning()
             preparationIssue = Self.preparationIssue(for: error)
             technicalDetails = SendFlowModel.details(error)
@@ -611,6 +726,17 @@ final class SwapFlowModel {
         quoteTask?.cancel()
         onExit?()
     }
+
+    /// « Swap again » (reçu) : un parcours neuf, prérempli (même tiroir, mêmes actifs, même montant), devis neuf.
+    var onSwapAgain: ((SwapPrefill) -> Void)?
+}
+
+/// Ce que « Swap again » préremplit : un swap déjà fait, à refaire au prix du moment (tout est revérifié).
+struct SwapPrefill: Equatable, Hashable {
+    let drawerID: String
+    let given: SendAsset
+    let received: SendAsset
+    let amount: Decimal?
 }
 
 /// Issue d'un swap, une fois la carte passée (mêmes cas qu'Envoyer).

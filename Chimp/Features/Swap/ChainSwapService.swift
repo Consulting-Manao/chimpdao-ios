@@ -193,8 +193,10 @@ final class ChainSwapService: SwapService {
         return SwapUnits.amount(fromUnits: last)
     }
 
+    /// Comme Envoyer (`ChainSendService.check`, qui écrit la ligne d'un **envoi** en attente finalement parti, jamais
+    /// celle d'un swap) : un swap en attente se vérifie de la même façon, par le nonce de son autorisation.
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck {
-        try await PaymentClient(client: client, config: config).check(trace)
+        try await drawers.check(trace)
     }
 
     var pendingSend: PendingSend? { session.wallet.pendingSend }

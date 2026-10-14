@@ -196,18 +196,102 @@ struct SwapFlowTests {
         #expect(!model.isSigningLocked, "La feuille du PIN se ferme encore (« Cancel »)")
     }
 
-    @Test("Le prix a bougé à la préparation : rien n'est signé, nouveau devis à revoir")
+    @Test("E4p · Le prix a bougé à la préparation : rien n'est signé, nouveau devis demandé tout de suite, ancien et nouveau minimum")
     func priceMoved() async throws {
         let (model, service) = await reviewReady(.priceMovesBeforeSigning)
         model.confirmReview()
-        await waitUntil { model.preparationIssue != nil }
-        #expect(model.preparationIssue == .priceMoved)
+        await waitUntil { model.priceMoved?.newDraft != nil }
+        let moved = try #require(model.priceMoved)
+        #expect(moved.oldMinimum == Decimal(string: "99.1816"))
+        #expect(moved.received == .usdc)
+        #expect(moved.newDraft?.quote.amountIn == 400)
         #expect(model.stage == .idle)
-        #expect(service.send.signCount == 0)
-        service.quoteScenario = .normal
-        await model.requoteAfterPriceMoved()
         #expect(model.preparationIssue == nil)
-        #expect(model.draft?.quote.amountIn == 400)
+        #expect(service.send.signCount == 0)
+    }
+
+    @Test("« See new price » : retour à la vérification complète avec les nouvelles bornes, jamais une signature directe")
+    func seeNewPrice() async throws {
+        let (model, service) = await reviewReady(.priceMovesBeforeSigning)
+        model.confirmReview()
+        await waitUntil { model.priceMoved?.newDraft != nil }
+        let newDraft = try #require(model.priceMoved?.newDraft)
+        service.quoteScenario = .normal
+        model.acceptNewPrice()
+        #expect(model.priceMoved == nil)
+        #expect(model.draft == newDraft)
+        #expect(model.stage == .idle, "Il faut de nouveau « Looks good »")
+        #expect(model.isReviewPresented)
+        #expect(service.prepareCount == 1)
+        #expect(service.send.signCount == 0)
+    }
+
+    @Test("E4p · nouveau devis impossible : « Try again » le redemande")
+    func newPriceFails() async throws {
+        let (model, service) = await reviewReady(.priceMovesBeforeSigning)
+        model.confirmReview()
+        await waitUntil { model.priceMoved?.newDraft != nil }
+        service.quoteScenario = .protocolUnavailable
+        await model.fetchNewPrice()
+        #expect(model.priceMoved?.failed == true)
+        #expect(model.priceMoved?.newDraft == nil)
+        model.acceptNewPrice()
+        #expect(model.priceMoved != nil, "Pas de nouveau prix : rien à accepter")
+        service.quoteScenario = .normal
+        await model.fetchNewPrice()
+        #expect(model.priceMoved?.newDraft != nil)
+    }
+
+    @Test("E3s · trois tolérances (0,5 %, 1 %, 3 %) avec le minimum de chacune ; taux et soldes après en quantités")
+    func slippageSheetAndRate() async {
+        let (model, _) = await model()
+        await quoted(model, 400)
+        #expect(SwapFlowModel.slippageOptions == [50, 100, 300])
+        #expect(model.minimum(atSlippage: 100) == Decimal(string: "98.6832"))
+        #expect(model.minimum(atSlippage: 300) == Decimal(string: "96.6896"))
+        #expect(model.rate == Decimal(string: "0.2492"))
+        #expect(model.givenBalanceLine.after == 0)
+        #expect(model.receivedBalanceLine.after == Decimal(string: "819.68"))
+        model.isSlippageSheetPresented = true
+        model.setSlippage(100)
+        #expect(model.slippageBasisPoints == 100)
+        #expect(!model.isSlippageSheetPresented)
+    }
+
+    @Test("E3f « Check again » : l'envoi en attente est parti, il est effacé et le swap redevient possible")
+    func checkPendingPayment() async {
+        let service = MockSwapService(resultScenario: .sent, delay: .zero)
+        service.pendingSend = PendingSend(
+            trace: PaymentTrace(token: "xlm", from: "main", destination: "tom", units: 1, nonce: 1, preparedAtLedger: 1, expirationLedger: 121),
+            recipient: "tom", recipientName: nil, drawerTitle: "Main account", asset: "xlm", amount: 1, signedAt: .now
+        )
+        let model = SwapFlowModel(service: service, quoteDebounce: .zero)
+        await model.loadIfNeeded()
+        #expect(model.blockedByPendingPayment)
+        #expect(model.loadPhase == .loaded, "L'écran E3 s'affiche quand même")
+        await model.checkPendingPayment()
+        #expect(!model.blockedByPendingPayment)
+        #expect(service.pendingSend == nil)
+        await quoted(model, 10)
+        #expect(model.canReview)
+    }
+
+    @Test("« Swap again » : tiroir, actifs et montant préremplis, devis demandé au chargement")
+    func swapAgainPrefill() async {
+        let service = MockSwapService(delay: .zero)
+        let model = SwapFlowModel(service: service, prefill: SwapPrefill(drawerID: "0688", given: .usdc, received: .xlm, amount: 10), quoteDebounce: .zero)
+        await model.loadIfNeeded()
+        #expect(model.selectedDrawer?.id == "0688")
+        #expect(model.given == .usdc)
+        #expect(model.currentQuote?.amountIn == 10)
+    }
+
+    @Test("E4i « Change the amount » : retour à la saisie")
+    func changeAmount() async {
+        let (model, _) = await reviewReady(.bigImpact)
+        #expect(model.draft?.quote.needsPriceImpactWarning == true)
+        model.changeAmount()
+        #expect(!model.isReviewPresented)
     }
 
     @Test("PIN faux : retour au PIN avec les essais restants, rien n'est envoyé")
@@ -288,6 +372,6 @@ struct SwapFlowTests {
         await model.loadIfNeeded()
         #expect(model.blockedByPendingPayment)
         #expect(!model.canReview)
-        #expect(service.checkCount == 0, "L'envoi en attente se vérifie dans Envoyer")
+        #expect(service.checkCount == 0, "Vérifié seulement sur « Check again » (E3f)")
     }
 }
