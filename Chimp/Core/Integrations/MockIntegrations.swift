@@ -50,6 +50,12 @@ struct MockSwapAdapter: SwapAdapter {
     func terms(of call: ContractCall) throws -> SignedTerms {
         try SoroswapCalls.terms(of: call, router: router)
     }
+
+    var deadlineSeconds: UInt64? { SoroswapCalls.deadlineSeconds }
+
+    func swapError(for error: Error) -> SwapError? { SoroswapAdapter.swapError(for: error) }
+
+    func receivedUnits(_ returnValue: SCValXDR) -> Int128? { (try? SoroswapAdapter.amounts(returnValue))?.last }
 }
 
 /// Un protocole de rendement factice : un seul vault, positions tenues en mémoire, mêmes appels et même forme

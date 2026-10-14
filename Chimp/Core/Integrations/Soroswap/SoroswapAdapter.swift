@@ -92,6 +92,17 @@ final class SoroswapAdapter: SwapAdapter {
         try SoroswapCalls.terms(of: call, router: contracts.router)
     }
 
+    var deadlineSeconds: UInt64? { SoroswapCalls.deadlineSeconds }
+
+    func swapError(for error: Error) -> SwapError? {
+        Self.swapError(for: error)
+    }
+
+    /// Dernier montant rendu par `swap_exact_tokens_for_tokens`.
+    func receivedUnits(_ returnValue: SCValXDR) -> Int128? {
+        (try? Self.amounts(returnValue))?.last
+    }
+
     // MARK: Lecture des réponses
 
     /// `Vec<i128>` des montants à chaque saut.

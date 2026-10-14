@@ -1,4 +1,5 @@
 import Foundation
+import stellarsdk
 
 /// Un actif tel que les intégrations le manipulent : son code affiché et l'adresse de son contrat (SAC, ou jeton de parts).
 struct IntegrationAsset: Equatable, Hashable, Sendable {
@@ -27,8 +28,23 @@ struct SwapQuote: Equatable, Sendable {
     let amountOut: Int128
     /// Écart au prix des réserves (`Slippage.priceImpactBasisPoints`), si le protocole le connaît.
     let priceImpactBasisPoints: Int?
-    /// Le contrat qui reçoit la prise du premier saut (paire Soroswap, pool Aquarius) : la forme d'autorisation en dépend.
+    /// Le contrat qui reçoit ce qui part (paire Soroswap, pool Aquarius, ou router d'un `swap_chained`) : la forme
+    /// d'autorisation et la trace de « Check again » en dépendent.
     let firstHopVenue: String
+    /// Les pools traversés, quand le protocole doit les nommer dans l'appel (Aquarius : `pool_index`). Vide pour Soroswap.
+    var hops: [SwapHop] = []
+}
+
+/// Un pool traversé par un devis : ses deux jetons triés comme le veut le protocole, son identifiant (`pool_index`
+/// d'Aquarius, 32 octets), son contrat et le jeton obtenu.
+struct SwapHop: Equatable, Hashable, Sendable {
+    let tokens: [String]
+    let poolHash: Data
+    let pool: String
+    let tokenOut: String
+
+    /// Le jeton donné à ce pool : l'autre des deux.
+    var tokenIn: String? { tokens.first { $0 != tokenOut } }
 }
 
 /// Un protocole d'échange (Soroswap, Aquarius). Chaque adaptateur fournit le devis, l'appel, sa forme d'autorisation et
@@ -44,6 +60,12 @@ protocol SwapAdapter {
     func authShape(for quote: SwapQuote) -> any AuthShape
     /// Les bornes que porte un appel de ce protocole (ce que l'écran de vérification affiche).
     func terms(of call: ContractCall) throws -> SignedTerms
+    /// L'échéance que l'appel porte (secondes après la préparation), `nil` si le protocole n'en a pas.
+    var deadlineSeconds: UInt64? { get }
+    /// Un refus de ce protocole dit simplement (prix qui a bougé, pas de route…), `nil` pour toute autre erreur.
+    func swapError(for error: Error) -> SwapError?
+    /// La quantité reçue, lue dans la valeur rendue par l'appel exécuté (affichage seulement).
+    func receivedUnits(_ returnValue: SCValXDR) -> Int128?
 }
 
 // MARK: Rendement (D1)

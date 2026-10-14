@@ -17,17 +17,7 @@ enum AquariusCalls {
     static let swapFunction = "swap"
     static let chainedFunction = "swap_chained"
 
-    /// Un pool traversé : ses deux jetons triés, son identifiant dans le router (`pool_index`, 32 octets), son contrat,
-    /// et le jeton obtenu.
-    struct Hop: Equatable, Hashable, Sendable {
-        let tokens: [String]
-        let poolHash: Data
-        let pool: String
-        let tokenOut: String
-
-        /// Le jeton donné à ce pool : l'autre des deux.
-        var tokenIn: String? { tokens.first { $0 != tokenOut } }
-    }
+    typealias Hop = SwapHop
 
     /// Les deux jetons dans l'ordre du router : par les 32 octets de leur contrat, comme des entiers non signés.
     static func sortedTokens(_ tokenA: String, _ tokenB: String) throws -> [String] {
