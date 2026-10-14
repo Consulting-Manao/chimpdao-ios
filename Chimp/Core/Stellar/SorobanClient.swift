@@ -331,6 +331,17 @@ struct SorobanClient {
         }
     }
 
+    /// Valeur rendue par l'appel d'une transaction confirmée (par exemple les montants d'un swap), `nil` si elle n'est
+    /// pas (ou plus) lisible. Ne sert qu'à l'affichage : l'issue d'une transaction se lit avec `lookUpTransaction`.
+    func transactionReturnValue(_ hash: String) async throws -> SCValXDR? {
+        switch await server.getTransaction(transactionHash: hash) {
+        case .success(let response):
+            return response.status == GetTransactionResponse.STATUS_SUCCESS ? response.resultValue : nil
+        case .failure(let error):
+            throw StellarError.rpc(Self.describe(error))
+        }
+    }
+
     /// Dernier ledger fermé et son heure de fermeture (secondes depuis 1970).
     func latestLedgerInfo() async throws -> (sequence: UInt32, closeTime: UInt64) {
         switch await server.getLatestLedger() {

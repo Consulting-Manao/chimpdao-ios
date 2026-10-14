@@ -116,25 +116,44 @@ struct IntegrationCallClient {
     /// Met la signature de la carte dans l'entrée (`ChipAuth` pour une Pocket, `AccountAuth` pour le Main account),
     /// construit la transaction (source = payeur de frais), la simule et l'assemble ; Infineon : `recovery_id` cherché par
     /// simulation (`#201` Pocket, `#301` compte). Puis frais par le serveur de frais, envoi, attente. Renvoie le hash.
-    /// Refus sans rien envoyer si la carte n'est pas acceptée ou si l'autorisation a déjà expiré.
-    func submit(_ prepared: PreparedIntegrationCall, signed: CardSignatures, feeSigner: FeeSigner) async throws -> String {
-        guard prepared.acceptedKeys.contains(signed.card.publicKey) else {
-            throw ChipError.cardNotAccepted(tapped: signed.card.publicKey)
+    /// Refus si la carte n'est pas acceptée ou si l'autorisation a déjà expiré.
+    ///
+    /// Comme `PaymentClient.submit` : toute erreur est rendue dans un `PaymentFailure` qui porte `trace` (complétée de la
+    /// limite de temps et du hash de la transaction) ; l'entrée signée a pu sortir du téléphone, l'issue se vérifie avec
+    /// `PaymentClient.check` (le nonce de l'entrée identifie notre autorisation dans n'importe quelle transaction).
+    func submit(
+        _ prepared: PreparedIntegrationCall,
+        signed: CardSignatures,
+        trace: PaymentTrace,
+        feeSigner: FeeSigner,
+        onProgress: ((PaymentProgress) -> Void)? = nil
+    ) async throws -> String {
+        var trace = trace
+        onProgress?(.checking)
+        do {
+            guard prepared.acceptedKeys.contains(signed.card.publicKey) else {
+                throw ChipError.cardNotAccepted(tapped: signed.card.publicKey)
+            }
+            guard signed.signatures.count == 1, let signature = signed.signatures.first else {
+                throw ChipError.malformedResponse("expected 1 signature, got \(signed.signatures.count)")
+            }
+            let current = try await client.latestLedger()
+            guard current < prepared.expirationLedger else {
+                throw SigningError.authorizationExpiring(expirationLedger: prepared.expirationLedger, currentLedger: current)
+            }
+            let transaction = try await AuthorizedCall.assembled(
+                client: client, source: try await client.account(config.feePayer),
+                contract: prepared.call.contract, function: prepared.call.function, arguments: prepared.call.arguments,
+                entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCode: prepared.rejectionCode,
+                envelope: { prepared.envelope($0, card: signed.card.publicKey) }
+            )
+            trace.transactionMaxTime = transaction.preconditions?.timeBounds?.maxTime
+            onProgress?(.sending)
+            return try await client.refitAndSubmit(transaction, feeSigner: feeSigner) { onProgress?(.confirming) }
+        } catch {
+            trace.transactionHash = PaymentClient.sentHash(in: error)
+            throw PaymentFailure(trace: trace, underlying: error)
         }
-        guard signed.signatures.count == 1, let signature = signed.signatures.first else {
-            throw ChipError.malformedResponse("expected 1 signature, got \(signed.signatures.count)")
-        }
-        let current = try await client.latestLedger()
-        guard current < prepared.expirationLedger else {
-            throw SigningError.authorizationExpiring(expirationLedger: prepared.expirationLedger, currentLedger: current)
-        }
-        let transaction = try await AuthorizedCall.assembled(
-            client: client, source: try await client.account(config.feePayer),
-            contract: prepared.call.contract, function: prepared.call.function, arguments: prepared.call.arguments,
-            entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCode: prepared.rejectionCode,
-            envelope: { prepared.envelope($0, card: signed.card.publicKey) }
-        )
-        return try await client.refitAndSubmit(transaction, feeSigner: feeSigner)
     }
 }
 
@@ -165,5 +184,14 @@ struct PreparedIntegrationCall {
 
     var nonce: Int64 {
         (try? SorobanAuth.addressCredentials(entry))?.nonce ?? 0
+    }
+
+    /// La trace de « Check again » : `token` est l'actif que l'autorisateur fait partir (ses `transfer` sont relus pour
+    /// trouver notre nonce), `destination` et `units` ce qui part, pour l'affichage.
+    func trace(token: String, destination: String, units: UInt64) -> PaymentTrace {
+        PaymentTrace(
+            token: token, from: authorizer.address, destination: destination, units: units, nonce: nonce,
+            preparedAtLedger: preparedAtLedger, expirationLedger: expirationLedger
+        )
     }
 }

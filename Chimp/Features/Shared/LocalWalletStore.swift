@@ -84,6 +84,20 @@ struct PendingSend: Codable, Equatable {
     /// Montant dans l'unité de l'actif.
     var amount: Decimal
     var signedAt: Date
+    /// Swap signé (tranche 2) : ce qui devait arriver. `nil` pour un envoi ou un Move. `recipient` est alors le contrat
+    /// appelé (router), `asset` et `amount` ce qui part. Optionnel : un fichier écrit avant ce champ reste lisible.
+    var swap: PendingSwap? = nil
+}
+
+/// Ce qu'un swap à l'issue incertaine devait rendre, pour réafficher son état (« Check again »).
+struct PendingSwap: Codable, Equatable {
+    /// `SendAsset.rawValue` de l'actif reçu.
+    var receivedAsset: String
+    /// Quantité attendue au devis, et minimum signé (dans l'unité de l'actif reçu).
+    var expectedReceived: Decimal
+    var minimumReceived: Decimal
+    /// « Soroswap ».
+    var protocolName: String
 }
 
 /// Un Main account et ses cartes connues sur ce téléphone.

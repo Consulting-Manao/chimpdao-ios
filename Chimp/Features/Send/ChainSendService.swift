@@ -143,6 +143,12 @@ final class ChainSendService: SendService {
         return SignedSend(prepared: prepared, cardName: localCard(signed.card.publicKey).name, card: signed)
     }
 
+    /// Clé de la carte d'un tiroir « carte », d'après la dernière lecture (`fetchContext`) : Swap s'en sert pour savoir
+    /// quelle carte peut signer depuis ce wallet.
+    func cardKey(drawerID: String) -> ChipPublicKey? {
+        cardKeys[drawerID]
+    }
+
     func knownCard(_ key: ChipPublicKey) -> KnownCard? {
         let isMember = cardKeys.values.contains(key) || session.wallet.account?.cards.contains { $0.publicKey == key.hex } == true
         guard isMember else { return nil }
@@ -176,8 +182,9 @@ final class ChainSendService: SendService {
 
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck {
         let result = try await payments.check(trace)
-        // Un paiement en attente finalement parti : écrit dans l'historique comme un envoi confirmé.
-        if case .sent(let hash) = result, let account = session.wallet.account?.address,
+        // Un paiement en attente finalement parti : écrit dans l'historique comme un envoi confirmé. Pas un swap : ses deux
+        // côtés reviennent de la chaîne.
+        if case .sent(let hash) = result, session.wallet.pendingSend?.swap == nil, let account = session.wallet.account?.address,
            let code = (try? SACClient.stellarAssets(config: config))?.first(where: { $0.contract == trace.token })?.code {
             session.recordActivity(.payment(
                 hash: hash, from: trace.from, to: trace.destination, assetCode: code,
