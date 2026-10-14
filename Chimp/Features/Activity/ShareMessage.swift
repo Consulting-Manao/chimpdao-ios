@@ -15,6 +15,8 @@ enum ShareMessage {
         case moved(from: String, to: String)
         /// Carte ajoutée, et la carte qui a dit oui si on la connaît.
         case cardAdded(card: String, approvedBy: String?)
+        /// Swap dans un tiroir : ce qui est arrivé (exact), si on le sait.
+        case swapped(received: String?, in: String)
     }
 
     static let sentPunchlines: [LocalizedStringResource] = [
@@ -55,6 +57,14 @@ enum ShareMessage {
                 String(localized: "Same jungle, different branch."),
                 "\(networkName) · \(date)",
             ]
+        case let .swapped(received, drawer):
+            lines = [
+                received.map { String(localized: "🔄 Swapped \(amount) for \($0) with ChimpDAO.") }
+                    ?? String(localized: "🔄 Swapped \(amount) with ChimpDAO."),
+                String(localized: "Same drawer, different coin."),
+                String(localized: "In my \(drawer) · \(networkName) · \(date)"),
+            ]
+            if let proof { lines.append(proof) }
         case let .cardAdded(card, approvedBy):
             lines = [
                 approvedBy.map { String(localized: "🃏 \(card) just joined my jungle! \($0) said yes.") }

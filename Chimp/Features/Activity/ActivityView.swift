@@ -56,8 +56,11 @@ struct ActivityView: View {
 private struct ActivityReceiptSheetModifier: ViewModifier {
     @Bindable var model: ActivityViewModel
     let onSendPrefilled: (SendPrefill) -> Void
+    let onSwapPrefilled: (SwapPrefill) -> Void
     /// Envoi choisi dans le reçu : Envoyer s'ouvre une fois la feuille refermée.
     @State private var chosenSend: SendPrefill?
+    /// « Swap again » : Swap s'ouvre une fois la feuille refermée.
+    @State private var chosenSwap: SwapPrefill?
 
     func body(content: Content) -> some View {
         content
@@ -66,12 +69,19 @@ private struct ActivityReceiptSheetModifier: ViewModifier {
                     chosenSend = nil
                     onSendPrefilled(prefill)
                 }
+                if let prefill = chosenSwap {
+                    chosenSwap = nil
+                    onSwapPrefilled(prefill)
+                }
             }) {
                 if let record = model.selectedRecord, let receipt = model.receipt(for: record) {
-                    ActivityReceiptSheet(receipt: receipt, model: model) { prefill in
+                    ActivityReceiptSheet(receipt: receipt, model: model, onSend: { prefill in
                         chosenSend = prefill
                         model.selectedRecord = nil
-                    }
+                    }, onSwap: { prefill in
+                        chosenSwap = prefill
+                        model.selectedRecord = nil
+                    })
                 }
             }
     }
@@ -84,8 +94,12 @@ private struct ActivityReceiptSheetModifier: ViewModifier {
 extension View {
     /// Ouvre le reçu de `model.selectedRecord` ; « Pay again » et « Send back » appellent `onSendPrefilled` une fois la
     /// feuille refermée.
-    func activityReceiptSheet(model: ActivityViewModel, onSendPrefilled: @escaping (SendPrefill) -> Void) -> some View {
-        modifier(ActivityReceiptSheetModifier(model: model, onSendPrefilled: onSendPrefilled))
+    func activityReceiptSheet(
+        model: ActivityViewModel,
+        onSendPrefilled: @escaping (SendPrefill) -> Void,
+        onSwapPrefilled: @escaping (SwapPrefill) -> Void = { _ in }
+    ) -> some View {
+        modifier(ActivityReceiptSheetModifier(model: model, onSendPrefilled: onSendPrefilled, onSwapPrefilled: onSwapPrefilled))
     }
 }
 
@@ -160,12 +174,15 @@ struct ActivityContent: View {
                 } label: {
                     ChimpTicketRow(
                         title: row.title, meta: row.meta, stamp: row.stamp.text, stampColor: row.stamp.color,
-                        stampTilt: index.isMultiple(of: 2) ? -3 : 2.5, amount: row.amount, amountColor: color(row.tone)
+                        stampTilt: row.stamp == .swapped ? -4 : (index.isMultiple(of: 2) ? -3 : 2.5), amount: row.amount,
+                        amountColor: color(row.tone), secondaryAmount: row.secondaryAmount,
+                        secondaryAmountColor: Color(.chimpStampReceived),
+                        background: row.isHighlighted ? Color(.chimpTicketSwap) : nil
                     )
                 }
                 .buttonStyle(ChimpPressableStyle())
                 .accessibilityElement(children: .combine)
-                .accessibilityHint(row.record == nil ? Text("Opens the payment's status") : Text("Opens the receipt"))
+                .accessibilityHint(row.record == nil ? Text("Opens the status") : Text("Opens the receipt"))
             }
         }
     }
@@ -218,6 +235,7 @@ extension ActivityStamp {
         case .moved: "Moved"
         case .newCard: "New card"
         case .pending: "Pending"
+        case .swapped: "Swapped"
         }
     }
 
@@ -228,6 +246,7 @@ extension ActivityStamp {
         case .moved: Color(.chimpTicketMuted)
         case .newCard: Color(.chimpStampCard)
         case .pending: Color(.chimpStampPending)
+        case .swapped: Color(.chimpTicketMuted)
         }
     }
 }

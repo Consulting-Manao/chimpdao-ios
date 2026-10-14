@@ -130,7 +130,7 @@ final class SwapFlowModel {
         self.quoteDebounce = quoteDebounce
         if let initialDrawerID { selectedDrawerID = initialDrawerID }
         if let prefill {
-            selectedDrawerID = prefill.drawerID
+            prefillDrawerAddress = prefill.drawerAddress
             given = prefill.given
             received = prefill.received
             if let value = prefill.amount, value > 0, value == value.truncated(to: prefill.given.maxFractionDigits) {
@@ -138,6 +138,9 @@ final class SwapFlowModel {
             }
         }
     }
+
+    /// Tiroir du préremplissage, retrouvé par son adresse une fois les tiroirs lus.
+    private var prefillDrawerAddress: String?
 
     /// Préremplissage demandé (« Swap again ») : le devis est demandé dès que les tiroirs sont lus.
     private var needsInitialQuote: Bool { amount.value > 0 && quoteState == .idle }
@@ -168,6 +171,10 @@ final class SwapFlowModel {
         do {
             let context = try await service.fetchContext()
             self.context = context
+            if let address = prefillDrawerAddress, let drawer = context.drawers.first(where: { $0.address == address }) {
+                selectedDrawerID = drawer.id
+                prefillDrawerAddress = nil
+            }
             if !context.drawers.contains(where: { $0.id == selectedDrawerID }) {
                 selectedDrawerID = context.drawers.first?.id ?? "main"
             }
@@ -733,7 +740,8 @@ final class SwapFlowModel {
 
 /// Ce que « Swap again » préremplit : un swap déjà fait, à refaire au prix du moment (tout est revérifié).
 struct SwapPrefill: Equatable, Hashable {
-    let drawerID: String
+    /// Adresse du tiroir (Main account ou Pocket).
+    let drawerAddress: String
     let given: SendAsset
     let received: SendAsset
     let amount: Decimal?

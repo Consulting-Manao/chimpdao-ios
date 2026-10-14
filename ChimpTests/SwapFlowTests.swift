@@ -279,7 +279,7 @@ struct SwapFlowTests {
     @Test("« Swap again » : tiroir, actifs et montant préremplis, devis demandé au chargement")
     func swapAgainPrefill() async {
         let service = MockSwapService(delay: .zero)
-        let model = SwapFlowModel(service: service, prefill: SwapPrefill(drawerID: "0688", given: .usdc, received: .xlm, amount: 10), quoteDebounce: .zero)
+        let model = SwapFlowModel(service: service, prefill: SwapPrefill(drawerAddress: MockReceiveDataSource.bananaAddress, given: .usdc, received: .xlm, amount: 10), quoteDebounce: .zero)
         await model.loadIfNeeded()
         #expect(model.selectedDrawer?.id == "0688")
         #expect(model.given == .usdc)

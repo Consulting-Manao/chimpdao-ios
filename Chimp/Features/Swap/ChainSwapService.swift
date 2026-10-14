@@ -180,10 +180,15 @@ final class ChainSwapService: SwapService {
             units: UInt64(try SwapUnits.units(of: prepared.draft.amount, asset: prepared.draft.given))
         )
         let hash = try await integrations.submit(integration, signed: card, trace: trace, feeSigner: feeSigner, onProgress: onProgress)
-        return SwapReceipt(
+        let receipt = SwapReceipt(
             summary: SwapSummary(prepared.draft), transactionHash: hash, sentAt: .now,
             explorerURL: explorerURL(transactionHash: hash), receivedAmount: await receivedAmount(hash)
         )
+        // La ligne d'historique du swap (I1s) : celle du reçu de E5, avec le minimum signé et le protocole.
+        if let account = session.wallet.account?.address {
+            session.recordActivity(receipt.activityRecord(venue: prepared.firstHopVenue), account: account)
+        }
+        return receipt
     }
 
     /// La quantité reçue : dernier montant rendu par `swap_exact_tokens_for_tokens`. `nil` si illisible (affichage seulement).
@@ -196,7 +201,17 @@ final class ChainSwapService: SwapService {
     /// Comme Envoyer (`ChainSendService.check`, qui écrit la ligne d'un **envoi** en attente finalement parti, jamais
     /// celle d'un swap) : un swap en attente se vérifie de la même façon, par le nonce de son autorisation.
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck {
-        try await drawers.check(trace)
+        let pending = session.wallet.pendingSend
+        let result = try await drawers.check(trace)
+        // Un swap en attente finalement parti : sa ligne d'historique, avec la quantité reçue si elle se lit encore.
+        if case .sent(let hash) = result, let pending, let swap = pending.swap, let account = session.wallet.account?.address {
+            session.recordActivity(.swap(
+                hash: hash, drawer: trace.from, venue: trace.destination, givenCode: SendAsset(rawValue: pending.asset)?.code ?? pending.asset,
+                given: pending.amount, receivedCode: SendAsset(rawValue: swap.receivedAsset)?.code ?? swap.receivedAsset,
+                received: await receivedAmount(hash), minimum: swap.minimumReceived, protocolName: swap.protocolName, at: pending.signedAt
+            ), account: account)
+        }
+        return result
     }
 
     var pendingSend: PendingSend? { session.wallet.pendingSend }

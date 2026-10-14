@@ -70,7 +70,10 @@ struct ChainActivityHistory {
         func read(_ start: UInt32, _ end: UInt32) async throws -> Bool {
             guard let events = try await scan(groups, start: start, end: end, floor: &floor) else { return false }
             let known = Set(state.records.map(\.hash))
-            let rows = Self.records(from: events, account: account, drawers: Set(addresses), assets: assets, known: known)
+            let rows = ActivityRecord.groupingSwaps(
+                Self.records(from: events, account: account, drawers: Set(addresses), assets: assets, known: known),
+                drawers: Set(addresses)
+            )
             state.records = ActivityLog.merging(Self.withLedgers(state.records, from: events), rows)
             return true
         }

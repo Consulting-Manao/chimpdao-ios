@@ -116,7 +116,10 @@ final class ChainActivityDataSource: ActivityDataSource {
     var pendingSend: PendingSend? { session.wallet.pendingSend }
 
     func checkPending(_ pending: PendingSend) async throws -> PaymentCheck {
-        let result = try await ChainSendService(session: session, config: config).check(pending.trace)
+        // Un swap en attente se vérifie comme un envoi ; le service du swap écrit sa ligne s'il est parti.
+        let result = pending.swap == nil
+            ? try await ChainSendService(session: session, config: config).check(pending.trace)
+            : try await ChainSwapService(session: session, config: config).check(pending.trace)
         switch result {
         case .sent, .nothingSent:
             try? session.setPendingSend(nil)
@@ -273,6 +276,12 @@ final class MockActivityDataSource: ActivityDataSource {
             transfer("t1", Self.jungle, Self.maya, "USDC", "25", at(0, 14, 2), local: true),
             transfer("t2", Self.main, Self.jungle, "USDC", "50", at(0, 11, 20), local: true),
             transfer("t3", Self.shop, Self.main, "USDC", "0.12", at(0, 9, 0)),
+            // Maquette I1s : un swap fait sur ce téléphone (ce qui est parti, ce qui est arrivé, le minimum signé).
+            ActivityRecord.swap(
+                hash: Self.fakeHash("y0"), drawer: Self.main, venue: Self.shop, givenCode: "XLM", given: 400,
+                receivedCode: "USDC", received: Decimal(string: "99.7100000")!, minimum: Decimal(string: "99.1816")!,
+                protocolName: "Soroswap", at: at(1, 18, 41)
+            ),
             transfer("y1", Self.shop, Self.main, "USDC", "12.5", at(1, 16, 5)),
             ActivityRecord(
                 id: "stellar:y2", event: .cardAdded, hash: Self.fakeHash("y2"), from: Self.main, to: "", cardKey: Self.leafKey,

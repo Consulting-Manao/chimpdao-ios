@@ -7,10 +7,12 @@ struct ActivityReceiptSheet: View {
     let receipt: ActivityReceipt
     let model: ActivityViewModel
     var onSend: (SendPrefill) -> Void = { _ in }
+    /// « Swap again » (maquette I1s.1).
+    var onSwap: (SwapPrefill) -> Void = { _ in }
 
     /// La feuille (`chimpSheet(fitsContent:)`) fait défiler le contenu s'il dépasse l'écran.
     var body: some View {
-        ActivityReceiptContent(receipt: receipt, model: model, onSend: onSend)
+        ActivityReceiptContent(receipt: receipt, model: model, onSend: onSend, onSwap: onSwap)
             .padding(.horizontal, ChimpSpacing.xxl)
             .padding(.top, ChimpSpacing.xs)
     }
@@ -21,6 +23,7 @@ struct ActivityReceiptContent: View {
     let receipt: ActivityReceipt
     let model: ActivityViewModel
     var onSend: (SendPrefill) -> Void = { _ in }
+    var onSwap: (SwapPrefill) -> Void = { _ in }
 
     @Environment(\.openURL) private var openURL
 
@@ -43,6 +46,7 @@ struct ActivityReceiptContent: View {
             header: receipt.header, number: receipt.number, title: receipt.title, total: receipt.total,
             totalColor: receipt.totalTone == .positive ? Color(.chimpStampReceived) : Color(.chimpTicketInk),
             stamp: receipt.stamp.text, stampColor: receipt.stamp.color,
+            stampAmounts: receipt.stampAmounts.map { ($0.text, $0.tone == .positive ? Color(.chimpStampReceived) : Color(.chimpTicketInk)) },
             onExplorer: receipt.explorerURL.map { url in { openURL(url) } }
         ) {
             ForEach(receipt.lines) { line in
@@ -105,7 +109,12 @@ struct ActivityReceiptContent: View {
 
     @ViewBuilder
     private var buttons: some View {
-        if let send = receipt.send {
+        if let swap = receipt.swap {
+            HStack(spacing: ChimpSpacing.sm) {
+                ChimpButton("Swap again") { onSwap(swap) }
+                share.frame(width: 96)
+            }
+        } else if let send = receipt.send {
             HStack(spacing: ChimpSpacing.sm) {
                 ChimpButton(send.origin == .sendBack ? "Send back" : "Pay again") { onSend(send) }
                 share.frame(width: 96)

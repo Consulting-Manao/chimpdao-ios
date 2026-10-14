@@ -11,6 +11,9 @@ struct ChimpReceiptSlip<Lines: View>: View {
     var totalColor: Color = Color(.chimpTicketInk)
     let stamp: LocalizedStringKey
     let stampColor: Color
+    /// Quantités affichées à côté du tampon, à la place du total (swap, maquette I1s.1 : « −400 XLM » puis
+    /// « +99.71 USDC », la dernière en grand).
+    var stampAmounts: [(text: String, color: Color)] = []
     var onExplorer: (() -> Void)?
     @ViewBuilder let lines: Lines
 
@@ -75,20 +78,27 @@ struct ChimpReceiptSlip<Lines: View>: View {
                 .accessibilityElement(children: .combine)
             }
 
-            Text(stamp)
-                .chimpFont(.stampL)
-                .textCase(.uppercase)
-                .foregroundStyle(stampColor)
-                .tracking(1.5)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .padding(.horizontal, 20)
-                .padding(.top, 7)
-                .padding(.bottom, 3)
-                .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(stampColor, lineWidth: 4) }
-                .rotationEffect(.degrees(-3))
-                .frame(maxWidth: .infinity)
-                .padding(.top, ChimpSpacing.xxs)
+            if stampAmounts.isEmpty {
+                stampText
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, ChimpSpacing.xxs)
+            } else {
+                HStack(alignment: .center, spacing: ChimpSpacing.s) {
+                    stampText
+                    Spacer(minLength: ChimpSpacing.xs)
+                    VStack(alignment: .trailing, spacing: 0) {
+                        ForEach(Array(stampAmounts.enumerated()), id: \.offset) { index, amount in
+                            Text(amount.text)
+                                .chimpFont(index == stampAmounts.count - 1 ? .amountM : .displayS)
+                                .foregroundStyle(amount.color)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                .padding(.top, ChimpSpacing.s)
+            }
 
             if let onExplorer {
                 Button(action: onExplorer) {
@@ -128,6 +138,21 @@ struct ChimpReceiptSlip<Lines: View>: View {
         }
         .overlay(alignment: .topLeading) { punchHole(leading: true) }
         .overlay(alignment: .topTrailing) { punchHole(leading: false) }
+    }
+
+    private var stampText: some View {
+        Text(stamp)
+            .chimpFont(.stampL)
+            .textCase(.uppercase)
+            .foregroundStyle(stampColor)
+            .tracking(1.5)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .padding(.horizontal, 20)
+            .padding(.top, 7)
+            .padding(.bottom, 3)
+            .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(stampColor, lineWidth: 4) }
+            .rotationEffect(.degrees(-3))
     }
 
     /// Encoche : un demi-cercle de la couleur du fond, cerclé, dans le bord du papier.

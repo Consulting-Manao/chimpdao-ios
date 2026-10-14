@@ -157,6 +157,16 @@ struct SwapReceipt: Equatable {
     let explorerURL: URL?
     /// Quantité réellement reçue (valeur rendue par le router), `nil` si elle n'a pas pu être lue.
     let receivedAmount: Decimal?
+
+    /// La ligne que ce téléphone écrit dans son historique pour ce swap : « See the receipt » (E5) ouvre le même reçu
+    /// que cette ligne dans l'Activity (I1s.1). `venue` : le contrat qui a reçu ce qui est parti.
+    func activityRecord(venue: String) -> ActivityRecord {
+        .swap(
+            hash: transactionHash, drawer: summary.fromAddress, venue: venue, givenCode: summary.given.code, given: summary.amountIn,
+            receivedCode: summary.received.code, received: receivedAmount, minimum: summary.minimumOut,
+            protocolName: summary.protocolName, at: sentAt
+        )
+    }
 }
 
 /// Ce qu'un écran peut dire d'un swap impossible **avant** toute signature.

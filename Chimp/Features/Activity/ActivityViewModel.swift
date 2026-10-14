@@ -9,6 +9,8 @@ enum ActivityStamp: Equatable, Sendable {
     case moved
     case newCard
     case pending
+    /// Maquette I1s : « SWAPPED ».
+    case swapped
 }
 
 /// Montant coloré (reçu) ou neutre.
@@ -30,6 +32,10 @@ struct ActivityRow: Identifiable, Equatable {
     let tone: ActivityTone
     /// La ligne d'origine (reçu) ; `nil` pour le paiement en attente (il ouvre l'écran d'état d'Envoyer).
     let record: ActivityRecord?
+    /// Swap : ce qui est arrivé (« +99.71 USDC »), sous ce qui est parti.
+    var secondaryAmount: String? = nil
+    /// Fond de la ligne (maquette I1s : un swap sur fond #F9CFA0).
+    var isHighlighted = false
 }
 
 /// Un ticket : une journée (ou le paiement en attente, en haut).
@@ -222,13 +228,20 @@ final class ActivityViewModel {
         if case .drawer(let address) = filter, pending.trace.from != address, pending.trace.destination != address { return nil }
         let isMove = addresses.contains(pending.trace.destination)
         let to = drawers.first { $0.address == pending.trace.destination }
-        let title = isMove
-            ? String(localized: "Moving to \(to?.title ?? StellarAddressParser.short(pending.recipient))")
-            : String(localized: "Paying \(pending.recipientName ?? StellarAddressParser.short(pending.recipient))")
+        let given = SendAsset(rawValue: pending.asset)?.code ?? pending.asset
+        let title = if let swap = pending.swap {
+            String(localized: "Swapping \(given) for \(SendAsset(rawValue: swap.receivedAsset)?.code ?? swap.receivedAsset)")
+        } else if isMove {
+            String(localized: "Moving to \(to?.title ?? StellarAddressParser.short(pending.recipient))")
+        } else {
+            String(localized: "Paying \(pending.recipientName ?? StellarAddressParser.short(pending.recipient))")
+        }
         let time = pending.signedAt.formatted(date: .omitted, time: .shortened)
         let row = ActivityRow(
             id: "pending", title: title, meta: "\(time) · \(Self.statusText(pendingStatus))", stamp: .pending,
-            amount: Self.amountText(pending.amount, code: SendAsset(rawValue: pending.asset)?.code ?? pending.asset, sign: isMove ? nil : .negative),
+            amount: pending.swap != nil
+                ? Self.quantityText(pending.amount, code: given, sign: .negative)
+                : Self.amountText(pending.amount, code: given, sign: isMove ? nil : .negative),
             tone: .neutral, record: nil
         )
         return ActivityTicket(
@@ -300,6 +313,15 @@ final class ActivityViewModel {
                 meta: "\(time) · \(drawer(record.from)?.name ?? "") → \(drawer(record.to)?.name ?? "")", stamp: .moved,
                 amount: record.amount.map { amountText($0, code: code, sign: nil) }, tone: .neutral, record: record
             )
+        case .swapped:
+            let received = record.receivedAssetCode ?? "?"
+            return ActivityRow(
+                id: record.id, title: String(localized: "Swapped \(code) for \(received)"),
+                meta: "\(time) · " + String(localized: "in \(drawer(record.from)?.name ?? "")"), stamp: .swapped,
+                amount: record.amount.map { quantityText($0, code: code, sign: .negative) }, tone: .neutral, record: record,
+                secondaryAmount: record.receivedAmount.map { quantityText($0, code: received, sign: .positive) },
+                isHighlighted: true
+            )
         case .cardAdded:
             let name = record.cardKey.flatMap(cardName) ?? String(localized: "A new card")
             let approver = record.approvedBy.flatMap(cardName)
@@ -330,6 +352,13 @@ final class ActivityViewModel {
                 if case .drawer(let address) = filter {
                     signed = record.from == address ? -amount : (record.to == address ? amount : 0)
                 }
+            case .swapped:
+                // Les deux actifs du swap : ce qui est sorti du tiroir, ce qui y est entré.
+                if let received = record.receivedAssetCode, let receivedAmount = record.receivedAmount {
+                    if sums[received] == nil { codes.append(received) }
+                    sums[received, default: 0] += receivedAmount
+                }
+                signed = -amount
             case .cardAdded: break
             }
             sums[code, default: 0] += signed
@@ -374,6 +403,18 @@ final class ActivityViewModel {
         return prefix + body
     }
 
+    /// Une quantité d'actif, jamais en dollars (swap, décision du 2026-10-14) : « −400 XLM », « +99.71 USDC », 2 décimales
+    /// au plus, tronquées (`SendAsset.displayed`) ; `exact` : la quantité exacte (reçu).
+    static func quantityText(_ amount: Decimal, code: String, sign: ActivityTone?, exact: Bool = false, locale: Locale = .autoupdatingCurrent) -> String {
+        let prefix = switch sign {
+        case .positive: "+"
+        case .negative: "\u{2212}"
+        default: ""
+        }
+        let body = exact ? exactAmount(amount, code: code, locale: locale) : "\(SendAsset.displayed(amount, code: code, locale: locale)) \(code)"
+        return prefix + body
+    }
+
     static func dayTitle(_ day: Date, calendar: Calendar, now: Date) -> String {
         if calendar.isDate(day, inSameDayAs: now) { return String(localized: "Today") }
         if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(day, inSameDayAs: yesterday) {
@@ -408,6 +449,24 @@ final class ActivityViewModel {
         }
         var lines: [ActivityReceipt.Line] = []
         switch kind {
+        case .swapped:
+            // Maquette I1s.1 : où, ce qui est parti, ce qui est arrivé, le minimum signé, la route, le protocole.
+            let given = record.assetCode ?? "?"
+            let received = record.receivedAssetCode ?? "?"
+            lines.append(.init(id: "in", label: "In", value: place(record.from)))
+            if let amount = record.amount {
+                lines.append(.init(id: "gave", label: "Gave", value: .text(Self.exactAmount(amount, code: given, locale: locale))))
+            }
+            if let amount = record.receivedAmount {
+                lines.append(.init(id: "got", label: "Got", value: .positive(Self.exactAmount(amount, code: received, locale: locale))))
+            }
+            if let minimum = record.minimumReceived {
+                lines.append(.init(id: "minimum", label: "Min. guaranteed", value: .text(Self.exactAmount(minimum, code: received, locale: locale))))
+            }
+            lines.append(.init(id: "route", label: "Route", value: .text("\(given) → \(received)")))
+            if let name = record.protocolName {
+                lines.append(.init(id: "protocol", label: "Protocol", value: .text(name)))
+            }
         case .cardAdded:
             lines.append(.init(id: "card", label: "Card", value: card(record.cardKey)))
             lines.append(.init(id: "added", label: "Added to", value: .drawer(String(localized: "Main account"), swatch: .main)))
@@ -428,7 +487,11 @@ final class ActivityViewModel {
             }
         }
         if record.isLocal {
-            lines.append(.init(id: "fee", label: "Fee", value: .text(String(localized: "Paid by ChimpDAO"))))
+            if kind == .swapped {
+                lines.append(.init(id: "fee", label: "Fees", value: .positive(String(localized: "On us"))))
+            } else {
+                lines.append(.init(id: "fee", label: "Fee", value: .text(String(localized: "Paid by ChimpDAO"))))
+            }
         }
         lines.append(.init(id: "status", label: "Status", value: .positive(String(localized: "Confirmed"))))
         let date = record.at.formatted(Date.FormatStyle(locale: locale).weekday(.abbreviated).day().month(.abbreviated))
@@ -441,6 +504,10 @@ final class ActivityViewModel {
         case .sent: .sent(to: StellarAddressParser.short(record.to))
         case .received: .received(from: StellarAddressParser.short(record.from), into: title(record.to))
         case .moved: .moved(from: title(record.from), to: title(record.to))
+        case .swapped: .swapped(
+            received: record.receivedAmount.map { Self.exactAmount($0, code: record.receivedAssetCode ?? "", locale: locale) },
+            in: title(record.from)
+        )
         case .cardAdded: .cardAdded(
             card: record.cardKey.flatMap { source.cardName(key: $0) } ?? String(localized: "A new card"),
             approvedBy: record.approvedBy.flatMap { source.cardName(key: $0) }
@@ -460,7 +527,7 @@ final class ActivityViewModel {
             lines: lines,
             hash: record.hash,
             shortHash: record.hash.count > 12 ? "\(record.hash.prefix(4))…\(record.hash.suffix(4))" : record.hash,
-            total: record.amount.flatMap { amount in
+            total: kind == .swapped ? nil : record.amount.flatMap { amount in
                 record.assetCode.map { code in
                     Self.amountText(amount, code: code, sign: kind == .sent ? .negative : (kind == .received ? .positive : nil), exact: true, locale: locale)
                 }
@@ -470,7 +537,9 @@ final class ActivityViewModel {
             explorerURL: explorer,
             shareText: share,
             counterparty: Self.counterparty(of: record, kind: kind),
-            send: Self.prefill(for: record, kind: kind)
+            send: Self.prefill(for: record, kind: kind),
+            stampAmounts: kind == .swapped ? Self.swapAmounts(of: record, locale: locale) : [],
+            swap: kind == .swapped ? Self.swapPrefill(for: record) : nil
         )
     }
 
@@ -495,7 +564,7 @@ final class ActivityViewModel {
         switch kind {
         case .sent: ActivityReceipt.Counterparty(lineID: "to", address: record.to)
         case .received: ActivityReceipt.Counterparty(lineID: "from", address: record.from)
-        case .moved, .cardAdded: nil
+        case .moved, .cardAdded, .swapped: nil
         }
     }
 
@@ -509,9 +578,28 @@ final class ActivityViewModel {
         case .received:
             guard asset != nil else { return nil }
             return SendPrefill(address: record.from, asset: asset, amount: record.amount, origin: .sendBack)
-        case .moved, .cardAdded:
+        case .moved, .cardAdded, .swapped:
             return nil
         }
+    }
+
+    /// Les deux quantités d'un swap, à côté du tampon (maquette I1s.1) : « −400 XLM », « +99.71 USDC ».
+    static func swapAmounts(of record: ActivityRecord, locale: Locale = .autoupdatingCurrent) -> [ActivityReceipt.StampAmount] {
+        var amounts: [ActivityReceipt.StampAmount] = []
+        if let amount = record.amount, let code = record.assetCode {
+            amounts.append(.init(text: quantityText(amount, code: code, sign: .negative, locale: locale), tone: .neutral))
+        }
+        if let amount = record.receivedAmount, let code = record.receivedAssetCode {
+            amounts.append(.init(text: quantityText(amount, code: code, sign: .positive, locale: locale), tone: .positive))
+        }
+        return amounts
+    }
+
+    /// « Swap again » : même tiroir, mêmes actifs, même montant (XLM et USDC seulement), au prix du moment.
+    static func swapPrefill(for record: ActivityRecord) -> SwapPrefill? {
+        guard let given = record.assetCode.flatMap(SendAsset.init(code:)),
+              let received = record.receivedAssetCode.flatMap(SendAsset.init(code:)) else { return nil }
+        return SwapPrefill(drawerAddress: record.from, given: given, received: received, amount: record.amount)
     }
 
     // MARK: Copier (hash, adresse de l'autre partie)
@@ -590,6 +678,14 @@ struct ActivityReceipt: Identifiable, Equatable {
     let counterparty: Counterparty?
     /// « Pay again » (envoi) ou « Send back » (paiement reçu) : Envoyer prérempli.
     let send: SendPrefill?
+    /// Swap : les deux quantités à côté du tampon (à la place du total), et « Swap again ».
+    var stampAmounts: [StampAmount] = []
+    var swap: SwapPrefill? = nil
+
+    struct StampAmount: Equatable {
+        let text: String
+        let tone: ActivityTone
+    }
 
     struct Counterparty: Equatable {
         /// Ligne qui l'affiche (« to », « from »).

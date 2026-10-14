@@ -8,6 +8,9 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
         case transfer
         /// `card_added` du Main account : une carte est entrée dans le compte (`add_card`).
         case cardAdded
+        /// Swap dans un tiroir (tranche 2) : `from` est le tiroir, `to` le contrat qui a reçu ce qui est parti (paire),
+        /// `assetCode`/`amount` ce qui est parti, `receivedAssetCode`/`receivedAmount` ce qui est arrivé.
+        case swap
     }
 
     /// Lue sur la chaîne : `stellar:<hash>:<id de l'événement>` (comme le terminal). Écrite par ce téléphone :
@@ -33,6 +36,13 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
     /// Ledger où la transaction a été incluse : « N° » du reçu (I1.1d). Une ligne écrite par ce téléphone le reçoit à
     /// la lecture suivante de la chaîne. Optionnel : les fichiers écrits avant restent lisibles.
     var ledger: UInt32? = nil
+    /// Swap : ce qui est arrivé (code et quantité exacte), le minimum que la carte avait signé et le protocole, connus
+    /// seulement pour un swap fait sur ce téléphone (un swap relu sur la chaîne n'a que les deux transferts).
+    /// Optionnels : les fichiers écrits avant restent lisibles.
+    var receivedAssetCode: String? = nil
+    var receivedAmount: Decimal? = nil
+    var minimumReceived: Decimal? = nil
+    var protocolName: String? = nil
 
     /// Ce que la ligne représente pour ce compte. `classifyTransfer` du terminal (`lib/chain-history.ts`), sans les
     /// protocoles DeFi (hors V1), plus **Move** : les deux côtés sont des tiroirs du compte (DESIGN_NOTES §13).
@@ -41,6 +51,8 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
         switch event {
         case .cardAdded:
             return .cardAdded
+        case .swap:
+            return drawers.contains(from) ? .swapped : nil
         case .transfer:
             let sent = drawers.contains(from)
             let received = drawers.contains(to)
@@ -64,6 +76,53 @@ extension ActivityRecord {
         )
     }
 
+    /// Un swap confirmé, écrit par ce téléphone : ce qui est parti, ce qui est arrivé (quantité rendue par le router), le
+    /// minimum signé et le protocole.
+    static func swap(
+        hash: String, drawer: String, venue: String, givenCode: String, given: Decimal, receivedCode: String, received: Decimal?,
+        minimum: Decimal?, protocolName: String?, at: Date = .now
+    ) -> ActivityRecord {
+        ActivityRecord(
+            id: "stellar:\(hash)", event: .swap, hash: hash, from: drawer, to: venue, assetCode: givenCode, amount: given,
+            at: at, isLocal: true, receivedAssetCode: receivedCode, receivedAmount: received, minimumReceived: minimum,
+            protocolName: protocolName
+        )
+    }
+
+    /// Les deux transferts d'un swap relus sur la chaîne deviennent une seule ligne : dans une même transaction, un actif
+    /// **sort** d'un tiroir et un autre actif **y entre**, et l'autre partie n'est pas un tiroir (ce n'est pas un Move).
+    /// Toute autre transaction reste telle quelle. Le protocole et le minimum ne sont pas connus.
+    static func groupingSwaps(_ records: [ActivityRecord], drawers: Set<String>) -> [ActivityRecord] {
+        var byHash: [String: [ActivityRecord]] = [:]
+        for record in records where record.event == .transfer && !record.isLocal {
+            byHash[record.hash, default: []].append(record)
+        }
+        var merged: [String: ActivityRecord] = [:]
+        for (hash, group) in byHash where group.count == 2 {
+            guard let out = group.first(where: { drawers.contains($0.from) && !drawers.contains($0.to) }),
+                  let into = group.first(where: { drawers.contains($0.to) && !drawers.contains($0.from) }),
+                  out.from == into.to, out.assetCode != into.assetCode else { continue }
+            var swap = ActivityRecord(
+                id: "stellar:\(hash):swap", event: .swap, hash: hash, from: out.from, to: out.to, assetCode: out.assetCode,
+                amount: out.amount, at: out.at, isLocal: false, ledger: out.ledger
+            )
+            swap.receivedAssetCode = into.assetCode
+            swap.receivedAmount = into.amount
+            merged[hash] = swap
+        }
+        guard !merged.isEmpty else { return records }
+        var result: [ActivityRecord] = []
+        var emitted: Set<String> = []
+        for record in records {
+            if let swap = merged[record.hash], record.event == .transfer {
+                if emitted.insert(record.hash).inserted { result.append(swap) }
+            } else {
+                result.append(record)
+            }
+        }
+        return result
+    }
+
     /// `recordNft` du terminal, pour une carte entrée dans le compte (`add_card` confirmé), avec la carte qui a dit oui.
     static func cardAdded(hash: String, account: String, cardKey: String, approvedBy: String?, at: Date = .now) -> ActivityRecord {
         ActivityRecord(
@@ -79,6 +138,8 @@ enum ActivityKind: Equatable, Sendable {
     case received
     case moved
     case cardAdded
+    /// Un actif échangé contre un autre dans le même tiroir.
+    case swapped
 }
 
 /// Ce que le téléphone garde de l'historique d'un compte.
