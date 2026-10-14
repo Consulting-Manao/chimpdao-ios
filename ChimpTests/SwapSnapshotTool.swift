@@ -97,7 +97,7 @@ struct SwapSnapshotTool {
         await activity.refresh()
         save("I1s", ActivityView(model: activity))
         if let record = activity.records.first(where: { $0.event == .swap }), let receipt = activity.receipt(for: record) {
-            save("I1s1", ScrollView { ActivityReceiptSheet(receipt: receipt, model: activity) }.background(Color(.chimpBackground)))
+            save("I1s1", ScrollView { ActivityReceiptSheet(receipt: receipt, model: activity) { _ in } }.background(Color(.chimpBackground)))
         }
     }
 }

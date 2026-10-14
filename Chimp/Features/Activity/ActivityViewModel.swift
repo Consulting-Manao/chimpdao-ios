@@ -687,9 +687,52 @@ struct ActivityReceipt: Identifiable, Equatable {
         let tone: ActivityTone
     }
 
+    /// Le bouton « again » de ce reçu : « Swap again » pour un swap, « Send back » pour un paiement reçu, « Pay again »
+    /// pour un envoi ; `nil` sinon (Move, carte ajoutée).
+    var again: ReceiptAgain? {
+        if let swap { return .swapAgain(swap) }
+        guard let send else { return nil }
+        return send.origin == .sendBack ? .sendBack(send) : .payAgain(send)
+    }
+
     struct Counterparty: Equatable {
         /// Ligne qui l'affiche (« to », « from »).
         let lineID: String
         let address: String
+    }
+}
+
+/// Ce que relance le bouton « again » d'un reçu. Une seule action typée (au lieu d'une fermeture par sorte) : chaque écran
+/// dit explicitement ce qu'il fait de chacune, une fermeture ne peut plus être branchée sur la mauvaise (bug du
+/// 2026-10-14 : « Pay again » d'un envoi lançait l'action du swap).
+enum ReceiptAgain: Equatable {
+    /// Envoi : payer de nouveau la même adresse.
+    case payAgain(SendPrefill)
+    /// Paiement reçu : renvoyer à l'expéditeur.
+    case sendBack(SendPrefill)
+    /// Swap : refaire le même swap au prix du moment.
+    case swapAgain(SwapPrefill)
+
+    /// Le texte du bouton.
+    var title: LocalizedStringKey {
+        switch self {
+        case .payAgain: "Pay again"
+        case .sendBack: "Send back"
+        case .swapAgain: "Swap again"
+        }
+    }
+
+    /// Envoyer prérempli (« Pay again », « Send back »), `nil` pour un swap.
+    var sendPrefill: SendPrefill? {
+        switch self {
+        case .payAgain(let prefill), .sendBack(let prefill): prefill
+        case .swapAgain: nil
+        }
+    }
+
+    /// Swap prérempli (« Swap again »), `nil` pour un envoi.
+    var swapPrefill: SwapPrefill? {
+        if case .swapAgain(let prefill) = self { return prefill }
+        return nil
     }
 }

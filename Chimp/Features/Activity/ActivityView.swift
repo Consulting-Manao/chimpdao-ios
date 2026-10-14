@@ -77,13 +77,12 @@ private struct ActivityReceiptSheetModifier: ViewModifier {
                 }
             }) {
                 if let record = model.selectedRecord, let receipt = model.receipt(for: record) {
-                    ActivityReceiptSheet(receipt: receipt, model: model, onSend: { prefill in
-                        chosenSend = prefill
+                    ActivityReceiptSheet(receipt: receipt, model: model) { again in
+                        // Chaque action ouvre son parcours : Envoyer (Pay again, Send back) ou Swap (Swap again).
+                        chosenSend = again.sendPrefill
+                        chosenSwap = again.swapPrefill
                         model.selectedRecord = nil
-                    }, onSwap: { prefill in
-                        chosenSwap = prefill
-                        model.selectedRecord = nil
-                    })
+                    }
                 }
             }
     }

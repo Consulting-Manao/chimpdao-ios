@@ -29,7 +29,7 @@ struct SendStatusView: View {
                     .chimpSheet(isPresented: $model.isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true) {
                         if let printed = activity.receipt(forSent: receipt.activityRecord, locale: locale) {
                             // « Pay again » (envoi seulement, comme dans l'Activity) : un parcours neuf, prérempli.
-                            ActivityReceiptSheet(receipt: printed, model: activity, onSend: { _ in model.sendAgain() })
+                            ActivityReceiptSheet(receipt: printed, model: activity, onAgain: model.receiptAgain)
                         }
                     }
             } else {

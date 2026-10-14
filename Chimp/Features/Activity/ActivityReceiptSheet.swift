@@ -1,18 +1,16 @@
 import SwiftUI
 
 /// Détail d'un mouvement (maquette I1.1d, « Details — mix: I1 slip + printed receipt ») : le reçu imprimé, l'adresse de
-/// l'autre partie copiable, puis « Pay again » (envoi) ou « Send back » (paiement reçu), qui ouvrent Envoyer prérempli
-/// (adresse, actif, montant ; C4 toujours), et « Share ».
+/// l'autre partie copiable, puis « Pay again » (envoi), « Send back » (paiement reçu) ou « Swap again » (swap), et
+/// « Share ». `onAgain` reçoit l'action du bouton ; l'écran qui ouvre le reçu dit ce qu'il en fait.
 struct ActivityReceiptSheet: View {
     let receipt: ActivityReceipt
     let model: ActivityViewModel
-    var onSend: (SendPrefill) -> Void = { _ in }
-    /// « Swap again » (maquette I1s.1).
-    var onSwap: (SwapPrefill) -> Void = { _ in }
+    let onAgain: (ReceiptAgain) -> Void
 
     /// La feuille (`chimpSheet(fitsContent:)`) fait défiler le contenu s'il dépasse l'écran.
     var body: some View {
-        ActivityReceiptContent(receipt: receipt, model: model, onSend: onSend, onSwap: onSwap)
+        ActivityReceiptContent(receipt: receipt, model: model, onAgain: onAgain)
             .padding(.horizontal, ChimpSpacing.xxl)
             .padding(.top, ChimpSpacing.xs)
     }
@@ -22,8 +20,7 @@ struct ActivityReceiptSheet: View {
 struct ActivityReceiptContent: View {
     let receipt: ActivityReceipt
     let model: ActivityViewModel
-    var onSend: (SendPrefill) -> Void = { _ in }
-    var onSwap: (SwapPrefill) -> Void = { _ in }
+    let onAgain: (ReceiptAgain) -> Void
 
     @Environment(\.openURL) private var openURL
 
@@ -109,14 +106,9 @@ struct ActivityReceiptContent: View {
 
     @ViewBuilder
     private var buttons: some View {
-        if let swap = receipt.swap {
+        if let again = receipt.again {
             HStack(spacing: ChimpSpacing.sm) {
-                ChimpButton("Swap again") { onSwap(swap) }
-                share.frame(width: 96)
-            }
-        } else if let send = receipt.send {
-            HStack(spacing: ChimpSpacing.sm) {
-                ChimpButton(send.origin == .sendBack ? "Send back" : "Pay again") { onSend(send) }
+                ChimpButton(again.title) { onAgain(again) }
                 share.frame(width: 96)
             }
         } else {

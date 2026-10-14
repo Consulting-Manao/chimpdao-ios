@@ -25,10 +25,10 @@ struct SwapStatusView: View {
                 SwapSentView(receipt: receipt, onDone: model.finish, onReceipt: { isReceiptPresented = true })
                     .chimpSheet(isPresented: $isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true) {
                         if let printed = activity.receipt(forSent: receipt.activityRecord(venue: ""), locale: locale) {
-                            ActivityReceiptSheet(receipt: printed, model: activity, onSwap: { prefill in
+                            ActivityReceiptSheet(receipt: printed, model: activity) { again in
                                 isReceiptPresented = false
-                                model.onSwapAgain?(prefill)
-                            })
+                                model.receiptAgain(again)
+                            }
                         }
                     }
             case .finished(.notConfirmed), .finished(.undetermined):

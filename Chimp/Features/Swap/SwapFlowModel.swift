@@ -736,6 +736,12 @@ final class SwapFlowModel {
 
     /// « Swap again » (reçu) : un parcours neuf, prérempli (même tiroir, mêmes actifs, même montant), devis neuf.
     var onSwapAgain: ((SwapPrefill) -> Void)?
+
+    /// Le bouton du reçu de E5 : seul « Swap again » relance le swap ; toute autre action est ignorée ici.
+    func receiptAgain(_ again: ReceiptAgain) {
+        guard case .swapAgain(let prefill) = again else { return }
+        onSwapAgain?(prefill)
+    }
 }
 
 /// Ce que « Swap again » préremplit : un swap déjà fait, à refaire au prix du moment (tout est revérifié).

@@ -760,6 +760,12 @@ final class SendFlowModel {
         return SendPrefill(address: summary.recipientAddress, asset: summary.asset, amount: summary.amount, origin: .payAgain)
     }
 
+    /// Le bouton du reçu de C9 : seul « Pay again » relance Envoyer ; toute autre action est ignorée ici.
+    func receiptAgain(_ again: ReceiptAgain) {
+        guard case .payAgain = again else { return }
+        sendAgain()
+    }
+
     /// Ferme le reçu, puis repart d'un parcours neuf prérempli (C1, C2 et C4 à refaire).
     func sendAgain() {
         guard let prefill = sendAgainPrefill else { return }
