@@ -48,7 +48,7 @@ struct SwapQuoteSummary: Equatable {
     enum Comparison: Equatable {
         /// « Best price from Soroswap and Aquarius ».
         case best(among: [String])
-        /// « Soroswap isn't answering · price from Aquarius ».
+        /// « Soroswap is unavailable, using Aquarius » (un seul protocole en panne : pas d'écran d'erreur).
         case fallback(unavailable: [String], used: String)
     }
 
