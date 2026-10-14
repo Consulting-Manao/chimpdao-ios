@@ -357,8 +357,9 @@ struct SwapAmountView: View {
     private func quoteProblem(_ issue: SwapFlowModel.QuoteIssue) -> some View {
         let (title, line): (LocalizedStringKey, LocalizedStringKey) = switch issue {
         case .noRoute: ("No route for this pair", "Try another coin.")
-        case .protocolUnavailable: ("Soroswap is unavailable right now", "Nothing moved. Try again in a minute.")
-        case .network: ("I can't reach Soroswap", "Check your connection. Nothing moved.")
+        case .protocolUnavailable(let names):
+            ("\(names.formatted(.list(type: .and).locale(locale))) \(names.count > 1 ? "are" : "is") unavailable right now", "Nothing moved. Try again in a minute.")
+        case .network: ("I can't reach the exchanges", "Check your connection. Nothing moved.")
         }
         return HStack(spacing: ChimpSpacing.m) {
             Image(.tileHead)

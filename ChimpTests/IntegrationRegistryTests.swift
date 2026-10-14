@@ -48,6 +48,7 @@ struct IntegrationRegistryTests {
         #expect(comparison.best?.protocolID == "up")
         #expect(comparison.failures.map(\.protocolID) == ["down"])
         #expect(comparison.failures.first?.error is Unavailable)
+        #expect(comparison.answered == ["empty", "up"])
 
         let none = await IntegrationRegistry(swapAdapters: [down, empty], yieldAdapters: []).bestQuote(request)
         #expect(none.best == nil)

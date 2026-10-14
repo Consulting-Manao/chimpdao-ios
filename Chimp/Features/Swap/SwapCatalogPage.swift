@@ -118,9 +118,11 @@ private extension MockSwapService.QuoteScenario {
         switch self {
         case .normal: "Normal (1 XLM ≈ 0.2492 USDC)"
         case .noRoute: "No route (E3b)"
-        case .protocolUnavailable: "Soroswap is down (E3c)"
+        case .protocolUnavailable: "Both protocols are down (E3c)"
         case .bigImpact: "Price impact 8.12% (E3e, E4i)"
         case .priceMovesBeforeSigning: "Price moves before signing (E4p)"
+        case .aquariusBest: "Best price from Aquarius"
+        case .soroswapDown: "Soroswap is down, Aquarius answers"
         }
     }
 }

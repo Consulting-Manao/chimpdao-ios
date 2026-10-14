@@ -14,6 +14,10 @@ final class MockSwapService: SwapService {
         case bigImpact
         /// Le devis est bon, mais le prix a bougé quand on prépare la signature (« Price moved »).
         case priceMovesBeforeSigning
+        /// Aquarius donne le meilleur prix (comparé à Soroswap).
+        case aquariusBest
+        /// Soroswap ne répond pas : le prix vient d'Aquarius seul, et l'écran le dit.
+        case soroswapDown
 
         var id: String { rawValue }
     }
@@ -61,16 +65,19 @@ final class MockSwapService: SwapService {
         try await Task.sleep(for: delay)
         switch quoteScenario {
         case .noRoute: throw SwapError.noRoute
-        case .protocolUnavailable: throw SwapServiceError.protocolUnavailable(["Mock"])
-        case .normal, .bigImpact, .priceMovesBeforeSigning: break
+        case .protocolUnavailable: throw SwapServiceError.protocolUnavailable(["Soroswap", "Aquarius"])
+        case .normal, .bigImpact, .priceMovesBeforeSigning, .aquariusBest, .soroswapDown: break
         }
         let units = try SwapUnits.units(of: amount, asset: given)
         var out = units * (Self.rates[given] ?? 0) / 1_000_000
         if priceHasMoved { out = out * 994 / 1000 }
+        let fromAquarius = quoteScenario == .aquariusBest || quoteScenario == .soroswapDown
         return SwapQuoteSummary(
-            protocolID: "mock", protocolName: "Soroswap", given: given, received: received, amountIn: amount,
+            protocolID: "mock", protocolName: fromAquarius ? "Aquarius" : "Soroswap", given: given, received: received, amountIn: amount,
             expectedOutUnits: out, route: [given, received], routeContracts: [given.rawValue, received.rawValue],
-            priceImpactBasisPoints: quoteScenario == .bigImpact ? 812 : 30
+            priceImpactBasisPoints: quoteScenario == .bigImpact ? 812 : 30,
+            comparedProtocols: quoteScenario == .soroswapDown ? ["Aquarius"] : ["Soroswap", "Aquarius"],
+            unavailableProtocols: quoteScenario == .soroswapDown ? ["Soroswap"] : []
         )
     }
 

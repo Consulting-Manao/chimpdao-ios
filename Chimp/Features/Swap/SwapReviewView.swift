@@ -217,8 +217,8 @@ struct SwapReviewView: View {
     static func message(for issue: SwapFlowModel.PreparationIssue, draft: SwapDraft) -> LocalizedStringKey {
         switch issue {
         case .insufficientBalance: "Not enough \(draft.given.code) in \(draft.drawer.title). Nothing was signed."
-        case .noRoute: "Soroswap has no route for this pair right now. Nothing was signed."
-        case .protocolUnavailable: "Soroswap is unavailable right now. Nothing was signed. Try again in a minute."
+        case .noRoute: "\(draft.quote.protocolName) has no route for this pair right now. Nothing was signed."
+        case .protocolUnavailable: "\(draft.quote.protocolName) is unavailable right now. Nothing was signed. Try again in a minute."
         case .priceMoved: "The price moved. Nothing was signed."
         case .other: "Couldn't get ready to swap. Nothing was signed. Check your connection and try again."
         }

@@ -18,12 +18,16 @@ struct IntegrationRegistry {
 
     /// Les devis de chaque protocole et le meilleur d'entre eux.
     struct QuoteComparison {
-        /// Le devis qui rend la plus grande quantité ; à égalité, le premier protocole enregistré.
+        /// Le devis qui rend la plus grande quantité ; à égalité, le premier protocole enregistré. Le minimum signé est ce
+        /// devis moins la même tolérance pour tous (`Slippage.minimum`, croissant) : c'est aussi le meilleur minimum reçu.
         let best: SwapQuote?
         /// Tous les devis obtenus, dans l'ordre d'enregistrement.
         let quotes: [SwapQuote]
         /// Les protocoles sans route ne sont pas des pannes : ils n'apparaissent ni ici ni dans `quotes`.
         let failures: [Failure]
+        /// Les protocoles qui ont répondu (avec un devis ou sans route), dans l'ordre d'enregistrement : ceux qui ont
+        /// vraiment été comparés.
+        let answered: [String]
     }
 
     struct PositionDiscovery {
@@ -40,15 +44,19 @@ struct IntegrationRegistry {
     }
 
     /// Demande un devis à chaque protocole d'échange et garde le meilleur (« meilleure route retenue », D2). Un devis à 0
-    /// ou d'une autre demande est ignoré. Les protocoles sont interrogés l'un après l'autre (deux aujourd'hui).
+    /// ou d'une autre demande est ignoré. Les protocoles sont interrogés en même temps ; le résultat ne dépend que de
+    /// l'ordre d'enregistrement.
     func bestQuote(_ request: SwapRequest) async -> QuoteComparison {
+        let tasks = swapAdapters.map { adapter in Task { try await adapter.quote(request) } }
         var quotes: [SwapQuote] = []
         var failures: [Failure] = []
-        for adapter in swapAdapters {
+        var answered: [String] = []
+        for (adapter, task) in zip(swapAdapters, tasks) {
             do {
-                if let quote = try await adapter.quote(request), quote.request == request, quote.amountOut > 0 {
+                if let quote = try await task.value, quote.request == request, quote.amountOut > 0 {
                     quotes.append(quote)
                 }
+                answered.append(adapter.id)
             } catch {
                 failures.append(Failure(protocolID: adapter.id, error: error))
             }
@@ -57,7 +65,7 @@ struct IntegrationRegistry {
             guard let best else { return quote }
             return quote.amountOut > best.amountOut ? quote : best
         }
-        return QuoteComparison(best: best, quotes: quotes, failures: failures)
+        return QuoteComparison(best: best, quotes: quotes, failures: failures, answered: answered)
     }
 
     /// Les positions de `holder` chez chaque protocole de rendement, avec les protocoles qui n'ont pas répondu.

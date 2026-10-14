@@ -31,8 +31,8 @@ final class SwapFlowModel {
     enum QuoteIssue: Equatable {
         /// Aucune route entre ces actifs.
         case noRoute
-        /// Aucun protocole n'a répondu.
-        case protocolUnavailable
+        /// Aucun protocole n'a répondu (leurs noms).
+        case protocolUnavailable([String])
         /// Réseau.
         case network
     }
@@ -356,7 +356,7 @@ final class SwapFlowModel {
     static func quoteIssue(for error: Error) -> QuoteIssue {
         switch error {
         case SwapError.noRoute, SwapError.insufficientLiquidity: .noRoute
-        case SwapServiceError.protocolUnavailable: .protocolUnavailable
+        case SwapServiceError.protocolUnavailable(let names): .protocolUnavailable(names)
         default: .network
         }
     }

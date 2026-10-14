@@ -37,6 +37,10 @@ struct SwapQuoteSummary: Equatable {
     let routeContracts: [String]
     /// Écart au prix des réserves, frais du pool compris.
     let priceImpactBasisPoints: Int?
+    /// Les protocoles comparés pour ce devis (« Soroswap », « Aquarius »), qui ont répondu, avec ou sans route.
+    var comparedProtocols: [String] = []
+    /// Les protocoles qui n'ont pas répondu : le devis vient des autres, et l'écran le dit.
+    var unavailableProtocols: [String] = []
 
     var expectedOut: Decimal { SwapUnits.amount(fromUnits: expectedOutUnits) }
 

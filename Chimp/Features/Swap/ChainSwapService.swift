@@ -2,8 +2,8 @@ import Foundation
 import stellarsdk
 
 /// Le vrai service de swap, sur le réseau de l'app (testnet) : tiroirs et cartes lus comme Envoyer (`ChainSendService`,
-/// sans copie), devis et appel par les adaptateurs du registre (Soroswap en phase 2), signature par la carte, frais par
-/// le serveur de frais (`IntegrationCallClient`). Ne fait aucune crypto lui-même.
+/// sans copie), devis et appel par les adaptateurs du registre (Soroswap et Aquarius, le meilleur retenu), signature par
+/// la carte, frais par le serveur de frais (`IntegrationCallClient`). Ne fait aucune crypto lui-même.
 ///
 /// - Main account : ordre 2, l'arbre simulé doit être exactement l'arbre déclaré par l'adaptateur.
 /// - Wallet d'une carte : ordre 1, l'arbre déclaré est signé avant toute simulation.
@@ -30,8 +30,13 @@ final class ChainSwapService: SwapService {
         client = SorobanClient(config: config)
         integrations = IntegrationCallClient(client: client, config: config)
         let reader = SimulationReader(client: client, source: config.feePayer)
+        // Actif pivot d'Aquarius : l'USDC de Circle (un saut au plus, décision du 2026-10-14).
+        let usdc = (try? SACClient.stellarAssets(config: config))?.first { $0.code == SendAsset.usdc.code }?.contract
         registry = IntegrationRegistry(
-            swapAdapters: config.integrations.map { [SoroswapAdapter(contracts: $0.soroswap, reader: reader)] } ?? [],
+            swapAdapters: config.integrations.map { [
+                SoroswapAdapter(contracts: $0.soroswap, reader: reader),
+                AquariusAdapter(contracts: $0.aquarius, hub: usdc, reader: reader),
+            ] } ?? [],
             yieldAdapters: []
         )
         self.signer = signer
@@ -59,13 +64,19 @@ final class ChainSwapService: SwapService {
 
     func quote(given: SendAsset, received: SendAsset, amount: Decimal) async throws -> SwapQuoteSummary {
         let comparison = await registry.bestQuote(try request(given: given, received: received, amount: amount))
+        let unavailable = comparison.failures.map { name(of: $0.protocolID) }
         guard let best = comparison.best else {
             if comparison.failures.isEmpty { throw SwapError.noRoute }
-            throw SwapServiceError.protocolUnavailable(comparison.failures.map { failure in
-                registry.swapAdapter(id: failure.protocolID)?.name ?? failure.protocolID
-            })
+            throw SwapServiceError.protocolUnavailable(unavailable)
         }
-        return try summary(of: best, given: given, received: received, amount: amount)
+        var summary = try summary(of: best, given: given, received: received, amount: amount)
+        summary.comparedProtocols = comparison.answered.map(name(of:))
+        summary.unavailableProtocols = unavailable
+        return summary
+    }
+
+    private func name(of protocolID: String) -> String {
+        registry.swapAdapter(id: protocolID)?.name ?? protocolID
     }
 
     private func summary(of quote: SwapQuote, given: SendAsset, received: SendAsset, amount: Decimal) throws -> SwapQuoteSummary {
@@ -102,7 +113,7 @@ final class ChainSwapService: SwapService {
             action: .swap, contract: call.contract, authorizer: draft.drawer.address,
             assetIn: request.assetIn.contract, amountIn: request.amountIn,
             assetOut: request.assetOut.contract, minimumOut: draft.minimumOutUnits,
-            route: draft.quote.routeContracts, deadline: now + SoroswapCalls.deadlineSeconds
+            route: draft.quote.routeContracts, deadline: adapter.deadlineSeconds.map { now + $0 }
         )
         try BoundsCheck.verify(shown: shown, signed: try adapter.terms(of: call), quotedOut: draft.quote.expectedOutUnits, now: now)
 
@@ -125,7 +136,7 @@ final class ChainSwapService: SwapService {
             return PreparedSwap(draft: draft, integration: integration, firstHopVenue: fresh.firstHopVenue, contract: call.contract)
         } catch {
             // La simulation du Main account exécute le swap : un refus du router a un nom (prix qui a bougé, échéance…).
-            throw SoroswapAdapter.swapError(for: error) ?? error
+            throw adapter.swapError(for: error) ?? error
         }
     }
 
@@ -182,7 +193,7 @@ final class ChainSwapService: SwapService {
         let hash = try await integrations.submit(integration, signed: card, trace: trace, feeSigner: feeSigner, onProgress: onProgress)
         let receipt = SwapReceipt(
             summary: SwapSummary(prepared.draft), transactionHash: hash, sentAt: .now,
-            explorerURL: explorerURL(transactionHash: hash), receivedAmount: await receivedAmount(hash)
+            explorerURL: explorerURL(transactionHash: hash), receivedAmount: await receivedAmount(hash, protocolID: prepared.draft.quote.protocolID)
         )
         // La ligne d'historique du swap (I1s) : celle du reçu de E5, avec le minimum signé et le protocole.
         if let account = session.wallet.account?.address {
@@ -191,11 +202,11 @@ final class ChainSwapService: SwapService {
         return receipt
     }
 
-    /// La quantité reçue : dernier montant rendu par `swap_exact_tokens_for_tokens`. `nil` si illisible (affichage seulement).
-    private func receivedAmount(_ hash: String) async -> Decimal? {
-        guard let value = try? await client.transactionReturnValue(hash),
-              let amounts = try? SoroswapAdapter.amounts(value), let last = amounts.last else { return nil }
-        return SwapUnits.amount(fromUnits: last)
+    /// La quantité reçue, lue par le protocole dans la valeur rendue par l'appel. `nil` si illisible (affichage seulement).
+    private func receivedAmount(_ hash: String, protocolID: String?) async -> Decimal? {
+        guard let adapter = protocolID.flatMap({ registry.swapAdapter(id: $0) }),
+              let value = try? await client.transactionReturnValue(hash), let units = adapter.receivedUnits(value) else { return nil }
+        return SwapUnits.amount(fromUnits: units)
     }
 
     /// Comme Envoyer (`ChainSendService.check`, qui écrit la ligne d'un **envoi** en attente finalement parti, jamais
@@ -208,7 +219,8 @@ final class ChainSwapService: SwapService {
             session.recordActivity(.swap(
                 hash: hash, drawer: trace.from, venue: trace.destination, givenCode: SendAsset(rawValue: pending.asset)?.code ?? pending.asset,
                 given: pending.amount, receivedCode: SendAsset(rawValue: swap.receivedAsset)?.code ?? swap.receivedAsset,
-                received: await receivedAmount(hash), minimum: swap.minimumReceived, protocolName: swap.protocolName, at: pending.signedAt
+                received: await receivedAmount(hash, protocolID: registry.swapAdapters.first { $0.name == swap.protocolName }?.id),
+                minimum: swap.minimumReceived, protocolName: swap.protocolName, at: pending.signedAt
             ), account: account)
         }
         return result

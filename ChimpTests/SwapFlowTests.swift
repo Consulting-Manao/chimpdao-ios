@@ -94,7 +94,7 @@ struct SwapFlowTests {
 
     @Test("Route introuvable et protocole indisponible : devis en échec, vérification impossible")
     func quoteFailures() async {
-        for (scenario, issue) in [(MockSwapService.QuoteScenario.noRoute, SwapFlowModel.QuoteIssue.noRoute), (.protocolUnavailable, .protocolUnavailable)] {
+        for (scenario, issue) in [(MockSwapService.QuoteScenario.noRoute, SwapFlowModel.QuoteIssue.noRoute), (.protocolUnavailable, .protocolUnavailable(["Soroswap", "Aquarius"]))] {
             let (model, _) = await model(scenario)
             await quoted(model, 10)
             #expect(model.quoteState == .failed(issue))
