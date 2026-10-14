@@ -31,6 +31,8 @@ enum SwapError: Error, Equatable, LocalizedError {
     case slippageExceeded
     /// L'échéance du swap est passée avant l'exécution.
     case deadlineExpired
+    /// Le devis est invraisemblable (plus que la réserve du pool, ou plus qu'au prix spot) : refusé, jamais affiché.
+    case implausibleQuote
 
     var errorDescription: String? {
         switch self {
@@ -38,6 +40,7 @@ enum SwapError: Error, Equatable, LocalizedError {
         case .insufficientLiquidity: "The pool doesn't have enough liquidity for this amount."
         case .slippageExceeded: "The price moved past the minimum you agreed to."
         case .deadlineExpired: "The swap's deadline passed."
+        case .implausibleQuote: "The quote doesn't look right (more than the pool holds, or better than its own price)."
         }
     }
 }

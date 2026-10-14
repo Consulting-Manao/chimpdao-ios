@@ -124,6 +124,17 @@ struct SwapFlowTests {
         #expect(single.comparison == nil)
     }
 
+    @Test("Devis invraisemblable : bandeau dédié, aucun prix affiché, vérification impossible")
+    func implausibleQuote() async {
+        let (model, _) = await model(.implausible)
+        await quoted(model, 10)
+        #expect(model.quoteState == .failed(.implausibleQuote))
+        #expect(model.currentQuote == nil)
+        #expect(model.rate == nil)
+        #expect(!model.canReview)
+        #expect(SwapFlowModel.preparationIssue(for: SwapError.implausibleQuote) == .implausibleQuote)
+    }
+
     @Test("Solde insuffisant : signalé, vérification impossible")
     func insufficientBalance() async {
         let (model, _) = await model()

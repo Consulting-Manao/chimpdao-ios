@@ -47,6 +47,10 @@ final class SoroswapAdapter: SwapAdapter {
         let pair = try await verifiedPair(tokenIn, tokenOut)
         let reserves = try Self.reserves(try await reader.readValue(contract: pair.pair, function: "get_reserves", arguments: []))
         let (reserveIn, reserveOut) = pair.token0 == tokenIn ? (reserves.0, reserves.1) : (reserves.1, reserves.0)
+        // Un devis faux n'est jamais affiché comme un prix (`Slippage.isPlausible`).
+        guard Slippage.isPlausible(amountIn: request.amountIn, amountOut: out, reserveOut: reserveOut, spotIn: reserveIn, spotOut: reserveOut) else {
+            throw SwapError.implausibleQuote
+        }
         return SwapQuote(
             protocolID: id, request: request, route: path, amountOut: out,
             priceImpactBasisPoints: Slippage.priceImpactBasisPoints(

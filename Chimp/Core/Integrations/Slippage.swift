@@ -49,6 +49,19 @@ enum Slippage {
         return Int((spotOut - amountOut) * 10_000 / spotOut)
     }
 
+    /// Vraisemblance d'un devis, pour un pool traversé (décision de Barth du 2026-10-14, après le défaut de Swift 6.3 qui a
+    /// produit un devis de 14,57 millions d'USDC pour 10 XLM) : un pool ne rend jamais sa réserve entière ni plus, et
+    /// jamais plus qu'au prix « spot » (`spotIn` donne `spotOut` : ses réserves, ou un montant mille fois plus petit pour
+    /// une autre courbe), parce que frais et courbe le font toujours rendre moins. Tolérance de 1 pb pour les arrondis.
+    /// `false` : le devis est faux, il est refusé et jamais affiché comme un prix.
+    static func isPlausible(amountIn: Int128, amountOut: Int128, reserveOut: Int128, spotIn: Int128, spotOut: Int128) -> Bool {
+        guard amountIn > 0, amountOut > 0, reserveOut > 0, spotIn > 0, spotOut > 0, amountOut < reserveOut else { return false }
+        let (spot, overflow) = amountIn.multipliedReportingOverflow(by: spotOut)
+        guard !overflow else { return false }
+        let spotAmount = spot / spotIn
+        return amountOut <= spotAmount + spotAmount / 10_000
+    }
+
     /// Au-delà de 5 % : avertissement fort.
     static func needsPriceImpactWarning(_ basisPoints: Int) -> Bool {
         basisPoints > priceImpactWarningBasisPoints

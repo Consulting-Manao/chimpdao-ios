@@ -18,6 +18,8 @@ final class MockSwapService: SwapService {
         case aquariusBest
         /// Soroswap ne répond pas : le prix vient d'Aquarius seul, et l'écran le dit.
         case soroswapDown
+        /// Devis invraisemblable (plus que la réserve du pool) : refusé, jamais affiché.
+        case implausible
 
         var id: String { rawValue }
     }
@@ -66,6 +68,7 @@ final class MockSwapService: SwapService {
         switch quoteScenario {
         case .noRoute: throw SwapError.noRoute
         case .protocolUnavailable: throw SwapServiceError.protocolUnavailable(["Soroswap", "Aquarius"])
+        case .implausible: throw SwapError.implausibleQuote
         case .normal, .bigImpact, .priceMovesBeforeSigning, .aquariusBest, .soroswapDown: break
         }
         let units = try SwapUnits.units(of: amount, asset: given)

@@ -67,6 +67,8 @@ final class ChainSwapService: SwapService {
         let unavailable = comparison.failures.map { name(of: $0.protocolID) }
         guard let best = comparison.best else {
             if comparison.failures.isEmpty { throw SwapError.noRoute }
+            // Un devis faux n'est jamais affiché comme un prix : il est dit tel quel, pas comme une panne.
+            if comparison.failures.contains(where: { ($0.error as? SwapError) == .implausibleQuote }) { throw SwapError.implausibleQuote }
             throw SwapServiceError.protocolUnavailable(unavailable)
         }
         var summary = try summary(of: best, given: given, received: received, amount: amount)

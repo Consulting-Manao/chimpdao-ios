@@ -123,6 +123,7 @@ private extension MockSwapService.QuoteScenario {
         case .priceMovesBeforeSigning: "Price moves before signing (E4p)"
         case .aquariusBest: "Best price from Aquarius"
         case .soroswapDown: "Soroswap is down, Aquarius answers"
+        case .implausible: "Implausible quote (blocked)"
         }
     }
 }

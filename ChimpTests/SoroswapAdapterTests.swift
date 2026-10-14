@@ -64,6 +64,16 @@ struct SoroswapAdapterTests {
         #expect(reader.calls.filter { $0 == "router_get_amounts_out" }.count == 2)
     }
 
+    @Test("Devis invraisemblable (meilleur que le prix des réserves de la paire) : refusé, jamais affiché")
+    func implausibleQuote() async throws {
+        let reader = try testnetReader()
+        // 10 XLM → 10 000 USDC, alors que les réserves en donnent ~1,065 USDC.
+        reader.replies["router_get_amounts_out"] = .success(amounts([100_000_000, 100_000_000_000]))
+        await #expect(throws: SwapError.implausibleQuote) {
+            _ = try await SoroswapAdapter(contracts: contracts, reader: reader).quote(request)
+        }
+    }
+
     @Test("Paire qui ne contient pas ces actifs : refusée")
     func foreignPairRefused() async throws {
         let reader = try testnetReader()

@@ -382,6 +382,7 @@ struct SwapAmountView: View {
         case .noRoute: ("No route for this pair", "Try another coin.")
         case .protocolUnavailable(let names):
             ("\(names.formatted(.list(type: .and).locale(locale))) \(names.count > 1 ? "are" : "is") unavailable right now", "Nothing moved. Try again in a minute.")
+        case .implausibleQuote: ("This price doesn't look right", "I won't show it or sign it. Nothing moved. Try again in a minute.")
         case .network: ("I can't reach the exchanges", "Check your connection. Nothing moved.")
         }
         return HStack(spacing: ChimpSpacing.m) {

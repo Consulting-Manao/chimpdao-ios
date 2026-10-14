@@ -33,6 +33,8 @@ final class SwapFlowModel {
         case noRoute
         /// Aucun protocole n'a répondu (leurs noms).
         case protocolUnavailable([String])
+        /// Le devis est invraisemblable (`Slippage.isPlausible`) : rien n'est affiché comme un prix.
+        case implausibleQuote
         /// Réseau.
         case network
     }
@@ -58,6 +60,8 @@ final class SwapFlowModel {
         case priceMoved
         case insufficientBalance
         case noRoute
+        /// Le nouveau devis est invraisemblable : rien n'est signé.
+        case implausibleQuote
         case protocolUnavailable
         /// Réseau, serveur, refus inattendu.
         case other
@@ -356,6 +360,7 @@ final class SwapFlowModel {
     static func quoteIssue(for error: Error) -> QuoteIssue {
         switch error {
         case SwapError.noRoute, SwapError.insufficientLiquidity: .noRoute
+        case SwapError.implausibleQuote: .implausibleQuote
         case SwapServiceError.protocolUnavailable(let names): .protocolUnavailable(names)
         default: .network
         }
@@ -439,6 +444,7 @@ final class SwapFlowModel {
         switch error {
         case SwapError.slippageExceeded, SwapError.deadlineExpired: .priceMoved
         case SwapError.noRoute, SwapError.insufficientLiquidity: .noRoute
+        case SwapError.implausibleQuote: .implausibleQuote
         case PaymentClient.PaymentError.insufficientBalance: .insufficientBalance
         case SwapServiceError.protocolUnavailable: .protocolUnavailable
         default: .other

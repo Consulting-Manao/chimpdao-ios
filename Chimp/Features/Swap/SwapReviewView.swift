@@ -220,6 +220,7 @@ struct SwapReviewView: View {
         case .noRoute: "\(draft.quote.protocolName) has no route for this pair right now. Nothing was signed."
         case .protocolUnavailable: "\(draft.quote.protocolName) is unavailable right now. Nothing was signed. Try again in a minute."
         case .priceMoved: "The price moved. Nothing was signed."
+        case .implausibleQuote: "The new price doesn't look right, so I won't sign it. Nothing was signed. Try again in a minute."
         case .other: "Couldn't get ready to swap. Nothing was signed. Check your connection and try again."
         }
     }

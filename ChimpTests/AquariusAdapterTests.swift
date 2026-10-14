@@ -183,7 +183,7 @@ struct AquariusAdapterTests {
         let quote = try #require(try await adapter(reader).quote(SwapRequest(assetIn: xlm, assetOut: usdc, amountIn: 100_000_000)))
         // spot : 50 000 000 ; rendu : 44 560 433 → 10,87 %
         #expect(quote.priceImpactBasisPoints == 1_087)
-        #expect(!reader.calls.contains("get_reserves"))
+        #expect(reader.calls.contains("get_reserves"), "Réserves lues pour toute courbe : un devis ne doit jamais les dépasser")
     }
 
     @Test("Montants envoyés au RPC exacts, à chaque saut (garde-fou : Swift 6.3 corrompt un Int128 passé à une fonction async)")
@@ -202,6 +202,43 @@ struct AquariusAdapterTests {
         sent = []
         _ = try await adapter(reader).quote(SwapRequest(assetIn: usdc, assetOut: xlm, amountIn: 123_456_789_012))
         #expect(sent == [123_456_789_012, 123_456_789_012, 123_456_789_012])
+    }
+
+    // MARK: Vraisemblance
+
+    @Test("Rejeu du devis corrompu (Swift 6.3, Debug) : 14,57 millions d'USDC pour 10 XLM, refusé avant l'écran")
+    func corruptedQuoteBlocked() async throws {
+        let reader = testnetReader()
+        let base = reader.reply
+        // Ce que le pool avait estimé pour le montant géant : presque toute sa réserve d'USDC (relevé sur testnet).
+        reader.reply = { function, arguments in
+            function == "estimate_swap" ? ContractArgument.u128(14_571_967_060_779) : try base(function, arguments)
+        }
+        await #expect(throws: SwapError.implausibleQuote) {
+            _ = try await adapter(reader).quote(SwapRequest(assetIn: xlm, assetOut: usdc, amountIn: 100_000_000))
+        }
+    }
+
+    @Test("Vraisemblance : un devis égal ou supérieur à la réserve du pool, ou meilleur que le prix spot, est refusé")
+    func plausibility() async throws {
+        // Réserves du pool à 0,3 % (USDC, XLM) : 14 572 443,601290 USDC et 3 260 444,4338308 XLM.
+        let reserveUSDC: Int128 = 14_572_443_601_290, reserveXLM: Int128 = 32_604_444_338_308
+        let spot = 100_000_000 * reserveUSDC / reserveXLM // 10 XLM au prix des réserves
+        #expect(Slippage.isPlausible(amountIn: 100_000_000, amountOut: 44_560_433, reserveOut: reserveUSDC, spotIn: reserveXLM, spotOut: reserveUSDC))
+        #expect(Slippage.isPlausible(amountIn: 100_000_000, amountOut: spot, reserveOut: reserveUSDC, spotIn: reserveXLM, spotOut: reserveUSDC), "Au prix spot exact : accepté")
+        #expect(!Slippage.isPlausible(amountIn: 100_000_000, amountOut: spot + spot / 1_000, reserveOut: reserveUSDC, spotIn: reserveXLM, spotOut: reserveUSDC), "0,1 % au-dessus du spot")
+        #expect(!Slippage.isPlausible(amountIn: 100_000_000, amountOut: reserveUSDC, reserveOut: reserveUSDC, spotIn: reserveXLM, spotOut: reserveUSDC), "Toute la réserve")
+        #expect(!Slippage.isPlausible(amountIn: 100_000_000, amountOut: 0, reserveOut: reserveUSDC, spotIn: reserveXLM, spotOut: reserveUSDC))
+
+        // Plus que la réserve, quelle que soit la courbe.
+        let reader = testnetReader()
+        let base = reader.reply
+        reader.reply = { function, arguments in
+            function == "estimate_swap" ? ContractArgument.u128(UInt128(reserveUSDC + 1)) : try base(function, arguments)
+        }
+        await #expect(throws: SwapError.implausibleQuote) {
+            _ = try await adapter(reader).quote(SwapRequest(assetIn: xlm, assetOut: usdc, amountIn: 100_000_000))
+        }
     }
 
     // MARK: Erreurs

@@ -59,7 +59,19 @@ final class AquariusAdapter: SwapAdapter {
         var impacts: [Int?] = []
         for (hop, out) in best.hops {
             let small = amountIn / 1_000
-            let reference = try await spotReference(of: hop, small: small > 0 ? TokenAmount(small) : nil)
+            let reserves = try await orientedReserves(of: hop)
+            let reference: (reserveIn: Int128, reserveOut: Int128)?
+            if try await poolType(of: hop) == "constant_product" {
+                reference = reserves
+            } else {
+                reference = try await smallTradeReference(of: hop, small: small > 0 ? TokenAmount(small) : nil)
+            }
+            // Un devis faux n'est jamais affiché comme un prix (`Slippage.isPlausible`) : plus que la réserve du pool, ou
+            // plus qu'au prix spot. Sans prix spot connu (montant minuscule), la réserve seule.
+            let plausible = reference.map {
+                Slippage.isPlausible(amountIn: amountIn, amountOut: out, reserveOut: reserves.reserveOut, spotIn: $0.reserveIn, spotOut: $0.reserveOut)
+            } ?? (out < reserves.reserveOut)
+            guard plausible else { throw SwapError.implausibleQuote }
             impacts.append(reference.flatMap {
                 Slippage.priceImpactBasisPoints(amountIn: amountIn, amountOut: out, reserveIn: $0.reserveIn, reserveOut: $0.reserveOut)
             })
@@ -122,19 +134,20 @@ final class AquariusAdapter: SwapAdapter {
         return found
     }
 
-    /// Le prix « spot » d'un saut, sous forme de deux quantités (`reserveIn` donne `reserveOut`) : les réserves du pool à
-    /// produit constant (comme Soroswap), sinon le devis d'un montant mille fois plus petit (`small`). `nil` si on ne
-    /// peut pas le connaître.
-    private func spotReference(of hop: SwapHop, small: TokenAmount?) async throws -> (reserveIn: Int128, reserveOut: Int128)? {
-        guard let tokenIn = hop.tokenIn else { return nil }
-        if try await poolType(of: hop) == "constant_product" {
-            let reserves = try Self.reserves(try await reader.readValue(
-                contract: contracts.router, function: "get_reserves",
-                arguments: [.vec(try hop.tokens.map { try ContractArgument.address($0) }), .bytes(hop.poolHash)]
-            ))
-            return hop.tokens[0] == tokenIn ? (reserves.0, reserves.1) : (reserves.1, reserves.0)
-        }
-        guard let small else { return nil }
+    /// Les réserves du pool d'un saut, dans le sens du swap (ce qui entre, ce qui sort).
+    private func orientedReserves(of hop: SwapHop) async throws -> (reserveIn: Int128, reserveOut: Int128) {
+        let reserves = try Self.reserves(try await reader.readValue(
+            contract: contracts.router, function: "get_reserves",
+            arguments: [.vec(try hop.tokens.map { try ContractArgument.address($0) }), .bytes(hop.poolHash)]
+        ))
+        return hop.tokens[0] == hop.tokenIn ? (reserves.0, reserves.1) : (reserves.1, reserves.0)
+    }
+
+    /// Le prix « spot » d'un pool qui n'est pas à produit constant (stable, concentré) : le devis d'un montant mille fois
+    /// plus petit (`small` donne le résultat). `nil` si on ne peut pas le connaître. Pour un pool à produit constant, ce
+    /// sont ses réserves.
+    private func smallTradeReference(of hop: SwapHop, small: TokenAmount?) async throws -> (reserveIn: Int128, reserveOut: Int128)? {
+        guard let tokenIn = hop.tokenIn, let small else { return nil }
         let smallOut = try await estimate(try Self.estimateArguments(
             tokens: hop.tokens, from: tokenIn, to: hop.tokenOut, poolHash: hop.poolHash, units: try AquariusCalls.u128(small.units)
         ))

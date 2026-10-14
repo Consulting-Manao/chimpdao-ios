@@ -18,6 +18,8 @@ struct SwapComparisonTests {
         let pair: String
         var soroswapDown = false
         var aquariusDown = false
+        /// Aquarius rend le devis du défaut de Swift 6.3 (14,57 millions d'USDC pour 10 XLM).
+        var aquariusCorrupted = false
 
         init(config: IntegrationConfig, pair: String) {
             self.config = config
@@ -39,7 +41,7 @@ struct SwapComparisonTests {
                     key: .bytes(Data(hex: "9ac7a9cde23ac2ada11105eeaa42e43c2ea8332ca0aa8f41f58d7160274d718e")!),
                     val: try ContractArgument.address("CAYBMZYJCOMMOHOGOGBK7ANIKF3JPZAL4D7SWAPVPHC4WBMOUT5DJN5B")
                 )])
-            case (config.aquarius.router, "estimate_swap"): return ContractArgument.u128(44_560_433)
+            case (config.aquarius.router, "estimate_swap"): return ContractArgument.u128(aquariusCorrupted ? 14_571_967_060_779 : 44_560_433)
             case (config.aquarius.router, "get_info"):
                 return try SCValXDR(xdr: "AAAAEQAAAAEAAAACAAAADwAAAANmZWUAAAAAAwAAAB4AAAAPAAAACXBvb2xfdHlwZQAAAAAAAA8AAAAQY29uc3RhbnRfcHJvZHVjdA==")
             case (config.aquarius.router, "get_reserves"):
@@ -94,6 +96,23 @@ struct SwapComparisonTests {
         #expect(none.best == nil)
         #expect(none.failures.map(\.protocolID) == ["soroswap", "aquarius"])
         #expect(none.answered.isEmpty)
+    }
+
+    @Test("Devis corrompu chez Aquarius : écarté (Soroswap sert, Aquarius signalé) ; seul : aucun prix, erreur dédiée")
+    func corruptedQuoteNeverShown() async throws {
+        let reader = TestnetReader(config: config, pair: soroswapPair)
+        reader.aquariusCorrupted = true
+        let comparison = await registry(reader).bestQuote(request)
+        #expect(comparison.best?.protocolID == "soroswap")
+        #expect(comparison.best?.amountOut == 10_619_368)
+        #expect(comparison.quotes.map(\.protocolID) == ["soroswap"], "Le devis corrompu n'est jamais un devis")
+        #expect(comparison.failures.map(\.protocolID) == ["aquarius"])
+        #expect((comparison.failures.first?.error as? SwapError) == .implausibleQuote)
+
+        reader.soroswapDown = true
+        let none = await registry(reader).bestQuote(request)
+        #expect(none.best == nil)
+        #expect(none.failures.contains { ($0.error as? SwapError) == .implausibleQuote })
     }
 
     @Test("Devis Aquarius → appel au minimum, bornes = écran, arbre déclaré pour le Main et pour une Pocket")
