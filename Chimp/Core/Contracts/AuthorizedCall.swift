@@ -9,13 +9,16 @@ enum AuthorizedCall {
     enum CallError: Error, Equatable, LocalizedError {
         /// La simulation n'a rendu aucune autorisation (`simulation missing auth for …`).
         case missingAuthorization(function: String)
-        /// La simulation a rendu autre chose qu'une seule autorisation, ou un autre appel que celui demandé.
+        /// La simulation a rendu autre chose qu'une seule autorisation.
         case unexpectedAuthorization(String)
+        /// L'arbre rendu par la simulation n'est pas l'arbre attendu (`AuthTreeCheck`).
+        case treeMismatch(AuthTreeCheck.Mismatch)
 
         var errorDescription: String? {
             switch self {
             case .missingAuthorization(let function): "The simulation returned no authorization for \(function)."
             case .unexpectedAuthorization(let detail): "Unexpected authorization from the simulation: \(detail)"
+            case .treeMismatch(let mismatch): "Unexpected authorization from the simulation: \(mismatch)"
             }
         }
     }
@@ -35,9 +38,10 @@ enum AuthorizedCall {
     /// `account`, expiration = ledger de la simulation + 120 (`sim.latestLedger + AUTH_EXPIRATION_LEDGERS`), digest dans la
     /// variante reçue (`SorobanAuth.pendingEntries`, règle 4).
     ///
-    /// Défense en profondeur, absente du terminal : l'entrée rendue doit être **exactement** l'appel demandé (même contrat,
-    /// même fonction, mêmes arguments, aucun sous-appel), et la seule à signer ; sinon rien n'est signé. Un serveur RPC
-    /// malveillant ne peut pas faire signer à la carte autre chose que ce qui est affiché (règle 8).
+    /// Défense en profondeur, absente du terminal : l'entrée rendue doit être **exactement** l'arbre attendu, et la seule à
+    /// signer ; sinon rien n'est signé. Un serveur RPC malveillant ne peut pas faire signer à la carte autre chose que ce qui
+    /// est affiché (règle 8). Arbre attendu par défaut : l'appel demandé, sans sous-appel (paiement, `add_card`,
+    /// `remove_card`). Une intégration passe l'arbre déclaré par son adaptateur (`expectedInvocation`, DESIGN_NOTES §13).
     static func prepareAccountEntry(
         client: SorobanClient,
         source: Account,
@@ -45,7 +49,8 @@ enum AuthorizedCall {
         contract: String,
         function: String,
         arguments: [SCValXDR],
-        passphrase: String
+        passphrase: String,
+        expectedInvocation: SorobanAuthorizedInvocationXDR? = nil
     ) async throws -> AccountEntry {
         let transaction = try client.contractCall(
             source: try PocketClient.copy(source), contract: contract, function: function, arguments: arguments
@@ -54,15 +59,32 @@ enum AuthorizedCall {
         guard let entries = simulation.sorobanAuth, !entries.isEmpty else { throw CallError.missingAuthorization(function: function) }
         let simulatedLedger = UInt32(clamping: simulation.latestLedger)
         let expiration = simulatedLedger + SorobanAuth.expirationLedgers
-        let pending = try SorobanAuth.pendingEntries(entries, signer: account, passphrase: passphrase, expirationLedger: expiration)
+        let expected = try expectedInvocation
+            ?? SorobanAuth.contractInvocation(contract: contract, function: function, arguments: arguments)
+        let only = try checkedAccountEntry(
+            entries, account: account, expected: expected, passphrase: passphrase, expirationLedger: expiration
+        )
+        return AccountEntry(entry: only.entry, digest: only.digest, expirationLedger: expiration, simulatedLedger: simulatedLedger)
+    }
+
+    /// Ordre 2, sans réseau : parmi les entrées rendues par la simulation, la seule à signer pour `account`, vérifiée contre
+    /// l'arbre attendu (`AuthTreeCheck`), expiration posée et digest calculé dans la variante reçue (règle 4).
+    /// Refus si une entrée nomme une autre adresse, s'il y a plus d'une entrée, ou si l'arbre diffère d'un seul octet.
+    static func checkedAccountEntry(
+        _ entries: [SorobanAuthorizationEntryXDR],
+        account: String,
+        expected: SorobanAuthorizedInvocationXDR,
+        passphrase: String,
+        expirationLedger: UInt32
+    ) throws -> SorobanAuth.PendingEntry {
+        let pending = try SorobanAuth.pendingEntries(entries, signer: account, passphrase: passphrase, expirationLedger: expirationLedger)
         guard pending.count == 1, let only = pending.first else {
             throw CallError.unexpectedAuthorization("\(pending.count) entries to sign")
         }
-        let expected = try SorobanAuth.contractInvocation(contract: contract, function: function, arguments: arguments)
-        guard try XDREncoder.encode(only.entry.rootInvocation) == XDREncoder.encode(expected) else {
-            throw CallError.unexpectedAuthorization("the authorized call is not the requested \(function)")
+        if let mismatch = AuthTreeCheck.mismatch(only.entry.rootInvocation, expected: expected) {
+            throw CallError.treeMismatch(mismatch)
         }
-        return AccountEntry(entry: only.entry, digest: only.digest, expirationLedger: expiration, simulatedLedger: simulatedLedger)
+        return only
     }
 
     /// Après le tap : la signature de la carte va dans l'entrée (`envelope` : `ChipAuth` tel quel pour une Pocket,
