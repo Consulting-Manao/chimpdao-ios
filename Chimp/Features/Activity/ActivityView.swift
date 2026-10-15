@@ -265,6 +265,7 @@ extension ActivityStamp {
         case .deposited: "Deposited"
         case .withdrawn: "Withdrawn"
         case .takenBack: "Taken back"
+        case .arrived: "Arrived"
         }
     }
 
@@ -280,6 +281,7 @@ extension ActivityStamp {
         case .deposited: Color(.chimpStampReceived)
         case .withdrawn: Color(.chimpTicketMuted)
         case .takenBack: Color(.chimpStampPaid)
+        case .arrived: Color(.chimpStampReceived)
         }
     }
 }

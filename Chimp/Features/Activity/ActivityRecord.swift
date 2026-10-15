@@ -20,6 +20,10 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
         /// `clawback` d'un SAC (stablebond, tranche 2, D3) : l'émetteur a repris des jetons. `from` est le tiroir, `to`
         /// est vide, `assetCode`/`amount` ce qui a été repris.
         case clawback
+        /// Arrivée d'USDC depuis une autre blockchain par Circle CCTP (tranche 2, D4) : `from` est le `CctpForwarder`,
+        /// `to` le tiroir, `assetCode`/`amount` ce qui est arrivé ; `sourceChain`, `sourceAddress`, `bridgeFee` lus dans
+        /// le message attesté, s'il a pu être relu et qu'il désigne bien ce tiroir.
+        case bridgeArrival
     }
 
     /// Lue sur la chaîne : `stellar:<hash>:<id de l'événement>` (comme le terminal). Écrite par ce téléphone :
@@ -60,6 +64,11 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
     /// au moment du swap (décision de Barth du 2026-10-15 : base de « Price +0.62% since you got them »). Jamais signé,
     /// jamais tiré d'un pool ; `nil` si le prix n'était pas disponible. Optionnel : les fichiers écrits avant restent lisibles.
     var receivedPriceUSD: Decimal? = nil
+    /// Arrivée CCTP : chaîne d'origine (« Ethereum »), adresse qui a envoyé (« 0x… »), frais pris par Circle (USDC).
+    /// Optionnels : les fichiers écrits avant restent lisibles.
+    var sourceChain: String? = nil
+    var sourceAddress: String? = nil
+    var bridgeFee: Decimal? = nil
 
     /// Ce que la ligne représente pour ce compte. `classifyTransfer` du terminal (`lib/chain-history.ts`), sans les
     /// protocoles DeFi (hors V1), plus **Move** : les deux côtés sont des tiroirs du compte (DESIGN_NOTES §13).
@@ -76,6 +85,8 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
             return drawers.contains(to) ? .withdrawn : nil
         case .clawback:
             return drawers.contains(from) ? .takenBack : nil
+        case .bridgeArrival:
+            return drawers.contains(to) ? .arrived : nil
         case .transfer:
             let sent = drawers.contains(from)
             let received = drawers.contains(to)
@@ -110,6 +121,35 @@ extension ActivityRecord {
             at: at, isLocal: true, receivedAssetCode: receivedCode, receivedAmount: received, minimumReceived: minimum,
             protocolName: protocolName, receivedPriceUSD: receivedPriceUSD
         )
+    }
+
+    /// Un transfert relu sur la chaîne, du `CctpForwarder` vers un tiroir, est une arrivée CCTP (« ARRIVED ») et non un
+    /// paiement reçu : on ne « renvoie » pas à un contrat de Circle.
+    static func classifyingArrivals(_ records: [ActivityRecord], forwarder: String?, drawers: Set<String>) -> [ActivityRecord] {
+        guard let forwarder else { return records }
+        return records.map { record in
+            guard record.event == .transfer, !record.isLocal, record.from == forwarder, drawers.contains(record.to) else { return record }
+            var arrival = record
+            arrival.event = .bridgeArrival
+            arrival.protocolName = "Circle CCTP"
+            return arrival
+        }
+    }
+
+    /// Les détails d'une arrivée, tirés du message attesté que la transaction a passé à `mint_and_forward` — seulement si
+    /// ce message désigne bien cette arrivée : arrivée sur Stellar, `mintRecipient` et `destinationCaller` = le forwarder,
+    /// destinataire du hook data = ce tiroir, même montant. Sinon, la ligne reste sans détails.
+    func withArrivalDetails(from message: CCTPMessage, cctp: IntegrationConfig.CCTP) -> ActivityRecord {
+        guard event == .bridgeArrival, message.destinationDomain == cctp.localDomain,
+              let forwarder = try? CCTPMessage.bytes32(contract: cctp.forwarder),
+              message.burn.mintRecipient == forwarder, message.destinationCaller == forwarder,
+              (try? CCTPMessage.forwardRecipient(in: message.burn.hookData)) == to,
+              amount == CCTPMessage.stellarAmount(message.burn.amount - message.burn.feeExecuted) else { return self }
+        var detailed = self
+        detailed.sourceChain = cctp.sourceChains[message.sourceDomain]
+        detailed.sourceAddress = CCTPMessage.evmAddress(message.burn.messageSender)
+        detailed.bridgeFee = CCTPMessage.stellarAmount(message.burn.feeExecuted)
+        return detailed
     }
 
     /// Les deux transferts d'un swap relus sur la chaîne deviennent une seule ligne : dans une même transaction, un actif
@@ -222,6 +262,8 @@ enum ActivityKind: Equatable, Sendable {
     case withdrawn
     /// L'émetteur d'un stablebond a repris des jetons (clawback).
     case takenBack
+    /// De l'USDC arrivé d'une autre blockchain (Circle CCTP).
+    case arrived
 }
 
 /// Ce que le téléphone garde de l'historique d'un compte.

@@ -53,10 +53,25 @@ struct IntegrationConfig: Equatable, Sendable {
         let priceAPI: URL
     }
 
+    /// Circle CCTP V2 (D4) : arrivées d'USDC depuis une autre blockchain. Le transfert se lance et se finalise sur le site
+    /// (`/fund`, décision de Barth du 2026-10-15) ; l'app ne signe jamais rien d'Ethereum, elle reconnaît l'arrivée.
+    /// Adresses vérifiées sur testnet le 2026-10-15 (interfaces lues sur la chaîne, forwarder relié à ces deux contrats).
+    struct CCTP: Equatable, Sendable {
+        /// `CctpForwarder` : reçoit le mint et le transfère au destinataire du hook data (`mint_and_forward`).
+        let forwarder: String
+        let tokenMessengerMinter: String
+        let messageTransmitter: String
+        /// Domaine CCTP de Stellar.
+        let localDomain: UInt32
+        /// Domaines d'origine connus (« Supported chains and domains » de Circle) ; un autre domaine reste « another chain ».
+        let sourceChains: [UInt32: String]
+    }
+
     let soroswap: Soroswap
     let aquarius: Aquarius
     let defindexVaults: [DeFindexVault]
     let etherfuse: Etherfuse
+    let cctp: CCTP
 
     static let testnet = IntegrationConfig(
         soroswap: Soroswap(
@@ -78,6 +93,13 @@ struct IntegrationConfig: Equatable, Sendable {
             issuer: "GC3CW7EDYRTWQ635VDIGY6S4ZUF5L6TQ7AA4MWS7LEQDBLUSZXV7UPS4",
             stablebonds: [Stablebond(code: "CETES", contract: "CC72F57YTPX76HAA64JQOEGHQAPSADQWSY5DWVBR66JINPFDLNCQYHIC")],
             priceAPI: URL(string: "https://api.sand.etherfuse.com")!
+        ),
+        cctp: CCTP(
+            forwarder: "CA66Q2WFBND6V4UEB7RD4SAXSVIWMD6RA4X3U32ELVFGXV5PJK4T4VSZ",
+            tokenMessengerMinter: "CDNG7HXAPBWICI2E3AUBP3YZWZELJLYSB6F5CC7WLDTLTHVM74SLRTHP",
+            messageTransmitter: "CBJ6MTCKKZG73PMDZCJMSFRD7DQEMI4FKDH7CGDSV4W6FHCRBCQAVVJY",
+            localDomain: 27,
+            sourceChains: [0: "Ethereum", 1: "Avalanche", 5: "Solana", 6: "Base", 26: "Arc"]
         )
     )
 
@@ -118,6 +140,10 @@ struct IntegrationConfig: Equatable, Sendable {
             if expected != bond.contract { problems.append("etherfuse.\(bond.code) is not the SAC of \(bond.code):\(etherfuse.issuer)") }
         }
         if etherfuse.priceAPI.scheme != "https" { problems.append("etherfuse.priceAPI is not https") }
+        address("cctp.forwarder", cctp.forwarder)
+        address("cctp.tokenMessengerMinter", cctp.tokenMessengerMinter)
+        address("cctp.messageTransmitter", cctp.messageTransmitter)
+        if cctp.sourceChains[cctp.localDomain] != nil { problems.append("cctp.sourceChains names Stellar's own domain") }
         return problems
     }
 }

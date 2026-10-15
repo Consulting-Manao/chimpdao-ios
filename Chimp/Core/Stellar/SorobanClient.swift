@@ -350,6 +350,32 @@ struct SorobanClient {
         }
     }
 
+    /// Arguments du premier appel de contrat d'une transaction réussie (`getTransaction`), enveloppe « fee bump » comprise.
+    /// Sert à relire le message CCTP passé à `mint_and_forward` (Activity, D4). `nil` : transaction introuvable, échouée,
+    /// ou qui n'appelle pas de contrat.
+    func invocationArguments(_ hash: String) async throws -> [SCValXDR]? {
+        switch await server.getTransaction(transactionHash: hash) {
+        case .success(let response):
+            guard response.status == GetTransactionResponse.STATUS_SUCCESS, let envelope = response.transactionEnvelope else { return nil }
+            let transaction: TransactionXDR
+            switch envelope {
+            case .v1(let v1): transaction = v1.tx
+            case .feeBump(let bump):
+                guard case .v1(let inner) = bump.tx.innerTx else { return nil }
+                transaction = inner.tx
+            default: return nil
+            }
+            for operation in transaction.operations {
+                if case .invokeHostFunctionOp(let invoke) = operation.body, case .invokeContract(let call) = invoke.hostFunction {
+                    return call.args
+                }
+            }
+            return nil
+        case .failure(let error):
+            throw StellarError.rpc(Self.describe(error))
+        }
+    }
+
     /// Dernier ledger fermé et son heure de fermeture (secondes depuis 1970).
     func latestLedgerInfo() async throws -> (sequence: UInt32, closeTime: UInt64) {
         switch await server.getLatestLedger() {

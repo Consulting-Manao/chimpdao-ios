@@ -16,6 +16,8 @@ enum ActivityStamp: Equatable, Sendable {
     case withdrawn
     /// Décision de Barth du 2026-10-15 : « TAKEN BACK » (clawback d'un stablebond par son émetteur).
     case takenBack
+    /// Décision de Barth du 2026-10-15 : « ARRIVED » (USDC arrivé d'une autre blockchain par Circle CCTP).
+    case arrived
 }
 
 /// Montant coloré (reçu) ou neutre.
@@ -343,6 +345,13 @@ final class ActivityViewModel {
                 meta: "\(time) · " + String(localized: "vault") + " → \(drawer(record.to)?.name ?? "")", stamp: .withdrawn,
                 amount: record.amount.map { quantityText($0, code: code, sign: .positive) }, tone: .positive, record: record
             )
+        case .arrived:
+            // Décision de Barth du 2026-10-15 : tampon « ARRIVED », « from Ethereum · via Circle CCTP » (maquette à venir).
+            return ActivityRow(
+                id: record.id, title: String(localized: "Arrived in \(drawer(record.to)?.name ?? "")"),
+                meta: "\(time) · " + Self.arrivalLine(record), stamp: .arrived,
+                amount: record.amount.map { amountText($0, code: code, sign: .positive) }, tone: .positive, record: record
+            )
         case .takenBack:
             // Décision de Barth du 2026-10-15 : « Etherfuse took back {X} CETES », tampon « TAKEN BACK », comme une ligne
             // d'envoi (quantité, jamais de dollars).
@@ -391,6 +400,7 @@ final class ActivityViewModel {
             case .deposited: signed = -amount
             case .withdrawn: signed = amount
             case .takenBack: signed = -amount
+            case .arrived: signed = amount
             case .cardAdded: break
             }
             sums[code, default: 0] += signed
@@ -526,6 +536,20 @@ final class ActivityViewModel {
             if let protocols = record.protocolName {
                 lines.append(.init(id: "protocols", label: "Protocols", value: .text(protocols)))
             }
+        case .arrived:
+            // D'où (chaîne, adresse d'origine), où c'est arrivé, combien, les frais de Circle, par quoi (reçu non dessiné).
+            lines.append(.init(id: "fromChain", label: "From", value: .text(record.sourceChain ?? String(localized: "Another chain"))))
+            if let sender = record.sourceAddress {
+                lines.append(.init(id: "sender", label: "Sent by", value: .text(Self.shortEVM(sender))))
+            }
+            lines.append(.init(id: "into", label: "Into", value: place(record.to)))
+            if let amount = record.amount, let code = record.assetCode {
+                lines.append(.init(id: "amount", label: "Amount", value: .positive(Self.exactAmount(amount, code: code, locale: locale))))
+            }
+            if let fee = record.bridgeFee, let code = record.assetCode {
+                lines.append(.init(id: "bridgeFee", label: "Circle fee", value: .text(Self.exactAmount(fee, code: code, locale: locale))))
+            }
+            lines.append(.init(id: "via", label: "Via", value: .text(record.protocolName ?? "Circle CCTP")))
         case .takenBack:
             // Qui a repris, d'où, combien (reçu non dessiné : construit comme celui d'un envoi).
             lines.append(.init(id: "by", label: "Taken back by", value: .text(Self.issuer(of: record))))
@@ -577,6 +601,7 @@ final class ActivityViewModel {
         case .deposited: .deposited(vault: record.vaultName ?? "DeFindex", from: title(record.from))
         case .withdrawn: .withdrawn(vault: record.vaultName ?? "DeFindex", into: title(record.to))
         case .takenBack: .takenBack(by: Self.issuer(of: record), from: title(record.from))
+        case .arrived: .arrived(from: record.sourceChain ?? String(localized: "another chain"), into: title(record.to))
         case .cardAdded: .cardAdded(
             card: record.cardKey.flatMap { source.cardName(key: $0) } ?? String(localized: "A new card"),
             approvedBy: record.approvedBy.flatMap { source.cardName(key: $0) }
@@ -638,8 +663,21 @@ final class ActivityViewModel {
         switch kind {
         case .sent: ActivityReceipt.Counterparty(lineID: "to", address: record.to)
         case .received: ActivityReceipt.Counterparty(lineID: "from", address: record.from)
+        case .arrived:
+            record.sourceAddress.map { ActivityReceipt.Counterparty(lineID: "sender", address: $0) }
         case .moved, .cardAdded, .swapped, .deposited, .withdrawn, .takenBack: nil
         }
+    }
+
+    /// « from Ethereum · via Circle CCTP » (décision de Barth du 2026-10-15) ; chaîne inconnue : « from another chain ».
+    static func arrivalLine(_ record: ActivityRecord) -> String {
+        let chain = record.sourceChain ?? String(localized: "another chain")
+        return String(localized: "from \(chain) · via \(record.protocolName ?? "Circle CCTP")")
+    }
+
+    /// « 0x2226…d55c ».
+    static func shortEVM(_ address: String) -> String {
+        address.count > 12 ? "\(address.prefix(6))…\(address.suffix(4))" : address
     }
 
     /// Qui a repris les jetons : l'émetteur connu de l'actif (« Etherfuse »), sinon « The issuer ».
@@ -665,7 +703,8 @@ final class ActivityViewModel {
         case .received:
             guard asset != nil else { return nil }
             return SendPrefill(address: record.from, asset: asset, amount: record.amount, origin: .sendBack)
-        case .moved, .cardAdded, .swapped, .deposited, .withdrawn, .takenBack:
+        // Une arrivée d'une autre blockchain ne se « renvoie » pas : l'expéditeur est un contrat de Circle.
+        case .moved, .cardAdded, .swapped, .deposited, .withdrawn, .takenBack, .arrived:
             return nil
         }
     }

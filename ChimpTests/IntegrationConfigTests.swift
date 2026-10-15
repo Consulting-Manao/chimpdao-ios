@@ -46,6 +46,10 @@ struct IntegrationConfigTests {
                 issuer: base.etherfuse.issuer,
                 stablebonds: [.init(code: "CETES", contract: base.defindexVaults[0].vault)],
                 priceAPI: URL(string: "http://api.etherfuse.com/")!
+            ),
+            cctp: .init(
+                forwarder: "not-an-address", tokenMessengerMinter: base.cctp.tokenMessengerMinter,
+                messageTransmitter: base.cctp.tokenMessengerMinter, localDomain: 27, sourceChains: [27: "Stellar"]
             )
         )
         let problems = broken.problems(passphrase: config.passphrase, knownAssetCodes: knownAssetCodes, reserved: reserved)
@@ -57,5 +61,8 @@ struct IntegrationConfigTests {
         #expect(problems.contains("etherfuse.CETES repeats an address used elsewhere"))
         #expect(problems.contains { $0.hasPrefix("etherfuse.CETES is not the SAC of CETES:") })
         #expect(problems.contains("etherfuse.priceAPI is not https"))
+        #expect(problems.contains { $0.hasPrefix("cctp.forwarder is not a C-address") })
+        #expect(problems.contains("cctp.messageTransmitter repeats an address used elsewhere"))
+        #expect(problems.contains("cctp.sourceChains names Stellar's own domain"))
     }
 }

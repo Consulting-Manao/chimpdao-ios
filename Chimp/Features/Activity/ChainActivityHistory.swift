@@ -5,6 +5,12 @@ import stellarsdk
 protocol ActivityEventSource {
     func latestLedger() async throws -> UInt32
     func contractEvents(filters: [EventFilter], startLedger: UInt32, endLedger: UInt32, pageLimit: Int) async throws -> SorobanClient.EventRange
+    /// Arguments du premier appel de contrat d'une transaction (message CCTP d'une arrivée).
+    func invocationArguments(_ hash: String) async throws -> [SCValXDR]?
+}
+
+extension ActivityEventSource {
+    func invocationArguments(_ hash: String) async throws -> [SCValXDR]? { nil }
 }
 
 extension SorobanClient: ActivityEventSource {}
@@ -38,12 +44,36 @@ struct ChainActivityHistory {
     let assets: [String: String]
     /// Vaults connus (Grow) : un transfert vers l'un d'eux est un dépôt, depuis l'un d'eux un retrait.
     let vaults: [String: ActivityRecord.VaultLabel]
+    /// Circle CCTP (D4) : un transfert venu de son `CctpForwarder` est une arrivée d'une autre blockchain.
+    let cctp: IntegrationConfig.CCTP?
     var pause: (Duration) async -> Void = { try? await Task.sleep(for: $0) }
 
-    init(source: ActivityEventSource, assets: [(code: String, contract: String)], vaults: [String: ActivityRecord.VaultLabel] = [:]) {
+    init(
+        source: ActivityEventSource, assets: [(code: String, contract: String)], vaults: [String: ActivityRecord.VaultLabel] = [:],
+        cctp: IntegrationConfig.CCTP? = nil
+    ) {
         self.source = source
         self.assets = Dictionary(uniqueKeysWithValues: assets.map { ($0.contract, $0.code) })
         self.vaults = vaults
+        self.cctp = cctp
+    }
+
+    /// Les arrivées CCTP nouvellement lues reçoivent leurs détails (chaîne et adresse d'origine, frais de Circle), lus dans
+    /// le message de leur transaction. Une relecture ratée laisse la ligne sans détails, jamais fausse.
+    func detailingArrivals(_ rows: [ActivityRecord]) async -> [ActivityRecord] {
+        guard let cctp else { return rows }
+        var result: [ActivityRecord] = []
+        for row in rows {
+            guard row.event == .bridgeArrival,
+                  let arguments = try? await source.invocationArguments(row.hash),
+                  let first = arguments.first, case .bytes(let data) = first,
+                  let message = try? CCTPMessage(data) else {
+                result.append(row)
+                continue
+            }
+            result.append(row.withArrivalDetails(from: message, cctp: cctp))
+        }
+        return result
     }
 
     /// Relit ce qui manque de la fenêtre du RPC pour ces tiroirs et l'ajoute à `activity`. `onProgress` reçoit l'historique
@@ -73,13 +103,16 @@ struct ChainActivityHistory {
         func read(_ start: UInt32, _ end: UInt32) async throws -> Bool {
             guard let events = try await scan(groups, start: start, end: end, floor: &floor) else { return false }
             let known = Set(state.records.map(\.hash))
-            let rows = ActivityRecord.groupingSwaps(
-                ActivityRecord.classifyingVaults(
-                    Self.records(from: events, account: account, drawers: Set(addresses), assets: assets, known: known),
-                    vaults: vaults, drawers: Set(addresses)
+            let rows = await detailingArrivals(ActivityRecord.classifyingArrivals(
+                ActivityRecord.groupingSwaps(
+                    ActivityRecord.classifyingVaults(
+                        Self.records(from: events, account: account, drawers: Set(addresses), assets: assets, known: known),
+                        vaults: vaults, drawers: Set(addresses)
+                    ),
+                    drawers: Set(addresses)
                 ),
-                drawers: Set(addresses)
-            )
+                forwarder: cctp?.forwarder, drawers: Set(addresses)
+            ))
             state.records = ActivityLog.merging(Self.withLedgers(state.records, from: events), rows)
             return true
         }

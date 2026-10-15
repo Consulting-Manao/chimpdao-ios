@@ -23,6 +23,8 @@ enum ShareMessage {
         case withdrawn(vault: String, into: String)
         /// Clawback : l'émetteur (« Etherfuse ») a repris des jetons d'un tiroir.
         case takenBack(by: String, from: String)
+        /// Arrivée d'une autre blockchain (« Ethereum ») par Circle CCTP, dans un tiroir.
+        case arrived(from: String, into: String)
     }
 
     static let sentPunchlines: [LocalizedStringResource] = [
@@ -84,6 +86,13 @@ enum ShareMessage {
                 String(localized: "🧺 Took \(amount) out of the \(vault) vault with ChimpDAO."),
                 String(localized: "Back home, ready to use."),
                 String(localized: "Into my \(drawer) · \(networkName) · \(date)"),
+            ]
+            if let proof { lines.append(proof) }
+        case let .arrived(chain, drawer):
+            lines = [
+                String(localized: "🌉 \(amount) just arrived from \(chain) with ChimpDAO."),
+                String(localized: "Native USDC, via Circle CCTP."),
+                String(localized: "Landed in my \(drawer) · \(networkName) · \(date)"),
             ]
             if let proof { lines.append(proof) }
         case let .takenBack(issuer, drawer):
