@@ -101,6 +101,14 @@ struct SorobanClient {
         }
     }
 
+    /// Entrées du ledger (`getLedgerEntries`), dans l'ordre rendu par le RPC ; une entrée absente (expirée) n'y est pas.
+    func ledgerEntries(_ base64Keys: [String]) async throws -> [LedgerEntry] {
+        switch await server.getLedgerEntries(base64EncodedKeys: base64Keys) {
+        case .success(let response): return response.entries
+        case .failure(let error): throw StellarError.rpc(Self.describe(error))
+        }
+    }
+
     /// Le contrat existe-t-il déjà ? Lit l'entrée « instance » du contrat (`getContractData(address,
     /// scvLedgerKeyContractInstance)` dans `deployAccount`). Écart minimal : le terminal traite **toute** erreur
     /// comme « pas encore déployé » ; ici seule une réponse vide l'est, une panne réseau remonte.

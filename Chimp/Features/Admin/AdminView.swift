@@ -23,6 +23,8 @@ struct AdminView: View {
     @State private var diagnosticsModel: AdminDiagnosticsModel?
     /// Argent de test (étape 5B) : créé à l'affichage, avec le compte ouvert sur ce téléphone.
     @State private var fundModel: AdminFundModel?
+    /// Durée de vie du vault DeFindex et de sa stratégie (tranche 2, D1).
+    @State private var lifetimeModel = AdminLifetimeModel()
     @Environment(AppSession.self) private var session
 
     var body: some View {
@@ -51,6 +53,7 @@ struct AdminView: View {
                 if session.hasAccount, let fundModel {
                     AdminFundPanel(model: fundModel, hasAdminKey: keyModel.hasKey || isSimulator, usdcFaucet: ChimpNetworkConfig.testnet.usdcFaucet)
                 }
+                AdminLifetimePanel(model: lifetimeModel, hasAdminKey: keyModel.hasKey)
             }
             .padding(ChimpSpacing.screenMargin)
             .frame(maxWidth: .infinity, alignment: .leading)

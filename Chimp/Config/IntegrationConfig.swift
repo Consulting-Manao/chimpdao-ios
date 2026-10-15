@@ -30,6 +30,9 @@ struct IntegrationConfig: Equatable, Sendable {
         let name: String
         /// Protocoles sous-jacents, toujours affichés avec l'avertissement (principe 6).
         let underlyingProtocols: [String]
+        /// Stratégie du vault (lue sur la chaîne par `get_assets`, gardée ici pour la prolongation de sa durée de vie en
+        /// mode admin).
+        var strategy: String? = nil
     }
 
     struct Stablebond: Equatable, Sendable {
@@ -65,7 +68,8 @@ struct IntegrationConfig: Equatable, Sendable {
         defindexVaults: [
             DeFindexVault(
                 vault: "CCLV4H7WTLJQ7ATLHBBQV2WW3OINF3FOY5XZ7VPHZO7NH3D2ZS4GFSF6",
-                assetCode: "XLM", name: "XLM vault", underlyingProtocols: ["DeFindex", "Blend"]
+                assetCode: "XLM", name: "XLM vault", underlyingProtocols: ["DeFindex", "Blend"],
+                strategy: "CDVLOSPJPQOTB6ZCWO5VSGTOLGMKTXSFWYTUP572GTPNOWX4F76X3HPM"
             ),
         ],
         etherfuse: Etherfuse(
@@ -98,6 +102,7 @@ struct IntegrationConfig: Equatable, Sendable {
         address("aquarius.router", aquarius.router)
         for vault in defindexVaults {
             address("defindexVaults[\(vault.name)]", vault.vault)
+            if let strategy = vault.strategy { address("defindexVaults[\(vault.name)].strategy", strategy) }
             if !knownAssetCodes.contains(vault.assetCode) {
                 problems.append("defindexVaults[\(vault.name)] names unknown asset \"\(vault.assetCode)\"")
             }
