@@ -59,4 +59,33 @@ struct StablebondControlTests {
         #expect(SendAsset.cetes.issuerName == "Etherfuse")
         #expect(SendAsset.usdc.issuerName == nil)
     }
+
+    @Test("Gel entre la signature et l'envoi : l'envoi n'est pas bloqué, l'échec dit « Etherfuse froze your CETES »")
+    func frozenAtSend() async throws {
+        func run(_ scenario: MockSwapService.QuoteScenario, received: SendAsset) async -> SwapFlowModel {
+            let service = MockSwapService(quoteScenario: scenario, resultScenario: .rejectedThenNothingSent, delay: .zero)
+            service.send.authorizationWait = .seconds(1)
+            let model = SwapFlowModel(service: service, quoteDebounce: .zero)
+            await model.loadIfNeeded()
+            model.choose(.usdc, for: .given)
+            model.choose(received, for: .received)
+            model.setAmount(10)
+            await model.refreshQuote()
+            model.continueToReview()
+            model.confirmReview()
+            for _ in 0..<200 where model.stage != .enteringPin { try? await Task.sleep(for: .milliseconds(10)) }
+            model.pinEntered("1234")
+            model.scanCard()
+            for _ in 0..<300 {
+                if case .finished = model.stage { break }
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            return model
+        }
+        let frozen = await run(.cetesFrozenAtSend, received: .cetes)
+        guard case .finished = frozen.stage else { Issue.record("le swap n'est pas allé au bout : \(frozen.stage)"); return }
+        #expect(frozen.frozenAtSend == .cetes)
+        let plain = await run(.normal, received: .xlm)
+        #expect(plain.frozenAtSend == nil, "Sans stablebond, rien n'est relu")
+    }
 }

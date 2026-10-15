@@ -80,6 +80,17 @@ final class ChainSwapService: SwapService {
         }
     }
 
+    func frozenAsset(in drawer: SendDrawer, among assets: [SendAsset]) async -> SendAsset? {
+        let bonds = config.integrations?.etherfuse.stablebonds ?? []
+        guard let source = try? Account(accountId: config.feePayer, sequenceNumber: 0) else { return nil }
+        let control = StablebondControl(client: client)
+        for asset in assets {
+            guard let bond = bonds.first(where: { $0.code == asset.code }) else { continue }
+            if (try? await control.isFrozen(token: bond.contract, holder: drawer.address, source: source)) == true { return asset }
+        }
+        return nil
+    }
+
     /// Avant de signer : si l'un des deux actifs est un stablebond, son gel est relu pour ce tiroir. Gelé → rien n'est
     /// signé ; illisible → l'erreur remonte (jamais « pas gelé » par défaut).
     private func checkNotFrozen(_ draft: SwapDraft, request: SwapRequest, source: Account) async throws {

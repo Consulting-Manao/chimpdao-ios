@@ -148,11 +148,17 @@ struct SwapStatusView: View {
             }
         case .finished(.waiting(let until)):
             waiting(until: until)
-            if let reason = model.failureReason {
+            if let frozen = model.frozenAtSend {
+                ChimpFieldMessage(text: "\(frozen.issuerName ?? String(localized: "The issuer")) froze your \(frozen.code). Nothing moved.", kind: .error)
+            } else if let reason = model.failureReason {
                 ChimpFieldMessage(text: SendStatusView.message(for: reason), kind: .info)
             }
         case .finished(.nothingSent):
-            ChimpySays(text: "Your \(model.summary?.given.code ?? "XLM") didn't move. You can try again.", pose: .peel)
+            if let frozen = model.frozenAtSend {
+                ChimpySays(text: "\(frozen.issuerName ?? String(localized: "The issuer")) froze your \(frozen.code). Nothing moved.", pose: .peel)
+            } else {
+                ChimpySays(text: "Your \(model.summary?.given.code ?? "XLM") didn't move. You can try again.", pose: .peel)
+            }
         default:
             EmptyView()
         }

@@ -73,6 +73,8 @@ final class SwapFlowModel {
 
     private(set) var loadPhase: LoadPhase = .loading
     private(set) var context: SwapContext?
+    /// L'actif que son émetteur a gelé entre la signature et l'envoi (relu après l'échec) : « Etherfuse froze your CETES ».
+    private(set) var frozenAtSend: SendAsset?
     private(set) var selectedDrawerID = "main"
     private(set) var given: SendAsset = .xlm
     private(set) var received: SendAsset = .usdc
@@ -663,6 +665,10 @@ final class SwapFlowModel {
         } catch {
             technicalDetails = SendFlowModel.details(error)
             failureReason = SendFailureReason(error)
+            // Gel entre la signature et l'envoi (décision de Barth du 2026-10-15) : on ne bloque pas l'envoi, mais l'échec
+            // est traduit, relu sur la chaîne.
+            let bonds = [draft.given, draft.received].filter { !$0.isSendable }
+            if !bonds.isEmpty { frozenAtSend = await service.frozenAsset(in: draft.drawer, among: bonds) }
             guard let failure = error as? PaymentFailure else {
                 stage = .finished(.undetermined)
                 return

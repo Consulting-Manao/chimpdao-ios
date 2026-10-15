@@ -236,6 +236,9 @@ protocol SwapService {
     /// Après le tap. Toute erreur est un `PaymentFailure` : l'issue se vérifie avec `check`.
     func submit(_ signed: SignedSwap, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SwapReceipt
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck
+    /// Après un échec de l'envoi : parmi ces actifs, celui que son émetteur a gelé dans ce tiroir (relu sur la chaîne),
+    /// pour dire « Etherfuse froze your CETES » (décision de Barth du 2026-10-15). `nil` : rien de gelé, ou illisible.
+    func frozenAsset(in drawer: SendDrawer, among assets: [SendAsset]) async -> SendAsset?
     /// Opération signée à l'issue incertaine gardée sur le téléphone (un envoi ou un swap : un seul emplacement, pour
     /// qu'aucune nouvelle signature ne parte tant qu'une issue est inconnue).
     var pendingSend: PendingSend? { get }

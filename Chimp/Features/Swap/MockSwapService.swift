@@ -22,6 +22,8 @@ final class MockSwapService: SwapService {
         case implausible
         /// Etherfuse a gelé les CETES du Main : aucun swap avec CETES dans Main.
         case cetesFrozen
+        /// Etherfuse gèle les CETES entre la signature et l'envoi : l'envoi échoue (avec un résultat « refusé »).
+        case cetesFrozenAtSend
 
         var id: String { rawValue }
     }
@@ -90,7 +92,7 @@ final class MockSwapService: SwapService {
         case .noRoute: throw SwapError.noRoute
         case .protocolUnavailable: throw SwapServiceError.protocolUnavailable(["Soroswap", "Aquarius"])
         case .implausible: throw SwapError.implausibleQuote
-        case .normal, .bigImpact, .priceMovesBeforeSigning, .aquariusBest, .soroswapDown, .cetesFrozen: break
+        case .normal, .bigImpact, .priceMovesBeforeSigning, .aquariusBest, .soroswapDown, .cetesFrozen, .cetesFrozenAtSend: break
         }
         let units = try SwapUnits.units(of: amount, asset: given)
         var out = units * Self.rate(given, received) / 1_000_000
@@ -150,6 +152,11 @@ final class MockSwapService: SwapService {
                 explorerURL: receipt.explorerURL, receivedAmount: draft.quote.expectedOut
             )
         }
+    }
+
+    func frozenAsset(in drawer: SendDrawer, among assets: [SendAsset]) async -> SendAsset? {
+        guard quoteScenario == .cetesFrozen || quoteScenario == .cetesFrozenAtSend, drawer.kind == .main else { return nil }
+        return assets.first { $0 == .cetes }
     }
 
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck {
