@@ -90,6 +90,9 @@ struct PriceOracleConfig: Equatable, Sendable {
     let cacheDuration: Duration
     /// Stablecoins comptés à exactement 1 $ (`STABLE_USD`, décision produit : USDC = 1 $).
     let stableUSD: Set<String>
+    /// Codes jamais demandés à Reflector : les stablebonds d'Etherfuse n'ont de prix que par l'API d'Etherfuse, pour
+    /// l'affichage (décision de Barth du 2026-10-14). Un autre « CETES » coté ailleurs ne serait pas le nôtre.
+    var neverPriced: Set<String> = ["CETES"]
 
     static let reflector = PriceOracleConfig(
         rpc: URL(string: "https://rpc.lightsail.network")!,

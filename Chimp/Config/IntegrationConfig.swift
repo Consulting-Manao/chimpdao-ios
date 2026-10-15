@@ -46,8 +46,10 @@ struct IntegrationConfig: Equatable, Sendable {
         /// Émetteur sandbox (`sand.etherfuse.com`). Clawback activé : l'émetteur peut reprendre ou geler les jetons.
         let issuer: String
         let stablebonds: [Stablebond]
-        /// API publique de prix, sans clé : **affichage uniquement**, jamais pour signer, avec la source, la date et la
-        /// mention « prix indicatif » sur testnet (décision du 2026-10-14). Ni le SDEX ni les pools.
+        /// API publique d'Etherfuse, sans clé (points d'accès `/lookup/…`, « Public. No API key required. » dans
+        /// `openapi-v2.json`, vérifié le 2026-10-15) : **affichage uniquement**, jamais pour signer, avec la source, la
+        /// date et la mention « prix indicatif » (décision du 2026-10-14). Ni le SDEX ni les pools. Testnet : la sandbox,
+        /// la seule qui connaît l'émetteur `GC3CW7…UPS4` (la production répond « Stablebond not found »).
         let priceAPI: URL
     }
 
@@ -75,7 +77,7 @@ struct IntegrationConfig: Equatable, Sendable {
         etherfuse: Etherfuse(
             issuer: "GC3CW7EDYRTWQ635VDIGY6S4ZUF5L6TQ7AA4MWS7LEQDBLUSZXV7UPS4",
             stablebonds: [Stablebond(code: "CETES", contract: "CC72F57YTPX76HAA64JQOEGHQAPSADQWSY5DWVBR66JINPFDLNCQYHIC")],
-            priceAPI: URL(string: "https://api.etherfuse.com/lookup/tokens/cost/")!
+            priceAPI: URL(string: "https://api.sand.etherfuse.com")!
         )
     )
 

@@ -27,7 +27,7 @@ struct IntegrationConfigTests {
         #expect(!integrations.defindexVaults.contains { $0.vault == "CBMVK2JK6NTOT2O4HNQAIQFJY232BHKGLIMXDVQVHIIZKDACXDFZDWHN" })
         #expect(integrations.defindexVaults[0].underlyingProtocols.contains("Blend"))
         #expect(integrations.etherfuse.stablebonds.map(\.code) == ["CETES"])
-        #expect(integrations.etherfuse.priceAPI.host == "api.etherfuse.com")
+        #expect(integrations.etherfuse.priceAPI.host == "api.sand.etherfuse.com")
     }
 
     @Test("Aucune intégration sur mainnet")

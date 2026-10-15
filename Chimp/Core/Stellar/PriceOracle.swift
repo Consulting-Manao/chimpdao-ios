@@ -30,7 +30,7 @@ final class ReflectorPriceOracle: PriceOracle {
     }
 
     func usdPrices(for codes: Set<String>) async -> [String: Decimal] {
-        let wanted = Set(codes.map { $0.uppercased() })
+        let wanted = Set(codes.map { $0.uppercased() }).subtracting(config.neverPriced)
         var have = cache.flatMap { now() - $0.at < config.cacheDuration ? $0.prices : nil } ?? [:]
         for code in wanted where config.stableUSD.contains(code) || code == "USD" { have[code] = 1 }
         if wanted.allSatisfy({ have[$0] != nil }) { return have.filter { wanted.contains($0.key) } }
