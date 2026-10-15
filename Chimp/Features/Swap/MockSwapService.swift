@@ -70,7 +70,13 @@ final class MockSwapService: SwapService {
 
     func fetchContext() async throws -> SwapContext {
         let context = try await send.fetchContext()
-        return SwapContext(network: context.network, drawers: context.drawers)
+        // Le Main de la maquette E3g/E3h détient aussi 1 820,40 CETES (Envoyer ne les voit pas : CETES ne s'envoie pas).
+        let drawers = context.drawers.map { drawer in
+            var drawer = drawer
+            if case .main = drawer.kind, !drawer.balances.isEmpty { drawer.balances[.cetes] = Decimal(string: "1820.4")! }
+            return drawer
+        }
+        return SwapContext(network: context.network, drawers: drawers)
     }
 
     func quote(given: SendAsset, received: SendAsset, amount: Decimal) async throws -> SwapQuoteSummary {
