@@ -10,6 +10,8 @@ struct ReceiveView: View {
     @Bindable var model: ReceiveViewModel
     /// Bouton retour affiché seulement si une action est fournie.
     var onBack: (() -> Void)?
+    /// « Add money from another chain » (D4, sans maquette) : affiché seulement si une action est fournie.
+    var onAddMoney: (() -> Void)?
 
     @Environment(\.chimpScreenInsets) private var screenInsets
 
@@ -108,6 +110,10 @@ struct ReceiveView: View {
 
             ChimpNavigationRow(title: "Take a payment in person", subtitle: "They tap their Chimp card on your phone") {
                 model.takePaymentInPerson()
+            }
+
+            if let onAddMoney {
+                ChimpNavigationRow(title: "Add money from another chain", subtitle: "See a live price from NEAR Intents", action: onAddMoney)
             }
         }
     }

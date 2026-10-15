@@ -67,11 +67,24 @@ struct IntegrationConfig: Equatable, Sendable {
         let sourceChains: [UInt32: String]
     }
 
+    /// NEAR Intents (D4, voie de repli du grant) : **devis à blanc seulement**, dans l'app (décision de Barth du 2026-10-15).
+    /// Pas de testnet (Stellar mainnet seulement) ; une adresse de carte (C…) est refusée.
+    struct NearIntents: Equatable, Sendable {
+        /// API 1Click, publique, sans clé.
+        let api: URL
+        /// Destinataire du devis : un compte G de ChimpDAO (le payeur de frais), puisque les adresses de carte sont refusées.
+        /// Aucun dépôt n'est jamais demandé : rien ne peut partir vers lui.
+        let quoteRecipient: String
+        /// Compte de remboursement exigé par un devis `INTENTS` (le contrat de NEAR Intents) ; jamais utilisé.
+        let refundAccount: String
+    }
+
     let soroswap: Soroswap
     let aquarius: Aquarius
     let defindexVaults: [DeFindexVault]
     let etherfuse: Etherfuse
     let cctp: CCTP
+    let nearIntents: NearIntents
 
     static let testnet = IntegrationConfig(
         soroswap: Soroswap(
@@ -100,6 +113,11 @@ struct IntegrationConfig: Equatable, Sendable {
             messageTransmitter: "CBJ6MTCKKZG73PMDZCJMSFRD7DQEMI4FKDH7CGDSV4W6FHCRBCQAVVJY",
             localDomain: 27,
             sourceChains: [0: "Ethereum", 1: "Avalanche", 5: "Solana", 6: "Base", 26: "Arc"]
+        ),
+        nearIntents: NearIntents(
+            api: URL(string: "https://1click.chaindefuser.com")!,
+            quoteRecipient: "GDZE7UWGO3PS6R6RI6F3XIJLX7WGIEFD3X4YQO4AJH4LS3KDY6LLFXG2",
+            refundAccount: "intents.near"
         )
     )
 
@@ -144,6 +162,8 @@ struct IntegrationConfig: Equatable, Sendable {
         address("cctp.tokenMessengerMinter", cctp.tokenMessengerMinter)
         address("cctp.messageTransmitter", cctp.messageTransmitter)
         if cctp.sourceChains[cctp.localDomain] != nil { problems.append("cctp.sourceChains names Stellar's own domain") }
+        if nearIntents.api.scheme != "https" { problems.append("nearIntents.api is not https") }
+        if (try? KeyPair(accountId: nearIntents.quoteRecipient)) == nil { problems.append("nearIntents.quoteRecipient is not a G-address") }
         return problems
     }
 }

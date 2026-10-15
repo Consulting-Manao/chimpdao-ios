@@ -14,6 +14,8 @@ struct WalletView: View {
     var onAddCard: () -> Void = {}
     /// Main ou une carte touchée : son détail (B2, B3).
     var onOpenDrawer: (DrawerSelection) -> Void = { _ in }
+    /// « Add money » (D4, sans maquette) : affiché seulement si une action est fournie.
+    var onAddMoney: (() -> Void)?
 
     /// De combien l'en-tête est tiré vers le bas (« tirer pour rafraîchir »).
     @State private var pull = WalletPull()
@@ -112,6 +114,11 @@ struct WalletView: View {
                     }
                     .disabled(!model.isEnabled(action))
                 }
+            }
+
+            if let onAddMoney {
+                ChimpNavigationRow(title: "Add money", subtitle: "From another chain", action: onAddMoney)
+                    .padding(.top, ChimpSpacing.m)
             }
 
             if content.isZeroBalance {

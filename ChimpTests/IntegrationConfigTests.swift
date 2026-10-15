@@ -50,7 +50,8 @@ struct IntegrationConfigTests {
             cctp: .init(
                 forwarder: "not-an-address", tokenMessengerMinter: base.cctp.tokenMessengerMinter,
                 messageTransmitter: base.cctp.tokenMessengerMinter, localDomain: 27, sourceChains: [27: "Stellar"]
-            )
+            ),
+            nearIntents: .init(api: URL(string: "http://1click.chaindefuser.com")!, quoteRecipient: "CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB", refundAccount: "intents.near")
         )
         let problems = broken.problems(passphrase: config.passphrase, knownAssetCodes: knownAssetCodes, reserved: reserved)
         #expect(problems.contains { $0.hasPrefix("soroswap.router is not a C-address") })
@@ -64,5 +65,7 @@ struct IntegrationConfigTests {
         #expect(problems.contains { $0.hasPrefix("cctp.forwarder is not a C-address") })
         #expect(problems.contains("cctp.messageTransmitter repeats an address used elsewhere"))
         #expect(problems.contains("cctp.sourceChains names Stellar's own domain"))
+        #expect(problems.contains("nearIntents.api is not https"))
+        #expect(problems.contains("nearIntents.quoteRecipient is not a G-address"))
     }
 }

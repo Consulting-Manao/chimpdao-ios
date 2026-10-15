@@ -53,14 +53,25 @@ struct MainTabView: View {
             NavigationStack(path: $walletPath) {
                 WalletView(
                     model: walletModel, onSettings: settingsAction, onAction: openWalletAction,
-                    onAddCard: { walletPath.append(.addCard) }, onOpenDrawer: { walletPath.append(.drawer($0)) }
+                    onAddCard: { walletPath.append(.addCard) }, onOpenDrawer: { walletPath.append(.drawer($0)) },
+                    onAddMoney: config.integrations == nil ? nil : { walletPath.append(.addMoney) }
                 )
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
                     .navigationDestination(for: WalletRoute.self) { route in
                         switch route {
                         case .receive(let drawerID):
-                            ReceiveDestination(session: session, initialDrawerID: drawerID)
+                            ReceiveDestination(session: session, initialDrawerID: drawerID) {
+                                walletPath.append(.addMoney)
+                            }
+                        case .addMoney:
+                            AddMoneyView(onBack: { if !walletPath.isEmpty { walletPath.removeLast() } }) {
+                                walletPath.append(.crossChainQuote)
+                            }
+                            .toolbar(.hidden, for: .navigationBar)
+                        case .crossChainQuote:
+                            // N1 : devis NEAR Intents seulement (aucun envoi), D4.
+                            CrossChainQuoteDestination(config: config) { if !walletPath.isEmpty { walletPath.removeLast() } }
                         case .send(let drawerID):
                             // Le vrai envoi (testnet) ; au retour, les soldes du Wallet sont relus. Un swap ou un dépôt en
                             // attente : son état d'abord (une seule opération à l'issue incertaine à la fois).
@@ -407,20 +418,53 @@ enum WalletRoute: Hashable {
     case vaultPosition(String)
     /// F10 : les CETES de ce tiroir (adresse).
     case savings(String)
+    /// « Add money » (D4).
+    case addMoney
+    /// N1 : devis NEAR Intents (« From another chain »).
+    case crossChainQuote
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
 private struct ReceiveDestination: View {
     @State private var model: ReceiveViewModel
+    let onAddMoney: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
-    init(session: AppSession, initialDrawerID: String? = nil) {
+    init(session: AppSession, initialDrawerID: String? = nil, onAddMoney: (() -> Void)? = nil) {
         _model = State(initialValue: ReceiveViewModel(dataSource: LocalReceiveDataSource(session: session), initialDrawerID: initialDrawerID))
+        self.onAddMoney = session.network == .testnet ? onAddMoney : nil
     }
 
     var body: some View {
-        ReceiveView(model: model, onBack: { dismiss() })
+        ReceiveView(model: model, onBack: { dismiss() }, onAddMoney: onAddMoney)
             .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// N1 : un ViewModel neuf à chaque ouverture, sur l'API 1Click (devis à blanc, sans clé).
+private struct CrossChainQuoteDestination: View {
+    @State private var model: CrossChainQuoteModel?
+    let onBack: () -> Void
+
+    init(config: ChimpNetworkConfig, onBack: @escaping () -> Void) {
+        _model = State(initialValue: config.integrations.map { integrations in
+            CrossChainQuoteModel(
+                client: OneClickClient(api: integrations.nearIntents.api, refundAccount: integrations.nearIntents.refundAccount),
+                recipient: integrations.nearIntents.quoteRecipient
+            )
+        })
+        self.onBack = onBack
+    }
+
+    var body: some View {
+        Group {
+            if let model {
+                CrossChainQuoteView(model: model, onBack: onBack)
+            } else {
+                Color(.chimpBackground).onAppear(perform: onBack)
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 

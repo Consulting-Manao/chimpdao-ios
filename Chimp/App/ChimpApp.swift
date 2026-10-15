@@ -23,6 +23,7 @@ struct ChimpApp: App {
             #if DESIGN_CATALOG
                 .modifier(SwapDemoLaunch())
                 .modifier(VaultDemoLaunch())
+                .modifier(CrossChainDemoLaunch())
             #endif
         }
     }
