@@ -91,6 +91,16 @@ final class EtherfusePriceClient: StablebondPricing {
         self.init(api: etherfuse.priceAPI, issuer: etherfuse.issuer)
     }
 
+    /// Un client par réseau pour toute l'app : son cache de 5 minutes sert au Wallet, à Grow et au swap.
+    static func shared(for config: ChimpNetworkConfig) -> EtherfusePriceClient? {
+        if let client = clients[config.network] { return client }
+        let client = EtherfusePriceClient(config: config)
+        clients[config.network] = client
+        return client
+    }
+
+    private static var clients: [StellarNetwork: EtherfusePriceClient] = [:]
+
     func price(of bond: IntegrationConfig.Stablebond) async -> StablebondPriceResult {
         if let cached = cache[bond.code], now().timeIntervalSince(cached.at) < Self.cacheDuration { return .price(cached.price) }
         do {

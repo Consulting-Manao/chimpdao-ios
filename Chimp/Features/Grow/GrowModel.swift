@@ -16,12 +16,27 @@ final class GrowModel {
     private(set) var context: VaultContext?
     private(set) var technicalDetails: String?
 
+    /// Économies (CETES, F9 et F10) : lues à part, une panne du vault ne les cache pas (et inversement).
+    private(set) var savingsPhase: Phase = .loading
+    private(set) var savings: SavingsContext?
+    private(set) var savingsDetails: String?
+
     let service: VaultService
+    let savingsService: SavingsService?
     private var loadTask: Task<Void, Never>?
 
-    init(service: VaultService) {
+    init(service: VaultService, savingsService: SavingsService? = nil) {
         self.service = service
+        self.savingsService = savingsService
     }
+
+    /// Les CETES d'un tiroir (adresse), s'il en détient (ou s'ils sont gelés).
+    func savingsHolding(drawerAddress: String) -> SavingsHolding? {
+        savings?.holding(drawerAddress: drawerAddress)
+    }
+
+    /// Le prix indicatif du moment, s'il est disponible.
+    var savingsPrice: StablebondPrice? { savings?.price.price }
 
     var vault: VaultInfo? { context?.vault }
     var holdings: [VaultHolding] { context?.holdings ?? [] }
@@ -58,19 +73,39 @@ final class GrowModel {
         if let loadTask { return await loadTask.value }
         let task = Task { [weak self] in
             guard let self else { return }
-            if context == nil { phase = .loading }
-            do {
-                context = try await service.fetchContext()
-                technicalDetails = nil
-                phase = .loaded
-            } catch is CancellationError {
-            } catch {
-                technicalDetails = SendFlowModel.details(error)
-                phase = .unavailable
-            }
+            async let vault: Void = loadVault()
+            async let bonds: Void = loadSavings()
+            _ = await (vault, bonds)
         }
         loadTask = task
         await task.value
         loadTask = nil
+    }
+
+    private func loadVault() async {
+        if context == nil { phase = .loading }
+        do {
+            context = try await service.fetchContext()
+            technicalDetails = nil
+            phase = .loaded
+        } catch is CancellationError {
+        } catch {
+            technicalDetails = SendFlowModel.details(error)
+            phase = .unavailable
+        }
+    }
+
+    private func loadSavings() async {
+        guard let savingsService else { return }
+        if savings == nil { savingsPhase = .loading }
+        do {
+            savings = try await savingsService.fetchSavings()
+            savingsDetails = nil
+            savingsPhase = .loaded
+        } catch is CancellationError {
+        } catch {
+            savingsDetails = SendFlowModel.details(error)
+            savingsPhase = .unavailable
+        }
     }
 }

@@ -17,6 +17,9 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
         /// Retrait d'un vault : `from` est le vault, `to` le tiroir, `assetCode`/`amount` ce qui est revenu, `shares` les
         /// parts rendues (si connues).
         case vaultWithdraw
+        /// `clawback` d'un SAC (stablebond, tranche 2, D3) : l'émetteur a repris des jetons. `from` est le tiroir, `to`
+        /// est vide, `assetCode`/`amount` ce qui a été repris.
+        case clawback
     }
 
     /// Lue sur la chaîne : `stellar:<hash>:<id de l'événement>` (comme le terminal). Écrite par ce téléphone :
@@ -53,6 +56,10 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
     /// la chaîne des protocoles (« DeFindex → Blend »). Optionnels : les fichiers écrits avant restent lisibles.
     var shares: Decimal? = nil
     var vaultName: String? = nil
+    /// Swap vers un stablebond (CETES) fait sur ce téléphone : prix indicatif d'Etherfuse d'un jeton reçu, en dollars,
+    /// au moment du swap (décision de Barth du 2026-10-15 : base de « Price +0.62% since you got them »). Jamais signé,
+    /// jamais tiré d'un pool ; `nil` si le prix n'était pas disponible. Optionnel : les fichiers écrits avant restent lisibles.
+    var receivedPriceUSD: Decimal? = nil
 
     /// Ce que la ligne représente pour ce compte. `classifyTransfer` du terminal (`lib/chain-history.ts`), sans les
     /// protocoles DeFi (hors V1), plus **Move** : les deux côtés sont des tiroirs du compte (DESIGN_NOTES §13).
@@ -67,6 +74,8 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
             return drawers.contains(from) ? .deposited : nil
         case .vaultWithdraw:
             return drawers.contains(to) ? .withdrawn : nil
+        case .clawback:
+            return drawers.contains(from) ? .takenBack : nil
         case .transfer:
             let sent = drawers.contains(from)
             let received = drawers.contains(to)
@@ -94,12 +103,12 @@ extension ActivityRecord {
     /// minimum signé et le protocole.
     static func swap(
         hash: String, drawer: String, venue: String, givenCode: String, given: Decimal, receivedCode: String, received: Decimal?,
-        minimum: Decimal?, protocolName: String?, at: Date = .now
+        minimum: Decimal?, protocolName: String?, at: Date = .now, receivedPriceUSD: Decimal? = nil
     ) -> ActivityRecord {
         ActivityRecord(
             id: "stellar:\(hash)", event: .swap, hash: hash, from: drawer, to: venue, assetCode: givenCode, amount: given,
             at: at, isLocal: true, receivedAssetCode: receivedCode, receivedAmount: received, minimumReceived: minimum,
-            protocolName: protocolName
+            protocolName: protocolName, receivedPriceUSD: receivedPriceUSD
         )
     }
 
@@ -211,6 +220,8 @@ enum ActivityKind: Equatable, Sendable {
     /// Mis dans un vault (Grow), retiré d'un vault.
     case deposited
     case withdrawn
+    /// L'émetteur d'un stablebond a repris des jetons (clawback).
+    case takenBack
 }
 
 /// Ce que le téléphone garde de l'historique d'un compte.

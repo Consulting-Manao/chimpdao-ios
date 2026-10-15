@@ -16,16 +16,20 @@ final class ChainSwapService: SwapService {
     private let registry: IntegrationRegistry
     private let signer: ChipSigner
     private let feeSigner: FeeSigner
+    /// Prix indicatif des stablebonds (Etherfuse), noté dans la ligne d'un swap qui en rapporte : jamais pour signer.
+    private let pricing: StablebondPricing?
 
     init(
         session: AppSession,
         config: ChimpNetworkConfig = .testnet,
         drawers: ChainSendService? = nil,
         signer: ChipSigner = NFCChipSigner(),
-        feeSigner: FeeSigner? = nil
+        feeSigner: FeeSigner? = nil,
+        pricing: StablebondPricing? = nil
     ) {
         self.session = session
         self.config = config
+        self.pricing = pricing ?? EtherfusePriceClient.shared(for: config)
         self.drawers = drawers ?? ChainSendService(session: session, config: config, signer: signer)
         client = SorobanClient(config: config)
         integrations = IntegrationCallClient(client: client, config: config)
@@ -246,9 +250,12 @@ final class ChainSwapService: SwapService {
             summary: SwapSummary(prepared.draft), transactionHash: hash, sentAt: .now,
             explorerURL: explorerURL(transactionHash: hash), receivedAmount: await receivedAmount(hash, protocolID: prepared.draft.quote.protocolID)
         )
-        // La ligne d'historique du swap (I1s) : celle du reçu de E5, avec le minimum signé et le protocole.
+        // La ligne d'historique du swap (I1s) : celle du reçu de E5, avec le minimum signé et le protocole ; vers un
+        // stablebond, le prix d'Etherfuse du moment (base de l'évolution, F9 et F10).
         if let account = session.wallet.account?.address {
-            session.recordActivity(receipt.activityRecord(venue: prepared.firstHopVenue), account: account)
+            var record = receipt.activityRecord(venue: prepared.firstHopVenue)
+            record.receivedPriceUSD = await priceNow(of: prepared.draft.received)
+            session.recordActivity(record, account: account)
         }
         return receipt
     }
@@ -271,10 +278,22 @@ final class ChainSwapService: SwapService {
                 hash: hash, drawer: trace.from, venue: trace.destination, givenCode: SendAsset(rawValue: pending.asset)?.code ?? pending.asset,
                 given: pending.amount, receivedCode: SendAsset(rawValue: swap.receivedAsset)?.code ?? swap.receivedAsset,
                 received: await receivedAmount(hash, protocolID: registry.swapAdapters.first { $0.name == swap.protocolName }?.id),
-                minimum: swap.minimumReceived, protocolName: swap.protocolName, at: pending.signedAt
+                minimum: swap.minimumReceived, protocolName: swap.protocolName, at: pending.signedAt,
+                // Le prix « du moment du swap » n'est plus connu si la vérification arrive trop tard.
+                receivedPriceUSD: Date().timeIntervalSince(pending.signedAt) < Self.priceWindow
+                    ? await priceNow(of: SendAsset(rawValue: swap.receivedAsset)) : nil
             ), account: account)
         }
         return result
+    }
+
+    /// Au-delà, le prix lu ne serait plus celui du moment du swap : 15 minutes (l'âge maximal d'une source d'Etherfuse).
+    static let priceWindow: TimeInterval = TimeInterval(EtherfusePriceClient.maxSourceAge)
+
+    /// Prix indicatif d'un jeton reçu, si c'est un stablebond de `Config/` et qu'Etherfuse répond.
+    private func priceNow(of asset: SendAsset?) async -> Decimal? {
+        guard let asset, let bond = config.integrations?.etherfuse.stablebonds.first(where: { $0.code == asset.code }) else { return nil }
+        return await pricing?.price(of: bond).price?.usd
     }
 
     var pendingSend: PendingSend? { session.wallet.pendingSend }

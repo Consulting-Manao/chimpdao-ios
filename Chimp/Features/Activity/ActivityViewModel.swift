@@ -14,6 +14,8 @@ enum ActivityStamp: Equatable, Sendable {
     /// Maquette I1g : « DEPOSITED », « WITHDRAWN ».
     case deposited
     case withdrawn
+    /// Décision de Barth du 2026-10-15 : « TAKEN BACK » (clawback d'un stablebond par son émetteur).
+    case takenBack
 }
 
 /// Montant coloré (reçu) ou neutre.
@@ -341,6 +343,14 @@ final class ActivityViewModel {
                 meta: "\(time) · " + String(localized: "vault") + " → \(drawer(record.to)?.name ?? "")", stamp: .withdrawn,
                 amount: record.amount.map { quantityText($0, code: code, sign: .positive) }, tone: .positive, record: record
             )
+        case .takenBack:
+            // Décision de Barth du 2026-10-15 : « Etherfuse took back {X} CETES », tampon « TAKEN BACK », comme une ligne
+            // d'envoi (quantité, jamais de dollars).
+            return ActivityRow(
+                id: record.id, title: Self.takenBackTitle(record),
+                meta: "\(time) · " + String(localized: "from \(drawer(record.from)?.name ?? "")"), stamp: .takenBack,
+                amount: record.amount.map { quantityText($0, code: code, sign: .negative) }, tone: .neutral, record: record
+            )
         case .cardAdded:
             let name = record.cardKey.flatMap(cardName) ?? String(localized: "A new card")
             let approver = record.approvedBy.flatMap(cardName)
@@ -380,6 +390,7 @@ final class ActivityViewModel {
                 signed = -amount
             case .deposited: signed = -amount
             case .withdrawn: signed = amount
+            case .takenBack: signed = -amount
             case .cardAdded: break
             }
             sums[code, default: 0] += signed
@@ -515,6 +526,13 @@ final class ActivityViewModel {
             if let protocols = record.protocolName {
                 lines.append(.init(id: "protocols", label: "Protocols", value: .text(protocols)))
             }
+        case .takenBack:
+            // Qui a repris, d'où, combien (reçu non dessiné : construit comme celui d'un envoi).
+            lines.append(.init(id: "by", label: "Taken back by", value: .text(Self.issuer(of: record))))
+            lines.append(.init(id: "from", label: "From", value: place(record.from)))
+            if let amount = record.amount, let code = record.assetCode {
+                lines.append(.init(id: "amount", label: "Amount", value: .text(Self.exactAmount(amount, code: code, locale: locale))))
+            }
         case .cardAdded:
             lines.append(.init(id: "card", label: "Card", value: card(record.cardKey)))
             lines.append(.init(id: "added", label: "Added to", value: .drawer(String(localized: "Main account"), swatch: .main)))
@@ -558,6 +576,7 @@ final class ActivityViewModel {
         )
         case .deposited: .deposited(vault: record.vaultName ?? "DeFindex", from: title(record.from))
         case .withdrawn: .withdrawn(vault: record.vaultName ?? "DeFindex", into: title(record.to))
+        case .takenBack: .takenBack(by: Self.issuer(of: record), from: title(record.from))
         case .cardAdded: .cardAdded(
             card: record.cardKey.flatMap { source.cardName(key: $0) } ?? String(localized: "A new card"),
             approvedBy: record.approvedBy.flatMap { source.cardName(key: $0) }
@@ -619,8 +638,20 @@ final class ActivityViewModel {
         switch kind {
         case .sent: ActivityReceipt.Counterparty(lineID: "to", address: record.to)
         case .received: ActivityReceipt.Counterparty(lineID: "from", address: record.from)
-        case .moved, .cardAdded, .swapped, .deposited, .withdrawn: nil
+        case .moved, .cardAdded, .swapped, .deposited, .withdrawn, .takenBack: nil
         }
+    }
+
+    /// Qui a repris les jetons : l'émetteur connu de l'actif (« Etherfuse »), sinon « The issuer ».
+    static func issuer(of record: ActivityRecord) -> String {
+        record.assetCode.flatMap(SendAsset.init(code:))?.issuerName ?? String(localized: "The issuer")
+    }
+
+    /// « Etherfuse took back 131.34 CETES ».
+    static func takenBackTitle(_ record: ActivityRecord, locale: Locale = .autoupdatingCurrent) -> String {
+        let code = record.assetCode ?? ""
+        let quantity = record.amount.map { "\(SendAsset.displayed($0, code: code, locale: locale)) \(code)" } ?? code
+        return String(localized: "\(issuer(of: record)) took back \(quantity)")
     }
 
     /// « Pay again » (envoi) ou « Send back » (paiement reçu) : adresse, actif et montant préremplis (décision de Barth du
@@ -634,7 +665,7 @@ final class ActivityViewModel {
         case .received:
             guard asset != nil else { return nil }
             return SendPrefill(address: record.from, asset: asset, amount: record.amount, origin: .sendBack)
-        case .moved, .cardAdded, .swapped, .deposited, .withdrawn:
+        case .moved, .cardAdded, .swapped, .deposited, .withdrawn, .takenBack:
             return nil
         }
     }

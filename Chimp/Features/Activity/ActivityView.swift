@@ -264,6 +264,7 @@ extension ActivityStamp {
         case .swapped: "Swapped"
         case .deposited: "Deposited"
         case .withdrawn: "Withdrawn"
+        case .takenBack: "Taken back"
         }
     }
 
@@ -278,6 +279,7 @@ extension ActivityStamp {
         // Maquette I1g : DEPOSITED en vert, WITHDRAWN en brun.
         case .deposited: Color(.chimpStampReceived)
         case .withdrawn: Color(.chimpTicketMuted)
+        case .takenBack: Color(.chimpStampPaid)
         }
     }
 }

@@ -103,6 +103,11 @@ struct ActivityHistoryTests {
         ])
         #expect(two[0][0].contractIds == nil)
         #expect(two[0][1].topics!.map(\.segmentMatchers) == [[Self.cardAddedTopic]])
+        // Sans liste blanche (appel direct), pas de filtre clawback ; avec, un seul, limité à ses contrats.
+        let withClawback = try ChainActivityHistory.filterGroups(drawers: [Self.account, Self.pocket], clawbackContracts: [Self.usdcSAC, Self.xlmSAC])
+        #expect(withClawback[0].count == 3)
+        #expect(withClawback[0][2].contractIds == [Self.usdcSAC, Self.xlmSAC])
+        #expect(withClawback[0][2].topics!.map(\.segmentMatchers) == [[ChainActivityHistory.clawbackTopic, "*", "*"]])
 
         // Main + 9 cartes : 20 motifs = 4 filtres, + card_added = 5 filtres, une requête. Une carte de plus : deux requêtes.
         let ten = try ChainActivityHistory.filterGroups(drawers: [Self.account] + Array(repeating: Self.pocket, count: 9))

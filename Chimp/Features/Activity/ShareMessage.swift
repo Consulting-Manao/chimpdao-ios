@@ -21,6 +21,8 @@ enum ShareMessage {
         case deposited(vault: String, from: String)
         /// Retrait d'un vault, vers un tiroir.
         case withdrawn(vault: String, into: String)
+        /// Clawback : l'émetteur (« Etherfuse ») a repris des jetons d'un tiroir.
+        case takenBack(by: String, from: String)
     }
 
     static let sentPunchlines: [LocalizedStringResource] = [
@@ -82,6 +84,13 @@ enum ShareMessage {
                 String(localized: "🧺 Took \(amount) out of the \(vault) vault with ChimpDAO."),
                 String(localized: "Back home, ready to use."),
                 String(localized: "Into my \(drawer) · \(networkName) · \(date)"),
+            ]
+            if let proof { lines.append(proof) }
+        case let .takenBack(issuer, drawer):
+            // Rien de festif : ce qui s'est passé, avec la preuve.
+            lines = [
+                String(localized: "\(issuer) took back \(amount) from my \(drawer)."),
+                "\(networkName) · \(date)",
             ]
             if let proof { lines.append(proof) }
         case let .cardAdded(card, approvedBy):

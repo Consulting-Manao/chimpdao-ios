@@ -56,7 +56,7 @@ struct ChainActivityHistory {
         onProgress: (AccountActivity) throws -> Void
     ) async throws -> AccountActivity {
         let addresses = Array(Set(drawers + [account])).sorted()
-        let groups = try Self.filterGroups(drawers: addresses)
+        let groups = try Self.filterGroups(drawers: addresses, clawbackContracts: assets.keys.sorted())
         let latest = try await source.latestLedger()
         // `latest - LOOKBACK_LEDGERS` : ici `lookbackLedgers` ledgers exactement (12 tranches), jamais avant le ledger 2.
         var floor = latest > Self.lookbackLedgers + 1 ? latest - Self.lookbackLedgers + 1 : 2
@@ -137,12 +137,13 @@ struct ChainActivityHistory {
 
     /// `symTopic("transfer")`, `symTopic("card_added")`.
     static let transferTopic = symbolTopic("transfer")
+    static let clawbackTopic = symbolTopic("clawback")
     static let cardAddedTopic = symbolTopic("card_added")
 
     /// Filtres de la requête : pour chaque tiroir, un motif « expéditeur » et un motif « destinataire »
     /// (`[transfer, adresse, *, *]`, `[transfer, *, adresse, *]`), 5 motifs au plus par filtre ; plus un filtre `card_added`.
     /// Le RPC accepte 5 filtres au plus par requête : au-delà (plus de 9 cartes), plusieurs requêtes par tranche.
-    static func filterGroups(drawers: [String]) throws -> [[EventFilter]] {
+    static func filterGroups(drawers: [String], clawbackContracts: [String] = []) throws -> [[EventFilter]] {
         var matchers: [[String]] = []
         for address in drawers {
             let topic = try addressTopic(address)
@@ -153,6 +154,14 @@ struct ChainActivityHistory {
             EventFilter(type: "contract", topics: matchers[index..<min(index + 5, matchers.count)].map { TopicFilter(segmentMatchers: $0) })
         }
         filters.append(EventFilter(type: "contract", topics: [TopicFilter(segmentMatchers: [cardAddedTopic])]))
+        // `clawback` d'un SAC depuis le protocole 23 (CAP-67) : `[clawback, détenteur, actif]`, montant `i128`. Un seul
+        // filtre, limité aux contrats de la liste blanche (5 au plus) ; le détenteur est trié à la lecture.
+        if !clawbackContracts.isEmpty {
+            filters.append(EventFilter(
+                type: "contract", contractIds: Array(clawbackContracts.prefix(5)),
+                topics: [TopicFilter(segmentMatchers: [clawbackTopic, "*", "*"])]
+            ))
+        }
         return stride(from: 0, to: filters.count, by: 5).map { Array(filters[$0..<min($0 + 5, filters.count)]) }
     }
 
@@ -197,6 +206,14 @@ struct ChainActivityHistory {
                       case .i128(let parts)? = decode(event.value) else { return nil }
                 return ActivityRecord(
                     id: id, event: .transfer, hash: event.transactionHash, from: from, to: to, assetCode: code,
+                    amount: SACClient.amount(fromUnits: SACClient.decimal(parts)), at: at, isLocal: false, ledger: event.ledger
+                )
+            case ("clawback", 3):
+                // Seulement un actif de la liste blanche (par l'adresse de son contrat), repris dans l'un des tiroirs.
+                guard let code = assets[event.contractID], let from = strkey(topics[1]), drawers.contains(from),
+                      case .i128(let parts)? = decode(event.value) else { return nil }
+                return ActivityRecord(
+                    id: id, event: .clawback, hash: event.transactionHash, from: from, to: "", assetCode: code,
                     amount: SACClient.amount(fromUnits: SACClient.decimal(parts)), at: at, isLocal: false, ledger: event.ledger
                 )
             case ("card_added", 1):
