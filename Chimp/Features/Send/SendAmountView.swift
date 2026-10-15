@@ -360,7 +360,7 @@ struct SendAmountView: View {
     // MARK: Feuille de l'actif
 
     private var assetSheetHeight: CGFloat {
-        CGFloat(170 + 76 * SendAsset.allCases.count)
+        CGFloat(170 + 76 * SendAsset.sendable.count)
     }
 
     private var assetSheet: some View {
@@ -371,7 +371,7 @@ struct SendAmountView: View {
                 .accessibilityAddTraits(.isHeader)
 
             VStack(spacing: ChimpSpacing.listGap) {
-                ForEach(SendAsset.allCases) { asset in
+                ForEach(SendAsset.sendable) { asset in
                     ChimpOptionRow(
                         title: asset.code,
                         subtitle: assetSubtitle(asset),

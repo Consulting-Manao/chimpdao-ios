@@ -32,6 +32,7 @@ struct SoroswapAdapterTests {
     private func testnetReader() throws -> ScriptedReader {
         let reader = ScriptedReader()
         reader.replies = [
+            "pair_exists": .success(.bool(true)),
             "router_get_amounts_out": .success(amounts([100_000_000, 10_619_368])),
             "router_pair_for": .success(try ContractArgument.address(pair)),
             "token_0": .success(try ContractArgument.address(usdc.contract)),

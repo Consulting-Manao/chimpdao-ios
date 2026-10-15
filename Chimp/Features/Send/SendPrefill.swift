@@ -25,7 +25,8 @@ struct SendPrefill: Hashable {
 }
 
 extension SendAsset {
-    /// L'actif d'un code (« USDC », « XLM ») ; `nil` pour un actif qu'on ne sait pas envoyer.
+    /// L'actif de l'app de ce code (« USDC », « XLM », « CETES »), pour un code **déjà lu par l'app** (relevé par l'adresse
+    /// exacte de son contrat) ; `nil` sinon. Pour un envoi, vérifier aussi `isSendable`.
     init?(code: String) {
         guard let asset = SendAsset.allCases.first(where: { $0.code == code }) else { return nil }
         self = asset

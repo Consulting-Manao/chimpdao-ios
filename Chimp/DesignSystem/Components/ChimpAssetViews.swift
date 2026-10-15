@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// Icône d'un actif (DESIGN_NOTES §2.4) : USDC = carré vert avec « $ », XLM = logo Chimp (`tile-logo`).
+/// Icône d'un actif (DESIGN_NOTES §2.4) : USDC = carré vert avec « $ », XLM = logo Chimp (`tile-logo`), CETES = carré
+/// pêche avec « C » (maquette E3p du 2026-10-15).
 enum ChimpAssetGlyph: Equatable {
     case usdc
     case xlm
+    case cetes
 }
 
 /// Dessin de l'icône d'un actif dans un carré de la taille demandée, contour compris.
@@ -30,6 +32,17 @@ struct ChimpAssetIcon: View {
                 Image(.tileLogo)
                     .resizable()
                     .scaledToFit()
+            case .cetes:
+                let shape = RoundedRectangle(cornerRadius: size / 3)
+                shape
+                    .fill(Color(.chimpAssetCetes))
+                    .overlay { shape.strokeBorder(Color(.chimpOutline), lineWidth: border) }
+                    .overlay {
+                        Text(verbatim: "C")
+                            .font(Font(ChimpFontFamily.luckiestGuy.uiFont(size: size * 0.47)))
+                            .foregroundStyle(Color(.chimpTicketInk))
+                            .offset(y: size * 0.04)
+                    }
             }
         }
         .frame(width: size, height: size)

@@ -626,7 +626,8 @@ final class ActivityViewModel {
     /// « Pay again » (envoi) ou « Send back » (paiement reçu) : adresse, actif et montant préremplis (décision de Barth du
     /// 2026-10-01). Seulement pour un actif qu'on sait envoyer (XLM, USDC).
     static func prefill(for record: ActivityRecord, kind: ActivityKind) -> SendPrefill? {
-        let asset = record.assetCode.flatMap(SendAsset.init(code:))
+        // CETES ne s'envoie pas (on le rend par un swap) : ni « Pay again » ni « Send back » pour lui.
+        let asset = record.assetCode.flatMap(SendAsset.init(code:)).flatMap { $0.isSendable ? $0 : nil }
         switch kind {
         case .sent:
             return SendPrefill(address: record.to, asset: asset, amount: asset == nil ? nil : record.amount, origin: .payAgain)

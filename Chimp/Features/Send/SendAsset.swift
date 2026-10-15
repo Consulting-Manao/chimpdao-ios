@@ -1,12 +1,26 @@
 import Foundation
+import SwiftUI
 
-/// Actif qu'on peut envoyer. Au jalon 5, la liste viendra de `Config/` (SAC de chaque réseau).
+/// Actif de l'app. Leurs contrats (SAC) viennent de `Config/` (`SACClient.stellarAssets`), **par adresse exacte** :
+/// un code n'identifie jamais un actif (il existe d'autres « CETES » sur testnet).
 ///
-/// Décimales saisissables au pavé reprises du terminal (`chain/assets.ts`) : USDC 2, XLM 7.
-/// On-chain, les deux actifs ont 7 décimales (conversion en unités au jalon 5, avec tests).
+/// Décimales saisissables au pavé reprises du terminal (`chain/assets.ts`) : USDC 2, XLM 7. CETES : 7, pour que « Max »
+/// rende tout le solde (aucune poussière laissée au retour d'un swap). On-chain, tous ont 7 décimales.
+///
+/// CETES (Etherfuse, tranche 2, D3) ne s'obtient et ne se rend que par un swap : ni Envoyer, ni Move, ni Recevoir
+/// (`sendable`).
 enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     case usdc
     case xlm
+    case cetes
+
+    /// Ce qu'Envoyer, Move et les préremplissages d'un envoi proposent.
+    static let sendable: [SendAsset] = [.usdc, .xlm]
+
+    var isSendable: Bool { Self.sendable.contains(self) }
+
+    /// Ce que propose le swap (maquette E3p), dans cet ordre.
+    static let swappable: [SendAsset] = [.xlm, .usdc, .cetes]
 
     var id: String { rawValue }
 
@@ -15,6 +29,16 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .usdc: "USDC"
         case .xlm: "XLM"
+        case .cetes: "CETES"
+        }
+    }
+
+    /// Ce que c'est, en une ligne (feuille des actifs du swap, maquette E3p).
+    var summary: LocalizedStringKey {
+        switch self {
+        case .usdc: "Digital dollar, by Circle"
+        case .xlm: "Stellar Lumens"
+        case .cetes: "Mexican government bonds, by Etherfuse"
         }
     }
 
@@ -22,6 +46,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .usdc: .usdc
         case .xlm: .xlm
+        case .cetes: .cetes
         }
     }
 
@@ -29,7 +54,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     var maxFractionDigits: Int {
         switch self {
         case .usdc: 2
-        case .xlm: 7
+        case .xlm, .cetes: 7
         }
     }
 
@@ -42,6 +67,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .usdc: [10, 25, 50]
         case .xlm: [50, 100, 250]
+        case .cetes: [100, 500, 1000]
         }
     }
 
@@ -54,7 +80,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
             let cents = amount.truncated(to: 2)
             fractionLength = cents.isWhole ? 0...0 : 2...2
             return cents.formatted(.number.locale(locale).precision(.fractionLength(fractionLength)))
-        case .xlm:
+        case .xlm, .cetes:
             fractionLength = 0...maxFractionDigits
             return amount.truncated(to: maxFractionDigits)
                 .formatted(.number.locale(locale).precision(.fractionLength(fractionLength)))

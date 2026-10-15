@@ -16,12 +16,8 @@ struct SwapAmountView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Feuille du choix d'un actif : le côté « You give » ou « You get ».
-    @State private var assetSheetSide: AssetSide?
+    @State private var assetSheetSide: SwapFlowModel.Side?
 
-    private enum AssetSide: Identifiable {
-        case given, received
-        var id: Self { self }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,7 +37,7 @@ struct SwapAmountView: View {
         }
         .chimpSheet(
             isPresented: Binding(get: { assetSheetSide != nil }, set: { if !$0 { assetSheetSide = nil } }),
-            height: CGFloat(170 + 76 * SendAsset.allCases.count)
+            height: CGFloat(170 + 76 * SendAsset.swappable.count)
         ) {
             assetSheet
         }
@@ -493,14 +489,14 @@ struct SwapAmountView: View {
                 .foregroundStyle(.chimpTextPrimary)
                 .accessibilityAddTraits(.isHeader)
             VStack(spacing: ChimpSpacing.listGap) {
-                ForEach(SendAsset.allCases) { asset in
+                ForEach(SendAsset.swappable) { asset in
                     let current = assetSheetSide == .received ? model.received : model.given
                     ChimpOptionRow(
                         title: asset.code,
                         subtitle: model.selectedDrawer.map { "\(asset.displayedWithCode($0.balance(of: asset), locale: locale)) in \(shortTitle($0))" },
                         isSelected: asset == current
                     ) {
-                        if asset != current { model.flipAssets() }
+                        if let side = assetSheetSide { model.choose(asset, for: side) }
                         assetSheetSide = nil
                     } icon: {
                         ChimpAssetIcon(glyph: asset.glyph, size: 38)

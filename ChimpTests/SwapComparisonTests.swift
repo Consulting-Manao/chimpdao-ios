@@ -29,8 +29,10 @@ struct SwapComparisonTests {
         func readValue(contract: String, function: String, arguments: [SCValXDR]) async throws -> SCValXDR {
             let i128 = { (values: [Int128]) in SCValXDR.vec(values.map { ContractArgument.i128($0) }) }
             switch (contract, function) {
-            case (config.soroswap.router, _) where soroswapDown, (config.aquarius.router, _) where aquariusDown:
+            case (config.soroswap.router, _) where soroswapDown, (config.soroswap.factory, _) where soroswapDown,
+                 (config.aquarius.router, _) where aquariusDown:
                 throw StellarError.rpc("timeout")
+            case (config.soroswap.factory, "pair_exists"): return .bool(true)
             case (config.soroswap.router, "router_get_amounts_out"): return i128([100_000_000, 10_619_368])
             case (config.soroswap.router, "router_pair_for"): return try ContractArgument.address(pair)
             case (pair, "token_0"): return try ContractArgument.address("CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA")

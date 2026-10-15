@@ -42,8 +42,19 @@ final class MockSwapService: SwapService {
     var nextSignError: Error?
     var pendingSend: PendingSend?
 
-    /// Prix fixes, en millionièmes : 1 XLM → 0,2492 USDC ; 1 USDC → 4,0128 XLM.
-    static let rates: [SendAsset: Int128] = [.xlm: 249_200, .usdc: 4_012_800]
+    /// Prix fixes par couple (donné, reçu), en millionièmes : 1 XLM → 0,2492 USDC ; 1 USDC → 4,0128 XLM ; et CETES comme
+    /// la maquette E3g/E3h (1 USDC ≈ 18,28 CETES, 1 CETES ≈ 0,0546 USDC).
+    static func rate(_ given: SendAsset, _ received: SendAsset) -> Int128 {
+        switch (given, received) {
+        case (.xlm, .usdc): 249_200
+        case (.usdc, .xlm): 4_012_800
+        case (.usdc, .cetes): 18_280_000
+        case (.cetes, .usdc): 54_600
+        case (.xlm, .cetes): 4_555_376
+        case (.cetes, .xlm): 219_100
+        default: 0
+        }
+    }
 
     init(
         quoteScenario: QuoteScenario = .normal,
@@ -72,7 +83,7 @@ final class MockSwapService: SwapService {
         case .normal, .bigImpact, .priceMovesBeforeSigning, .aquariusBest, .soroswapDown: break
         }
         let units = try SwapUnits.units(of: amount, asset: given)
-        var out = units * (Self.rates[given] ?? 0) / 1_000_000
+        var out = units * Self.rate(given, received) / 1_000_000
         if priceHasMoved { out = out * 994 / 1000 }
         let fromAquarius = quoteScenario == .aquariusBest || quoteScenario == .soroswapDown
         return SwapQuoteSummary(

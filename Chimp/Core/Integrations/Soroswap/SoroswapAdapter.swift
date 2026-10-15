@@ -7,7 +7,9 @@ import stellarsdk
 /// - Devis : `router.router_get_amounts_out(montant, chemin)`, l'arithmétique du router lui-même (jamais recalculée ici).
 /// - Paire : `router.router_pair_for(a, b)`, vérifiée (`token_0` est l'un des deux actifs) et gardée en mémoire, comme
 ///   `pairAddrMemo` ; ses réserves donnent l'impact de prix.
-/// - Route : directe (une paire). Les deux actifs de la phase 2 (XLM, USDC de Circle) ont une paire sur testnet.
+/// - Route : directe (une paire). XLM/USDC et USDC/CETES ont une paire sur testnet ; XLM/CETES n'en a pas (Aquarius
+///   passe par l'USDC). La paire est demandée d'abord à la factory (`pair_exists`, comme `pairExists` du terminal) :
+///   sans elle, le router renverrait une erreur de stockage, qui ressemblerait à une panne.
 /// - Appel : `swap_exact_tokens_for_tokens(montant, minimum, chemin, to = autorisateur, échéance = maintenant + 300 s)`,
 ///   forme `SoroswapAuthShape` (la prise va à la paire).
 final class SoroswapAdapter: SwapAdapter {
@@ -30,6 +32,8 @@ final class SoroswapAdapter: SwapAdapter {
         let tokenIn = request.assetIn.contract, tokenOut = request.assetOut.contract
         guard request.amountIn > 0, tokenIn != tokenOut else { return nil }
         let path = [tokenIn, tokenOut]
+        // `pairExists` du terminal : pas de paire, pas de route chez Soroswap (jamais une panne).
+        guard try await pairExists(tokenIn, tokenOut) else { return nil }
         let amounts: [Int128]
         do {
             amounts = try Self.amounts(try await reader.readValue(
@@ -59,6 +63,21 @@ final class SoroswapAdapter: SwapAdapter {
             firstHopVenue: pair.pair
         )
     }
+
+    /// `factory.pair_exists(a, b)` (`pairExists` du terminal). Une paire qui existe existe pour toujours : gardée en mémoire.
+    func pairExists(_ tokenA: String, _ tokenB: String) async throws -> Bool {
+        let key = [tokenA, tokenB].sorted().joined(separator: "|")
+        if existing.contains(key) { return true }
+        let value = try await reader.readValue(
+            contract: contracts.factory, function: "pair_exists",
+            arguments: [try ContractArgument.address(tokenA), try ContractArgument.address(tokenB)]
+        )
+        guard case .bool(let exists) = value else { throw ContractArgument.ArgumentError.malformed("pair_exists returned \(value)") }
+        if exists { existing.insert(key) }
+        return exists
+    }
+
+    private var existing: Set<String> = []
 
     /// La paire des deux actifs, lue au router puis vérifiée : son `token_0` doit être l'un d'eux.
     func verifiedPair(_ tokenA: String, _ tokenB: String) async throws -> (pair: String, token0: String) {

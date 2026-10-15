@@ -19,14 +19,18 @@ struct SACClient {
         return try Data(SHA256.hash(data: Data(try XDREncoder.encode(preimage)))).encodeContractId()
     }
 
-    /// Actifs Stellar de l'app, XLM puis USDC (`assetsOf(network, "stellar")` du terminal), avec l'adresse de leur SAC.
+    /// Actifs Stellar de l'app, XLM puis USDC (`assetsOf(network, "stellar")` du terminal), avec l'adresse de leur SAC ;
+    /// puis les stablebonds d'Etherfuse du réseau (CETES sur testnet, tranche 2), **par l'adresse exacte de `Config/`**
+    /// (elle-même vérifiée contre `code:émetteur`, `IntegrationConfig.problems`). C'est la liste blanche de l'app : un
+    /// jeton n'est reconnu (soldes, Activity, swap) que par l'adresse de son contrat, jamais par son code.
     static func stellarAssets(config: ChimpNetworkConfig) throws -> [(code: String, contract: String)] {
         let network = Network.custom(passphrase: config.passphrase)
         let usdc = Asset(type: AssetType.ASSET_TYPE_CREDIT_ALPHANUM4, code: "USDC", issuer: try KeyPair(accountId: config.usdcIssuer))!
+        let stablebonds = config.integrations?.etherfuse.stablebonds.map { ($0.code, $0.contract) } ?? []
         return [
             ("XLM", try contractID(for: Asset(type: AssetType.ASSET_TYPE_NATIVE)!, network: network)),
             ("USDC", try contractID(for: usdc, network: network)),
-        ]
+        ] + stablebonds
     }
 
     /// `balance(holder)` en unités on-chain (entier, 7 décimales). `nil` si la simulation n'a rendu aucune valeur :

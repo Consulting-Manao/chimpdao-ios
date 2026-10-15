@@ -280,6 +280,23 @@ final class SwapFlowModel {
         amountChanged()
     }
 
+    /// Un côté du swap.
+    enum Side: Identifiable {
+        case given, received
+        var id: Self { self }
+    }
+
+    /// Choix d'un actif pour un côté (feuille E3p) : l'actif de l'autre côté échange les deux (jamais le même des deux
+    /// côtés) ; un troisième actif (CETES) remplace seulement ce côté.
+    func choose(_ asset: SendAsset, for side: Side) {
+        let (current, other) = side == .given ? (given, received) : (received, given)
+        guard asset != current else { return }
+        if asset == other { return flipAssets() }
+        if side == .given { given = asset } else { received = asset }
+        amount = amount.clamped(toFractionDigits: given.maxFractionDigits)
+        amountChanged()
+    }
+
     /// E3s : les trois tolérances proposées (maquette), 0,5 % par défaut. Pas de saisie libre.
     static let slippageOptions = [50, 100, 300]
     var isSlippageSheetPresented = false
