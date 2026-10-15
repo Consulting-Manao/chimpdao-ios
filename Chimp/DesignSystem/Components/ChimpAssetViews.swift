@@ -43,6 +43,8 @@ struct ChimpAssetPill: View {
     let glyph: ChimpAssetGlyph
     /// Code de l'actif (« USDC »), affiché tel quel.
     let title: String
+    /// Sans chevron quand il n'y a qu'un actif possible (le vault : XLM seulement).
+    var isChoosable = true
     let action: () -> Void
 
     var body: some View {
@@ -51,9 +53,11 @@ struct ChimpAssetPill: View {
                 ChimpAssetIcon(glyph: glyph, size: 18 + ChimpBorder.thin, border: ChimpBorder.thin)
                 Text(verbatim: title)
                     .chimpFont(.pill)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .black))
-                    .accessibilityHidden(true)
+                if isChoosable {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .black))
+                        .accessibilityHidden(true)
+                }
             }
             .foregroundStyle(.chimpTextPrimary)
             .padding(.vertical, ChimpSpacing.xs + ChimpBorder.regular)
@@ -62,7 +66,7 @@ struct ChimpAssetPill: View {
             .contentShape(Rectangle().inset(by: -ChimpSpacing.xs))
         }
         .buttonStyle(ChimpPressableStyle())
-        .accessibilityHint(Text("Choose what to send"))
+        .accessibilityHint(isChoosable ? Text("Choose what to send") : Text(verbatim: ""))
     }
 }
 

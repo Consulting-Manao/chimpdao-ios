@@ -11,6 +11,7 @@ struct ChimpAssetTile: View {
     let value: String
     /// Détail (« 620 USDC ») ; masqué si `nil`.
     var detail: String?
+    var detailColor: Color = Color(.chimpTextSecondary)
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 20)
@@ -40,7 +41,7 @@ struct ChimpAssetTile: View {
                         .chimpFont(.captionStrong)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                        .foregroundStyle(.chimpTextSecondary)
+                        .foregroundStyle(detailColor)
                 }
             }
             .padding(.top, 9)

@@ -22,6 +22,10 @@ struct VaultInfo: Equatable {
 
     /// « DeFindex → Blend ».
     var protocolChain: String { protocols.joined(separator: " → ") }
+
+    /// Ce que le vault peut rendre tout de suite : ce qui n'est pas prêté (le reste revient quand les emprunteurs
+    /// remboursent).
+    var availableNow: Decimal { max(0, totalManaged - invested) }
 }
 
 /// Une position du compte : un tiroir qui détient des parts du vault.

@@ -157,18 +157,49 @@ struct VaultFlowTests {
     }
 
     @Test("Retirer : le vault a bougé avant la signature → rien n'est signé, nouveau devis, vérification à refaire")
-    func withdrawPriceMoved() async {
+    func withdrawPriceMoved() async throws {
         let (model, service) = await reviewReady(.withdraw, scenario: .priceMovesBeforeSigning, amount: 20)
         await waitUntil { model.quoteState != .loading }
         let quotesBefore = service.quoteCount
+        let oldMinimum = try #require(model.draft?.quote.minimum)
         model.confirmReview()
-        await waitUntil { model.preparationIssue == .priceMoved && service.quoteCount > quotesBefore && !model.isRefreshingQuote }
+        await waitUntil { model.amountMoved?.newDraft != nil && !model.isRefreshingQuote }
         #expect(model.stage == .idle)
         #expect(service.signCount == 0)
-        #expect(service.quoteCount == quotesBefore + 1, "Un nouveau devis remplace le brouillon")
+        #expect(service.quoteCount == quotesBefore + 1, "Un nouveau devis est demandé tout de suite")
+        let moved = try #require(model.amountMoved, "Écran « le montant a bougé » (comme E4p)")
+        #expect(moved.old == oldMinimum, "L'ancien minimum, barré")
+        let newMinimum = try #require(moved.newDraft?.quote.minimum)
+        #expect(newMinimum < oldMinimum)
+        #expect(model.draft?.quote.minimum == oldMinimum, "Rien ne remplace le brouillon avant « See new amount »")
+        model.acceptNewAmount()
+        #expect(model.amountMoved == nil)
+        #expect(model.draft?.quote.minimum == newMinimum, "Vérification complète avec le nouveau minimum")
+        #expect(model.stage == .idle, "Jamais une signature directe")
         await signWithPin(model)
         await waitUntil { isSent(model) }
         #expect(isSent(model), "Il a fallu « Looks good » à nouveau")
+    }
+
+    @Test("Retirer : argent prêté sur Blend → message, « Take out 30 XLM » remet le disponible ; le retrait passe ensuite")
+    func withdrawLentOut() async throws {
+        let (model, service) = await reviewReady(.withdraw, scenario: .lentOut, amount: 40)
+        #expect(model.amountIssue == nil, "40 XLM ≤ la position : rien n'est refusé avant le contrat")
+        model.confirmReview()
+        await waitUntil { model.preparationIssue != nil }
+        #expect(model.preparationIssue == .notEnoughLiquidity)
+        #expect(service.signCount == 0)
+        let draft = try #require(model.draft)
+        #expect(draft.vault.availableNow == MockVaultService.availableWhenLentOut)
+        model.takeOutAvailableNow()
+        #expect(model.isReviewPresented == false, "Retour au montant")
+        #expect(model.amount.value == MockVaultService.availableWhenLentOut)
+        await model.refreshQuote()
+        model.continueToReview()
+        #expect(model.preparationIssue == nil)
+        await signWithPin(model)
+        await waitUntil { isSent(model) }
+        #expect(isSent(model))
     }
 
     // MARK: Issues incertaines

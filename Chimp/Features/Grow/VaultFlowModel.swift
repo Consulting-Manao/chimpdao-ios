@@ -38,8 +38,16 @@ final class VaultFlowModel {
     enum AmountIssue: Equatable {
         /// Mettre : pas assez de l'actif dans le tiroir (F3a).
         case insufficient(drawer: String, available: Decimal, asset: SendAsset)
-        /// Retirer : plus que la position.
+        /// Retirer : plus que la position (« All » pour tout retirer).
         case moreThanPosition(available: Decimal, asset: SendAsset)
+    }
+
+    /// Le montant a bougé entre la vérification et la signature (comme E4p) : rien n'a été signé. L'ancien montant (le
+    /// minimum d'un retrait, ou les parts attendues d'un dépôt), et le nouveau brouillon dès qu'il est arrivé.
+    struct AmountMoved: Equatable {
+        let old: Decimal
+        var newDraft: VaultDraft?
+        var failed = false
     }
 
     /// Préparation ratée (avant la carte) : rien n'a été signé.
@@ -81,6 +89,8 @@ final class VaultFlowModel {
     private(set) var preparationIssue: PreparationIssue?
     /// Le vault a bougé : un nouveau devis remplace le brouillon dès qu'il arrive (vérification complète à refaire).
     private(set) var isRefreshingQuote = false
+    /// Écran « le montant a bougé », par-dessus la vérification.
+    private(set) var amountMoved: AmountMoved?
     private(set) var tapProblem: TapProblem?
     private(set) var technicalDetails: String?
 
@@ -205,14 +215,20 @@ final class VaultFlowModel {
     }
 
     var amountIssue: AmountIssue? {
-        guard !withdrawAll, amount.value > available else { return nil }
-        switch action {
-        case .deposit:
-            guard let drawer = selectedDrawer else { return nil }
-            return .insufficient(drawer: drawer.title, available: available, asset: asset)
-        case .withdraw:
-            return .moreThanPosition(available: available, asset: asset)
+        if action == .withdraw {
+            // Ce que le vault peut rendre tout de suite n'est connu qu'au refus du contrat (`#114`, `#128`) : la stratégie
+            // peut récupérer une partie de ce qui est prêté sur Blend. Voir `PreparationIssue.notEnoughLiquidity`.
+            return !withdrawAll && amount.value > available ? .moreThanPosition(available: available, asset: asset) : nil
         }
+        guard !withdrawAll, amount.value > available, let drawer = selectedDrawer else { return nil }
+        return .insufficient(drawer: drawer.title, available: available, asset: asset)
+    }
+
+    /// « Take out {X} XLM » : ce que le vault peut rendre tout de suite, à la place du montant demandé.
+    func takeOutAvailableNow() {
+        guard action == .withdraw, let now = context?.vault.availableNow, now > 0 else { return }
+        isReviewPresented = false
+        setAmount(min(now, available).truncated(to: 7))
     }
 
     var currentQuote: VaultQuote? {
@@ -374,8 +390,11 @@ final class VaultFlowModel {
                 stage = .idle
                 technicalDetails = SendFlowModel.details(error)
                 let issue = Self.preparationIssue(for: error)
-                preparationIssue = issue
-                if issue == .priceMoved { await refreshDraft() }
+                if issue == .priceMoved {
+                    await amountDidMove()
+                } else {
+                    preparationIssue = issue
+                }
             }
         }
     }
@@ -392,21 +411,45 @@ final class VaultFlowModel {
         }
     }
 
-    /// Le vault a bougé : nouveau devis pour le même tiroir et le même montant ; il remplace le brouillon et la
-    /// vérification se refait **en entier** (« Looks good » à nouveau), jamais une signature directe (comme E4p).
-    func refreshDraft() async {
+    /// Le vault a bougé : rien n'a été signé ; l'écran le dit (comme E4p) et un nouveau devis est demandé tout de suite.
+    private func amountDidMove() async {
         guard let draft else { return }
+        amountMoved = AmountMoved(old: Self.movedAmount(of: draft))
+        await fetchNewAmount()
+    }
+
+    /// Retrait : le minimum reçu ; dépôt : les parts attendues.
+    static func movedAmount(of draft: VaultDraft) -> Decimal {
+        draft.action == .withdraw ? (draft.quote.minimum ?? draft.amount) : draft.quote.sharesAmount
+    }
+
+    /// Nouveau devis pour le même tiroir et le même montant.
+    func fetchNewAmount() async {
+        guard let draft, var moved = amountMoved else { return }
+        moved.failed = false
+        moved.newDraft = nil
+        amountMoved = moved
         isRefreshingQuote = true
         defer { isRefreshingQuote = false }
         do {
             let quote = draft.action == .deposit
                 ? try await service.depositQuote(drawer: draft.drawer, amount: draft.amount)
                 : try await service.withdrawQuote(drawer: draft.drawer, amount: draft.quote.all ? 0 : draft.amount, all: draft.quote.all)
-            self.draft = VaultDraft(drawer: draft.drawer, vault: draft.vault, quote: quote, network: draft.network)
-            quoteState = .quoted(quote)
+            moved.newDraft = VaultDraft(drawer: draft.drawer, vault: draft.vault, quote: quote, network: draft.network)
         } catch {
             technicalDetails = SendFlowModel.details(error)
+            moved.failed = true
         }
+        if amountMoved != nil { amountMoved = moved }
+    }
+
+    /// « See new amount » : retour à une vérification **complète** avec les nouvelles bornes, jamais une signature directe.
+    func acceptNewAmount() {
+        guard stage == .idle, let newDraft = amountMoved?.newDraft else { return }
+        draft = newDraft
+        quoteState = .quoted(newDraft.quote)
+        amountMoved = nil
+        preparationIssue = nil
     }
 
     /// « Change the amount » : retour à la saisie.
@@ -491,8 +534,11 @@ final class VaultFlowModel {
             resetSigning()
             technicalDetails = SendFlowModel.details(error)
             let issue = Self.preparationIssue(for: error)
-            preparationIssue = issue
-            if issue == .priceMoved { Task { await refreshDraft() } }
+            if issue == .priceMoved {
+                Task { await amountDidMove() }
+            } else {
+                preparationIssue = issue
+            }
         default:
             tapProblem = SendFlowModel.tapProblem(for: error)
             technicalDetails = SendFlowModel.details(error)
@@ -655,6 +701,19 @@ final class VaultFlowModel {
         quoteTask?.cancel()
         onExit?()
     }
+
+    /// F5, et le reçu : « See my position » ouvre F6 pour le tiroir de l'opération (adresse du tiroir).
+    var onSeePosition: ((String) -> Void)?
+
+    func seePosition() {
+        guard let address = summary?.drawerAddress ?? draft?.drawer.address else { return finish() }
+        waitTask?.cancel()
+        quoteTask?.cancel()
+        onSeePosition?(address)
+    }
+
+    /// Les protocoles traversés, pour l'avertissement (« DeFindex », « Blend »).
+    var protocols: [String] { draft?.vault.protocols ?? context?.vault.protocols ?? ["DeFindex", "Blend"] }
 }
 
 /// Issue d'un dépôt ou d'un retrait, une fois la carte passée (mêmes cas qu'Envoyer).

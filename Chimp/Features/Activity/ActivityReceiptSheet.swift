@@ -27,6 +27,10 @@ struct ActivityReceiptContent: View {
     var body: some View {
         VStack(spacing: ChimpSpacing.ml) {
             slip
+            if let protocols = receipt.vaultProtocols {
+                // I1g.1, I1g.2 : où va l'argent et l'avertissement, sur chaque reçu du vault.
+                ChimpVaultNotice(asset: receipt.vaultAsset ?? "XLM", protocols: protocols)
+            }
             buttons
         }
         .sensoryFeedback(.success, trigger: model.copyCount)

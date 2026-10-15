@@ -14,6 +14,8 @@ final class MockVaultService: VaultService {
         case priceMovesBeforeSigning
         /// Une valeur lue n'est pas vraisemblable : refusée, rien n'est affiché comme un montant.
         case implausible
+        /// Presque tout est prêté sur Blend : le vault ne peut rendre que 30 XLM tout de suite (retrait refusé au-delà).
+        case lentOut
 
         var id: String { rawValue }
     }
@@ -52,6 +54,17 @@ final class MockVaultService: VaultService {
         invested: 0, totalManaged: Decimal(string: "49557.2426222")!
     )
 
+    /// `lentOut` : tout est prêté sauf 30 XLM.
+    static let availableWhenLentOut: Decimal = 30
+
+    private var vault: VaultInfo {
+        guard scenario == .lentOut else { return Self.vault }
+        return VaultInfo(
+            id: Self.vault.id, name: Self.vault.name, protocols: Self.vault.protocols, asset: Self.vault.asset,
+            invested: Self.vault.totalManaged - Self.availableWhenLentOut, totalManaged: Self.vault.totalManaged
+        )
+    }
+
     func fetchContext() async throws -> VaultContext {
         try await Task.sleep(for: delay)
         if scenario == .vaultUnavailable { throw VaultServiceError.vaultUnavailable }
@@ -65,7 +78,7 @@ final class MockVaultService: VaultService {
                 basis: VaultBasis(putIn: 50, since: Self.depositDate), readAt: .now
             ))
         }
-        return VaultContext(network: context.network, drawers: context.drawers, vault: Self.vault, holdings: holdings)
+        return VaultContext(network: context.network, drawers: context.drawers, vault: vault, holdings: holdings)
     }
 
     func depositQuote(drawer: SendDrawer, amount: Decimal) async throws -> VaultQuote {
@@ -81,7 +94,9 @@ final class MockVaultService: VaultService {
         try await Task.sleep(for: delay)
         if scenario == .vaultUnavailable { throw VaultServiceError.vaultUnavailable }
         let value = all ? Decimal(string: "50.12")! : amount
-        let expected = try SwapUnits.units(of: value, asset: .xlm)
+        // Après « le vault a bougé » : il rend un peu moins (0,2 %).
+        let paid = priceHasMoved ? (value * Decimal(string: "0.998")!).truncated(to: 7) : value
+        let expected = try SwapUnits.units(of: paid, asset: .xlm)
         let shares = try SwapUnits.units(of: (value / Self.xlmPerShare).truncated(to: 7), asset: .xlm)
         return VaultQuote(
             action: .withdraw, amount: value, shares: TokenAmount(shares), expectedOut: TokenAmount(expected),
@@ -98,6 +113,9 @@ final class MockVaultService: VaultService {
         if scenario == .priceMovesBeforeSigning, draft.action == .withdraw, !priceHasMoved {
             priceHasMoved = true
             throw VaultServiceError.priceMoved
+        }
+        if scenario == .lentOut, draft.action == .withdraw, (draft.quote.expected ?? draft.amount) > Self.availableWhenLentOut {
+            throw YieldError.notEnoughLiquidity
         }
         return PreparedVault(draft: draft)
     }

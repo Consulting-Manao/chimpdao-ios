@@ -87,6 +87,7 @@ struct DesignSystemCatalogView: View {
                     link("Receive states", systemImage: "qrcode") { ReceiveStatesCatalogPage(settings: settings) }
                     link("Send", systemImage: "paperplane.fill") { SendCatalogPage(settings: settings) }
                     link("Swap", systemImage: "arrow.left.arrow.right") { SwapCatalogPage(settings: settings) }
+                    link("Grow", systemImage: "leaf.fill") { GrowCatalogPage(settings: settings) }
                     link("Activity states", systemImage: "list.bullet.rectangle.portrait.fill") { ActivityStatesCatalogPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))

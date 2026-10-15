@@ -13,6 +13,8 @@ struct ActivityView: View {
     var onSendPrefilled: (SendPrefill) -> Void = { _ in }
     /// « Swap again » du reçu : la coque ouvre Swap prérempli.
     var onSwapPrefilled: (SwapPrefill) -> Void = { _ in }
+    /// « See my position » d'un reçu du vault : la coque ouvre F6 (adresse du tiroir).
+    var onPosition: (String) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,7 +33,7 @@ struct ActivityView: View {
         }
         .background(Color(.chimpBackground))
         .task { await model.refresh() }
-        .activityReceiptSheet(model: model, onSendPrefilled: onSendPrefilled, onSwapPrefilled: onSwapPrefilled)
+        .activityReceiptSheet(model: model, onSendPrefilled: onSendPrefilled, onSwapPrefilled: onSwapPrefilled, onPosition: onPosition)
     }
 
     // MARK: Filtres
@@ -59,6 +61,9 @@ private struct ActivityReceiptSheetModifier: ViewModifier {
     @Bindable var model: ActivityViewModel
     let onSendPrefilled: (SendPrefill) -> Void
     let onSwapPrefilled: (SwapPrefill) -> Void
+    let onPosition: (String) -> Void
+    /// « See my position » : F6 s'ouvre une fois la feuille refermée.
+    @State private var chosenPosition: String?
     /// Envoi choisi dans le reçu : Envoyer s'ouvre une fois la feuille refermée.
     @State private var chosenSend: SendPrefill?
     /// « Swap again » : Swap s'ouvre une fois la feuille refermée.
@@ -75,12 +80,17 @@ private struct ActivityReceiptSheetModifier: ViewModifier {
                     chosenSwap = nil
                     onSwapPrefilled(prefill)
                 }
+                if let address = chosenPosition {
+                    chosenPosition = nil
+                    onPosition(address)
+                }
             }) {
                 if let record = model.selectedRecord, let receipt = model.receipt(for: record) {
                     ActivityReceiptSheet(receipt: receipt, model: model) { again in
                         // Chaque action ouvre son parcours : Envoyer (Pay again, Send back) ou Swap (Swap again).
                         chosenSend = again.sendPrefill
                         chosenSwap = again.swapPrefill
+                        chosenPosition = again.positionDrawer
                         model.selectedRecord = nil
                     }
                 }
@@ -98,9 +108,12 @@ extension View {
     func activityReceiptSheet(
         model: ActivityViewModel,
         onSendPrefilled: @escaping (SendPrefill) -> Void,
-        onSwapPrefilled: @escaping (SwapPrefill) -> Void = { _ in }
+        onSwapPrefilled: @escaping (SwapPrefill) -> Void = { _ in },
+        onPosition: @escaping (String) -> Void = { _ in }
     ) -> some View {
-        modifier(ActivityReceiptSheetModifier(model: model, onSendPrefilled: onSendPrefilled, onSwapPrefilled: onSwapPrefilled))
+        modifier(ActivityReceiptSheetModifier(
+            model: model, onSendPrefilled: onSendPrefilled, onSwapPrefilled: onSwapPrefilled, onPosition: onPosition
+        ))
     }
 }
 
@@ -167,7 +180,7 @@ struct ActivityContent: View {
     private func ticketView(_ ticket: ActivityTicket, tilt: Double) -> some View {
         ChimpTicket(
             title: ticket.title, date: ticket.date, net: ticket.net, netColor: color(ticket.netTone),
-            showsSeal: !ticket.isPending, tilt: tilt
+            showsSeal: !ticket.isPending && ticket.vaultProtocols == nil, tilt: tilt
         ) {
             ForEach(Array(ticket.rows.enumerated()), id: \.element.id) { index, row in
                 Button {
@@ -183,6 +196,19 @@ struct ActivityContent: View {
                 .buttonStyle(ChimpPressableStyle())
                 .accessibilityElement(children: .combine)
                 .accessibilityHint(row.record == nil ? Text("Opens the status") : Text("Opens the receipt"))
+            }
+            if let protocols = ticket.vaultProtocols {
+                // I1g : pas de sceau ni de fond vert, la ligne des protocoles et l'avertissement (décision du 2026-10-15).
+                VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
+                    Text("via \(protocols)")
+                        .chimpFont(.captionStrong)
+                        .foregroundStyle(Color(.chimpTicketMuted))
+                    ChimpVaultNotice(
+                        asset: ticket.vaultAsset ?? "XLM", protocols: protocols.components(separatedBy: " → "),
+                        ink: Color(.chimpTicketInk)
+                    )
+                }
+                .padding(.top, ChimpSpacing.s)
             }
         }
     }

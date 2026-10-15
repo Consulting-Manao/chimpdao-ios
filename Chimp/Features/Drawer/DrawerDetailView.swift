@@ -5,13 +5,20 @@ import SwiftUI
 /// Move / Swap depuis ce tiroir.
 ///
 /// Écarts avec la maquette (DESIGN_NOTES §12) : l'adresse est ajoutée (demande de Barth) ; « Receive » a été retiré de la
-/// barre du bas le 2026-10-14 (quatre boutons coupaient « Receive » ; la place ira à Grow) : l'adresse copiable suffit ;
-/// tout ce qui est Grow (tuile « XOXNO · GROWING », « Plant … more », « +$3.51/mo », bouton Grow) est masqué tant que
-/// Grow n'existe pas ; « Give this card away » (G4) aussi, session à part.
+/// barre du bas le 2026-10-14 (quatre boutons coupaient « Receive ») : l'adresse copiable suffit, la place va à Grow ;
+/// « Give this card away » (G4) est masqué, session à part.
+///
+/// Grow (maquettes « B2 / B3 — SWAP + VAULT » du 2026-10-15) : la tuile « DEFINDEX · GROWING » (valeur, évolution réelle
+/// depuis le dépôt) à côté des actifs, dans les deux tiroirs (le Main de l'app est en tuiles, B2r), « Plant more » et
+/// l'avertissement sous la grille ; le bouton Grow ouvre « Put money in » depuis ce tiroir.
 struct DrawerDetailView: View {
     @Bindable var model: DrawerDetailModel
     let activity: ActivityViewModel
     var actions: DrawerDetailActions
+    /// Les positions du vault, lues par l'onglet Grow (une par tiroir).
+    var grow: GrowModel?
+
+    @Environment(\.locale) private var locale
 
     @State private var renameModel: SettingsModel?
     /// G5 : le compte n'a qu'une carte (dernière lecture) ; retirer ou déclarer perdue est refusé avant tout tap.
@@ -51,13 +58,18 @@ struct DrawerDetailView: View {
                 ChimpSoundPlayer.shared.play(.branch)
                 async let wallet: Void = model.refresh()
                 async let history: Void = activity.refresh()
-                _ = await (wallet, history)
+                async let vault: Void? = grow?.refresh()
+                _ = await (wallet, history, vault)
             }
             if !model.isMissing { bottomBar }
         }
         .background(Color(.chimpBackground))
         .task { await activity.refresh() }
-        .activityReceiptSheet(model: activity, onSendPrefilled: actions.onSendPrefilled, onSwapPrefilled: actions.onSwapPrefilled)
+        .task { await grow?.refresh() }
+        .activityReceiptSheet(
+            model: activity, onSendPrefilled: actions.onSendPrefilled, onSwapPrefilled: actions.onSwapPrefilled,
+            onPosition: actions.onPosition
+        )
         .chimpSheet(isPresented: Binding(get: { lastCardMode != nil }, set: { if !$0 { lastCardMode = nil } }), height: 560, fitsContent: true) {
             if let mode = lastCardMode {
                 LastCardSheet(mode: mode, name: model.cardName, onAddCard: {
@@ -114,7 +126,7 @@ struct DrawerDetailView: View {
                     .padding(.top, ChimpSpacing.l)
             }
 
-            if content.isEmpty {
+            if content.isEmpty && holding(content) == nil {
                 ChimpySays(text: emptyText, pose: .plant)
                     .padding(.top, ChimpSpacing.xl)
             } else {
@@ -129,10 +141,62 @@ struct DrawerDetailView: View {
                             value: asset.value ?? asset.amount, detail: asset.value == nil ? nil : asset.amount
                         )
                     }
+                    if let holding = holding(content) {
+                        Button { actions.onPosition(holding.drawerAddress) } label: { growingTile(holding) }
+                            .buttonStyle(ChimpPressableStyle())
+                            .accessibilityHint(Text("Opens your position"))
+                    }
                 }
                 .padding(.top, ChimpSpacing.xl)
+                if holding(content) != nil, let vault = grow?.vault {
+                    plantMore
+                        .padding(.top, ChimpSpacing.m)
+                    ChimpVaultNotice(asset: vault.asset.code, protocols: vault.protocols)
+                        .padding(.top, ChimpSpacing.s)
+                }
             }
         }
+    }
+
+    // MARK: Grow
+
+    private func holding(_ content: DrawerDetailContent) -> VaultHolding? {
+        content.address.flatMap { grow?.holding(drawerAddress: $0) }
+    }
+
+    /// « DEFINDEX · GROWING », « 40.09 XLM », « +0.11 XLM since 22 Sep » (la valeur seule si la base n'est pas connue).
+    private func growingTile(_ holding: VaultHolding) -> some View {
+        let asset = grow?.vault?.asset ?? .xlm
+        let runner = grow?.vault?.protocols.first ?? "DeFindex"
+        return ChimpAssetTile(
+            band: "\(runner.uppercased()) · \(String(localized: "Growing").uppercased())",
+            bandFill: Color(.chimpHeader), bandInk: Color(.chimpOnHeaderPrimary),
+            value: asset.displayedWithCode(holding.value, locale: locale),
+            detail: holding.change.flatMap { change in
+                holding.basis.map { basis in
+                    String(localized: "\(GrowView.changeText(change, asset: asset, locale: locale)) since \(basis.since.formatted(.dateTime.day().month(.abbreviated)))")
+                }
+            },
+            detailColor: (holding.change ?? 0) < 0 ? Color(.chimpNegative) : Color(.chimpPositive)
+        )
+    }
+
+    /// « Plant more » : mettre encore depuis ce tiroir (bordure pointillée, maquette B3).
+    private var plantMore: some View {
+        Button { actions.onGrow(model.selection.drawerID) } label: {
+            HStack(spacing: ChimpSpacing.s) {
+                Image(.tileBanana).resizable().scaledToFit().frame(width: 24).accessibilityHidden(true)
+                Text("Plant more").chimpFont(.buttonSmall)
+            }
+            .foregroundStyle(.chimpTextSecondary)
+            .frame(maxWidth: .infinity, minHeight: ChimpSize.minimumTouchTarget)
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color(.chimpTextSecondary), style: StrokeStyle(lineWidth: ChimpBorder.regular, dash: [7, 5]))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ChimpPressableStyle())
     }
 
     private func total(_ content: DrawerDetailContent) -> some View {
@@ -240,6 +304,11 @@ struct DrawerDetailView: View {
             // Maquette B2 / B3 « with Swap » : Swap s'ouvre avec ce tiroir déjà choisi.
             ChimpButton("Swap", kind: .secondary, size: .compact) { actions.onSwap(id) }
                 .disabled(isEmpty)
+            // Maquette B2 / B3 « Swap + Vault » : « Put money in » depuis ce tiroir.
+            if grow != nil {
+                ChimpButton("Grow", kind: .secondary, size: .compact) { actions.onGrow(id) }
+                    .disabled(isEmpty)
+            }
         }
         .padding(ChimpSpacing.bottomBar)
         .background(Color(.chimpBackground))
@@ -288,4 +357,8 @@ struct DrawerDetailActions {
     var onRemove: (RemoveCardModel.Mode, String) -> Void = { _, _ in }
     /// G5 « Add a card ».
     var onAddCard: () -> Void = {}
+    /// Grow, « Plant more » : mettre dans le vault depuis ce tiroir (identifiant).
+    var onGrow: (String) -> Void = { _ in }
+    /// La tuile « GROWING », « See my position » d'un reçu : F6 pour ce tiroir (adresse).
+    var onPosition: (String) -> Void = { _ in }
 }

@@ -22,6 +22,7 @@ struct ChimpApp: App {
                 .chimpReadsScreenInsets()
             #if DESIGN_CATALOG
                 .modifier(SwapDemoLaunch())
+                .modifier(VaultDemoLaunch())
             #endif
         }
     }

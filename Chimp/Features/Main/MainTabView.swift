@@ -20,6 +20,10 @@ struct MainTabView: View {
     @State private var prefilledSend: SendPrefill?
     /// « Swap again » depuis un reçu de l'Activity : Swap prérempli.
     @State private var prefilledSwap: SwapPrefill?
+    /// Les positions du vault, partagées par l'onglet Grow et les pages des tiroirs (tuile « GROWING »).
+    @State private var growModel: GrowModel
+    /// Écrans poussés dans l'onglet Grow.
+    @State private var growPath: [GrowRoute] = []
     #if DESIGN_CATALOG
     @State private var isShowingCatalog = false
     #endif
@@ -32,6 +36,7 @@ struct MainTabView: View {
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle()
         ))
         _walletModel = State(initialValue: wallet)
+        _growModel = State(initialValue: GrowModel(service: ChainVaultService(session: session, config: config)))
         // L'historique : téléphone + RPC de testnet ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
             session: session, config: config, walletCards: { [weak wallet] in wallet?.cards ?? [] }
@@ -53,42 +58,54 @@ struct MainTabView: View {
                         case .receive(let drawerID):
                             ReceiveDestination(session: session, initialDrawerID: drawerID)
                         case .send(let drawerID):
-                            // Le vrai envoi (testnet) ; au retour, les soldes du Wallet sont relus. Un swap en attente :
-                            // son état d'abord (une seule opération à l'issue incertaine à la fois).
-                            if hasPendingSwap {
-                                SwapFlowRoot(service: ChainSwapService(session: session), onExit: closeFlow)
-                            } else {
+                            // Le vrai envoi (testnet) ; au retour, les soldes du Wallet sont relus. Un swap ou un dépôt en
+                            // attente : son état d'abord (une seule opération à l'issue incertaine à la fois).
+                            pendingFirst(onExit: closeFlow) {
                                 SendFlowRoot(service: ChainSendService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
                             }
                         case .move(let drawerID):
                             // E1 : le même parcours, entre ses propres tiroirs (testnet).
-                            if hasPendingSwap {
-                                SwapFlowRoot(service: ChainSwapService(session: session), onExit: closeFlow)
-                            } else {
+                            pendingFirst(onExit: closeFlow) {
                                 SendFlowRoot(service: ChainSendService(session: session), kind: .move, fromDrawerID: drawerID, onExit: closeFlow)
                             }
                         case .prefilledSend(let prefill):
                             // « Pay again » ou « Send back » d'un reçu ouvert depuis la page d'un tiroir.
-                            if hasPendingSwap {
-                                SwapFlowRoot(service: ChainSwapService(session: session), onExit: closeFlow)
-                            } else {
+                            pendingFirst(onExit: closeFlow) {
                                 SendFlowRoot(service: ChainSendService(session: session), prefill: prefill, onExit: closeFlow)
                             }
                         case .pendingSend:
                             // L'état de l'opération en attente (« Check again »), jamais une nouvelle : un swap s'ouvre
-                            // dans Swap, un envoi ou un Move dans Envoyer.
-                            if hasPendingSwap {
-                                SwapFlowRoot(service: ChainSwapService(session: session), onExit: closeFlow)
-                            } else {
+                            // dans Swap, une opération du vault dans le vault, un envoi ou un Move dans Envoyer.
+                            pendingFirst(onExit: closeFlow) {
                                 SendFlowRoot(service: ChainSendService(session: session), onExit: closeFlow)
                             }
                         case .swap(let drawerID):
                             // E3 : le vrai swap (testnet), dans le tiroir choisi d'avance ou dans Main. Un envoi en
                             // attente : E3f (« Check again » à la place du bouton).
-                            SwapFlowRoot(service: ChainSwapService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
+                            pendingFirst(onExit: closeFlow) {
+                                SwapFlowRoot(service: ChainSwapService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
+                            }
                         case .prefilledSwap(let prefill):
                             // « Swap again » d'un reçu ouvert depuis la page d'un tiroir.
-                            SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill, onExit: closeFlow)
+                            pendingFirst(onExit: closeFlow) {
+                                SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill, onExit: closeFlow)
+                            }
+                        case .vault(let action, let drawerID):
+                            // F3 / F7 : mettre ou retirer (testnet), depuis ce tiroir. Un envoi en attente : F3c.
+                            pendingFirst(onExit: closeFlow) {
+                                VaultFlowRoot(
+                                    service: ChainVaultService(session: session, config: config), action: action, drawerID: drawerID,
+                                    onSeePosition: showPositionFromWallet, onExit: closeFlow
+                                )
+                            }
+                        case .vaultPosition(let address):
+                            // F6 depuis la tuile « GROWING » d'un tiroir.
+                            VaultPositionView(
+                                model: growModel, drawerAddress: address, onBack: { if !walletPath.isEmpty { walletPath.removeLast() } },
+                                onWithdraw: { walletPath.append(.vault(.withdraw, drawerID: $0)) },
+                                onDeposit: { walletPath.append(.vault(.deposit, drawerID: $0)) }
+                            )
+                            .toolbar(.hidden, for: .navigationBar)
                         case .removeCard(let mode, let key):
                             // G6 / G7 : retirer une carte ou la déclarer perdue (testnet), depuis sa page (B3).
                             RemoveCardDestination(mode: mode, key: key, wallet: walletModel, session: session) { removed in
@@ -111,7 +128,10 @@ struct MainTabView: View {
                             }
                         case .drawer(let selection):
                             // B2 / B3 : le détail d'un tiroir, sur les soldes déjà lus par le Wallet.
-                            DrawerDestination(selection: selection, wallet: walletModel, activity: activityModel, session: session, actions: drawerActions)
+                            DrawerDestination(
+                                selection: selection, wallet: walletModel, activity: activityModel, grow: growModel, session: session,
+                                actions: drawerActions
+                            )
                         case .addCard:
                             // G1 → G3 : ajouter une carte au compte (testnet) ; au retour, le Wallet relit ses cartes.
                             AddCardDestination(session: session) {
@@ -141,45 +161,134 @@ struct MainTabView: View {
             NavigationStack {
                 ActivityView(
                     model: activityModel, onPending: { isShowingPendingSend = true }, onSendPrefilled: { prefilledSend = $0 },
-                    onSwapPrefilled: { prefilledSwap = $0 }
+                    onSwapPrefilled: { prefilledSwap = $0 }, onPosition: showPositionInGrow
                 )
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
                     .navigationDestination(isPresented: $isShowingPendingSend) {
-                        // L'état de l'opération en attente (« Check again »), jamais une nouvelle : Swap ou Envoyer.
-                        if hasPendingSwap {
-                            SwapFlowRoot(service: ChainSwapService(session: session)) {
-                                isShowingPendingSend = false
-                                Task { await activityModel.refresh() }
-                            }
-                        } else {
-                            SendFlowRoot(service: ChainSendService(session: session)) {
-                                isShowingPendingSend = false
-                                Task { await activityModel.refresh() }
-                            }
+                        // L'état de l'opération en attente (« Check again »), jamais une nouvelle : Swap, le vault ou Envoyer.
+                        pendingFirst(onExit: closePendingFromActivity) {
+                            SendFlowRoot(service: ChainSendService(session: session), onExit: closePendingFromActivity)
                         }
                     }
                     .navigationDestination(item: $prefilledSwap) { prefill in
-                        SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill) {
+                        let close = {
                             prefilledSwap = nil
-                            Task { await activityModel.refresh() }
-                            Task { await walletModel.refresh() }
+                            refreshAll()
+                        }
+                        pendingFirst(onExit: close) {
+                            SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill, onExit: close)
                         }
                     }
                     .navigationDestination(item: $prefilledSend) { prefill in
-                        SendFlowRoot(service: ChainSendService(session: session), prefill: prefill) {
+                        let close = {
                             prefilledSend = nil
-                            Task { await activityModel.refresh() }
+                            refreshAll()
+                        }
+                        pendingFirst(onExit: close) {
+                            SendFlowRoot(service: ChainSendService(session: session), prefill: prefill, onExit: close)
                         }
                     }
             }
             .environment(activityModel)
         case .grow:
-            NavigationStack {
-                PlaceholderTabView(tab: selection)
+            NavigationStack(path: $growPath) {
+                GrowView(model: growModel) { growPath.append($0) }
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
+                    .navigationDestination(for: GrowRoute.self) { route in
+                        growDestination(route)
+                            .toolbar(.hidden, for: .navigationBar)
+                    }
             }
+            .environment(activityModel)
+        }
+    }
+
+    // MARK: Grow
+
+    /// F2, F6, F3 et F7 dans la pile de l'onglet Grow.
+    @ViewBuilder
+    private func growDestination(_ route: GrowRoute) -> some View {
+        switch route {
+        case .vault:
+            VaultInfoView(model: growModel, onBack: popGrow) { growPath.append(.deposit(drawerID: nil)) }
+        case .position(let address):
+            VaultPositionView(
+                model: growModel, drawerAddress: address, onBack: popGrow,
+                onWithdraw: { growPath.append(.withdraw(drawerID: $0)) },
+                onDeposit: { growPath.append(.deposit(drawerID: $0)) }
+            )
+        case .deposit(let drawerID):
+            pendingFirst(onExit: closeGrowFlow) {
+                VaultFlowRoot(
+                    service: ChainVaultService(session: session, config: config), action: .deposit, drawerID: drawerID,
+                    onSeePosition: showPositionInGrow, onExit: closeGrowFlow
+                )
+            }
+        case .withdraw(let drawerID):
+            pendingFirst(onExit: closeGrowFlow) {
+                VaultFlowRoot(
+                    service: ChainVaultService(session: session, config: config), action: .withdraw, drawerID: drawerID,
+                    onSeePosition: showPositionInGrow, onExit: closeGrowFlow
+                )
+            }
+        }
+    }
+
+    private func popGrow() {
+        if !growPath.isEmpty { growPath.removeLast() }
+    }
+
+    /// Fin d'un parcours du vault ouvert dans Grow : retour à l'écran d'où il est parti ; tout est relu.
+    private func closeGrowFlow() {
+        popGrow()
+        refreshAll()
+    }
+
+    /// « See my position » (F5, reçu) : F6 du tiroir dans l'onglet Grow, positions relues.
+    private func showPositionInGrow(_ address: String) {
+        refreshAll()
+        growPath = [.position(drawerAddress: address)]
+        selection = .grow
+    }
+
+    /// « See my position » (F5) d'un parcours ouvert depuis le Wallet : F6, à la place du parcours.
+    private func showPositionFromWallet(_ address: String) {
+        if let index = walletPath.lastIndex(where: { if case .drawer = $0 { true } else { false } }) {
+            walletPath.removeSubrange((index + 1)...)
+        } else {
+            walletPath.removeAll()
+        }
+        refreshAll()
+        walletPath.append(.vaultPosition(address))
+    }
+
+    private func closePendingFromActivity() {
+        isShowingPendingSend = false
+        refreshAll()
+    }
+
+    private func refreshAll() {
+        Task { await walletModel.refresh() }
+        Task { await activityModel.refresh() }
+        Task { await growModel.refresh() }
+    }
+
+    /// Une opération signée attend son issue : son propre parcours d'abord (une seule à la fois, et chaque parcours
+    /// note sa propre ligne d'historique) : un swap dans Swap, une opération du vault dans le vault. Sinon `content`
+    /// (qui, devant un envoi en attente, montre son propre « Check it first »).
+    @ViewBuilder
+    private func pendingFirst(onExit: @escaping () -> Void, @ViewBuilder content: () -> some View) -> some View {
+        if hasPendingVault {
+            VaultFlowRoot(
+                service: ChainVaultService(session: session, config: config), action: .deposit,
+                onSeePosition: showPositionInGrow, onExit: onExit
+            )
+        } else if hasPendingSwap {
+            SwapFlowRoot(service: ChainSwapService(session: session), onExit: onExit)
+        } else {
+            content()
         }
     }
 
@@ -199,6 +308,9 @@ struct MainTabView: View {
     /// Une opération signée attend son issue, et c'est un swap : Envoyer et Move ouvrent son état.
     private var hasPendingSwap: Bool { session.wallet.pendingSend?.swap != nil }
 
+    /// Une opération signée attend son issue, et c'est un dépôt ou un retrait du vault.
+    private var hasPendingVault: Bool { session.wallet.pendingSend?.vault != nil }
+
     /// Fin d'un parcours (Send, Move…) : retour à la page du tiroir d'où il est parti, sinon au Wallet ; soldes et
     /// historique relus.
     private func closeFlow() {
@@ -207,8 +319,7 @@ struct MainTabView: View {
         } else {
             walletPath.removeAll()
         }
-        Task { await walletModel.refresh() }
-        Task { await activityModel.refresh() }
+        refreshAll()
     }
 
     /// Actions de la page d'un tiroir (B2, B3) : chacune part de ce tiroir.
@@ -229,7 +340,9 @@ struct MainTabView: View {
             },
             onChangePIN: { walletPath.append(.changePIN($0)) },
             onRemove: { walletPath.append(.removeCard($0, $1)) },
-            onAddCard: { walletPath = [.addCard] }
+            onAddCard: { walletPath = [.addCard] },
+            onGrow: { walletPath.append(.vault(.deposit, drawerID: $0)) },
+            onPosition: { walletPath.append(.vaultPosition($0)) }
         )
     }
 
@@ -270,6 +383,10 @@ enum WalletRoute: Hashable {
     case removeCard(RemoveCardModel.Mode, String)
     /// Changer le PIN de la carte de cette clé.
     case changePIN(String)
+    /// F3 (mettre) ou F7 (retirer), depuis ce tiroir (identifiant).
+    case vault(VaultAction, drawerID: String?)
+    /// F6 : la position de ce tiroir (adresse).
+    case vaultPosition(String)
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
@@ -291,16 +408,21 @@ private struct ReceiveDestination: View {
 private struct DrawerDestination: View {
     @State private var model: DrawerDetailModel
     let activity: ActivityViewModel
+    let grow: GrowModel
     let actions: DrawerDetailActions
 
-    init(selection: DrawerSelection, wallet: WalletViewModel, activity: ActivityViewModel, session: AppSession, actions: DrawerDetailActions) {
+    init(
+        selection: DrawerSelection, wallet: WalletViewModel, activity: ActivityViewModel, grow: GrowModel, session: AppSession,
+        actions: DrawerDetailActions
+    ) {
         _model = State(initialValue: DrawerDetailModel(selection: selection, wallet: wallet, session: session))
         self.activity = activity
+        self.grow = grow
         self.actions = actions
     }
 
     var body: some View {
-        DrawerDetailView(model: model, activity: activity, actions: actions)
+        DrawerDetailView(model: model, activity: activity, actions: actions, grow: grow)
             .toolbar(.hidden, for: .navigationBar)
     }
 }
@@ -406,20 +528,6 @@ private struct SettingsDestination: View {
     var body: some View {
         SettingsView(model: model, onBack: onExit, onDeveloper: onDeveloper)
             .toolbar(.hidden, for: .navigationBar)
-    }
-}
-
-/// Onglet pas encore construit (Grow) : en-tête seul.
-struct PlaceholderTabView: View {
-    let tab: ChimpTab
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ChimpHeader(title: tab.title)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .background(Color(.chimpBackground))
     }
 }
 

@@ -80,7 +80,8 @@ struct ActivityVaultTests {
         #expect(receipt.total == nil)
         #expect(receipt.stamp == .deposited)
         #expect(receipt.stampAmounts.map(\.text) == ["\u{2212}\(SendAsset.displayed(50, code: "XLM")) XLM"])
-        #expect(receipt.again == nil)
+        #expect(receipt.again == .seePosition(drawerAddress: main), "« See my position » (validé le 2026-10-15)")
+        #expect(receipt.vaultProtocols == ["DeFindex", "Blend"] && receipt.vaultAsset == "XLM", "L'avertissement sous le reçu")
         #expect(receipt.shareText.contains("Planted"))
         #expect(!receipt.shareText.contains("%"), "Aucun taux, même dans le partage")
     }
@@ -93,6 +94,20 @@ struct ActivityVaultTests {
         let receipt = try #require(model.receipt(for: withdrawal(Decimal(string: "10.02")!, shares: Decimal(string: "0.006")!, days: 0)))
         #expect(receipt.lines.map(\.id) == ["backTo", "gaveBack", "got", "vault", "protocols", "fee", "status"])
         #expect(receipt.stamp == .withdrawn)
+        #expect(receipt.again == .seePosition(drawerAddress: main), "La position du tiroir où l'argent est revenu")
+        #expect(receipt.again?.sendPrefill == nil && receipt.again?.swapPrefill == nil, "Ni Envoyer ni Swap")
+    }
+
+    @Test("Ticket du jour (I1g) : « via DeFindex → Blend » et l'avertissement à la place du sceau, seulement les jours du vault")
+    func vaultDayTicket() {
+        let earlier = ActivityRecord(id: "stellar:t:1", event: .transfer, hash: "t", from: main, to: jungle, assetCode: "XLM", amount: 5, at: start - day, isLocal: false, ledger: 8)
+        let records = [deposit(50, shares: nil, days: 0), earlier]
+        let tickets = ActivityViewModel.tickets(
+            for: records, filter: .all, drawers: drawers, cardName: { _ in nil }, calendar: .current, now: start + day
+        )
+        #expect(tickets.count == 2)
+        #expect(tickets[0].vaultProtocols == "DeFindex → Blend" && tickets[0].vaultAsset == "XLM")
+        #expect(tickets[1].vaultProtocols == nil, "Un jour sans ligne du vault garde son sceau")
     }
 
     // MARK: Évolution depuis le dépôt

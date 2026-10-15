@@ -52,6 +52,10 @@ struct ActivityTicket: Identifiable, Equatable {
     let netTone: ActivityTone
     /// Le paiement en attente n'est pas encore « Chimpy-certified ».
     let isPending: Bool
+    /// Jour avec une ligne du vault (I1g, décision de Barth du 2026-10-15) : « via DeFindex → Blend » et l'avertissement
+    /// à la place du sceau « CHIMPY-CERTIFIED ».
+    var vaultProtocols: String? = nil
+    var vaultAsset: String? = nil
 }
 
 /// ViewModel de l'onglet Activity (I1) : l'historique gardé sur le téléphone s'affiche tout de suite, la chaîne est relue
@@ -283,9 +287,11 @@ final class ActivityViewModel {
         return days.map { day, records in
             let rows = records.compactMap { row(for: $0, drawers: drawers, addresses: addresses, cardName: cardName) }
             let net = net(of: records, filter: filter, addresses: addresses)
+            let vault = rows.compactMap(\.record).first { [.deposited, .withdrawn].contains($0.kind(drawers: addresses)) }
             return ActivityTicket(
                 id: "\(day.timeIntervalSince1970)", title: dayTitle(day, calendar: calendar, now: now), date: dateText(day),
-                rows: rows, net: net?.text, netTone: net?.tone ?? .neutral, isPending: false
+                rows: rows, net: net?.text, netTone: net?.tone ?? .neutral, isPending: false,
+                vaultProtocols: vault.map { $0.protocolName ?? "DeFindex → Blend" }, vaultAsset: vault?.assetCode
             )
         }
     }
@@ -584,7 +590,11 @@ final class ActivityViewModel {
             send: Self.prefill(for: record, kind: kind),
             stampAmounts: kind == .swapped ? Self.swapAmounts(of: record, locale: locale)
                 : (kind == .deposited || kind == .withdrawn ? Self.vaultAmounts(of: record, kind: kind, locale: locale) : []),
-            swap: kind == .swapped ? Self.swapPrefill(for: record) : nil
+            swap: kind == .swapped ? Self.swapPrefill(for: record) : nil,
+            position: kind == .deposited ? record.from : (kind == .withdrawn ? record.to : nil),
+            vaultProtocols: kind == .deposited || kind == .withdrawn
+                ? (record.protocolName ?? "DeFindex → Blend").components(separatedBy: " → ") : nil,
+            vaultAsset: record.assetCode
         )
     }
 
@@ -739,6 +749,11 @@ struct ActivityReceipt: Identifiable, Equatable {
     /// Swap : les deux quantités à côté du tampon (à la place du total), et « Swap again ».
     var stampAmounts: [StampAmount] = []
     var swap: SwapPrefill? = nil
+    /// Vault (I1g) : le tiroir de la position (adresse), pour « See my position ».
+    var position: String? = nil
+    /// Vault (I1g) : les protocoles traversés, pour l'avertissement sous le reçu.
+    var vaultProtocols: [String]? = nil
+    var vaultAsset: String? = nil
 
     struct StampAmount: Equatable {
         let text: String
@@ -748,6 +763,7 @@ struct ActivityReceipt: Identifiable, Equatable {
     /// Le bouton « again » de ce reçu : « Swap again » pour un swap, « Send back » pour un paiement reçu, « Pay again »
     /// pour un envoi ; `nil` sinon (Move, carte ajoutée).
     var again: ReceiptAgain? {
+        if let position { return .seePosition(drawerAddress: position) }
         if let swap { return .swapAgain(swap) }
         guard let send else { return nil }
         return send.origin == .sendBack ? .sendBack(send) : .payAgain(send)
@@ -770,6 +786,8 @@ enum ReceiptAgain: Equatable {
     case sendBack(SendPrefill)
     /// Swap : refaire le même swap au prix du moment.
     case swapAgain(SwapPrefill)
+    /// Vault (dépôt, retrait) : ouvrir la position de ce tiroir (F6), adresse du tiroir.
+    case seePosition(drawerAddress: String)
 
     /// Le texte du bouton.
     var title: LocalizedStringKey {
@@ -777,6 +795,7 @@ enum ReceiptAgain: Equatable {
         case .payAgain: "Pay again"
         case .sendBack: "Send back"
         case .swapAgain: "Swap again"
+        case .seePosition: "See my position"
         }
     }
 
@@ -784,13 +803,19 @@ enum ReceiptAgain: Equatable {
     var sendPrefill: SendPrefill? {
         switch self {
         case .payAgain(let prefill), .sendBack(let prefill): prefill
-        case .swapAgain: nil
+        case .swapAgain, .seePosition: nil
         }
     }
 
     /// Swap prérempli (« Swap again »), `nil` pour un envoi.
     var swapPrefill: SwapPrefill? {
         if case .swapAgain(let prefill) = self { return prefill }
+        return nil
+    }
+
+    /// Position à ouvrir (« See my position »), `nil` sinon.
+    var positionDrawer: String? {
+        if case .seePosition(let address) = self { return address }
         return nil
     }
 }
