@@ -310,3 +310,61 @@ private final class FakeOracle: PriceOracle {
         return prices.filter { codes.contains($0.key) }
     }
 }
+
+/// Tranche 2, phase 5, étape 7 : les CETES comptent dans le total du Wallet au prix indicatif d'Etherfuse ; prix
+/// indisponible → la règle actuelle (pas de total partiel). Jamais demandés à Reflector.
+struct CetesWalletTests {
+    private static let account = "CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB"
+    private static let bond = IntegrationConfig.Stablebond(code: "CETES", contract: CetesAssetTests.cetes)
+    private static let price = StablebondPrice(code: "CETES", usd: Decimal(string: "0.05")!, currency: "MXN", fiat: 1, asOf: .now)
+
+    @MainActor private func snapshot(_ result: StablebondPriceResult) async throws -> (WalletSnapshot, FakeOracle, MockStablebondPricing) {
+        let chain = FakeWalletChain()
+        chain.balances = [Self.account: [
+            AssetAmount(code: "XLM", amount: 100), AssetAmount(code: "USDC", amount: 10), AssetAmount(code: "CETES", amount: 200),
+        ]]
+        let oracle = FakeOracle(prices: ["XLM": Decimal(string: "0.25")!, "USDC": 1, "USD": 1])
+        let pricing = MockStablebondPricing(result: result)
+        var wallet = LocalWallet()
+        wallet.account = SavedAccount(address: Self.account, cards: [])
+        var source = ChainWalletDataSource(
+            session: AppSession(store: InMemoryLocalWalletStore(wallet), network: .testnet), chain: chain, oracle: oracle
+        )
+        source.stablebondPrices = StablebondWalletPrices(bonds: [Self.bond], pricing: pricing)
+        return (try await source.fetchWallet(), oracle, pricing)
+    }
+
+    @Test("Prix d'Etherfuse : 200 CETES × 0,05 $ = 10 $ dans le total (25 + 10 + 10 = 45 $)")
+    @MainActor func counted() async throws {
+        let (snapshot, oracle, pricing) = try await snapshot(.price(Self.price))
+        #expect(snapshot.usdPrices["CETES"] == Decimal(string: "0.05"))
+        #expect(snapshot.money.value(snapshot.allAssets) == 45)
+        #expect(pricing.calls == 1)
+        #expect(oracle.requested.count == 1)
+    }
+
+    @Test("Prix d'Etherfuse indisponible : pas de total partiel (la règle actuelle)")
+    @MainActor func unavailable() async throws {
+        let (snapshot, _, _) = try await snapshot(.unavailable("down"))
+        #expect(snapshot.usdPrices["CETES"] == nil)
+        #expect(snapshot.money.value(snapshot.allAssets) == nil)
+    }
+
+    @Test("Page d'un tiroir : CETES n'est pas une tuile « READY » mais une tuile d'épargne ; le tiroir n'est pas vide")
+    func drawerTiles() {
+        let snapshot = WalletSnapshot(
+            currency: .usd, main: DrawerBalance(assets: []), cards: [], weeklyChange: nil,
+            usdPrices: ["USDC": 1, "CETES": Decimal(string: "0.05")!], fetchedAt: .now
+        )
+        let content = DrawerDetailModel.content(
+            assets: [AssetAmount(code: "USDC", amount: 10), AssetAmount(code: "CETES", amount: 200)],
+            snapshot: snapshot, signers: [], address: Self.account
+        )
+        #expect(content.assets.map(\.code) == ["USDC"])
+        #expect(content.savings.map(\.code) == ["CETES"])
+        let onlyCetes = DrawerDetailModel.content(
+            assets: [AssetAmount(code: "CETES", amount: 200)], snapshot: snapshot, signers: [], address: Self.account
+        )
+        #expect(!onlyCetes.isEmpty, "Des CETES seuls : Swap reste possible")
+    }
+}

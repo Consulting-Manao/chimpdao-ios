@@ -33,7 +33,8 @@ struct MainTabView: View {
         self.session = session
         self.config = config
         let wallet = WalletViewModel(dataSource: ChainWalletDataSource(
-            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle()
+            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle(),
+            stablebondPrices: StablebondWalletPrices(config: config)
         ))
         _walletModel = State(initialValue: wallet)
         _growModel = State(initialValue: GrowModel(
@@ -358,7 +359,8 @@ struct MainTabView: View {
             onRemove: { walletPath.append(.removeCard($0, $1)) },
             onAddCard: { walletPath = [.addCard] },
             onGrow: { walletPath.append(.vault(.deposit, drawerID: $0)) },
-            onPosition: { walletPath.append(.vaultPosition($0)) }
+            onPosition: { walletPath.append(.vaultPosition($0)) },
+            onSavings: { walletPath.append(.savings($0)) }
         )
     }
 
@@ -534,7 +536,8 @@ private struct SettingsDestination: View {
         onDeveloper: (() -> Void)?, onExit: @escaping () -> Void
     ) {
         let summaries = ChainAccountSummaryReader(wallet: ChainWalletDataSource(
-            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle()
+            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle(),
+            stablebondPrices: StablebondWalletPrices(config: config)
         ))
         _model = State(initialValue: SettingsModel(
             session: session, walletCards: walletCards, walletTotal: walletTotal, summaries: summaries

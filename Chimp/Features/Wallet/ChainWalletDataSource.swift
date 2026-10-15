@@ -32,6 +32,9 @@ struct ChainWalletDataSource: WalletDataSource {
     let session: AppSession
     let chain: WalletChain
     let oracle: PriceOracle
+    /// Stablebonds (CETES) : prix indicatif d'Etherfuse, compté dans le total (décision de Barth du 2026-10-15). Prix
+    /// indisponible → la règle actuelle : pas de total partiel.
+    var stablebondPrices: StablebondWalletPrices? = nil
     var now: () -> Date = { .now }
 
     var firstName: String? { session.wallet.firstName }
@@ -82,6 +85,7 @@ struct ChainWalletDataSource: WalletDataSource {
         let held = Set(snapshot.allAssets.filter { $0.amount != 0 }.map(\.code))
         var priced = snapshot
         priced.usdPrices = held.isEmpty ? [:] : await oracle.usdPrices(for: DisplayMoney.priceCodes(held: held, currency: snapshot.currency))
+        if let stablebondPrices { priced.usdPrices.merge(await stablebondPrices.usdPrices(for: held)) { _, etherfuse in etherfuse } }
         return priced
     }
 
@@ -162,5 +166,31 @@ final class ChainWalletReader: WalletChain {
     func tokenID(of card: ChipPublicKey) async throws -> UInt32 {
         let nft = NfcNftClient(client: client, defaultContract: config.contracts.nfcNft, collection: config.contracts.collection)
         return try await nft.token(of: card, source: try await source()).tokenID
+    }
+}
+
+/// Prix indicatifs des stablebonds détenus, pour le total du Wallet et des tiroirs : seulement par Etherfuse (jamais
+/// Reflector, jamais un pool), affichage seulement.
+struct StablebondWalletPrices {
+    let bonds: [IntegrationConfig.Stablebond]
+    let pricing: StablebondPricing?
+
+    init(bonds: [IntegrationConfig.Stablebond], pricing: StablebondPricing?) {
+        self.bonds = bonds
+        self.pricing = pricing
+    }
+
+    init?(config: ChimpNetworkConfig) {
+        guard let etherfuse = config.integrations?.etherfuse else { return nil }
+        self.init(bonds: etherfuse.stablebonds, pricing: EtherfusePriceClient.shared(for: config))
+    }
+
+    /// Le prix en dollars de chaque stablebond détenu ; un prix indisponible est absent (jamais inventé).
+    func usdPrices(for held: Set<String>) async -> [String: Decimal] {
+        var prices: [String: Decimal] = [:]
+        for bond in bonds where held.contains(bond.code) {
+            if let price = await pricing?.price(of: bond).price { prices[bond.code] = price.usd }
+        }
+        return prices
     }
 }

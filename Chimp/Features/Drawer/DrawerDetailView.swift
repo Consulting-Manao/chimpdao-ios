@@ -146,6 +146,11 @@ struct DrawerDetailView: View {
                             .buttonStyle(ChimpPressableStyle())
                             .accessibilityHint(Text("Opens your position"))
                     }
+                    ForEach(content.savings) { bond in
+                        Button { if let address = content.address { actions.onSavings(address) } } label: { savingsTile(bond, address: content.address) }
+                            .buttonStyle(ChimpPressableStyle())
+                            .accessibilityHint(Text("Opens your savings bonds"))
+                    }
                 }
                 .padding(.top, ChimpSpacing.xl)
                 if holding(content) != nil, let vault = grow?.vault {
@@ -178,6 +183,33 @@ struct DrawerDetailView: View {
                 }
             },
             detailColor: (holding.change ?? 0) < 0 ? Color(.chimpNegative) : Color(.chimpPositive)
+        )
+    }
+
+    /// Tuile d'un stablebond, construite comme « GROWING » (décision de Barth du 2026-10-15) : « ETHERFUSE · CETES »,
+    /// la quantité, puis « Price +0.62% since 22 Sep » si la base est connue, sinon « ≈ 99.58 USDC » au prix d'Etherfuse,
+    /// sinon rien ; gelés : « Frozen by Etherfuse » en rouge.
+    private func savingsTile(_ bond: DrawerDetailContent.Asset, address: String?) -> some View {
+        let asset = SendAsset(code: bond.code) ?? .cetes
+        let holding = address.flatMap { grow?.savingsHolding(drawerAddress: $0) }
+        let price = grow?.savingsPrice
+        let issuer = asset.issuerName ?? String(localized: "The issuer")
+        let detail: String?
+        var color = Color(.chimpTextSecondary)
+        if holding?.frozen == true {
+            detail = String(localized: "Frozen by \(issuer)")
+            color = Color(.chimpNegative)
+        } else if let holding, let change = holding.priceChange(price), let since = holding.basis?.since {
+            detail = String(localized: "Price \(SavingsText.change(change, locale: locale)) since \(since.formatted(.dateTime.day().month(.abbreviated)))")
+            color = change < 0 ? Color(.chimpNegative) : Color(.chimpPositive)
+        } else if let holding, let price {
+            detail = SavingsText.value(holding.amount, price: price, locale: locale)
+        } else {
+            detail = nil
+        }
+        return ChimpAssetTile(
+            band: "\(issuer.uppercased()) · \(asset.code)", bandFill: Color(.chimpAssetCetes), bandInk: Color(.chimpTicketInk),
+            value: bond.amount, detail: detail, detailColor: color
         )
     }
 
@@ -361,4 +393,6 @@ struct DrawerDetailActions {
     var onGrow: (String) -> Void = { _ in }
     /// La tuile « GROWING », « See my position » d'un reçu : F6 pour ce tiroir (adresse).
     var onPosition: (String) -> Void = { _ in }
+    /// La tuile d'un stablebond (CETES) : F10 pour ce tiroir (adresse).
+    var onSavings: (String) -> Void = { _ in }
 }

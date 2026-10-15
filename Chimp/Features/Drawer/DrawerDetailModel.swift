@@ -42,6 +42,8 @@ struct DrawerDetailContent: Equatable {
     let total: String
     /// Actifs non nuls, dans l'ordre du Wallet (XLM, USDC).
     let assets: [Asset]
+    /// Stablebonds détenus (CETES) : leur propre tuile, construite comme « GROWING » (décision de Barth du 2026-10-15).
+    var savings: [Asset] = []
     /// Cartes qui peuvent signer pour ce tiroir : toutes celles du compte pour Main, la carte seule pour son wallet.
     let signers: [Signer]
     /// Adresse du tiroir (C…), `nil` si elle n'est pas connue.
@@ -200,7 +202,7 @@ final class DrawerDetailModel {
             if sums[asset.code] == nil { codes.append(asset.code) }
             sums[asset.code, default: 0] += asset.amount
         }
-        let lines: [DrawerDetailContent.Asset] = codes.compactMap { code in
+        func line(_ code: String) -> DrawerDetailContent.Asset? {
             guard let amount = sums[code], amount != 0 else { return nil }
             let known = SendAsset.allCases.first { $0.code == code }
             let value = money.value([AssetAmount(code: code, amount: amount)]).map { money.text($0, style: .wholeWhenRound) }
@@ -210,12 +212,17 @@ final class DrawerDetailModel {
                 value: value
             )
         }
+        // Un actif qui ne s'envoie pas (CETES) n'est pas une tuile « READY » : il a sa tuile d'épargne.
+        let isSavings = { (code: String) in SendAsset.allCases.first { $0.code == code }.map { !$0.isSendable } ?? false }
+        let lines = codes.filter { !isSavings($0) }.compactMap(line)
+        let savings = codes.filter(isSavings).compactMap(line)
         return DrawerDetailContent(
             total: total.map { money.text($0) } ?? WalletViewModel.assetText(assets),
             assets: lines,
+            savings: savings,
             signers: signers,
             address: address,
-            isEmpty: lines.isEmpty
+            isEmpty: lines.isEmpty && savings.isEmpty
         )
     }
 
