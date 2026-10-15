@@ -11,6 +11,12 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
         /// Swap dans un tiroir (tranche 2) : `from` est le tiroir, `to` le contrat qui a reçu ce qui est parti (paire),
         /// `assetCode`/`amount` ce qui est parti, `receivedAssetCode`/`receivedAmount` ce qui est arrivé.
         case swap
+        /// Dépôt dans un vault (tranche 2, D1) : `from` est le tiroir, `to` le vault, `assetCode`/`amount` ce qui est entré
+        /// dans le vault, `shares` les parts reçues (si connues).
+        case vaultDeposit
+        /// Retrait d'un vault : `from` est le vault, `to` le tiroir, `assetCode`/`amount` ce qui est revenu, `shares` les
+        /// parts rendues (si connues).
+        case vaultWithdraw
     }
 
     /// Lue sur la chaîne : `stellar:<hash>:<id de l'événement>` (comme le terminal). Écrite par ce téléphone :
@@ -43,6 +49,10 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
     var receivedAmount: Decimal? = nil
     var minimumReceived: Decimal? = nil
     var protocolName: String? = nil
+    /// Vault (dépôt, retrait) : parts reçues ou rendues, et nom du vault (« DeFindex XLM »). `protocolName` porte alors
+    /// la chaîne des protocoles (« DeFindex → Blend »). Optionnels : les fichiers écrits avant restent lisibles.
+    var shares: Decimal? = nil
+    var vaultName: String? = nil
 
     /// Ce que la ligne représente pour ce compte. `classifyTransfer` du terminal (`lib/chain-history.ts`), sans les
     /// protocoles DeFi (hors V1), plus **Move** : les deux côtés sont des tiroirs du compte (DESIGN_NOTES §13).
@@ -53,6 +63,10 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
             return .cardAdded
         case .swap:
             return drawers.contains(from) ? .swapped : nil
+        case .vaultDeposit:
+            return drawers.contains(from) ? .deposited : nil
+        case .vaultWithdraw:
+            return drawers.contains(to) ? .withdrawn : nil
         case .transfer:
             let sent = drawers.contains(from)
             let received = drawers.contains(to)
@@ -123,6 +137,60 @@ extension ActivityRecord {
         return result
     }
 
+    /// Un vault connu de l'app : son nom affiché et la chaîne de ses protocoles (« DeFindex → Blend »).
+    struct VaultLabel: Equatable, Sendable {
+        let name: String
+        let protocols: String
+    }
+
+    /// Un dépôt confirmé dans un vault, écrit par ce téléphone.
+    static func vaultDeposit(
+        hash: String, drawer: String, vault: String, label: VaultLabel, assetCode: String, amount: Decimal, shares: Decimal?, at: Date = .now
+    ) -> ActivityRecord {
+        var record = ActivityRecord(
+            id: "stellar:\(hash)", event: .vaultDeposit, hash: hash, from: drawer, to: vault, assetCode: assetCode, amount: amount,
+            at: at, isLocal: true
+        )
+        record.protocolName = label.protocols
+        record.vaultName = label.name
+        record.shares = shares
+        return record
+    }
+
+    /// Un retrait confirmé d'un vault, écrit par ce téléphone : ce qui est revenu (`nil` si illisible) et les parts rendues.
+    static func vaultWithdraw(
+        hash: String, drawer: String, vault: String, label: VaultLabel, assetCode: String, received: Decimal?, shares: Decimal?, at: Date = .now
+    ) -> ActivityRecord {
+        var record = ActivityRecord(
+            id: "stellar:\(hash)", event: .vaultWithdraw, hash: hash, from: vault, to: drawer, assetCode: assetCode, amount: received,
+            at: at, isLocal: true
+        )
+        record.protocolName = label.protocols
+        record.vaultName = label.name
+        record.shares = shares
+        return record
+    }
+
+    /// Les transferts relus sur la chaîne entre un tiroir et un vault connu deviennent des dépôts et des retraits : vers le
+    /// vault, un dépôt ; depuis le vault, un retrait. Les parts ne sont pas connues (seul le transfert de l'actif est lu).
+    static func classifyingVaults(_ records: [ActivityRecord], vaults: [String: VaultLabel], drawers: Set<String>) -> [ActivityRecord] {
+        guard !vaults.isEmpty else { return records }
+        return records.map { record in
+            guard record.event == .transfer, !record.isLocal else { return record }
+            var classified = record
+            if drawers.contains(record.from), let label = vaults[record.to] {
+                classified.event = .vaultDeposit
+                classified.protocolName = label.protocols
+                classified.vaultName = label.name
+            } else if drawers.contains(record.to), let label = vaults[record.from] {
+                classified.event = .vaultWithdraw
+                classified.protocolName = label.protocols
+                classified.vaultName = label.name
+            }
+            return classified
+        }
+    }
+
     /// `recordNft` du terminal, pour une carte entrée dans le compte (`add_card` confirmé), avec la carte qui a dit oui.
     static func cardAdded(hash: String, account: String, cardKey: String, approvedBy: String?, at: Date = .now) -> ActivityRecord {
         ActivityRecord(
@@ -140,6 +208,9 @@ enum ActivityKind: Equatable, Sendable {
     case cardAdded
     /// Un actif échangé contre un autre dans le même tiroir.
     case swapped
+    /// Mis dans un vault (Grow), retiré d'un vault.
+    case deposited
+    case withdrawn
 }
 
 /// Ce que le téléphone garde de l'historique d'un compte.

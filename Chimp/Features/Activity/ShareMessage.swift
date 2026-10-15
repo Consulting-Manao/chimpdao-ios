@@ -17,6 +17,10 @@ enum ShareMessage {
         case cardAdded(card: String, approvedBy: String?)
         /// Swap dans un tiroir : ce qui est arrivé (exact), si on le sait.
         case swapped(received: String?, in: String)
+        /// Dépôt dans un vault (« DeFindex XLM »), depuis un tiroir.
+        case deposited(vault: String, from: String)
+        /// Retrait d'un vault, vers un tiroir.
+        case withdrawn(vault: String, into: String)
     }
 
     static let sentPunchlines: [LocalizedStringResource] = [
@@ -63,6 +67,21 @@ enum ShareMessage {
                     ?? String(localized: "🔄 Swapped \(amount) with ChimpDAO."),
                 String(localized: "Same drawer, different coin."),
                 String(localized: "In my \(drawer) · \(networkName) · \(date)"),
+            ]
+            if let proof { lines.append(proof) }
+        case let .deposited(vault, drawer):
+            // Aucun rendement promis, même pour rire : seulement ce qui a été fait.
+            lines = [
+                String(localized: "🌱 Planted \(amount) in the \(vault) vault with ChimpDAO."),
+                String(localized: "Not guaranteed, not advice. Just bananas in the ground."),
+                String(localized: "From my \(drawer) · \(networkName) · \(date)"),
+            ]
+            if let proof { lines.append(proof) }
+        case let .withdrawn(vault, drawer):
+            lines = [
+                String(localized: "🧺 Took \(amount) out of the \(vault) vault with ChimpDAO."),
+                String(localized: "Back home, ready to use."),
+                String(localized: "Into my \(drawer) · \(networkName) · \(date)"),
             ]
             if let proof { lines.append(proof) }
         case let .cardAdded(card, approvedBy):

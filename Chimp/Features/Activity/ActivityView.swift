@@ -236,6 +236,8 @@ extension ActivityStamp {
         case .newCard: "New card"
         case .pending: "Pending"
         case .swapped: "Swapped"
+        case .deposited: "Deposited"
+        case .withdrawn: "Withdrawn"
         }
     }
 
@@ -247,6 +249,9 @@ extension ActivityStamp {
         case .newCard: Color(.chimpStampCard)
         case .pending: Color(.chimpStampPending)
         case .swapped: Color(.chimpTicketMuted)
+        // Maquette I1g : DEPOSITED en vert, WITHDRAWN en brun.
+        case .deposited: Color(.chimpStampReceived)
+        case .withdrawn: Color(.chimpTicketMuted)
         }
     }
 }

@@ -93,7 +93,9 @@ final class ChainActivityDataSource: ActivityDataSource {
 
     func sync(onProgress: @escaping (AccountActivity) -> Void) async throws -> AccountActivity {
         guard let account = session.wallet.account?.address else { return AccountActivity() }
-        let history = ChainActivityHistory(source: SorobanClient(config: config), assets: try SACClient.stellarAssets(config: config))
+        let history = ChainActivityHistory(
+            source: SorobanClient(config: config), assets: try SACClient.stellarAssets(config: config), vaults: config.vaultLabels
+        )
         let pockets = drawers().filter { !$0.isMain }.map(\.address)
         let store = session.activity
         /// Ce que la lecture a trouvé, ajouté au fichier tel qu'il est **maintenant** : une ligne écrite pendant la lecture

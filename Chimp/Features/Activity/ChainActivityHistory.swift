@@ -36,11 +36,14 @@ struct ChainActivityHistory {
     let source: ActivityEventSource
     /// Adresse du SAC → code de l'actif (XLM, USDC).
     let assets: [String: String]
+    /// Vaults connus (Grow) : un transfert vers l'un d'eux est un dépôt, depuis l'un d'eux un retrait.
+    let vaults: [String: ActivityRecord.VaultLabel]
     var pause: (Duration) async -> Void = { try? await Task.sleep(for: $0) }
 
-    init(source: ActivityEventSource, assets: [(code: String, contract: String)]) {
+    init(source: ActivityEventSource, assets: [(code: String, contract: String)], vaults: [String: ActivityRecord.VaultLabel] = [:]) {
         self.source = source
         self.assets = Dictionary(uniqueKeysWithValues: assets.map { ($0.contract, $0.code) })
+        self.vaults = vaults
     }
 
     /// Relit ce qui manque de la fenêtre du RPC pour ces tiroirs et l'ajoute à `activity`. `onProgress` reçoit l'historique
@@ -71,7 +74,10 @@ struct ChainActivityHistory {
             guard let events = try await scan(groups, start: start, end: end, floor: &floor) else { return false }
             let known = Set(state.records.map(\.hash))
             let rows = ActivityRecord.groupingSwaps(
-                Self.records(from: events, account: account, drawers: Set(addresses), assets: assets, known: known),
+                ActivityRecord.classifyingVaults(
+                    Self.records(from: events, account: account, drawers: Set(addresses), assets: assets, known: known),
+                    vaults: vaults, drawers: Set(addresses)
+                ),
                 drawers: Set(addresses)
             )
             state.records = ActivityLog.merging(Self.withLedgers(state.records, from: events), rows)

@@ -11,6 +11,9 @@ enum ActivityStamp: Equatable, Sendable {
     case pending
     /// Maquette I1s : « SWAPPED ».
     case swapped
+    /// Maquette I1g : « DEPOSITED », « WITHDRAWN ».
+    case deposited
+    case withdrawn
 }
 
 /// Montant coloré (reçu) ou neutre.
@@ -319,6 +322,19 @@ final class ActivityViewModel {
                 amount: record.amount.map { quantityText($0, code: code, sign: .negative) }, tone: .neutral, record: record,
                 secondaryAmount: record.receivedAmount.map { quantityText($0, code: received, sign: .positive) }
             )
+        case .deposited:
+            // Maquette I1g : « Put money in », « 09:02 · Main → vault », −50 XLM (quantité, jamais de dollars).
+            return ActivityRow(
+                id: record.id, title: String(localized: "Put money in"),
+                meta: "\(time) · \(drawer(record.from)?.name ?? "") → " + String(localized: "vault"), stamp: .deposited,
+                amount: record.amount.map { quantityText($0, code: code, sign: .negative) }, tone: .neutral, record: record
+            )
+        case .withdrawn:
+            return ActivityRow(
+                id: record.id, title: String(localized: "Took money out"),
+                meta: "\(time) · " + String(localized: "vault") + " → \(drawer(record.to)?.name ?? "")", stamp: .withdrawn,
+                amount: record.amount.map { quantityText($0, code: code, sign: .positive) }, tone: .positive, record: record
+            )
         case .cardAdded:
             let name = record.cardKey.flatMap(cardName) ?? String(localized: "A new card")
             let approver = record.approvedBy.flatMap(cardName)
@@ -356,6 +372,8 @@ final class ActivityViewModel {
                     sums[received, default: 0] += receivedAmount
                 }
                 signed = -amount
+            case .deposited: signed = -amount
+            case .withdrawn: signed = amount
             case .cardAdded: break
             }
             sums[code, default: 0] += signed
@@ -464,6 +482,33 @@ final class ActivityViewModel {
             if let name = record.protocolName {
                 lines.append(.init(id: "protocol", label: "Protocol", value: .text(name)))
             }
+        case .deposited, .withdrawn:
+            // Maquettes I1g.1 et I1g.2 : d'où (ou vers où), ce qui est entré (ou les parts rendues et ce qui est revenu),
+            // le vault, les protocoles.
+            let code = record.assetCode ?? "XLM"
+            if kind == .deposited {
+                lines.append(.init(id: "from", label: "From", value: place(record.from)))
+                if let amount = record.amount {
+                    lines.append(.init(id: "putIn", label: "Put in", value: .text(Self.exactAmount(amount, code: code, locale: locale))))
+                }
+                if let shares = record.shares {
+                    lines.append(.init(id: "shares", label: "Shares", value: .text(Self.sharesText(shares, locale: locale))))
+                }
+            } else {
+                lines.append(.init(id: "backTo", label: "Back to", value: place(record.to)))
+                if let shares = record.shares {
+                    lines.append(.init(id: "gaveBack", label: "Gave back", value: .text(Self.sharesText(shares, locale: locale) + " " + String(localized: "shares"))))
+                }
+                if let amount = record.amount {
+                    lines.append(.init(id: "got", label: "Got", value: .positive(Self.exactAmount(amount, code: code, locale: locale))))
+                }
+            }
+            if let name = record.vaultName {
+                lines.append(.init(id: "vault", label: "Vault", value: .text(name)))
+            }
+            if let protocols = record.protocolName {
+                lines.append(.init(id: "protocols", label: "Protocols", value: .text(protocols)))
+            }
         case .cardAdded:
             lines.append(.init(id: "card", label: "Card", value: card(record.cardKey)))
             lines.append(.init(id: "added", label: "Added to", value: .drawer(String(localized: "Main account"), swatch: .main)))
@@ -484,7 +529,7 @@ final class ActivityViewModel {
             }
         }
         if record.isLocal {
-            if kind == .swapped {
+            if kind == .swapped || kind == .deposited || kind == .withdrawn {
                 lines.append(.init(id: "fee", label: "Fees", value: .positive(String(localized: "On us"))))
             } else {
                 lines.append(.init(id: "fee", label: "Fee", value: .text(String(localized: "Paid by ChimpDAO"))))
@@ -505,6 +550,8 @@ final class ActivityViewModel {
             received: record.receivedAmount.map { Self.exactAmount($0, code: record.receivedAssetCode ?? "", locale: locale) },
             in: title(record.from)
         )
+        case .deposited: .deposited(vault: record.vaultName ?? "DeFindex", from: title(record.from))
+        case .withdrawn: .withdrawn(vault: record.vaultName ?? "DeFindex", into: title(record.to))
         case .cardAdded: .cardAdded(
             card: record.cardKey.flatMap { source.cardName(key: $0) } ?? String(localized: "A new card"),
             approvedBy: record.approvedBy.flatMap { source.cardName(key: $0) }
@@ -524,7 +571,7 @@ final class ActivityViewModel {
             lines: lines,
             hash: record.hash,
             shortHash: record.hash.count > 12 ? "\(record.hash.prefix(4))…\(record.hash.suffix(4))" : record.hash,
-            total: kind == .swapped ? nil : record.amount.flatMap { amount in
+            total: [.swapped, .deposited, .withdrawn].contains(kind) ? nil : record.amount.flatMap { amount in
                 record.assetCode.map { code in
                     Self.amountText(amount, code: code, sign: kind == .sent ? .negative : (kind == .received ? .positive : nil), exact: true, locale: locale)
                 }
@@ -535,7 +582,8 @@ final class ActivityViewModel {
             shareText: share,
             counterparty: Self.counterparty(of: record, kind: kind),
             send: Self.prefill(for: record, kind: kind),
-            stampAmounts: kind == .swapped ? Self.swapAmounts(of: record, locale: locale) : [],
+            stampAmounts: kind == .swapped ? Self.swapAmounts(of: record, locale: locale)
+                : (kind == .deposited || kind == .withdrawn ? Self.vaultAmounts(of: record, kind: kind, locale: locale) : []),
             swap: kind == .swapped ? Self.swapPrefill(for: record) : nil
         )
     }
@@ -561,7 +609,7 @@ final class ActivityViewModel {
         switch kind {
         case .sent: ActivityReceipt.Counterparty(lineID: "to", address: record.to)
         case .received: ActivityReceipt.Counterparty(lineID: "from", address: record.from)
-        case .moved, .cardAdded, .swapped: nil
+        case .moved, .cardAdded, .swapped, .deposited, .withdrawn: nil
         }
     }
 
@@ -575,9 +623,22 @@ final class ActivityViewModel {
         case .received:
             guard asset != nil else { return nil }
             return SendPrefill(address: record.from, asset: asset, amount: record.amount, origin: .sendBack)
-        case .moved, .cardAdded, .swapped:
+        case .moved, .cardAdded, .swapped, .deposited, .withdrawn:
             return nil
         }
+    }
+
+    /// La quantité d'un dépôt ou d'un retrait, à côté du tampon (maquettes I1g.1, I1g.2) : « −50 XLM », « +10.02 XLM ».
+    static func vaultAmounts(of record: ActivityRecord, kind: ActivityKind, locale: Locale = .autoupdatingCurrent) -> [ActivityReceipt.StampAmount] {
+        guard let amount = record.amount, let code = record.assetCode else { return [] }
+        let positive = kind == .withdrawn
+        return [.init(text: quantityText(amount, code: code, sign: positive ? .positive : .negative, locale: locale), tone: positive ? .positive : .neutral)]
+    }
+
+    /// Parts d'un vault : 7 décimales au plus (une part du vault XLM vaut ~1 667 XLM sur testnet : 2 décimales n'y
+    /// suffiraient pas).
+    static func sharesText(_ shares: Decimal, locale: Locale = .autoupdatingCurrent) -> String {
+        shares.formatted(Decimal.FormatStyle(locale: locale).precision(.fractionLength(0...7)))
     }
 
     /// Les deux quantités d'un swap, à côté du tampon (maquette I1s.1) : « −400 XLM », « +99.71 USDC ».
