@@ -42,6 +42,11 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// La ligne de description sous l'actif, seulement quand elle aide (maquette E3p, décision de Barth du 2026-10-15).
+    var descriptionLine: String? {
+        self == .cetes ? String(localized: "Mexican government bonds, by Etherfuse") : nil
+    }
+
     /// Qui émet l'actif et peut le geler, quand ce n'est pas un actif « de base » (XLM, USDC de Circle).
     var issuerName: String? { self == .cetes ? "Etherfuse" : nil }
 

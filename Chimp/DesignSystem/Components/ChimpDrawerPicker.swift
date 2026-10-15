@@ -152,6 +152,8 @@ struct ChimpDrawerOptionRow: View {
 /// La ligne choisie est jaune, avec une ombre.
 struct ChimpOptionRow<Icon: View>: View {
     let title: String
+    /// Ce que c'est, sous le titre (« Mexican government bonds, by Etherfuse », maquette E3p). Masqué si `nil`.
+    var detail: String? = nil
     /// Sous-titre déjà formaté. Masqué si `nil`.
     var subtitle: String?
     let isSelected: Bool
@@ -166,6 +168,12 @@ struct ChimpOptionRow<Icon: View>: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: title)
                         .chimpFont(.optionTitle)
+                    if let detail {
+                        Text(verbatim: detail)
+                            .chimpFont(.captionS)
+                            .fontWeight(.heavy)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if let subtitle {
                         Text(verbatim: subtitle)
                             .chimpFont(.captionS)

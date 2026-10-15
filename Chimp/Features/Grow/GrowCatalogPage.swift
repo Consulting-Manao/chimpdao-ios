@@ -65,10 +65,13 @@ struct GrowDemoRoot: View {
     @State private var model: GrowModel
     @State private var path: [GrowRoute]
 
-    init(service: MockVaultService, start: [GrowRoute] = [], onClose: @escaping () -> Void) {
+    init(
+        service: MockVaultService, savings: MockSavingsService.Scenario = .normal, start: [GrowRoute] = [],
+        onClose: @escaping () -> Void
+    ) {
         self.service = service
         self.onClose = onClose
-        _model = State(initialValue: GrowModel(service: service))
+        _model = State(initialValue: GrowModel(service: service, savingsService: MockSavingsService(scenario: savings)))
         _path = State(initialValue: start)
     }
 
@@ -99,6 +102,10 @@ struct GrowDemoRoot: View {
             VaultFlowRoot(service: service, action: .deposit, drawerID: drawerID, onSeePosition: showPosition, onExit: pop)
         case .withdraw(let drawerID):
             VaultFlowRoot(service: service, action: .withdraw, drawerID: drawerID, onSeePosition: showPosition, onExit: pop)
+        case .savings(let address):
+            SavingsView(model: model, drawerAddress: address, onBack: pop) { path.append(.swap($0)) }
+        case .swap(let prefill):
+            SwapFlowRoot(service: MockSwapService(), prefill: prefill, onExit: pop)
         }
     }
 
@@ -113,16 +120,20 @@ struct GrowDemoRoot: View {
 
 /// Lancement direct de Grow factice (Debug et Testing), pour les captures et les essais :
 /// `xcrun simctl launch <appareil> com.consulting-manao.chimp -vaultDemo lentOut` (un scénario du vault ; suffixes
-/// `:deposit`, `:withdraw`, `:vault` ou `:position` pour ouvrir directement cet écran). Sans l'argument : rien.
+/// `:deposit`, `:withdraw`, `:vault`, `:position` ou `:savings` pour ouvrir directement cet écran). Les CETES :
+/// `-savingsDemo frozen` (un scénario de `MockSavingsService`). Sans l'argument : rien.
 struct VaultDemoLaunch: ViewModifier {
     @State private var argument = UserDefaults.standard.string(forKey: "vaultDemo")
+    private let savings = UserDefaults.standard.string(forKey: "savingsDemo").flatMap(MockSavingsService.Scenario.init(rawValue:)) ?? .normal
 
     func body(content: Content) -> some View {
         content.overlay {
             if argument != nil {
                 let parts = (argument ?? "normal").split(separator: ":").map(String.init)
                 let scenario = MockVaultService.Scenario(rawValue: parts.first ?? "normal") ?? .normal
-                GrowDemoRoot(service: GrowCatalogPage.service(scenario), start: Self.start(parts.dropFirst().first)) { argument = nil }
+                GrowDemoRoot(service: GrowCatalogPage.service(scenario), savings: savings, start: Self.start(parts.dropFirst().first)) {
+                    argument = nil
+                }
                     .background(Color(.chimpBackground))
             }
         }
@@ -134,6 +145,7 @@ struct VaultDemoLaunch: ViewModifier {
         case "withdraw": [.withdraw(drawerID: "main")]
         case "vault": [.vault]
         case "position": [.position(drawerAddress: MockReceiveDataSource.mainAddress)]
+        case "savings": [.savings(drawerAddress: MockReceiveDataSource.mainAddress)]
         default: []
         }
     }

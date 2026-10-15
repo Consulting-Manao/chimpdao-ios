@@ -19,6 +19,12 @@ struct SwapAmountView: View {
     @State private var assetSheetSide: SwapFlowModel.Side?
 
 
+    /// Une ligne par actif, plus la description de ceux qui en ont une (CETES).
+    private static let assetSheetHeight: CGFloat = {
+        let described = SendAsset.swappable.filter { $0.descriptionLine != nil }.count
+        return CGFloat(170 + 76 * SendAsset.swappable.count + 20 * described)
+    }()
+
     var body: some View {
         VStack(spacing: 0) {
             ChimpHeader(title: "Swap", subtitle: "Same drawer, different coin", onBack: onBack)
@@ -37,7 +43,7 @@ struct SwapAmountView: View {
         }
         .chimpSheet(
             isPresented: Binding(get: { assetSheetSide != nil }, set: { if !$0 { assetSheetSide = nil } }),
-            height: CGFloat(170 + 76 * SendAsset.swappable.count)
+            height: Self.assetSheetHeight
         ) {
             assetSheet
         }
@@ -61,6 +67,9 @@ struct SwapAmountView: View {
                         getCard
                         rateLine
                         notice
+                        if model.currentQuote != nil {
+                            ChimpTestnetPriceNote(network: model.context?.network)
+                        }
                     }
                     .padding(.horizontal, ChimpSpacing.xxl)
                     .padding(.top, ChimpSpacing.ml)
@@ -517,6 +526,7 @@ struct SwapAmountView: View {
                     let current = assetSheetSide == .received ? model.received : model.given
                     ChimpOptionRow(
                         title: asset.code,
+                        detail: asset.descriptionLine,
                         subtitle: model.selectedDrawer.map { "\(asset.displayedWithCode($0.balance(of: asset), locale: locale)) in \(shortTitle($0))" },
                         isSelected: asset == current
                     ) {

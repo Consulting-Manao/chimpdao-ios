@@ -89,6 +89,7 @@ struct SwapReviewView: View {
             minimumCard(draft)
             details(draft)
             signerBanner(draft)
+            ChimpTestnetPriceNote(network: draft.network)
             if let issue = model.preparationIssue {
                 VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
                     ChimpFieldMessage(text: Self.message(for: issue, draft: draft), kind: .error)

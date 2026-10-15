@@ -10,6 +10,10 @@ enum GrowRoute: Hashable {
     case deposit(drawerID: String?)
     /// F7 · retirer, vers le tiroir qui détient la position.
     case withdraw(drawerID: String)
+    /// F10 · les CETES d'un tiroir (adresse du tiroir ; une page par tiroir).
+    case savings(drawerAddress: String)
+    /// Swap prérempli depuis F9 ou F10 (« Get some », « Get more », « Swap back ») : la paire seule, montant vide.
+    case swap(SwapPrefill)
 }
 
 /// F1 · Grow (maquette du 2026-10-15, décisions de Barth du même jour) : ce qui pousse (valeur, évolution réelle depuis
@@ -26,14 +30,7 @@ struct GrowView: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.sm) {
-                    switch model.phase {
-                    case .loading where model.context == nil:
-                        ProgressView().frame(maxWidth: .infinity).padding(.top, ChimpSpacing.xl)
-                    case .unavailable where model.context == nil:
-                        VaultUnanswered(details: model.technicalDetails) { Task { await model.refresh() } }
-                    default:
-                        content
-                    }
+                    content
                 }
                 .padding(.horizontal, ChimpSpacing.xxl)
                 .padding(.top, ChimpSpacing.l)
@@ -54,7 +51,7 @@ struct GrowView: View {
     @ViewBuilder
     private var header: some View {
         if model.holdings.isEmpty {
-            ChimpHeader(title: "Grow", subtitle: "XLM only · no promised rates")
+            ChimpHeader(title: "Grow", subtitle: "What your coins really did. No promised rates.")
         } else {
             GrowHero(value: model.totalValue, change: model.totalChange, asset: model.vault?.asset ?? .xlm)
         }
@@ -62,20 +59,39 @@ struct GrowView: View {
 
     // MARK: Contenu
 
+    /// Décision de Barth du 2026-10-15 : F1 garde son en-tête vert, avec deux sections, « Vault » et « Savings bonds »
+    /// (maquette F9), sans niveau de risque.
     @ViewBuilder
     private var content: some View {
+        if model.holdings.isEmpty, model.savings?.holdings.isEmpty ?? true, model.phase != .loading {
+            ChimpySays(text: "Nothing growing yet. Your XLM can go in the vault below.", pose: .plant)
+                .padding(.bottom, ChimpSpacing.s)
+        }
+        Text("Vault").chimpFont(.displayS).foregroundStyle(.chimpTextPrimary).accessibilityAddTraits(.isHeader)
+        switch model.phase {
+        case .loading where model.context == nil:
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, ChimpSpacing.m)
+        case .unavailable where model.context == nil:
+            VaultUnanswered(details: model.technicalDetails) { Task { await model.refresh() } }
+        default:
+            vaultSection
+        }
+        if model.savingsService != nil {
+            Text("Savings bonds").chimpFont(.displayS).foregroundStyle(.chimpTextPrimary).accessibilityAddTraits(.isHeader)
+                .padding(.top, ChimpSpacing.m)
+            SavingsCard(model: model, onOpen: onOpen)
+        }
+        ChimpySays(text: "No promised rates here. I only show what your coins really did.", pose: .teacher)
+            .padding(.top, ChimpSpacing.m)
+        ChimpVaultNotice(chipsOnly: true)
+    }
+
+    @ViewBuilder
+    private var vaultSection: some View {
         if model.phase == .unavailable {
             ChimpNoticeBanner(text: "DeFindex isn't answering right now. Showing the last numbers.", marker: .error) {
                 ChimpPillButton("Retry") { Task { await model.refresh() } }
             }
-        }
-        if model.holdings.isEmpty {
-            ChimpySays(text: "Nothing growing yet. Your XLM can go in the vault below.", pose: .plant)
-                .padding(.bottom, ChimpSpacing.s)
-        }
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Places to grow").chimpFont(.displayS).foregroundStyle(.chimpTextPrimary)
-            Text("Just one for now.").chimpFont(.captionStrong).foregroundStyle(.chimpTextSecondary)
         }
         if let vault = model.vault {
             Button { onOpen(.vault) } label: { VaultPlaceCard(vault: vault) }
@@ -88,9 +104,6 @@ struct GrowView: View {
                     .buttonStyle(ChimpPressableStyle())
             }
         }
-        ChimpySays(text: "No promised rates here. I only show what your XLM really did.", pose: .teacher)
-            .padding(.top, ChimpSpacing.m)
-        ChimpVaultNotice(chipsOnly: true)
     }
 
     /// « In Main · 50 XLM put in · updated 09:00 · 50.12 XLM · +0.12 XLM ».

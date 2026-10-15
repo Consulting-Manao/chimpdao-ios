@@ -36,7 +36,10 @@ struct MainTabView: View {
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle()
         ))
         _walletModel = State(initialValue: wallet)
-        _growModel = State(initialValue: GrowModel(service: ChainVaultService(session: session, config: config)))
+        _growModel = State(initialValue: GrowModel(
+            service: ChainVaultService(session: session, config: config),
+            savingsService: config.integrations == nil ? nil : ChainSavingsService(session: session, config: config)
+        ))
         // L'historique : téléphone + RPC de testnet ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
             session: session, config: config, walletCards: { [weak wallet] in wallet?.cards ?? [] }
@@ -98,6 +101,12 @@ struct MainTabView: View {
                                     onSeePosition: showPositionFromWallet, onExit: closeFlow
                                 )
                             }
+                        case .savings(let address):
+                            // F10 depuis la tuile CETES d'un tiroir.
+                            SavingsView(model: growModel, drawerAddress: address, onBack: { if !walletPath.isEmpty { walletPath.removeLast() } }) {
+                                walletPath.append(.prefilledSwap($0))
+                            }
+                            .toolbar(.hidden, for: .navigationBar)
                         case .vaultPosition(let address):
                             // F6 depuis la tuile « GROWING » d'un tiroir.
                             VaultPositionView(
@@ -232,6 +241,13 @@ struct MainTabView: View {
                     service: ChainVaultService(session: session, config: config), action: .withdraw, drawerID: drawerID,
                     onSeePosition: showPositionInGrow, onExit: closeGrowFlow
                 )
+            }
+        case .savings(let address):
+            SavingsView(model: growModel, drawerAddress: address, onBack: popGrow) { growPath.append(.swap($0)) }
+        case .swap(let prefill):
+            // « Get some », « Get more », « Swap back » (F9, F10) : la paire seule, montant vide.
+            pendingFirst(onExit: closeGrowFlow) {
+                SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill, onExit: closeGrowFlow)
             }
         }
     }
@@ -387,6 +403,8 @@ enum WalletRoute: Hashable {
     case vault(VaultAction, drawerID: String?)
     /// F6 : la position de ce tiroir (adresse).
     case vaultPosition(String)
+    /// F10 : les CETES de ce tiroir (adresse).
+    case savings(String)
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
