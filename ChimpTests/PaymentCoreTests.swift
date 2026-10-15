@@ -307,6 +307,29 @@ struct PaymentCoreTests {
         #expect(try PaymentClient.transferTopics(from: pocket) == ["AAAADwAAAAh0cmFuc2Zlcg==", "AAAAEgAAAAEXZyNZ83PaLJiN85m37N9EyzJewm84Tq9DoXURVlTqRQ==", "*", "*"])
     }
 
+    @Test("Retrait d'un vault : on cherche le transfert vault → tiroir (pas tiroir → …), le nonce reste celui du tiroir")
+    func vaultWithdrawalTopics() async throws {
+        let vault = "CCLV4H7WTLJQ7ATLHBBQV2WW3OINF3FOY5XZ7VPHZO7NH3D2ZS4GFSF6"
+        #expect(try PaymentClient.transferTopics(from: vault, to: pocket) == [
+            "AAAADwAAAAh0cmFuc2Zlcg==",
+            try #require(SCValXDR.address(try SACClient.address(vault)).xdrEncoded),
+            "AAAAEgAAAAEXZyNZ83PaLJiN85m37N9EyzJewm84Tq9DoXURVlTqRQ==",
+            "*",
+        ])
+        var withdrawal = trace(hash: nil, maxTime: nil)
+        withdrawal.eventSender = vault
+        withdrawal.eventRecipient = withdrawal.from
+        let ledger = FakeLedger(latest: (2_000, 0))
+        ledger.scan = .init(transactionHashes: [], oldestLedger: 1, latestLedger: 99_999)
+        _ = try await PaymentClient.check(withdrawal, ledger: ledger)
+        #expect(ledger.scannedTopics == (try PaymentClient.transferTopics(from: vault, to: withdrawal.from)))
+
+        // Une trace enregistrée avant ces champs reste lisible (fichier local de l'opération en attente).
+        let old = #"{"token":"t","from":"f","destination":"d","units":1,"nonce":2,"preparedAtLedger":3,"expirationLedger":4}"#
+        let decoded = try JSONDecoder().decode(PaymentTrace.self, from: Data(old.utf8))
+        #expect(decoded.eventSender == nil && decoded.eventRecipient == nil)
+    }
+
     @Test("Curseur de getEvents → ledger atteint (curseurs réels de testnet, 2026-09-29)")
     func cursorLedger() {
         #expect(ChimpDAO.SorobanClient.cursorLedger("0021193825359773696-0000000000") == 4_934_572)
@@ -402,7 +425,10 @@ private final class FakeLedger: PaymentLedger, @unchecked Sendable {
 
     func latestLedgerInfo() async throws -> (sequence: UInt32, closeTime: UInt64) { latest }
 
+    private(set) var scannedTopics: [String] = []
+
     func eventTransactions(contract: String, topics: [String], startLedger: UInt32, endLedger: UInt32) async throws -> ChimpDAO.SorobanClient.EventScan {
+        scannedTopics = topics
         scanned = true
         scannedRange = startLedger...endLedger
         return scan

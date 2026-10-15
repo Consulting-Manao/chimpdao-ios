@@ -99,10 +99,17 @@ final class DeFindexAdapter: YieldAdapter {
         return try DeFindexCalls.deposit(vault: venue.id, from: authorizer, units: amount.units)
     }
 
-    func withdrawCall(position: YieldPosition, amount: TokenAmount, all: Bool) async throws -> ContractCall {
+    /// Ce qu'un retrait rendrait : parts rendues, valeur attendue, minimum signé (− 0,5 %). Parts et valeur relues juste
+    /// avant (jamais celles de l'écran) : le vault bouge à chaque ledger.
+    struct WithdrawQuote: Equatable, Sendable {
+        let shares: TokenAmount
+        let expected: TokenAmount
+        let minimum: TokenAmount
+    }
+
+    func withdrawQuote(position: YieldPosition, amount: TokenAmount, all: Bool) async throws -> WithdrawQuote {
         guard let venue = vaults.first(where: { $0.id == position.venueID }) else { throw YieldError.unknownVault }
         try await verifyAsset(of: venue)
-        // Parts et valeur relues juste avant (jamais celles de l'écran) : le vault grandit à chaque ledger.
         let shareBalance = try Self.int128(
             try await read(venue.id, "balance", [try ContractArgument.address(position.holder)]), "balance"
         )
@@ -115,7 +122,19 @@ final class DeFindexAdapter: YieldAdapter {
         let expected = shares == shareBalance ? total : try await valueOf(shares: TokenAmount(shares), in: venue)
         let minimum = Slippage.minimum(of: expected, basisPoints: Self.withdrawSlippageBasisPoints)
         guard minimum > 0 else { throw YieldError.amountTooSmall }
-        return try DeFindexCalls.withdraw(vault: venue.id, from: position.holder, shares: shares, minimumOut: minimum)
+        return WithdrawQuote(shares: TokenAmount(shares), expected: TokenAmount(expected), minimum: TokenAmount(minimum))
+    }
+
+    func withdrawCall(position: YieldPosition, amount: TokenAmount, all: Bool) async throws -> ContractCall {
+        let quote = try await withdrawQuote(position: position, amount: amount, all: all)
+        return try DeFindexCalls.withdraw(vault: position.venueID, from: position.holder, shares: quote.shares.units, minimumOut: quote.minimum.units)
+    }
+
+    /// Parts qu'un dépôt de `amount` recevrait au prix du moment (affichage : « about N shares » ; un dépôt ne fixe pas
+    /// de minimum de parts).
+    func depositQuote(venue: YieldVenue, amount: TokenAmount) async throws -> TokenAmount {
+        guard amount.units > 0 else { throw YieldError.amountTooSmall }
+        return TokenAmount(try await state(of: venue).shares(for: amount.units))
     }
 
     func authShape() -> any AuthShape {
@@ -170,6 +189,17 @@ final class DeFindexAdapter: YieldAdapter {
             throw ContractArgument.ArgumentError.malformed("this vault does not declare its asset")
         }
         return address
+    }
+
+    /// Parts reçues, dans la valeur rendue par `deposit` : `(Vec<i128> montants, i128 parts, allocations)`.
+    static func mintedShares(_ returnValue: SCValXDR) -> Int128? {
+        guard let parts = returnValue.vec, parts.count >= 2 else { return nil }
+        return ContractArgument.int128(parts[1])
+    }
+
+    /// Actif revenu, dans la valeur rendue par `withdraw` : `Vec<i128>`.
+    static func withdrawnAmount(_ returnValue: SCValXDR) -> Int128? {
+        try? firstAmount(returnValue)
     }
 
     /// Le premier montant d'un `Vec<i128>` (`get_asset_amounts_per_shares`, montants retirés).

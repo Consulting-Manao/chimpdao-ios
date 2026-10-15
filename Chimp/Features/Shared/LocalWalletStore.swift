@@ -87,6 +87,21 @@ struct PendingSend: Codable, Equatable {
     /// Swap signé (tranche 2) : ce qui devait arriver. `nil` pour un envoi ou un Move. `recipient` est alors le contrat
     /// appelé (router), `asset` et `amount` ce qui part. Optionnel : un fichier écrit avant ce champ reste lisible.
     var swap: PendingSwap? = nil
+    /// Dépôt ou retrait d'un vault signé (tranche 2, D1). `recipient` est alors le vault, `asset` et `amount` l'actif
+    /// mis (dépôt) ou attendu (retrait). Optionnel : un fichier écrit avant ce champ reste lisible.
+    var vault: PendingVault? = nil
+}
+
+/// Ce qu'un dépôt ou un retrait à l'issue incertaine portait, pour réafficher son état (« Check again »).
+struct PendingVault: Codable, Equatable {
+    /// `VaultAction.rawValue` : « deposit » ou « withdraw ».
+    var action: String
+    /// « DeFindex XLM ».
+    var vaultName: String
+    /// Parts reçues attendues (dépôt) ou rendues (retrait).
+    var shares: Decimal?
+    /// Retrait : le minimum signé.
+    var minimumReceived: Decimal?
 }
 
 /// Ce qu'un swap à l'issue incertaine devait rendre, pour réafficher son état (« Check again »).

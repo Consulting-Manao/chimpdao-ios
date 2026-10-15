@@ -182,9 +182,10 @@ final class ChainSendService: SendService {
 
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck {
         let result = try await payments.check(trace)
-        // Un paiement en attente finalement parti : écrit dans l'historique comme un envoi confirmé. Pas un swap : ses deux
-        // côtés reviennent de la chaîne.
-        if case .sent(let hash) = result, session.wallet.pendingSend?.swap == nil, let account = session.wallet.account?.address,
+        // Un paiement en attente finalement parti : écrit dans l'historique comme un envoi confirmé. Pas un swap ni une
+        // opération de vault : leur service écrit leur propre ligne.
+        if case .sent(let hash) = result, session.wallet.pendingSend?.swap == nil, session.wallet.pendingSend?.vault == nil,
+           let account = session.wallet.account?.address,
            let code = (try? SACClient.stellarAssets(config: config))?.first(where: { $0.contract == trace.token })?.code {
             session.recordActivity(.payment(
                 hash: hash, from: trace.from, to: trace.destination, assetCode: code,

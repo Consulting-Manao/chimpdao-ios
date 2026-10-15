@@ -180,7 +180,7 @@ struct PaymentClient {
         }
         let scan = try await ledger.eventTransactions(
             contract: trace.token,
-            topics: try transferTopics(from: trace.from),
+            topics: try transferTopics(from: trace.eventSender ?? trace.from, to: trace.eventRecipient),
             startLedger: trace.preparedAtLedger,
             endLedger: trace.expirationLedger
         )
@@ -204,12 +204,16 @@ struct PaymentClient {
 
     /// Sujets d'un événement `transfer` d'un SAC dont l'expéditeur est `from` (`["transfer", from, to, actif]`,
     /// comme les filtres de `backfillChainHistory`) : XDR base64, `*` pour « n'importe lequel ».
-    static func transferTopics(from: String) throws -> [String] {
+    static func transferTopics(from: String, to: String? = nil) throws -> [String] {
         guard let name = SCValXDR.symbol("transfer").xdrEncoded,
               let sender = SCValXDR.address(try SACClient.address(from)).xdrEncoded else {
             throw StellarError.invalidResponse("could not encode the transfer topics")
         }
-        return [name, sender, "*", "*"]
+        guard let to else { return [name, sender, "*", "*"] }
+        guard let recipient = SCValXDR.address(try SACClient.address(to)).xdrEncoded else {
+            throw StellarError.invalidResponse("could not encode the transfer topics")
+        }
+        return [name, sender, recipient, "*"]
     }
 
     /// L'enveloppe (base64, simple ou « fee bump ») contient-elle une entrée d'autorisation de `from` avec ce nonce ?
@@ -327,6 +331,11 @@ struct PaymentTrace: Equatable, Sendable, Codable {
     var transactionHash: String?
     /// Limite de temps de notre transaction (secondes depuis 1970) : au-delà, elle ne peut plus être incluse.
     var transactionMaxTime: UInt64?
+    /// Transfert à chercher quand ce n'est pas l'autorisateur qui envoie l'actif (retrait d'un vault : le vault paie le
+    /// tiroir). `nil` : un transfert envoyé par `from` (envoi, dépôt, swap). Le nonce est toujours celui de `from`.
+    /// Optionnels : une trace gardée avant reste lisible.
+    var eventSender: String? = nil
+    var eventRecipient: String? = nil
 }
 
 /// Un échec **après** le tap : l'autorisation signée a pu sortir du téléphone. `trace` sert à `PaymentClient.check`.
