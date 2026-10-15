@@ -42,6 +42,9 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// Qui émet l'actif et peut le geler, quand ce n'est pas un actif « de base » (XLM, USDC de Circle).
+    var issuerName: String? { self == .cetes ? "Etherfuse" : nil }
+
     var glyph: ChimpAssetGlyph {
         switch self {
         case .usdc: .usdc

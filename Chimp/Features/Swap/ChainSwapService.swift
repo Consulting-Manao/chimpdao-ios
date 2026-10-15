@@ -47,7 +47,45 @@ final class ChainSwapService: SwapService {
 
     func fetchContext() async throws -> SwapContext {
         let context = try await drawers.fetchContext()
-        return SwapContext(network: context.network, drawers: context.drawers)
+        return SwapContext(network: context.network, drawers: context.drawers, frozen: await frozenStablebonds(in: context.drawers))
+    }
+
+    // MARK: Gel (CETES)
+
+    /// Les stablebonds gelés par leur émetteur, tiroir par tiroir (`authorized` du SAC, lu en parallèle). Une lecture ratée
+    /// ne bloque rien ici : `prepare` relit le gel avant toute signature et refuse s'il ne peut pas le lire.
+    private func frozenStablebonds(in drawers: [SendDrawer]) async -> [String: Set<SendAsset>] {
+        guard let bonds = config.integrations?.etherfuse.stablebonds, !bonds.isEmpty,
+              let source = try? Account(accountId: config.feePayer, sequenceNumber: 0) else { return [:] }
+        let control = StablebondControl(client: client)
+        return await withTaskGroup(of: (String, SendAsset)?.self) { group in
+            for drawer in drawers {
+                for bond in bonds {
+                    guard let asset = SendAsset(code: bond.code) else { continue }
+                    group.addTask {
+                        let frozen = (try? await control.isFrozen(token: bond.contract, holder: drawer.address, source: source)) ?? false
+                        return frozen ? (drawer.id, asset) : nil
+                    }
+                }
+            }
+            var result: [String: Set<SendAsset>] = [:]
+            for await item in group {
+                if let (drawerID, asset) = item { result[drawerID, default: []].insert(asset) }
+            }
+            return result
+        }
+    }
+
+    /// Avant de signer : si l'un des deux actifs est un stablebond, son gel est relu pour ce tiroir. Gelé → rien n'est
+    /// signé ; illisible → l'erreur remonte (jamais « pas gelé » par défaut).
+    private func checkNotFrozen(_ draft: SwapDraft, request: SwapRequest, source: Account) async throws {
+        let bonds = Set(config.integrations?.etherfuse.stablebonds.map(\.contract) ?? [])
+        let control = StablebondControl(client: client)
+        for asset in [request.assetIn, request.assetOut] where bonds.contains(asset.contract) {
+            if try await control.isFrozen(token: asset.contract, holder: draft.drawer.address, source: source) {
+                throw SwapServiceError.frozen(asset.code)
+            }
+        }
     }
 
     /// Le contrat (SAC) d'un actif de l'app sur ce réseau.
@@ -108,6 +146,8 @@ final class ChainSwapService: SwapService {
         guard let adapter = registry.swapAdapter(id: draft.quote.protocolID) else { throw SwapServiceError.protocolUnavailable([draft.quote.protocolName]) }
         let request = try request(given: draft.given, received: draft.received, amount: draft.amount)
         let source = try Account(accountId: config.feePayer, sequenceNumber: 0)
+
+        try await checkNotFrozen(draft, request: request, source: source)
 
         // Solde relu : on ne signe jamais sur un solde inconnu ou insuffisant.
         let held = try await SACClient(client: client).balance(token: request.assetIn.contract, holder: draft.drawer.address, source: source)

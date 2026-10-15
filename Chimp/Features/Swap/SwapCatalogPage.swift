@@ -124,6 +124,7 @@ private extension MockSwapService.QuoteScenario {
         case .aquariusBest: "Best price from Aquarius"
         case .soroswapDown: "Soroswap is down, Aquarius answers"
         case .implausible: "Implausible quote (blocked)"
+        case .cetesFrozen: "CETES frozen by Etherfuse in Main"
         }
     }
 }

@@ -5,6 +5,9 @@ struct SwapContext: Equatable {
     var network: StellarNetwork
     /// Main d'abord, puis les wallets des cartes.
     var drawers: [SendDrawer]
+    /// Actifs gelés par leur émetteur, par tiroir (identifiant) : lus sur la chaîne (`authorized` du SAC, CETES). Un actif
+    /// gelé ne s'échange ni dans un sens ni dans l'autre.
+    var frozen: [String: Set<SendAsset>] = [:]
 }
 
 /// Conversions entre les montants affichés (`Decimal`, unité de l'actif) et les unités on-chain (7 décimales, `i128`).
@@ -202,12 +205,15 @@ enum SwapServiceError: Error, Equatable, LocalizedError {
     case protocolUnavailable([String])
     case noAccount
     case unknownDrawer(String)
+    /// L'émetteur a gelé cet actif dans ce tiroir (code de l'actif) : rien n'est signé.
+    case frozen(String)
 
     var errorDescription: String? {
         switch self {
         case .protocolUnavailable(let names): "No answer from \(names.joined(separator: ", "))."
         case .noAccount: "No account is open on this phone."
         case .unknownDrawer(let id): "Unknown drawer \(id)."
+        case .frozen(let code): "\(code) is frozen by its issuer in this drawer."
         }
     }
 }

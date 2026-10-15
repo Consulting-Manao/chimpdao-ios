@@ -20,6 +20,8 @@ final class MockSwapService: SwapService {
         case soroswapDown
         /// Devis invraisemblable (plus que la réserve du pool) : refusé, jamais affiché.
         case implausible
+        /// Etherfuse a gelé les CETES du Main : aucun swap avec CETES dans Main.
+        case cetesFrozen
 
         var id: String { rawValue }
     }
@@ -76,7 +78,9 @@ final class MockSwapService: SwapService {
             if case .main = drawer.kind, !drawer.balances.isEmpty { drawer.balances[.cetes] = Decimal(string: "1820.4")! }
             return drawer
         }
-        return SwapContext(network: context.network, drawers: drawers)
+        let main = drawers.first { $0.kind == .main }?.id
+        let frozen: [String: Set<SendAsset>] = quoteScenario == .cetesFrozen ? main.map { [$0: [.cetes]] } ?? [:] : [:]
+        return SwapContext(network: context.network, drawers: drawers, frozen: frozen)
     }
 
     func quote(given: SendAsset, received: SendAsset, amount: Decimal) async throws -> SwapQuoteSummary {
@@ -86,7 +90,7 @@ final class MockSwapService: SwapService {
         case .noRoute: throw SwapError.noRoute
         case .protocolUnavailable: throw SwapServiceError.protocolUnavailable(["Soroswap", "Aquarius"])
         case .implausible: throw SwapError.implausibleQuote
-        case .normal, .bigImpact, .priceMovesBeforeSigning, .aquariusBest, .soroswapDown: break
+        case .normal, .bigImpact, .priceMovesBeforeSigning, .aquariusBest, .soroswapDown, .cetesFrozen: break
         }
         let units = try SwapUnits.units(of: amount, asset: given)
         var out = units * Self.rate(given, received) / 1_000_000
@@ -104,6 +108,9 @@ final class MockSwapService: SwapService {
     func prepare(_ draft: SwapDraft) async throws -> PreparedSwap {
         prepareCount += 1
         try await Task.sleep(for: delay)
+        if quoteScenario == .cetesFrozen, draft.drawer.kind == .main, [draft.given, draft.received].contains(.cetes) {
+            throw SwapServiceError.frozen("CETES")
+        }
         if draft.amount > draft.drawer.balance(of: draft.given) {
             throw PaymentClient.PaymentError.insufficientBalance(held: draft.drawer.balance(of: draft.given))
         }

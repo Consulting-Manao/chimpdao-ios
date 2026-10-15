@@ -380,6 +380,8 @@ struct SwapAmountView: View {
             .padding(.horizontal, 13)
             .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.key), fill: Color(.chimpAccent), shadow: .tile)
             .accessibilityElement(children: .combine)
+        } else if let frozen = model.frozenAsset {
+            frozenNotice(frozen)
         } else if case .failed(let issue) = model.quoteState {
             quoteProblem(issue)
         } else if let quote = model.currentQuote, quote.needsPriceImpactWarning {
@@ -414,6 +416,25 @@ struct SwapAmountView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// Actif gelé par son émetteur dans ce tiroir (lu sur la chaîne) : dit clairement, aucun devis, aucun swap. État absent
+    /// de la maquette : texte proposé, à valider (DESIGN_NOTES §12).
+    private func frozenNotice(_ asset: SendAsset) -> some View {
+        let issuer = asset.issuerName ?? String(localized: "The issuer")
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("\(issuer) froze the \(asset.code) in \(drawerName)")
+                .chimpFont(.rowTitle)
+            Text("They can't be swapped until \(issuer) unfreezes them. Nothing moved.")
+                .chimpFont(.caption)
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 13)
+        .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.key), fill: Color(.chimpNegative))
+        .accessibilityElement(children: .combine)
+    }
+
     /// E3e : avertissement rouge, sans bloquer (« Check it over » reste actif).
     private func impactWarning(_ quote: SwapQuoteSummary) -> some View {
         let impact = Self.percent(quote.priceImpactBasisPoints ?? 0, locale: locale)
@@ -441,6 +462,9 @@ struct SwapAmountView: View {
             ChimpButton("Check again", isLoading: model.isCheckingPendingPayment) {
                 Task { await model.checkPendingPayment() }
             }
+        } else if let frozen = model.frozenAsset {
+            ChimpButton("\(frozen.code) is frozen") {}
+                .disabled(true)
         } else if case .failed(let issue) = model.quoteState, issue != .noRoute {
             ChimpButton("Try again") { Task { await model.refreshQuote() } }
         } else if model.quoteState == .loading {

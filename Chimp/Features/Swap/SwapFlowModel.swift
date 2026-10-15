@@ -63,6 +63,8 @@ final class SwapFlowModel {
         /// Le nouveau devis est invraisemblable : rien n'est signé.
         case implausibleQuote
         case protocolUnavailable
+        /// L'émetteur a gelé cet actif dans ce tiroir (relu juste avant de signer).
+        case frozen(SendAsset)
         /// Réseau, serveur, refus inattendu.
         case other
     }
@@ -228,6 +230,12 @@ final class SwapFlowModel {
         return .insufficient(drawer: drawer.title, available: available, asset: given)
     }
 
+    /// L'actif (donné ou reçu) que son émetteur a gelé dans ce tiroir, lu sur la chaîne : aucun devis, aucun swap.
+    var frozenAsset: SendAsset? {
+        guard let drawer = selectedDrawer, let frozen = context?.frozen[drawer.id] else { return nil }
+        return [given, received].first { frozen.contains($0) }
+    }
+
     /// Le devis affiché, s'il correspond exactement à ce qui est à l'écran (tiroir, actifs, montant).
     var currentQuote: SwapQuoteSummary? {
         guard case .quoted(let quote) = quoteState, quote.given == given, quote.received == received,
@@ -242,7 +250,7 @@ final class SwapFlowModel {
 
     var canReview: Bool {
         loadPhase == .loaded && selectedDrawer != nil && amount.value > 0 && amountIssue == nil && currentQuote != nil
-            && !blockedByPendingPayment
+            && !blockedByPendingPayment && frozenAsset == nil
     }
 
     func press(_ key: ChimpKeypadKey) {
@@ -271,6 +279,8 @@ final class SwapFlowModel {
     func select(drawerID: String) {
         selectedDrawerID = drawerID
         isDrawerSheetPresented = false
+        // Un tiroir gelé n'avait pas de devis : en quittant le gel, le devis est demandé.
+        if quoteState == .idle, amount.value > 0 { amountChanged() }
     }
 
     /// ⇅ : l'actif donné et l'actif reçu s'échangent ; le montant garde au plus les décimales du nouvel actif.
@@ -339,7 +349,7 @@ final class SwapFlowModel {
     /// Après chaque changement : l'ancien devis ne vaut plus, un nouveau est demandé après une courte attente.
     private func amountChanged() {
         quoteTask?.cancel()
-        guard amount.value > 0 else {
+        guard amount.value > 0, frozenAsset == nil else {
             quoteState = .idle
             return
         }
@@ -357,7 +367,7 @@ final class SwapFlowModel {
     /// Demande un devis pour ce qui est à l'écran. Un devis arrivé pour un montant déjà changé est ignoré.
     func refreshQuote() async {
         let (given, received, value) = (given, received, amount.value)
-        guard value > 0 else {
+        guard value > 0, frozenAsset == nil else {
             quoteState = .idle
             return
         }
@@ -464,6 +474,7 @@ final class SwapFlowModel {
         case SwapError.implausibleQuote: .implausibleQuote
         case PaymentClient.PaymentError.insufficientBalance: .insufficientBalance
         case SwapServiceError.protocolUnavailable: .protocolUnavailable
+        case SwapServiceError.frozen(let code): SendAsset(code: code).map(PreparationIssue.frozen) ?? .other
         default: .other
         }
     }
