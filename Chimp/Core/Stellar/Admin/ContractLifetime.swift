@@ -72,7 +72,7 @@ struct ContractLifetime {
             let code = try await ledgerEntry(try Self.codeKey(hash.wrapped))
             entries.append(Entry(
                 label: target.label, contract: target.contract, wasmHash: hash.wrapped,
-                instanceLiveUntil: UInt32(instance.liveUntilLedgerSeq ?? 0), codeLiveUntil: UInt32(code.liveUntilLedgerSeq ?? 0)
+                instanceLiveUntil: UInt32(clamping: instance.liveUntilLedgerSeq ?? 0), codeLiveUntil: UInt32(clamping: code.liveUntilLedgerSeq ?? 0)
             ))
         }
         return (latest, entries)

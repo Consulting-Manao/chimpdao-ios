@@ -168,6 +168,8 @@ extension ActivityRecord {
               let forwarder = try? CCTPMessage.bytes32(contract: cctp.forwarder),
               message.burn.mintRecipient == forwarder, message.destinationCaller == forwarder,
               (try? CCTPMessage.forwardRecipient(in: message.burn.hookData)) == to,
+              // Revue de sécurité F8 : des frais plus grands que le montant (message falsifié) ne font jamais planter.
+              message.burn.feeExecuted <= message.burn.amount,
               amount == CCTPMessage.stellarAmount(message.burn.amount - message.burn.feeExecuted) else { return self }
         var detailed = self
         detailed.sourceChain = cctp.sourceChains[message.sourceDomain]

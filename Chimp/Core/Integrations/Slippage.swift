@@ -34,7 +34,10 @@ enum Slippage {
     /// 0 pour un montant nul ou négatif.
     static func minimum(of units: Int128, basisPoints: Int) -> Int128 {
         guard units > 0 else { return 0 }
-        return units * Int128(10_000 - basisPoints) / 10_000
+        let kept = Int128(10_000 - min(max(basisPoints, 0), 10_000))
+        // Revue de sécurité F8 : jamais de dépassement, même pour un montant immense (on divise d'abord, un peu plus bas).
+        let (product, overflow) = units.multipliedReportingOverflow(by: kept)
+        return overflow ? units / 10_000 * kept : product / 10_000
     }
 
     /// Écart entre ce que le pool rend et ce qu'il rendrait au prix « spot » de ses réserves, en points de base
@@ -46,7 +49,9 @@ enum Slippage {
         let spotOut = spot / reserveIn
         guard spotOut > 0 else { return nil }
         guard amountOut < spotOut else { return 0 }
-        return Int((spotOut - amountOut) * 10_000 / spotOut)
+        let (scaled, scaledOverflow) = (spotOut - amountOut).multipliedReportingOverflow(by: 10_000)
+        guard !scaledOverflow else { return nil }
+        return Int(scaled / spotOut)
     }
 
     /// Vraisemblance d'un devis, pour un pool traversé (décision de Barth du 2026-10-14, après le défaut de Swift 6.3 qui a

@@ -93,10 +93,21 @@ struct SorobanClient {
         }
     }
 
+    /// Le plus grand numéro de ledger crédible (revue de sécurité F8) : bien au-delà de des siècles de ledgers, assez loin
+    /// d'`UInt32.max` pour que « ledger + 120 » ou « ledger + 1 » ne dépassent jamais.
+    static let maximumLedger: UInt32 = UInt32.max - 10_000_000
+
+    /// Un numéro de ledger annoncé par le RPC, refusé s'il est négatif ou absurde (un RPC menteur ne fait jamais planter
+    /// une addition sur lui).
+    static func plausibleLedger(_ value: Int) throws -> UInt32 {
+        guard value >= 0, value <= Int(maximumLedger) else { throw StellarError.invalidResponse("implausible ledger \(value)") }
+        return UInt32(value)
+    }
+
     /// Numéro du dernier ledger fermé (`getLatestLedger`), pour l'expiration des autorisations.
     func latestLedger() async throws -> UInt32 {
         switch await server.getLatestLedger() {
-        case .success(let response): return response.sequence
+        case .success(let response): return try Self.plausibleLedger(Int(response.sequence))
         case .failure(let error): throw StellarError.rpc(Self.describe(error))
         }
     }
@@ -323,7 +334,7 @@ struct SorobanClient {
             case GetTransactionResponse.STATUS_FAILED: .failed(response.resultXdr ?? "no result")
             default: .notFound
             }
-            return TransactionLookup(status: status, latestLedger: UInt32(response.latestLedger), latestLedgerCloseTime: closeTime)
+            return TransactionLookup(status: status, latestLedger: try Self.plausibleLedger(response.latestLedger), latestLedgerCloseTime: closeTime)
         case .failure(let error):
             throw StellarError.rpc(Self.describe(error))
         }
@@ -383,7 +394,7 @@ struct SorobanClient {
             guard let text = response.closeTime, let closeTime = UInt64(text) else {
                 throw StellarError.invalidResponse("getLatestLedger returned no close time")
             }
-            return (response.sequence, closeTime)
+            return (try Self.plausibleLedger(Int(response.sequence)), closeTime)
         case .failure(let error):
             throw StellarError.rpc(Self.describe(error))
         }
@@ -465,8 +476,8 @@ struct SorobanClient {
             case .success(let page): response = page
             case .failure(let error): throw StellarError.rpc(Self.describe(error))
             }
-            latest = UInt32(clamping: response.latestLedger)
-            oldest = response.oldestLedger.map { UInt32(clamping: $0) }
+            latest = try Self.plausibleLedger(response.latestLedger)
+            oldest = try response.oldestLedger.map { try Self.plausibleLedger($0) }
             // Avec le curseur seul, le RPC peut dépasser la fenêtre : on ne garde que ce qui est dedans.
             for event in response.events where event.ledger <= Int(endLedger) {
                 events.append(ContractEvent(

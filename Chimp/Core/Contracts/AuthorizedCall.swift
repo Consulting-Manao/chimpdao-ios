@@ -57,7 +57,7 @@ enum AuthorizedCall {
         )
         let simulation = try await client.simulate(transaction)
         guard let entries = simulation.sorobanAuth, !entries.isEmpty else { throw CallError.missingAuthorization(function: function) }
-        let simulatedLedger = UInt32(clamping: simulation.latestLedger)
+        let simulatedLedger = try SorobanClient.plausibleLedger(Int(simulation.latestLedger))
         let expiration = simulatedLedger + SorobanAuth.expirationLedgers
         let expected = try expectedInvocation
             ?? SorobanAuth.contractInvocation(contract: contract, function: function, arguments: arguments)

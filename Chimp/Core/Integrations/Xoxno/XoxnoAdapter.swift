@@ -26,7 +26,8 @@ struct XoxnoMarketState: Equatable, Sendable {
     /// `déposé − prêté ÷ limite` (au-delà, l'utilisation dépasserait la limite). Une marge couvre les intérêts courus
     /// depuis le dernier index (1 % de ce qui est prêté) : le retrait proposé passe encore au moment de la signature.
     var marketWithdrawable: Int128 {
-        guard maxUtilization > 0 else { return 0 }
+        // Revue de sécurité F8 : des valeurs négatives ou extrêmes (RPC menteur) donnent 0, jamais un plantage.
+        guard maxUtilization > 0, supplied >= 0, borrowed >= 0, cash >= 0 else { return 0 }
         let byUtilization: Int128
         if borrowed == 0 || maxUtilization >= Self.ray {
             byUtilization = supplied
@@ -35,7 +36,8 @@ struct XoxnoMarketState: Equatable, Sendable {
             byUtilization = supplied - floor
         }
         let margin = borrowed / 100 + 1
-        return max(0, min(cash, byUtilization) - margin)
+        let limit = min(cash, byUtilization)
+        return limit > margin ? limit - margin : 0
     }
 
     /// Ce qu'une position de `value` peut retirer maintenant.
@@ -44,7 +46,10 @@ struct XoxnoMarketState: Equatable, Sendable {
     }
 
     /// Ce qu'on peut encore déposer avant le plafond.
-    var remainingCap: Int128 { max(0, supplyCap - suppliedInSpoke) }
+    var remainingCap: Int128 {
+        guard supplyCap > 0, suppliedInSpoke >= 0, supplyCap > suppliedInSpoke else { return 0 }
+        return supplyCap - suppliedInSpoke
+    }
 }
 
 /// Une position XOXNO d'un tiroir : le numéro de son jeton et ce qu'on en sait.
@@ -224,8 +229,10 @@ final class XoxnoAdapter {
         guard let suppliedRay = XoxnoMath.mulDiv(suppliedScaled, supplyIndex, ray, roundUp: false),
               let borrowedRay = XoxnoMath.mulDiv(borrowedScaled, borrowIndex, ray, roundUp: true),
               let spokeRay = XoxnoMath.mulDiv(spokeScaled, supplyIndex, ray, roundUp: false) else { throw malformed }
+        // Prêté arrondi vers le haut sans addition qui pourrait dépasser (revue de sécurité F8).
+        let borrowedUnits = borrowedRay / perUnit + (borrowedRay % perUnit > 0 ? 1 : 0)
         return XoxnoMarketState(
-            supplied: suppliedRay / perUnit, borrowed: (borrowedRay + perUnit - 1) / perUnit, cash: cash,
+            supplied: suppliedRay / perUnit, borrowed: borrowedUnits, cash: cash,
             maxUtilization: maxUtilization, paused: paused, frozen: frozen, supplyCap: cap, suppliedInSpoke: spokeRay / perUnit
         )
     }
