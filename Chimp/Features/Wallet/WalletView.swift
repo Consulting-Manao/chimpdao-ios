@@ -85,7 +85,10 @@ struct WalletView: View {
 
     private func balances(_ content: WalletContent) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            if model.isShowingStaleData {
+            if let problem = model.securityProblem {
+                ChimpNoticeBanner(text: LocalizedStringKey(problem), marker: .error)
+                    .padding(.bottom, ChimpSpacing.m)
+            } else if model.isShowingStaleData {
                 ChimpNoticeBanner(
                     text: "Couldn't refresh. Balances from \(content.updatedAt.formatted(date: .omitted, time: .shortened)).",
                     marker: .error
@@ -189,7 +192,11 @@ struct WalletView: View {
 
     private var failure: some View {
         VStack(spacing: ChimpSpacing.xl) {
-            ChimpySays(text: "I can't reach the jungle right now. Check your connection.", pose: .crawl)
+            if let problem = model.securityProblem {
+                ChimpySays(text: LocalizedStringKey(problem), pose: .stop)
+            } else {
+                ChimpySays(text: "I can't reach the jungle right now. Check your connection.", pose: .crawl)
+            }
             ChimpButton("Try again") {
                 Task { await model.refresh() }
             }

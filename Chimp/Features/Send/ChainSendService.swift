@@ -27,7 +27,7 @@ final class ChainSendService: SendService {
     ) {
         self.session = session
         self.config = config
-        self.wallet = wallet ?? ChainWalletDataSource(session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle())
+        self.wallet = wallet ?? ChainWalletDataSource(session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle(), config: config)
         payments = PaymentClient(client: SorobanClient(config: config), config: config)
         self.signer = signer
         self.feeSigner = feeSigner ?? WorkerFeeSigner(url: config.feeSignerURL)

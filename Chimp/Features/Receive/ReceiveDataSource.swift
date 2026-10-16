@@ -31,12 +31,17 @@ protocol ReceiveDataSource {
 /// téléphone (adresses vérifiées sur la chaîne à l'onboarding). Rien à lire sur le réseau, rien à signer.
 struct LocalReceiveDataSource: ReceiveDataSource {
     let session: AppSession
+    /// Pour vérifier qu'une Pocket gardée est bien celle de sa carte (F2).
+    var config: ChimpNetworkConfig = .testnet
 
     func fetchReceiveOptions() async throws -> ReceiveOptions {
         guard let account = session.wallet.account else { throw ChainWalletDataSource.ReadError.noAccount }
         let main = ReceiveDrawer(id: "main", kind: .main, address: account.address)
-        let cards = account.cards.compactMap { card -> ReceiveDrawer? in
-            guard let pocket = card.pocket else { return nil }
+        let cards = try account.cards.compactMap { card -> ReceiveDrawer? in
+            guard let saved = card.pocket else { return nil }
+            // Revue de sécurité F2 : jamais une adresse qui n'est pas celle de la carte.
+            let key = try ChipPublicKey(Data(hex: card.publicKey) ?? Data())
+            let pocket = try config.checkedPocket(saved, of: key)
             let color = card.color.flatMap(ChimpCardColor.init(rawValue:)) ?? .jungle
             return ReceiveDrawer(id: card.publicKey, kind: .card(name: card.name ?? String(localized: "Card"), color: color), address: pocket)
         }

@@ -65,6 +65,8 @@ final class WalletViewModel {
     private(set) var content: WalletContent?
     /// Vrai si le dernier rafraîchissement a échoué alors que des soldes plus anciens sont affichés.
     private(set) var isShowingStaleData = false
+    /// Une adresse de wallet de carte refusée (revue de sécurité F2) : dit clairement, jamais « pas de réseau ».
+    private(set) var securityProblem: String?
     /// Cartes du compte lues au dernier chargement réussi (clé, numéro, puce, wallet) : les réglages s'en servent.
     private(set) var cards: [CardBalance] = []
     /// Dernière lecture réussie, telle quelle : le détail d'un tiroir (B2, B3) en tire ses soldes par actif.
@@ -100,10 +102,12 @@ final class WalletViewModel {
             cards = snapshot.cards
             self.snapshot = snapshot
             isShowingStaleData = false
+            securityProblem = nil
             phase = .loaded
         } catch is CancellationError {
             // Rafraîchissement interrompu (écran quitté) : on garde l'état actuel.
         } catch {
+            securityProblem = (error as? PocketAddressError)?.errorDescription
             if content != nil {
                 isShowingStaleData = true
                 phase = .loaded

@@ -69,7 +69,9 @@ final class ChainActivityDataSource: ActivityDataSource {
         for key in keys {
             let saved = account.cards.first { $0.publicKey == key }
             let fromWallet = read.first { $0.id == key }
-            guard let pocket = saved?.pocket ?? fromWallet?.pocket, !seen.contains(pocket) else { continue }
+            // Revue de sécurité F2 : une Pocket qui n'est pas celle de la carte n'est jamais lue ni affichée.
+            guard let found = saved?.pocket ?? fromWallet?.pocket, let cardKey = try? ChipPublicKey(Data(hex: key) ?? Data()),
+                  let pocket = try? config.checkedPocket(found, of: cardKey), !seen.contains(pocket) else { continue }
             seen.insert(pocket)
             let color = saved?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? fromWallet?.color
             drawers.append(.card(pocket, name: saved?.name ?? fromWallet?.name ?? String(localized: "Card"), color: color))

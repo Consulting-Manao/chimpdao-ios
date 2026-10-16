@@ -122,9 +122,9 @@ struct WalletTests {
         chain.balances = [
             Self.account: [AssetAmount(code: "XLM", amount: 100), AssetAmount(code: "USDC", amount: 0)],
             Self.pocket: [AssetAmount(code: "XLM", amount: 0), AssetAmount(code: "USDC", amount: 25)],
-            "COTHERPOCKET": [AssetAmount(code: "XLM", amount: 0), AssetAmount(code: "USDC", amount: 0)],
+            "CALWOI2Z6NZ5ULEYRXZZTN7M35CMWMS6YJXTQTVPIOQXKEKWKTVELEMX": [AssetAmount(code: "XLM", amount: 0), AssetAmount(code: "USDC", amount: 0)],
         ]
-        chain.pockets = [Self.otherKey: "COTHERPOCKET"]
+        chain.pockets = [Self.otherKey: "CALWOI2Z6NZ5ULEYRXZZTN7M35CMWMS6YJXTQTVPIOQXKEKWKTVELEMX"]
         chain.tokens = [Self.otherKey: 12]
         let oracle = FakeOracle(prices: ["XLM": Decimal(string: "0.25")!, "USDC": 1])
         let source = ChainWalletDataSource(session: session(cards: [Self.savedCard]), chain: chain, oracle: oracle)
@@ -144,6 +144,47 @@ struct WalletTests {
         // Prix demandés seulement pour les actifs détenus.
         #expect(oracle.requested == [["XLM", "USDC"]])
         #expect(snapshot.usdPrices["XLM"] == Decimal(string: "0.25")!)
+    }
+
+    // MARK: Revue de sécurité F2 (2026-10-16)
+
+    private static let attackerPocket = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+
+    @Test("F2 : la Pocket de la carte n°7 est bien l'adresse prédite (factory + sha256(clé)) sur testnet")
+    func realPocketMatchesPrediction() throws {
+        #expect(try PocketFactoryClient.predictedPocket(factory: ChimpNetworkConfig.testnet.contracts.factory, publicKey: Self.cardKey, network: .testnet) == Self.pocket)
+    }
+
+    @Test("F2 : un RPC qui annonce une autre Pocket pour une carte est refusé ; rien n'est lu à cette adresse")
+    @MainActor func rpcPocketMustMatchPrediction() async {
+        let chain = FakeWalletChain()
+        chain.members = [Self.otherKey]
+        chain.pockets = [Self.otherKey: Self.attackerPocket]
+        chain.balances = [
+            Self.account: [AssetAmount(code: "XLM", amount: 1)],
+            Self.attackerPocket: [AssetAmount(code: "USDC", amount: 1_000_000)],
+        ]
+        let source = ChainWalletDataSource(session: session(cards: []), chain: chain, oracle: FakeOracle(prices: [:]))
+        await #expect(throws: PocketAddressError.self) { try await source.fetchWallet() }
+        #expect(!chain.balanceReads.contains(Self.attackerPocket), "Rien n'est lu à l'adresse refusée")
+        let model = WalletViewModel(dataSource: source)
+        await model.refresh()
+        #expect(model.phase == .failed)
+        #expect(model.securityProblem?.contains("doesn't match the card") == true)
+    }
+
+    @Test("F2 : une Pocket enregistrée sur le téléphone qui n'est pas l'adresse prédite est refusée, au Wallet et à Recevoir")
+    @MainActor func savedPocketMustMatchPrediction() async {
+        let tampered = SavedCard(publicKey: Self.cardKey.hex, chip: "infineon2Go", tokenID: 7, pocket: Self.attackerPocket, name: "Banana", color: "banana")
+        let chain = FakeWalletChain()
+        chain.members = [Self.cardKey]
+        chain.balances = [
+            Self.account: [AssetAmount(code: "XLM", amount: 1)],
+            Self.attackerPocket: [AssetAmount(code: "USDC", amount: 1_000_000)],
+        ]
+        let source = ChainWalletDataSource(session: session(cards: [tampered]), chain: chain, oracle: FakeOracle(prices: [:]))
+        await #expect(throws: (any Error).self) { try await source.fetchWallet() }
+        await #expect(throws: (any Error).self) { try await LocalReceiveDataSource(session: session(cards: [tampered])).fetchReceiveOptions() }
     }
 
     @Test("Wallet : numéro illisible → « ···· » ; carte sans Pocket → aucun solde")
@@ -280,7 +321,10 @@ private final class FakeWalletChain: WalletChain {
 
     func cards(of account: String) async throws -> [AccountCard] { members.map { AccountCard(publicKey: $0, curve: .secp256k1) } }
 
+    private(set) var balanceReads: [String] = []
+
     func balances(of address: String) async throws -> [AssetAmount] {
+        balanceReads.append(address)
         guard let found = balances[address] else { throw URLError(.timedOut) }
         return found
     }

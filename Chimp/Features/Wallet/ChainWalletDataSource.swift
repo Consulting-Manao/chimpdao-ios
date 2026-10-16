@@ -36,6 +36,8 @@ struct ChainWalletDataSource: WalletDataSource {
     /// indisponible → la règle actuelle : pas de total partiel.
     var stablebondPrices: StablebondWalletPrices? = nil
     var now: () -> Date = { .now }
+    /// Pour vérifier qu'une Pocket est bien celle de sa carte (F2).
+    var config: ChimpNetworkConfig = .testnet
 
     var firstName: String? { session.wallet.firstName }
 
@@ -92,12 +94,14 @@ struct ChainWalletDataSource: WalletDataSource {
     /// Une carte : sa Pocket (mémorisée à l'onboarding, sinon demandée à la factory), ses soldes, son numéro.
     private func card(_ member: AccountCard, saved: SavedCard?) async throws -> CardBalance {
         let key = member.publicKey
-        let pocket: String?
+        var pocket: String?
         if let known = saved?.pocket {
             pocket = known
         } else {
             pocket = try await chain.pocket(of: key)
         }
+        // Revue de sécurité F2 : gardée ou lue, la Pocket doit être celle que la factory déploie pour cette clé.
+        if let found = pocket { pocket = try config.checkedPocket(found, of: key) }
         var assets: [AssetAmount] = []
         if let pocket { assets = try await chain.balances(of: pocket) }
         // Le numéro n'est que de l'affichage : une lecture ratée donne « ···· », pas une erreur.
