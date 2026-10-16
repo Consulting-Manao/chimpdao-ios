@@ -669,7 +669,8 @@ final class ActivityViewModel {
         }
     }
 
-    /// « from Ethereum · via Circle CCTP » (décision de Barth du 2026-10-15) ; chaîne inconnue : « from another chain ».
+    /// « from Ethereum · via Circle CCTP » (décision de Barth du 2026-10-15), « from Base · via ROZO » (2026-10-16) ; chaîne
+    /// inconnue : « from another chain ».
     static func arrivalLine(_ record: ActivityRecord) -> String {
         let chain = record.sourceChain ?? String(localized: "another chain")
         return String(localized: "from \(chain) · via \(record.protocolName ?? "Circle CCTP")")

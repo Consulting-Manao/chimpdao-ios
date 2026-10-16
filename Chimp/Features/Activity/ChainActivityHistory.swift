@@ -46,16 +46,19 @@ struct ChainActivityHistory {
     let vaults: [String: ActivityRecord.VaultLabel]
     /// Circle CCTP (D4) : un transfert venu de son `CctpForwarder` est une arrivée d'une autre blockchain.
     let cctp: IntegrationConfig.CCTP?
+    /// Qui livre les arrivées d'une autre blockchain (Circle CCTP, ROZO).
+    let arrivalSources: [String: ActivityRecord.ArrivalSource]
     var pause: (Duration) async -> Void = { try? await Task.sleep(for: $0) }
 
     init(
         source: ActivityEventSource, assets: [(code: String, contract: String)], vaults: [String: ActivityRecord.VaultLabel] = [:],
-        cctp: IntegrationConfig.CCTP? = nil
+        cctp: IntegrationConfig.CCTP? = nil, rozo: IntegrationConfig.Rozo? = nil
     ) {
         self.source = source
         self.assets = Dictionary(uniqueKeysWithValues: assets.map { ($0.contract, $0.code) })
         self.vaults = vaults
         self.cctp = cctp
+        arrivalSources = ActivityRecord.arrivalSources(cctp: cctp, rozo: rozo)
     }
 
     /// Les arrivées CCTP nouvellement lues reçoivent leurs détails (chaîne et adresse d'origine, frais de Circle), lus dans
@@ -64,7 +67,8 @@ struct ChainActivityHistory {
         guard let cctp else { return rows }
         var result: [ActivityRecord] = []
         for row in rows {
-            guard row.event == .bridgeArrival,
+            // Seules les arrivées CCTP ont un message à relire (ROZO paie par un simple `transfer`).
+            guard row.event == .bridgeArrival, row.from == cctp.forwarder,
                   let arguments = try? await source.invocationArguments(row.hash),
                   let first = arguments.first, case .bytes(let data) = first,
                   let message = try? CCTPMessage(data) else {
@@ -111,7 +115,7 @@ struct ChainActivityHistory {
                     ),
                     drawers: Set(addresses)
                 ),
-                forwarder: cctp?.forwarder, drawers: Set(addresses)
+                sources: arrivalSources, drawers: Set(addresses)
             ))
             state.records = ActivityLog.merging(Self.withLedgers(state.records, from: events), rows)
             return true

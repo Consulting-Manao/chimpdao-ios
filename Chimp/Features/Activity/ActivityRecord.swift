@@ -22,7 +22,8 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
         case clawback
         /// Arrivée d'USDC depuis une autre blockchain par Circle CCTP (tranche 2, D4) : `from` est le `CctpForwarder`,
         /// `to` le tiroir, `assetCode`/`amount` ce qui est arrivé ; `sourceChain`, `sourceAddress`, `bridgeFee` lus dans
-        /// le message attesté, s'il a pu être relu et qu'il désigne bien ce tiroir.
+        /// le message attesté, s'il a pu être relu et qu'il désigne bien ce tiroir. Aussi une arrivée par ROZO : `from` est
+        /// alors le compte G qui paie pour ROZO, `sourceChain` la chaîne d'origine proposée (Base), sans adresse ni frais.
         case bridgeArrival
     }
 
@@ -123,17 +124,40 @@ extension ActivityRecord {
         )
     }
 
-    /// Un transfert relu sur la chaîne, du `CctpForwarder` vers un tiroir, est une arrivée CCTP (« ARRIVED ») et non un
-    /// paiement reçu : on ne « renvoie » pas à un contrat de Circle.
-    static func classifyingArrivals(_ records: [ActivityRecord], forwarder: String?, drawers: Set<String>) -> [ActivityRecord] {
-        guard let forwarder else { return records }
+    /// Qui livre une arrivée d'une autre blockchain : le protocole (« Circle CCTP », « ROZO ») et, s'il est connu d'avance,
+    /// le nom de la chaîne d'origine.
+    struct ArrivalSource: Equatable, Sendable {
+        let protocolName: String
+        var sourceChain: String? = nil
+    }
+
+    /// Les expéditeurs d'arrivées d'un réseau : le `CctpForwarder` de Circle et les comptes payeurs de ROZO.
+    static func arrivalSources(cctp: IntegrationConfig.CCTP?, rozo: IntegrationConfig.Rozo?) -> [String: ArrivalSource] {
+        var sources: [String: ArrivalSource] = [:]
+        if let cctp { sources[cctp.forwarder] = ArrivalSource(protocolName: "Circle CCTP") }
+        for account in rozo?.payoutAccounts ?? [] {
+            sources[account] = ArrivalSource(protocolName: "ROZO", sourceChain: rozo?.sourceChainName)
+        }
+        return sources
+    }
+
+    /// Un transfert relu sur la chaîne, du `CctpForwarder` ou d'un payeur de ROZO vers un tiroir, est une arrivée
+    /// (« ARRIVED ») et non un paiement reçu : on ne « renvoie » pas à un contrat de Circle ni au stock de ROZO.
+    static func classifyingArrivals(_ records: [ActivityRecord], sources: [String: ArrivalSource], drawers: Set<String>) -> [ActivityRecord] {
+        guard !sources.isEmpty else { return records }
         return records.map { record in
-            guard record.event == .transfer, !record.isLocal, record.from == forwarder, drawers.contains(record.to) else { return record }
+            guard record.event == .transfer, !record.isLocal, let source = sources[record.from], drawers.contains(record.to) else { return record }
             var arrival = record
             arrival.event = .bridgeArrival
-            arrival.protocolName = "Circle CCTP"
+            arrival.protocolName = source.protocolName
+            arrival.sourceChain = source.sourceChain
             return arrival
         }
+    }
+
+    /// CCTP seul (le `CctpForwarder`).
+    static func classifyingArrivals(_ records: [ActivityRecord], forwarder: String?, drawers: Set<String>) -> [ActivityRecord] {
+        classifyingArrivals(records, sources: forwarder.map { [$0: ArrivalSource(protocolName: "Circle CCTP")] } ?? [:], drawers: drawers)
     }
 
     /// Les détails d'une arrivée, tirés du message attesté que la transaction a passé à `mint_and_forward` — seulement si

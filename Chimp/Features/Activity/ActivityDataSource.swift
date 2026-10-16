@@ -95,7 +95,7 @@ final class ChainActivityDataSource: ActivityDataSource {
         guard let account = session.wallet.account?.address else { return AccountActivity() }
         let history = ChainActivityHistory(
             source: SorobanClient(config: config), assets: try SACClient.stellarAssets(config: config), vaults: config.vaultLabels,
-            cctp: config.integrations?.cctp
+            cctp: config.integrations?.cctp, rozo: config.integrations?.rozo
         )
         let pockets = drawers().filter { !$0.isMain }.map(\.address)
         let store = session.activity

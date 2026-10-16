@@ -79,12 +79,41 @@ struct IntegrationConfig: Equatable, Sendable {
         let refundAccount: String
     }
 
+    /// ROZO (D4, décision de Barth du 2026-10-16) : un **intermédiaire de confiance**. L'utilisateur envoie de l'USDC depuis
+    /// son propre wallet à une adresse de dépôt de ROZO ; ROZO paie ensuite le tiroir sur Stellar depuis son propre stock
+    /// (un `transfer` du SAC, que la carte ne signe pas). Entre les deux, l'argent est chez ROZO. L'app ne signe jamais rien
+    /// d'une autre blockchain : elle crée la commande, montre l'adresse de dépôt et suit **sa** commande. Absent de
+    /// `reference/` ; API publique sans clé (`docs.rozo.ai`, « Testnet: Base Sepolia → Stellar »), revérifiée le 2026-10-16.
+    struct Rozo: Equatable, Sendable {
+        /// API de paiement (`…/payment-api`).
+        let api: URL
+        /// Identifiant d'application exigé dans chaque commande. Testnet : celui de la démo publique (décision du
+        /// 2026-10-16) ; demander le nôtre sur partners.rozo.ai avant le mainnet (ROADMAP).
+        let appId: String
+        /// La seule chaîne d'origine proposée, et son nom affiché (« from Base »).
+        let sourceChainId: String
+        let sourceChainName: String
+        /// USDC de la chaîne d'origine : une commande qui en nomme un autre est refusée.
+        let sourceToken: String
+        /// Identifiant de Stellar chez ROZO, et l'USDC livré (`CODE:émetteur`) : une commande qui en nomme un autre est refusée.
+        let stellarChainId: String
+        let stellarToken: String
+        /// Bornes d'un montant (testnet : 0,01 à 1 USDC).
+        let minimumAmount: Decimal
+        let maximumAmount: Decimal
+        /// Comptes G qui paient les arrivées sur Stellar : un `transfer` venu de l'un d'eux vers un tiroir est une arrivée
+        /// ROZO (« ARRIVED · from Base · via ROZO »). Relevé sur la chaîne le 2026-10-16 (paiement de la commande
+        /// `pay_ewHL66ke5XdqP7GLZ8xnkVPh`, transaction `e7eedc04…4572`).
+        let payoutAccounts: [String]
+    }
+
     let soroswap: Soroswap
     let aquarius: Aquarius
     let defindexVaults: [DeFindexVault]
     let etherfuse: Etherfuse
     let cctp: CCTP
     let nearIntents: NearIntents
+    let rozo: Rozo
 
     static let testnet = IntegrationConfig(
         soroswap: Soroswap(
@@ -118,6 +147,15 @@ struct IntegrationConfig: Equatable, Sendable {
             api: URL(string: "https://1click.chaindefuser.com")!,
             quoteRecipient: "GDZE7UWGO3PS6R6RI6F3XIJLX7WGIEFD3X4YQO4AJH4LS3KDY6LLFXG2",
             refundAccount: "intents.near"
+        ),
+        rozo: Rozo(
+            api: URL(string: "https://intentapitestnet.rozo.ai/functions/v1/payment-api")!,
+            appId: "rozoDemo",
+            sourceChainId: "84532", sourceChainName: "Base",
+            sourceToken: "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+            stellarChainId: "1500", stellarToken: "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+            minimumAmount: Decimal(string: "0.01")!, maximumAmount: 1,
+            payoutAccounts: ["GABWCTTOFK3TBVDLMVZER6JBXLOOCZ6PFDIUSYYU5GTJXP2CPMUYCQ37"]
         )
     )
 
@@ -164,6 +202,13 @@ struct IntegrationConfig: Equatable, Sendable {
         if cctp.sourceChains[cctp.localDomain] != nil { problems.append("cctp.sourceChains names Stellar's own domain") }
         if nearIntents.api.scheme != "https" { problems.append("nearIntents.api is not https") }
         if (try? KeyPair(accountId: nearIntents.quoteRecipient)) == nil { problems.append("nearIntents.quoteRecipient is not a G-address") }
+        if rozo.api.scheme != "https" { problems.append("rozo.api is not https") }
+        if rozo.payoutAccounts.isEmpty { problems.append("rozo names no payout account") }
+        for account in rozo.payoutAccounts where (try? KeyPair(accountId: account)) == nil {
+            problems.append("rozo.payoutAccounts has a non-G address: \"\(account)\"")
+        }
+        if !(rozo.minimumAmount > 0 && rozo.minimumAmount <= rozo.maximumAmount) { problems.append("rozo amount bounds are inverted") }
+        if rozo.sourceToken.range(of: "^0x[0-9a-fA-F]{40}$", options: .regularExpression) == nil { problems.append("rozo.sourceToken is not an EVM address") }
         return problems
     }
 }

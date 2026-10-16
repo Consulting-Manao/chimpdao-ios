@@ -51,7 +51,12 @@ struct IntegrationConfigTests {
                 forwarder: "not-an-address", tokenMessengerMinter: base.cctp.tokenMessengerMinter,
                 messageTransmitter: base.cctp.tokenMessengerMinter, localDomain: 27, sourceChains: [27: "Stellar"]
             ),
-            nearIntents: .init(api: URL(string: "http://1click.chaindefuser.com")!, quoteRecipient: "CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB", refundAccount: "intents.near")
+            nearIntents: .init(api: URL(string: "http://1click.chaindefuser.com")!, quoteRecipient: "CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB", refundAccount: "intents.near"),
+            rozo: .init(
+                api: URL(string: "http://intentapitestnet.rozo.ai")!, appId: "rozoDemo", sourceChainId: "84532", sourceChainName: "Base",
+                sourceToken: "0x036cbd", stellarChainId: "1500", stellarToken: base.rozo.stellarToken,
+                minimumAmount: 2, maximumAmount: 1, payoutAccounts: ["CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB"]
+            )
         )
         let problems = broken.problems(passphrase: config.passphrase, knownAssetCodes: knownAssetCodes, reserved: reserved)
         #expect(problems.contains { $0.hasPrefix("soroswap.router is not a C-address") })
@@ -67,5 +72,9 @@ struct IntegrationConfigTests {
         #expect(problems.contains("cctp.sourceChains names Stellar's own domain"))
         #expect(problems.contains("nearIntents.api is not https"))
         #expect(problems.contains("nearIntents.quoteRecipient is not a G-address"))
+        #expect(problems.contains("rozo.api is not https"))
+        #expect(problems.contains("rozo.payoutAccounts has a non-G address: \"CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB\""))
+        #expect(problems.contains("rozo amount bounds are inverted"))
+        #expect(problems.contains("rozo.sourceToken is not an EVM address"))
     }
 }

@@ -91,4 +91,33 @@ struct ActivityArrivalTests {
         #expect(receipt.again == nil)
         #expect(receipt.shareText.contains("arrived from Ethereum"))
     }
+
+    // MARK: ROZO (2026-10-16)
+
+    private let rozo = IntegrationConfig.testnet.rozo
+
+    @Test("Un transfert venu d'un payeur de ROZO vers un tiroir : « ARRIVED · from Base · via ROZO » ; vers un autre compte, rien")
+    @MainActor
+    func rozoArrival() async throws {
+        let main = MockReceiveDataSource.mainAddress
+        let sources = ActivityRecord.arrivalSources(cctp: cctp, rozo: rozo)
+        #expect(sources[cctp.forwarder]?.protocolName == "Circle CCTP")
+        let payer = try #require(rozo.payoutAccounts.first)
+        let rows = ActivityRecord.classifyingArrivals(
+            [transfer(from: payer, to: main, amount: Decimal(string: "0.1")!), transfer(from: payer, to: "CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB")],
+            sources: sources, drawers: [main]
+        )
+        #expect(rows[0].event == .bridgeArrival)
+        #expect(rows[0].protocolName == "ROZO")
+        #expect(rows[0].sourceChain == "Base")
+        #expect(rows[0].kind(drawers: [main]) == .arrived)
+        #expect(rows[1].event == .transfer)
+        #expect(ActivityViewModel.arrivalLine(rows[0]) == "from Base · via ROZO")
+
+        let model = ActivityViewModel(source: MockActivityDataSource(scenario: .standard))
+        await model.refresh()
+        let receipt = try #require(model.receipt(for: rows[0]))
+        #expect(receipt.lines.map(\.id) == ["fromChain", "into", "amount", "via", "status"])
+        #expect(receipt.counterparty == nil)
+    }
 }
