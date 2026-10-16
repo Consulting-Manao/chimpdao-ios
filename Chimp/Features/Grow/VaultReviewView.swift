@@ -87,11 +87,15 @@ struct VaultReviewView: View {
         VStack(alignment: .leading, spacing: ChimpSpacing.m) {
             amounts(draft)
             if draft.action == .withdraw, let minimum = draft.quote.minimum {
-                minimumCard(minimum, asset: draft.vault.asset)
+                minimumCard(minimum, asset: draft.vault.asset, lending: draft.vault.kind == .lending)
             }
             details(draft)
             signerBanner(draft)
-            ChimpVaultNotice(asset: draft.vault.asset.code, protocols: draft.vault.protocols)
+            if draft.vault.kind == .lending {
+                LendingRiskNotice(asset: draft.vault.asset.code)
+            } else {
+                ChimpVaultNotice(asset: draft.vault.asset.code, protocols: draft.vault.protocols)
+            }
             if let issue = model.preparationIssue {
                 VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
                     ChimpFieldMessage(text: Self.message(for: issue, draft: draft, locale: locale), kind: .error)
@@ -115,7 +119,10 @@ struct VaultReviewView: View {
             } else {
                 row(label: "You get") {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("about").chimpFont(.rowTitle).foregroundStyle(.chimpTextSecondary)
+                        // Prêt : un montant exact (pas de parts), sauf « tout », qui comprend les intérêts du moment.
+                        if draft.vault.kind != .lending || draft.quote.all {
+                            Text(draft.vault.kind == .lending ? "at least" : "about").chimpFont(.rowTitle).foregroundStyle(.chimpTextSecondary)
+                        }
                         Text(verbatim: asset.displayedWithCode(draft.quote.expected ?? draft.amount, locale: locale))
                     }
                 }
@@ -141,9 +148,9 @@ struct VaultReviewView: View {
     }
 
     /// Retirer : le minimum reçu, exact (7 décimales) : c'est ce que la carte signe.
-    private func minimumCard(_ minimum: Decimal, asset: SendAsset) -> some View {
+    private func minimumCard(_ minimum: Decimal, asset: SendAsset, lending: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
-            Text("Minimum received").textCase(.uppercase).chimpFont(.label)
+            Text(lending ? "Comes back" : "Minimum received").textCase(.uppercase).chimpFont(.label)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(verbatim: SwapReviewView.exact(minimum, locale: locale))
                     .chimpFont(.monoAmount)
@@ -151,7 +158,7 @@ struct VaultReviewView: View {
                     .minimumScaleFactor(0.5)
                 Text(verbatim: asset.code).chimpFont(.monoValue)
             }
-            Text("This is what your card signs. If the vault would pay less, nothing moves.")
+            Text(lending ? "This is what your card signs. If XOXNO can't pay it right now, nothing moves." : "This is what your card signs. If the vault would pay less, nothing moves.")
                 .chimpFont(.caption)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -166,7 +173,11 @@ struct VaultReviewView: View {
     /// Vault, protocoles, (retirer : où ça revient), frais.
     private func details(_ draft: VaultDraft) -> some View {
         VStack(spacing: 0) {
-            detail("Vault", Text(verbatim: "\(draft.vault.name) vault"))
+            if draft.vault.kind == .lending {
+                detail("Market", Text(verbatim: draft.vault.name))
+            } else {
+                detail("Vault", Text(verbatim: "\(draft.vault.name) vault"))
+            }
             detail("Protocols", Text(verbatim: draft.vault.protocolChain))
             if draft.action == .withdraw {
                 detail("Lands in", Text(verbatim: GrowView.shortTitle(draft.drawer)))
@@ -205,9 +216,14 @@ struct VaultReviewView: View {
         switch issue {
         case .insufficientBalance: return "Not enough \(asset.code) in \(draft.drawer.title). Nothing was signed."
         case .notEnoughShares: return "The position doesn't hold that much anymore. Nothing was signed."
+        case .notEnoughLiquidity where draft.vault.kind == .lending:
+            return "XOXNO can't pay that much back right now: it's lent out. Nothing was signed."
         case .notEnoughLiquidity:
             return "The vault can give back \(asset.displayedWithCode(draft.vault.availableNow, locale: locale)) right now. The rest is lent on Blend and comes back as borrowers repay."
+        case .vaultUnavailable where draft.vault.kind == .lending:
+            return "XOXNO is paused or unavailable right now. Nothing moved. Try again later."
         case .vaultUnavailable: return "The vault is unavailable right now. Nothing moved. Try again in a minute."
+        case .capReached: return "XOXNO isn't taking more deposits in this market right now. Nothing was signed."
         case .implausible: return "The vault's numbers don't look right, so I won't sign. Nothing was signed."
         case .priceMoved: return "The vault moved. Nothing was signed."
         case .other: return "Couldn't get ready. Nothing was signed. Check your connection and try again."
@@ -255,6 +271,11 @@ struct VaultReviewView: View {
     private func whatIsSigned(_ draft: VaultDraft) -> LocalizedStringKey {
         let asset = draft.vault.asset
         let runner = draft.vault.protocols.first ?? "DeFindex"
+        if draft.vault.kind == .lending {
+            return draft.action == .deposit
+                ? "Putting \(asset.formattedWithCode(draft.amount, locale: locale)) in \(runner)"
+                : "Taking \(asset.displayedWithCode(draft.quote.expected ?? draft.amount, locale: locale)) out of \(runner)"
+        }
         if draft.action == .deposit {
             return "Putting \(asset.formattedWithCode(draft.amount, locale: locale)) in the \(runner) vault"
         }

@@ -23,11 +23,14 @@ final class GrowModel {
 
     let service: VaultService
     let savingsService: SavingsService?
+    /// Prêt XOXNO (phase 7) : le même modèle, sur le service de prêt ; lu à part, une panne de l'un ne cache pas l'autre.
+    let lending: GrowModel?
     private var loadTask: Task<Void, Never>?
 
-    init(service: VaultService, savingsService: SavingsService? = nil) {
+    init(service: VaultService, savingsService: SavingsService? = nil, lendingService: VaultService? = nil) {
         self.service = service
         self.savingsService = savingsService
+        lending = lendingService.map { GrowModel(service: $0) }
     }
 
     /// Les CETES d'un tiroir (adresse), s'il en détient (ou s'ils sont gelés).
@@ -75,7 +78,8 @@ final class GrowModel {
             guard let self else { return }
             async let vault: Void = loadVault()
             async let bonds: Void = loadSavings()
-            _ = await (vault, bonds)
+            async let lent: Void = lending?.refresh() ?? ()
+            _ = await (vault, bonds, lent)
         }
         loadTask = task
         await task.value

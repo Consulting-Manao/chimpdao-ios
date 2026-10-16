@@ -159,6 +159,11 @@ struct VaultSummary: Equatable {
     let shares: Decimal?
     let minimumOut: Decimal?
     let network: StellarNetwork
+    /// Un vault, ou un marché de prêt (XOXNO).
+    let kind: VaultKind
+
+    /// « the vault », ou « XOXNO » pour un marché de prêt.
+    var placeName: String { kind == .lending ? "XOXNO" : String(localized: "the vault") }
 
     init(_ draft: VaultDraft) {
         action = draft.action
@@ -171,6 +176,7 @@ struct VaultSummary: Equatable {
         shares = draft.quote.sharesAmount
         minimumOut = draft.quote.minimum
         network = draft.network
+        kind = draft.vault.kind
     }
 
     /// Depuis une opération en attente (`PendingSend.vault`) ; `nil` si ce n'en est pas une.
@@ -186,6 +192,8 @@ struct VaultSummary: Equatable {
         shares = vault.shares
         minimumOut = vault.minimumReceived
         self.network = network
+        // L'opération gardée sur le téléphone ne porte pas le type de lieu : un nom de marché XOXNO le dit.
+        kind = vault.vaultName.hasPrefix("XOXNO") ? .lending : .vault
     }
 }
 

@@ -22,7 +22,9 @@ struct VaultAmountView: View {
         VStack(spacing: 0) {
             ChimpHeader(
                 title: isDeposit ? "Put money in" : "Take money out",
-                subtitle: isDeposit ? "\(vaultName) vault" : "\(vaultName) vault · in \(drawerName)",
+                subtitle: model.isLending
+                    ? (isDeposit ? "\(vaultName)" : "\(vaultName) · in \(drawerName)")
+                    : (isDeposit ? "\(vaultName) vault" : "\(vaultName) vault · in \(drawerName)"),
                 onBack: onBack
             )
             content
@@ -48,8 +50,12 @@ struct VaultAmountView: View {
                         amountCard
                         notice
                         if let vault = model.context?.vault {
-                            ChimpVaultNotice(asset: vault.asset.code, protocols: vault.protocols)
-                                .padding(.top, ChimpSpacing.xs)
+                            if vault.kind == .lending {
+                                LendingRiskNotice(asset: vault.asset.code).padding(.top, ChimpSpacing.xs)
+                            } else {
+                                ChimpVaultNotice(asset: vault.asset.code, protocols: vault.protocols)
+                                    .padding(.top, ChimpSpacing.xs)
+                            }
                         }
                     }
                     .padding(.horizontal, ChimpSpacing.xxl)
@@ -176,7 +182,7 @@ struct VaultAmountView: View {
                 Text(verbatim: "→")
                 Text(verbatim: asset.displayed(after, locale: locale)).fontWeight(.black).foregroundStyle(.chimpTextPrimary)
             }
-            Text(isDeposit ? "\(asset.code) in \(drawerName)" : "\(asset.code) in the vault")
+            Text(isDeposit ? "\(asset.code) in \(drawerName)" : (model.isLending ? "\(asset.code) in XOXNO" : "\(asset.code) in the vault"))
         }
         .chimpFont(.captionStrong)
         .foregroundStyle(.chimpTextSecondary)
@@ -189,12 +195,17 @@ struct VaultAmountView: View {
         case let .insufficient(drawer, available, asset):
             "Only \(asset.displayedWithCode(available, locale: locale)) in \(drawer)"
         case let .moreThanPosition(available, asset):
-            "Only \(asset.displayedWithCode(available, locale: locale)) in the vault. Tap All to take everything."
+            model.isLending
+                ? "Only \(asset.displayedWithCode(available, locale: locale)) in XOXNO."
+                : "Only \(asset.displayedWithCode(available, locale: locale)) in the vault. Tap All to take everything."
+        case let .moreThanAvailableNow(available, asset):
+            "XOXNO can pay back \(asset.displayedWithCode(available, locale: locale)) right now. The rest is lent out."
         }
     }
 
     private func maxButton(highlighted: Bool) -> some View {
-        Button(isDeposit ? "Max" : "All") { model.setMax() }
+        // Prêt : « All » seulement si toute la position peut sortir maintenant ; sinon « Max » (le plus qui peut sortir).
+        Button(isDeposit || (model.withdrawableNow.map { $0 < model.available } ?? false) ? "Max" : "All") { model.setMax() }
             .chimpFont(.buttonSmall)
             .foregroundStyle(Color(highlighted || model.withdrawAll ? .chimpOnAccent : .chimpTextPrimary))
             .padding(.horizontal, 12)
@@ -212,6 +223,13 @@ struct VaultAmountView: View {
     private var notice: some View {
         if model.blockedByPendingPayment {
             ChimpNoticeBanner(text: "A payment is still being checked. Check it first.", marker: .error)
+        } else if model.isBlockedByMarket {
+            ChimpNoticeBanner(
+                text: isDeposit ? "XOXNO isn't taking deposits right now." : "XOXNO has paused withdrawals right now. Your money is still there.",
+                marker: .error
+            )
+        } else if model.isLending, !isDeposit, let now = model.withdrawableNow, now < model.available {
+            ChimpNoticeBanner(text: "Right now XOXNO can pay back up to \(asset.displayedWithCode(now, locale: locale)). The rest is lent out and comes back as borrowers repay.", marker: .info)
         } else if model.loadPhase == .unavailable {
             problem(title: "The vault is unavailable right now", line: "Nothing moved. Try again in a minute.")
         } else if case .failed(let issue) = model.quoteState {
@@ -258,7 +276,7 @@ struct VaultAmountView: View {
             ChimpButton("Checking the vault…") {}
                 .disabled(true)
         } else if model.amountIssue != nil {
-            ChimpButton(isDeposit ? "Not enough \(asset.code)" : "More than you have") {}
+            ChimpButton(isDeposit ? "Not enough \(asset.code)" : (model.amountIssue?.isAvailableNow == true ? "More than can come out now" : "More than you have")) {}
                 .disabled(true)
         } else {
             ChimpButton("Check it over") { model.continueToReview() }

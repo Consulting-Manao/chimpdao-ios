@@ -65,13 +65,17 @@ struct GrowDemoRoot: View {
     @State private var model: GrowModel
     @State private var path: [GrowRoute]
 
+    let lendingService: MockLendingService
+
     init(
-        service: MockVaultService, savings: MockSavingsService.Scenario = .normal, start: [GrowRoute] = [],
-        onClose: @escaping () -> Void
+        service: MockVaultService, savings: MockSavingsService.Scenario = .normal, lending: MockLendingService.Scenario = .noPosition,
+        start: [GrowRoute] = [], onClose: @escaping () -> Void
     ) {
         self.service = service
         self.onClose = onClose
-        _model = State(initialValue: GrowModel(service: service, savingsService: MockSavingsService(scenario: savings)))
+        let lendingService = MockLendingService(scenario: lending, cardSetup: SendMockSettings.cardSetup)
+        self.lendingService = lendingService
+        _model = State(initialValue: GrowModel(service: service, savingsService: MockSavingsService(scenario: savings), lendingService: lendingService))
         _path = State(initialValue: start)
     }
 
@@ -106,6 +110,21 @@ struct GrowDemoRoot: View {
             SavingsView(model: model, drawerAddress: address, onBack: pop) { path.append(.swap($0)) }
         case .swap(let prefill):
             SwapFlowRoot(service: MockSwapService(), prefill: prefill, onExit: pop)
+        case .lending:
+            if let lending = model.lending {
+                LendingInfoView(model: lending, onBack: pop) { path.append(.lendingDeposit(drawerID: nil)) }
+            }
+        case .lendingPosition(let address):
+            if let lending = model.lending {
+                LendingPositionView(
+                    model: lending, drawerAddress: address, onBack: pop,
+                    onWithdraw: { path.append(.lendingWithdraw(drawerID: $0)) }, onDeposit: { path.append(.lendingDeposit(drawerID: $0)) }
+                )
+            }
+        case .lendingDeposit(let drawerID):
+            VaultFlowRoot(service: lendingService, action: .deposit, drawerID: drawerID, onSeePosition: { path = [.lendingPosition(drawerAddress: $0)] }, onExit: pop)
+        case .lendingWithdraw(let drawerID):
+            VaultFlowRoot(service: lendingService, action: .withdraw, drawerID: drawerID, onSeePosition: { path = [.lendingPosition(drawerAddress: $0)] }, onExit: pop)
         }
     }
 
@@ -123,7 +142,10 @@ struct GrowDemoRoot: View {
 /// `:deposit`, `:withdraw`, `:vault`, `:position` ou `:savings` pour ouvrir directement cet écran). Les CETES :
 /// `-savingsDemo frozen` (un scénario de `MockSavingsService`). Sans l'argument : rien.
 struct VaultDemoLaunch: ViewModifier {
-    @State private var argument = UserDefaults.standard.string(forKey: "vaultDemo")
+    @State private var argument = UserDefaults.standard.string(forKey: "vaultDemo") ?? UserDefaults.standard.string(forKey: "lendingDemo").map { _ in "normal" }
+    /// Prêt XOXNO (phase 7) : `-lendingDemo lentOut` (un scénario de `MockLendingService`) ; suffixes `:lending`,
+    /// `:lendingPosition`, `:lendingDeposit`, `:lendingWithdraw` pour ouvrir directement cet écran.
+    private let lending = UserDefaults.standard.string(forKey: "lendingDemo")
     private let savings = UserDefaults.standard.string(forKey: "savingsDemo").flatMap(MockSavingsService.Scenario.init(rawValue:)) ?? .normal
 
     func body(content: Content) -> some View {
@@ -131,7 +153,12 @@ struct VaultDemoLaunch: ViewModifier {
             if argument != nil {
                 let parts = (argument ?? "normal").split(separator: ":").map(String.init)
                 let scenario = MockVaultService.Scenario(rawValue: parts.first ?? "normal") ?? .normal
-                GrowDemoRoot(service: GrowCatalogPage.service(scenario), savings: savings, start: Self.start(parts.dropFirst().first)) {
+                let lendingParts = (lending ?? "noPosition").split(separator: ":").map(String.init)
+                let lendingScenario = MockLendingService.Scenario(rawValue: lendingParts.first ?? "noPosition") ?? .noPosition
+                GrowDemoRoot(
+                    service: GrowCatalogPage.service(scenario), savings: savings, lending: lendingScenario,
+                    start: Self.start(lending == nil ? parts.dropFirst().first : lendingParts.dropFirst().first)
+                ) {
                     argument = nil
                 }
                     .background(Color(.chimpBackground))
@@ -146,6 +173,10 @@ struct VaultDemoLaunch: ViewModifier {
         case "vault": [.vault]
         case "position": [.position(drawerAddress: MockReceiveDataSource.mainAddress)]
         case "savings": [.savings(drawerAddress: MockReceiveDataSource.mainAddress)]
+        case "lending": [.lending]
+        case "lendingPosition": [.lendingPosition(drawerAddress: MockReceiveDataSource.mainAddress)]
+        case "lendingDeposit": [.lendingDeposit(drawerID: nil)]
+        case "lendingWithdraw": [.lendingWithdraw(drawerID: "main")]
         default: []
         }
     }

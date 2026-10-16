@@ -41,7 +41,7 @@ struct VaultStatusView: View {
 
     private var notSureYet: some View {
         fullScreen(pose: .chimpyTeacher, title: "Not sure yet", text: isDeposit
-            ? "We couldn't confirm the deposit. Your \(assetCode) may already be in the vault. Check again before trying anything else."
+            ? "We couldn't confirm the deposit. Your \(assetCode) may already be in \(model.summary?.placeName ?? String(localized: "the vault")). Check again before trying anything else."
             : "We couldn't confirm the withdrawal. Your \(assetCode) may already be back in \(model.summary?.drawerShortTitle ?? "Main"). Check again before trying anything else."
         ) {
             ChimpButton("Check again", action: model.checkAgain)
@@ -71,7 +71,7 @@ struct VaultStatusView: View {
         if summary.action == .deposit {
             return "The network said no. Your \(summary.asset.formattedWithCode(summary.amount, locale: locale)) is still in \(summary.drawerShortTitle), safe and sound. Probably a hiccup."
         }
-        return "The network said no. Your \(summary.asset.code) is still in the vault, safe and sound. Probably a hiccup."
+        return "The network said no. Your \(summary.asset.code) is still in \(summary.placeName), safe and sound. Probably a hiccup."
     }
 
     private func fullScreen(
@@ -101,7 +101,7 @@ struct VaultStatusView: View {
                         .foregroundStyle(Color(.chimpOnHeaderPrimary))
                         .multilineTextAlignment(.center)
                 }
-                ChimpVaultNotice(asset: assetCode, protocols: model.protocols, ink: Color(.chimpOnHeaderPrimary))
+                GrowPlaceNotice(lending: model.summary?.kind == .lending, asset: assetCode, protocols: model.protocols, ink: Color(.chimpOnHeaderPrimary))
                     .padding(.top, ChimpSpacing.xs)
                 if let details = model.technicalDetails {
                     ChimpTechnicalDetails(details: details)
@@ -131,7 +131,7 @@ struct VaultStatusView: View {
                     if let summary = model.summary {
                         ChimpDetailList(items: details(summary))
                     }
-                    ChimpVaultNotice(asset: assetCode, protocols: model.protocols)
+                    GrowPlaceNotice(lending: model.summary?.kind == .lending, asset: assetCode, protocols: model.protocols)
                     if let details = model.technicalDetails, showsTechnicalDetails {
                         ChimpTechnicalDetails(details: details)
                     }
@@ -237,14 +237,16 @@ struct VaultStatusView: View {
 
     /// Mettre : depuis, ce qui part. Retirer : vers, ce qui est attendu, le minimum signé.
     private func details(_ summary: VaultSummary) -> [ChimpDetailItem] {
-        var items = [ChimpDetailItem(id: "vault", label: "Vault", value: "\(summary.vaultName) vault")]
+        var items = summary.kind == .lending
+            ? [ChimpDetailItem(id: "vault", label: "Market", value: summary.vaultName)]
+            : [ChimpDetailItem(id: "vault", label: "Vault", value: "\(summary.vaultName) vault")]
         if summary.action == .deposit {
             items.append(ChimpDetailItem(id: "from", label: "From", value: summary.drawerTitle))
             items.append(ChimpDetailItem(id: "in", label: "You put in", value: summary.asset.formattedWithCode(summary.amount, locale: locale)))
         } else {
             items.append(ChimpDetailItem(id: "to", label: "Lands in", value: summary.drawerTitle))
             if let minimum = summary.minimumOut {
-                items.append(ChimpDetailItem(id: "minimum", label: "At least", value: summary.asset.displayedWithCode(minimum, locale: locale)))
+                items.append(ChimpDetailItem(id: "minimum", label: summary.kind == .lending ? "Comes back" : "At least", value: summary.asset.displayedWithCode(minimum, locale: locale)))
             }
         }
         return items
@@ -293,7 +295,7 @@ struct VaultSentView: View {
                     .background(Capsule().fill(.white.opacity(0.35)))
                     .overlay { Capsule().strokeBorder(ChimpCardColor.leaf.ink, lineWidth: 2) }
                     .padding(.top, ChimpSpacing.m)
-                ChimpVaultNotice(asset: summary.asset.code, protocols: protocols, ink: ChimpCardColor.leaf.ink)
+                GrowPlaceNotice(lending: summary.kind == .lending, asset: summary.asset.code, protocols: protocols, ink: ChimpCardColor.leaf.ink)
                     .multilineTextAlignment(.leading)
                     .padding(.top, ChimpSpacing.l)
             }
@@ -324,6 +326,9 @@ struct VaultSentView: View {
     /// Main, ready to use. »
     private var lead: LocalizedStringKey {
         let runner = protocols.first ?? "DeFindex"
+        if isDeposit, summary.kind == .lending {
+            return "\(summary.asset.formattedWithCode(summary.amount, locale: locale)) is lent through \(runner). From now on I'll show you what it really does."
+        }
         if isDeposit {
             return "\(summary.asset.formattedWithCode(summary.amount, locale: locale)) is in the \(runner) vault. From now on I'll show you what it really does."
         }

@@ -40,6 +40,12 @@ final class VaultFlowModel {
         case insufficient(drawer: String, available: Decimal, asset: SendAsset)
         /// Retirer : plus que la position (« All » pour tout retirer).
         case moreThanPosition(available: Decimal, asset: SendAsset)
+        /// Prêt : plus que ce que le marché laisse sortir maintenant (le reste est prêté).
+        case moreThanAvailableNow(available: Decimal, asset: SendAsset)
+
+        var isAvailableNow: Bool {
+            if case .moreThanAvailableNow = self { true } else { false }
+        }
     }
 
     /// Le montant a bougé entre la vérification et la signature (comme E4p) : rien n'a été signé. L'ancien montant (le
@@ -59,6 +65,8 @@ final class VaultFlowModel {
         case notEnoughLiquidity
         case vaultUnavailable
         case implausible
+        /// Prêt : le marché n'accepte plus de dépôt (plafond).
+        case capReached
         case other
     }
 
@@ -197,8 +205,23 @@ final class VaultFlowModel {
 
     var drawers: [SendDrawer] {
         guard let context else { return [] }
-        // Retirer : seulement les tiroirs qui détiennent une position.
-        return action == .deposit ? context.drawers : context.drawers.filter { context.holding(drawerID: $0.id) != nil }
+        // Retirer : seulement les tiroirs qui détiennent une position qu'on peut déplacer.
+        return action == .deposit ? context.drawers : context.drawers.filter { context.holding(drawerID: $0.id)?.condition == .movable }
+    }
+
+    /// Un marché de prêt (XOXNO) plutôt qu'un vault.
+    var isLending: Bool { context?.vault.kind == .lending }
+
+    /// Prêt, retrait : ce que la position peut retirer maintenant (calculé avant de proposer quoi que ce soit).
+    var withdrawableNow: Decimal? {
+        guard isLending, action == .withdraw, let market = context?.vault.withdrawableNow else { return nil }
+        return min(available, market)
+    }
+
+    /// Prêt : XOXNO refuse ce mouvement en ce moment (gel, pause, plafond).
+    var isBlockedByMarket: Bool {
+        guard isLending, let vault = context?.vault else { return false }
+        return action == .deposit ? vault.depositsBlocked : vault.withdrawalsBlocked
     }
 
     var selectedDrawer: SendDrawer? { drawers.first { $0.id == selectedDrawerID } ?? drawers.first }
@@ -218,7 +241,11 @@ final class VaultFlowModel {
         if action == .withdraw {
             // Ce que le vault peut rendre tout de suite n'est connu qu'au refus du contrat (`#114`, `#128`) : la stratégie
             // peut récupérer une partie de ce qui est prêté sur Blend. Voir `PreparationIssue.notEnoughLiquidity`.
-            return !withdrawAll && amount.value > available ? .moreThanPosition(available: available, asset: asset) : nil
+            if !withdrawAll, amount.value > available { return .moreThanPosition(available: available, asset: asset) }
+            if let now = withdrawableNow, amount.value > now {
+                return .moreThanAvailableNow(available: now, asset: asset)
+            }
+            return nil
         }
         guard !withdrawAll, amount.value > available, let drawer = selectedDrawer else { return nil }
         return .insufficient(drawer: drawer.title, available: available, asset: asset)
@@ -238,7 +265,7 @@ final class VaultFlowModel {
 
     var canReview: Bool {
         loadPhase == .loaded && selectedDrawer != nil && (amount.value > 0 || withdrawAll) && amountIssue == nil
-            && currentQuote != nil && !blockedByPendingPayment
+            && currentQuote != nil && !blockedByPendingPayment && !isBlockedByMarket
     }
 
     func press(_ key: ChimpKeypadKey) {
@@ -262,6 +289,11 @@ final class VaultFlowModel {
         case .deposit:
             setAmount(available)
         case .withdraw:
+            // Prêt : « All » seulement si toute la position peut sortir maintenant ; sinon, le plus qui peut sortir.
+            if let now = withdrawableNow, now < available {
+                setAmount(now.truncated(to: 7))
+                return
+            }
             amount = AmountEntry(available.truncated(to: 2), maxFractionDigits: asset.maxFractionDigits, minFractionDigits: 0)
             withdrawAll = true
             amountChanged()
@@ -406,6 +438,7 @@ final class VaultFlowModel {
         case YieldError.notEnoughShares: .notEnoughShares
         case YieldError.notEnoughLiquidity: .notEnoughLiquidity
         case VaultServiceError.vaultUnavailable, YieldError.vaultUnavailable: .vaultUnavailable
+        case YieldError.capReached: .capReached
         case YieldError.implausibleValue: .implausible
         default: .other
         }

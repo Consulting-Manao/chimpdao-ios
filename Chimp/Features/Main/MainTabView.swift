@@ -39,7 +39,8 @@ struct MainTabView: View {
         _walletModel = State(initialValue: wallet)
         _growModel = State(initialValue: GrowModel(
             service: ChainVaultService(session: session, config: config),
-            savingsService: config.integrations == nil ? nil : ChainSavingsService(session: session, config: config)
+            savingsService: config.integrations == nil ? nil : ChainSavingsService(session: session, config: config),
+            lendingService: config.integrations == nil ? nil : ChainLendingService(session: session, config: config)
         ))
         // L'historique : téléphone + RPC de testnet ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
@@ -267,6 +268,33 @@ struct MainTabView: View {
             pendingFirst(onExit: closeGrowFlow) {
                 SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill, onExit: closeGrowFlow)
             }
+        case .lending:
+            // Prêt XOXNO (phase 7) : USDC, dépôt et retrait seulement, testnet.
+            if let lending = growModel.lending {
+                LendingInfoView(model: lending, onBack: popGrow) { growPath.append(.lendingDeposit(drawerID: nil)) }
+            }
+        case .lendingPosition(let address):
+            if let lending = growModel.lending {
+                LendingPositionView(
+                    model: lending, drawerAddress: address, onBack: popGrow,
+                    onWithdraw: { growPath.append(.lendingWithdraw(drawerID: $0)) },
+                    onDeposit: { growPath.append(.lendingDeposit(drawerID: $0)) }
+                )
+            }
+        case .lendingDeposit(let drawerID):
+            pendingFirst(onExit: closeGrowFlow) {
+                VaultFlowRoot(
+                    service: ChainLendingService(session: session, config: config), action: .deposit, drawerID: drawerID,
+                    onSeePosition: showLendingInGrow, onExit: closeGrowFlow
+                )
+            }
+        case .lendingWithdraw(let drawerID):
+            pendingFirst(onExit: closeGrowFlow) {
+                VaultFlowRoot(
+                    service: ChainLendingService(session: session, config: config), action: .withdraw, drawerID: drawerID,
+                    onSeePosition: showLendingInGrow, onExit: closeGrowFlow
+                )
+            }
         }
     }
 
@@ -278,6 +306,13 @@ struct MainTabView: View {
     private func closeGrowFlow() {
         popGrow()
         refreshAll()
+    }
+
+    /// « See my position » après un dépôt XOXNO : la position du tiroir dans l'onglet Grow, positions relues.
+    private func showLendingInGrow(_ address: String) {
+        refreshAll()
+        growPath = [.lendingPosition(drawerAddress: address)]
+        selection = .grow
     }
 
     /// « See my position » (F5, reçu) : F6 du tiroir dans l'onglet Grow, positions relues.

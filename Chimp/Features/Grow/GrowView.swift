@@ -14,6 +14,11 @@ enum GrowRoute: Hashable {
     case savings(drawerAddress: String)
     /// Swap prérempli depuis F9 ou F10 (« Get some », « Get more », « Swap back ») : la paire seule, montant vide.
     case swap(SwapPrefill)
+    /// Prêt XOXNO (phase 7) : le marché, la position d'un tiroir, mettre, retirer.
+    case lending
+    case lendingPosition(drawerAddress: String)
+    case lendingDeposit(drawerID: String?)
+    case lendingWithdraw(drawerID: String)
 }
 
 /// F1 · Grow (maquette du 2026-10-15, décisions de Barth du même jour) : ce qui pousse (valeur, évolution réelle depuis
@@ -63,7 +68,7 @@ struct GrowView: View {
     /// (maquette F9), sans niveau de risque.
     @ViewBuilder
     private var content: some View {
-        if model.holdings.isEmpty, model.savings?.holdings.isEmpty ?? true, model.phase != .loading {
+        if model.holdings.isEmpty, model.savings?.holdings.isEmpty ?? true, model.lending?.holdings.isEmpty ?? true, model.phase != .loading {
             ChimpySays(text: "Nothing growing yet. Your XLM can go in the vault below.", pose: .plant)
                 .padding(.bottom, ChimpSpacing.s)
         }
@@ -75,6 +80,9 @@ struct GrowView: View {
             VaultUnanswered(details: model.technicalDetails) { Task { await model.refresh() } }
         default:
             vaultSection
+        }
+        if let lending = model.lending {
+            GrowLendingSection(model: lending, onOpen: onOpen)
         }
         if model.savingsService != nil {
             Text("Savings bonds").chimpFont(.displayS).foregroundStyle(.chimpTextPrimary).accessibilityAddTraits(.isHeader)

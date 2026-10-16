@@ -254,8 +254,7 @@ final class ChainLendingService: VaultService {
             throw VaultServiceError.unknownDrawer(prepared.draft.drawer.id)
         }
         let (adapter, _) = try lending()
-        // La trace de « Check again » : l'actif va du tiroir à la réserve (dépôt) ou en revient (retrait).
-        let trace = try ChainVaultService.trace(of: prepared, integration: integration, asset: adapter.asset.contract)
+        let trace = try Self.trace(of: prepared, integration: integration, asset: adapter.asset.contract)
         let hash = try await integrations.submit(integration, signed: card, trace: trace, feeSigner: feeSigner, onProgress: onProgress)
         let value = try? await client.transactionReturnValue(hash)
         let receipt = VaultReceipt(
@@ -266,6 +265,20 @@ final class ChainLendingService: VaultService {
             session.recordActivity(receipt.activityRecord(vault: adapter.market.pool, label: adapter.market.label), account: account)
         }
         return receipt
+    }
+
+    /// La trace de « Check again » : l'actif va du tiroir à la réserve (dépôt) ou en revient (retrait). Unités prises dans
+    /// le devis (une position a 7 décimales, intérêts compris, quand le pavé de l'USDC n'en a que 2).
+    static func trace(of prepared: PreparedVault, integration: PreparedIntegrationCall, asset: String) throws -> PaymentTrace {
+        let draft = prepared.draft
+        let units = draft.action == .withdraw ? (draft.quote.expectedOut?.units ?? draft.quote.shares.units) : draft.quote.shares.units
+        guard units > 0, let whole = UInt64(exactly: units) else { throw YieldError.amountTooSmall }
+        var trace = integration.trace(token: asset, destination: draft.vault.id, units: whole)
+        if draft.action == .withdraw {
+            trace.eventSender = draft.vault.id
+            trace.eventRecipient = draft.drawer.address
+        }
+        return trace
     }
 
     /// Montant revenu, dans la valeur rendue par `withdraw` : `Vec<(HubAssetKey, i128)>`.
