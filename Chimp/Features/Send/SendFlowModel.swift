@@ -631,6 +631,14 @@ final class SendFlowModel {
         let draft = signed.prepared.draft
         summary = SendSummary(draft)
         signingStage = .sending(.checking)
+        func waiting(_ trace: PaymentTrace) -> PendingSend {
+            PendingSend(
+                trace: trace, recipient: draft.recipient.address, recipientName: draft.recipientName,
+                drawerTitle: draft.drawer.title, asset: draft.asset.rawValue, amount: draft.amount, signedAt: .now
+            )
+        }
+        // Revue de sécurité F7 : gardée dès le retour de la carte, avant l'envoi (effacée par `finish`).
+        if let trace = try? service.trace(for: signed) { keepPending(waiting(trace)) }
         do {
             let receipt = try await service.submit(signed) { [weak self] progress in
                 self?.signingStage = .sending(progress)
@@ -644,17 +652,19 @@ final class SendFlowModel {
                 signingStage = .finished(.undetermined)
                 return
             }
-            let waiting = PendingSend(
-                trace: failure.trace, recipient: draft.recipient.address, recipientName: draft.recipientName,
-                drawerTitle: draft.drawer.title, asset: draft.asset.rawValue, amount: draft.amount, signedAt: .now
-            )
-            pending = waiting
-            do {
-                try service.setPendingSend(waiting)
-            } catch {
-                pendingSaveFailed = true
-            }
+            keepPending(waiting(failure.trace))
             await check()
+        }
+    }
+
+    /// L'opération en attente, en mémoire et sur le téléphone ; un échec d'écriture est dit (« ne réessayez pas avant
+    /// d'avoir vérifié »).
+    private func keepPending(_ waiting: PendingSend) {
+        pending = waiting
+        do {
+            try service.setPendingSend(waiting)
+        } catch {
+            pendingSaveFailed = true
         }
     }
 

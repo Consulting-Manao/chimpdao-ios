@@ -657,6 +657,18 @@ final class SwapFlowModel {
         let draft = signed.prepared.draft
         summary = SwapSummary(draft)
         stage = .sending(.checking)
+        func waiting(_ trace: PaymentTrace) -> PendingSend {
+            PendingSend(
+                trace: trace, recipient: signed.prepared.contract, recipientName: draft.quote.protocolName,
+                drawerTitle: draft.drawer.title, asset: draft.given.rawValue, amount: draft.amount, signedAt: .now,
+                swap: PendingSwap(
+                    receivedAsset: draft.received.rawValue, expectedReceived: draft.quote.expectedOut,
+                    minimumReceived: draft.minimumOut, protocolName: draft.quote.protocolName
+                )
+            )
+        }
+        // Revue de sécurité F7 : gardée dès le retour de la carte, avant l'envoi (effacée par `finish`).
+        if let trace = try? service.trace(for: signed) { keepPending(waiting(trace)) }
         do {
             let receipt = try await service.submit(signed) { [weak self] progress in
                 self?.stage = .sending(progress)
@@ -673,21 +685,17 @@ final class SwapFlowModel {
                 stage = .finished(.undetermined)
                 return
             }
-            let waiting = PendingSend(
-                trace: failure.trace, recipient: signed.prepared.contract, recipientName: draft.quote.protocolName,
-                drawerTitle: draft.drawer.title, asset: draft.given.rawValue, amount: draft.amount, signedAt: .now,
-                swap: PendingSwap(
-                    receivedAsset: draft.received.rawValue, expectedReceived: draft.quote.expectedOut,
-                    minimumReceived: draft.minimumOut, protocolName: draft.quote.protocolName
-                )
-            )
-            pending = waiting
-            do {
-                try service.setPendingSend(waiting)
-            } catch {
-                pendingSaveFailed = true
-            }
+            keepPending(waiting(failure.trace))
             await check()
+        }
+    }
+
+    private func keepPending(_ waiting: PendingSend) {
+        pending = waiting
+        do {
+            try service.setPendingSend(waiting)
+        } catch {
+            pendingSaveFailed = true
         }
     }
 

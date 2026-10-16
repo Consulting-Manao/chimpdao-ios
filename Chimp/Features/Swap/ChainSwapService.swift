@@ -246,16 +246,22 @@ final class ChainSwapService: SwapService {
 
     // MARK: Après le tap
 
+    func trace(for signed: SignedSwap) throws -> PaymentTrace {
+        let prepared = signed.prepared
+        guard let integration = prepared.integration else { throw SwapServiceError.unknownDrawer(prepared.draft.drawer.id) }
+        let given = try asset(prepared.draft.given)
+        return integration.trace(
+            token: given.contract, destination: prepared.firstHopVenue,
+            units: UInt64(try SwapUnits.units(of: prepared.draft.amount, asset: prepared.draft.given))
+        )
+    }
+
     func submit(_ signed: SignedSwap, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SwapReceipt {
         let prepared = signed.prepared
         guard let integration = prepared.integration, let card = signed.card else {
             throw SwapServiceError.unknownDrawer(prepared.draft.drawer.id)
         }
-        let given = try asset(prepared.draft.given)
-        let trace = integration.trace(
-            token: given.contract, destination: prepared.firstHopVenue,
-            units: UInt64(try SwapUnits.units(of: prepared.draft.amount, asset: prepared.draft.given))
-        )
+        let trace = try trace(for: signed)
         let hash = try await integrations.submit(integration, signed: card, trace: trace, feeSigner: feeSigner, onProgress: onProgress)
         let receipt = SwapReceipt(
             summary: SwapSummary(prepared.draft), transactionHash: hash, sentAt: .now,

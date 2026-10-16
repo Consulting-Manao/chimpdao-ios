@@ -632,6 +632,16 @@ final class VaultFlowModel {
         let draft = signed.prepared.draft
         summary = VaultSummary(draft)
         stage = .sending(.checking)
+        func waiting(_ trace: PaymentTrace) -> PendingSend {
+            let summary = VaultSummary(draft)
+            return PendingSend(
+                trace: trace, recipient: draft.vault.id, recipientName: draft.vault.name,
+                drawerTitle: draft.drawer.title, asset: draft.vault.asset.rawValue, amount: summary.amount, signedAt: .now,
+                vault: PendingVault(action: draft.action.rawValue, vaultName: draft.vault.name, shares: summary.shares, minimumReceived: summary.minimumOut)
+            )
+        }
+        // Revue de sécurité F7 : gardée dès le retour de la carte, avant l'envoi (effacée par `finish`).
+        if let trace = try? service.trace(for: signed) { keepPending(waiting(trace)) }
         do {
             let receipt = try await service.submit(signed) { [weak self] progress in
                 self?.stage = .sending(progress)
@@ -644,19 +654,17 @@ final class VaultFlowModel {
                 stage = .finished(.undetermined)
                 return
             }
-            let summary = VaultSummary(draft)
-            let waiting = PendingSend(
-                trace: failure.trace, recipient: draft.vault.id, recipientName: draft.vault.name,
-                drawerTitle: draft.drawer.title, asset: draft.vault.asset.rawValue, amount: summary.amount, signedAt: .now,
-                vault: PendingVault(action: draft.action.rawValue, vaultName: draft.vault.name, shares: summary.shares, minimumReceived: summary.minimumOut)
-            )
-            pending = waiting
-            do {
-                try service.setPendingSend(waiting)
-            } catch {
-                pendingSaveFailed = true
-            }
+            keepPending(waiting(failure.trace))
             await check()
+        }
+    }
+
+    private func keepPending(_ waiting: PendingSend) {
+        pending = waiting
+        do {
+            try service.setPendingSend(waiting)
+        } catch {
+            pendingSaveFailed = true
         }
     }
 

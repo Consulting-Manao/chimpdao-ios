@@ -114,6 +114,10 @@ final class MockLendingService: VaultService {
 
     func knownCard(_ key: ChipPublicKey) -> KnownCard? { send.knownCard(key) }
 
+    func trace(for signed: SignedVault) throws -> PaymentTrace {
+        try send.trace(for: SignedSend(prepared: sendEquivalent(signed.prepared), cardName: signed.cardName))
+    }
+
     func submit(_ signed: SignedVault, onProgress: @escaping (PaymentProgress) -> Void) async throws -> VaultReceipt {
         let draft = signed.prepared.draft
         let receipt = try await send.submit(SignedSend(prepared: sendEquivalent(signed.prepared), cardName: signed.cardName), onProgress: onProgress)

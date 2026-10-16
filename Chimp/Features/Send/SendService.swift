@@ -222,6 +222,9 @@ protocol SendService {
     func knownCard(_ key: ChipPublicKey) -> KnownCard?
     /// Après le tap : frais par le serveur de frais, envoi, attente de la confirmation. Toute erreur est un
     /// `PaymentFailure` : l'autorisation signée a pu sortir du téléphone, l'issue se vérifie avec `check`.
+    /// La trace que l'envoi suivra, connue **avant** l'envoi : gardée sur le téléphone dès le retour de la carte (revue
+    /// de sécurité F7), pour qu'une app tuée pendant l'envoi ne permette jamais une nouvelle signature.
+    func trace(for signed: SignedSend) throws -> PaymentTrace
     func submit(_ signed: SignedSend, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SendReceipt
     /// « Check again » (question 16) : envoyé, peut encore passer, attendre, rien n'est parti, ou impossible à dire.
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck
@@ -422,6 +425,14 @@ final class MockSendService: SendService {
     /// Hash factice, visiblement faux.
     static let fakeHash = String(repeating: "ab", count: 32)
 
+    func trace(for signed: SignedSend) throws -> PaymentTrace {
+        let draft = signed.prepared.draft
+        return PaymentTrace(
+            token: "mock", from: draft.drawer.address, destination: draft.recipient.address, units: 0, nonce: 1,
+            preparedAtLedger: 1, expirationLedger: 121
+        )
+    }
+
     func submit(_ signed: SignedSend, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SendReceipt {
         submitCount += 1
         let draft = signed.prepared.draft
@@ -429,10 +440,7 @@ final class MockSendService: SendService {
             onProgress(step)
             try await Task.sleep(for: delay)
         }
-        var trace = PaymentTrace(
-            token: "mock", from: draft.drawer.address, destination: draft.recipient.address, units: 0, nonce: 1,
-            preparedAtLedger: 1, expirationLedger: 121
-        )
+        var trace = try trace(for: signed)
         switch resultScenario {
         case .sent:
             return SendReceipt(summary: SendSummary(draft), transactionHash: Self.fakeHash, sentAt: .now, explorerURL: nil)

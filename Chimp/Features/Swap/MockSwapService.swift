@@ -142,6 +142,10 @@ final class MockSwapService: SwapService {
 
     func knownCard(_ key: ChipPublicKey) -> KnownCard? { send.knownCard(key) }
 
+    func trace(for signed: SignedSwap) throws -> PaymentTrace {
+        try send.trace(for: SignedSend(prepared: sendEquivalent(signed.prepared), cardName: signed.cardName))
+    }
+
     func submit(_ signed: SignedSwap, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SwapReceipt {
         submitCount += 1
         let draft = signed.prepared.draft

@@ -252,6 +252,11 @@ final class ChainLendingService: VaultService {
 
     // MARK: Après le tap
 
+    func trace(for signed: SignedVault) throws -> PaymentTrace {
+        guard let integration = signed.prepared.integration else { throw VaultServiceError.unknownDrawer(signed.prepared.draft.drawer.id) }
+        return try Self.trace(of: signed.prepared, integration: integration, asset: try lending().0.asset.contract)
+    }
+
     func submit(_ signed: SignedVault, onProgress: @escaping (PaymentProgress) -> Void) async throws -> VaultReceipt {
         let prepared = signed.prepared
         guard let integration = prepared.integration, let card = signed.card else {

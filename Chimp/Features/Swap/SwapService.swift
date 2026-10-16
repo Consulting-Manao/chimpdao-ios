@@ -234,6 +234,9 @@ protocol SwapService {
     func sign(_ prepared: PreparedSwap, pin: String?, onlyCard: ChipPublicKey?) async throws -> SignedSwap
     func knownCard(_ key: ChipPublicKey) -> KnownCard?
     /// Après le tap. Toute erreur est un `PaymentFailure` : l'issue se vérifie avec `check`.
+    /// La trace que l'envoi suivra, connue **avant** l'envoi : gardée sur le téléphone dès le retour de la carte (revue
+    /// de sécurité F7), pour qu'une app tuée pendant l'envoi ne permette jamais une nouvelle signature.
+    func trace(for signed: SignedSwap) throws -> PaymentTrace
     func submit(_ signed: SignedSwap, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SwapReceipt
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck
     /// Après un échec de l'envoi : parmi ces actifs, celui que son émetteur a gelé dans ce tiroir (relu sur la chaîne),

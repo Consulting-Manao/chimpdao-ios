@@ -164,6 +164,11 @@ final class ChainSendService: SendService {
 
     // MARK: Après le tap
 
+    func trace(for signed: SignedSend) throws -> PaymentTrace {
+        guard let payment = signed.prepared.payment else { throw SendServiceError.unknownDrawer(signed.prepared.draft.drawer.id) }
+        return payment.trace
+    }
+
     func submit(_ signed: SignedSend, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SendReceipt {
         guard let payment = signed.prepared.payment, let card = signed.card else {
             throw SendServiceError.unknownDrawer(signed.prepared.draft.drawer.id)

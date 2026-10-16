@@ -227,6 +227,11 @@ final class ChainVaultService: VaultService {
         return trace
     }
 
+    func trace(for signed: SignedVault) throws -> PaymentTrace {
+        guard let integration = signed.prepared.integration else { throw VaultServiceError.unknownDrawer(signed.prepared.draft.drawer.id) }
+        return try Self.trace(of: signed.prepared, integration: integration, asset: try vault().1.asset.contract)
+    }
+
     func submit(_ signed: SignedVault, onProgress: @escaping (PaymentProgress) -> Void) async throws -> VaultReceipt {
         let prepared = signed.prepared
         guard let integration = prepared.integration, let card = signed.card else {

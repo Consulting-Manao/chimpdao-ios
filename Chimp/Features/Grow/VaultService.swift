@@ -261,6 +261,9 @@ protocol VaultService {
     func sign(_ prepared: PreparedVault, pin: String?, onlyCard: ChipPublicKey?) async throws -> SignedVault
     func knownCard(_ key: ChipPublicKey) -> KnownCard?
     /// Après le tap. Toute erreur est un `PaymentFailure` : l'issue se vérifie avec `check`.
+    /// La trace que l'envoi suivra, connue **avant** l'envoi : gardée sur le téléphone dès le retour de la carte (revue
+    /// de sécurité F7), pour qu'une app tuée pendant l'envoi ne permette jamais une nouvelle signature.
+    func trace(for signed: SignedVault) throws -> PaymentTrace
     func submit(_ signed: SignedVault, onProgress: @escaping (PaymentProgress) -> Void) async throws -> VaultReceipt
     func check(_ trace: PaymentTrace) async throws -> PaymentCheck
     var pendingSend: PendingSend? { get }
