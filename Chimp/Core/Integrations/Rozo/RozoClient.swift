@@ -8,6 +8,8 @@ struct RozoOrder: Equatable, Sendable {
         case unpaid
         /// ROZO a reçu l'USDC, le paiement sur Stellar suit.
         case payinCompleted
+        /// Le paiement sur Stellar est parti (vu au premier test réel, le 2026-10-16 ; absent de la documentation).
+        case payoutStarted
         /// Payé sur Stellar.
         case completed
         /// Renvoyé (erreur de paiement, liquidité…) : un remboursement passe par le support de ROZO.
@@ -19,6 +21,7 @@ struct RozoOrder: Equatable, Sendable {
             switch raw {
             case "payment_unpaid": self = .unpaid
             case "payment_payin_completed": self = .payinCompleted
+            case "payment_payout_started": self = .payoutStarted
             case "payment_completed": self = .completed
             case "payment_bounced": self = .bounced
             case "payment_expired": self = .expired

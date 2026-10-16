@@ -40,6 +40,17 @@ struct RozoTests {
         #expect(order.problems(recipient: main, requested: Decimal(string: "0.01")!, config: config).isEmpty)
     }
 
+    @Test("États lus : ceux de la documentation, et « payment_payout_started » vu au premier test réel")
+    func statuses() {
+        #expect(RozoOrder.Status("payment_unpaid") == .unpaid)
+        #expect(RozoOrder.Status("payment_payin_completed") == .payinCompleted)
+        #expect(RozoOrder.Status("payment_payout_started") == .payoutStarted)
+        #expect(RozoOrder.Status("payment_completed") == .completed)
+        #expect(RozoOrder.Status("payment_bounced").isFinal)
+        #expect(!RozoOrder.Status("payment_payout_started").isFinal)
+        #expect(RozoOrder.Status("payment_refunded") == .other("payment_refunded"))
+    }
+
     @Test("Dates : fractions de seconde de 2 ou 6 chiffres, ou aucune")
     func dates() throws {
         let short = try #require(RozoClient.date("2026-10-16T07:29:54.93+00:00"))

@@ -158,7 +158,7 @@ struct RozoTransferView: View {
                 switch order.status {
                 case .unpaid:
                     instructions(order)
-                case .payinCompleted:
+                case .payinCompleted, .payoutStarted:
                     ChimpNoticeBanner(text: "ROZO got your USDC. Paying your Main now…", marker: .info) { ProgressView() }
                 case .completed:
                     arrived(order)
