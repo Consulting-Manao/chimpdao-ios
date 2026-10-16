@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// « Add money » (tranche 2, D4 ; construit sans maquette avec le design system, décision de Barth du 2026-10-15) : pour
-/// l'instant une seule voie, « From another chain » (devis NEAR Intents, N1). Ouvert depuis le Wallet et depuis Recevoir.
+/// « Add money » (tranche 2, D4 ; construit sans maquette avec le design system, décisions de Barth du 2026-10-15 et du
+/// 2026-10-16) : « From Base · via ROZO » (N2, un intermédiaire de confiance) et « From another chain » (devis NEAR
+/// Intents, N1). Ouvert depuis le Wallet et depuis Recevoir.
 struct AddMoneyView: View {
     let onBack: () -> Void
+    var onRozo: (() -> Void)? = nil
     let onCrossChain: () -> Void
 
     var body: some View {
@@ -11,6 +13,9 @@ struct AddMoneyView: View {
             ChimpHeader(title: "Add money", subtitle: "Into your wallet", onBack: onBack)
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.l) {
+                    if let onRozo {
+                        ChimpNavigationRow(title: "From Base", subtitle: "Send USDC via ROZO, a middleman that holds it during the transfer", action: onRozo)
+                    }
                     ChimpNavigationRow(title: "From another chain", subtitle: "See a live price from NEAR Intents", action: onCrossChain)
                     ChimpySays(text: "To get money from someone on Stellar, share your address from Receive.", pose: .teacher)
                 }

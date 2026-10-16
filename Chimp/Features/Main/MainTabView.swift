@@ -65,13 +65,19 @@ struct MainTabView: View {
                                 walletPath.append(.addMoney)
                             }
                         case .addMoney:
-                            AddMoneyView(onBack: { if !walletPath.isEmpty { walletPath.removeLast() } }) {
+                            AddMoneyView(
+                                onBack: { if !walletPath.isEmpty { walletPath.removeLast() } },
+                                onRozo: config.integrations == nil || session.wallet.account == nil ? nil : { walletPath.append(.rozoTransfer) }
+                            ) {
                                 walletPath.append(.crossChainQuote)
                             }
                             .toolbar(.hidden, for: .navigationBar)
                         case .crossChainQuote:
                             // N1 : devis NEAR Intents seulement (aucun envoi), D4.
                             CrossChainQuoteDestination(config: config) { if !walletPath.isEmpty { walletPath.removeLast() } }
+                        case .rozoTransfer:
+                            // N2 : ROZO, intermédiaire de confiance (D4) ; l'arrivée apparaît ensuite dans l'Activity.
+                            RozoTransferDestination(config: config, session: session, onBack: { if !walletPath.isEmpty { walletPath.removeLast() } }, onDone: closeFlow)
                         case .send(let drawerID):
                             // Le vrai envoi (testnet) ; au retour, les soldes du Wallet sont relus. Un swap ou un dépôt en
                             // attente : son état d'abord (une seule opération à l'issue incertaine à la fois).
@@ -422,6 +428,8 @@ enum WalletRoute: Hashable {
     case addMoney
     /// N1 : devis NEAR Intents (« From another chain »).
     case crossChainQuote
+    /// N2 : « From Base · via ROZO ».
+    case rozoTransfer
 }
 
 /// Recevoir (D1) poussé depuis le Wallet : un ViewModel neuf à chaque ouverture, gardé tant que l'écran est affiché.
@@ -460,6 +468,36 @@ private struct CrossChainQuoteDestination: View {
         Group {
             if let model {
                 CrossChainQuoteView(model: model, onBack: onBack)
+            } else {
+                Color(.chimpBackground).onAppear(perform: onBack)
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// N2 : un ViewModel neuf à chaque ouverture, vers le Main du compte, sur l'API de ROZO (sans clé).
+private struct RozoTransferDestination: View {
+    @State private var model: RozoTransferModel?
+    let config: ChimpNetworkConfig
+    let onBack: () -> Void
+    let onDone: () -> Void
+
+    init(config: ChimpNetworkConfig, session: AppSession, onBack: @escaping () -> Void, onDone: @escaping () -> Void) {
+        _model = State(initialValue: config.integrations.flatMap { integrations in
+            session.wallet.account.map { account in
+                RozoTransferModel(client: RozoClient(config: integrations.rozo), config: integrations.rozo, recipient: account.address)
+            }
+        })
+        self.config = config
+        self.onBack = onBack
+        self.onDone = onDone
+    }
+
+    var body: some View {
+        Group {
+            if let model {
+                RozoTransferView(model: model, explorerURL: config.explorerURL(transactionHash:), onBack: onBack, onDone: onDone)
             } else {
                 Color(.chimpBackground).onAppear(perform: onBack)
             }

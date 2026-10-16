@@ -24,6 +24,7 @@ struct ChimpApp: App {
                 .modifier(SwapDemoLaunch())
                 .modifier(VaultDemoLaunch())
                 .modifier(CrossChainDemoLaunch())
+                .modifier(RozoDemoLaunch())
             #endif
         }
     }

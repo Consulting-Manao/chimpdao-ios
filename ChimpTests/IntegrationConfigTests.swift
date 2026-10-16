@@ -53,7 +53,7 @@ struct IntegrationConfigTests {
             ),
             nearIntents: .init(api: URL(string: "http://1click.chaindefuser.com")!, quoteRecipient: "CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB", refundAccount: "intents.near"),
             rozo: .init(
-                api: URL(string: "http://intentapitestnet.rozo.ai")!, appId: "rozoDemo", sourceChainId: "84532", sourceChainName: "Base",
+                api: URL(string: "http://intentapitestnet.rozo.ai")!, appId: "rozoDemo", sourceChainId: "84532", sourceChainName: "Base", sourceNetworkName: "Base Sepolia",
                 sourceToken: "0x036cbd", stellarChainId: "1500", stellarToken: base.rozo.stellarToken,
                 minimumAmount: 2, maximumAmount: 1, payoutAccounts: ["CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB"]
             )

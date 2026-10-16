@@ -93,6 +93,8 @@ struct IntegrationConfig: Equatable, Sendable {
         /// La seule chaîne d'origine proposée, et son nom affiché (« from Base »).
         let sourceChainId: String
         let sourceChainName: String
+        /// Le réseau d'origine tel que l'utilisateur doit le choisir dans son wallet (« Base Sepolia » sur testnet).
+        let sourceNetworkName: String
         /// USDC de la chaîne d'origine : une commande qui en nomme un autre est refusée.
         let sourceToken: String
         /// Identifiant de Stellar chez ROZO, et l'USDC livré (`CODE:émetteur`) : une commande qui en nomme un autre est refusée.
@@ -151,7 +153,7 @@ struct IntegrationConfig: Equatable, Sendable {
         rozo: Rozo(
             api: URL(string: "https://intentapitestnet.rozo.ai/functions/v1/payment-api")!,
             appId: "rozoDemo",
-            sourceChainId: "84532", sourceChainName: "Base",
+            sourceChainId: "84532", sourceChainName: "Base", sourceNetworkName: "Base Sepolia",
             sourceToken: "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
             stellarChainId: "1500", stellarToken: "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
             minimumAmount: Decimal(string: "0.01")!, maximumAmount: 1,
