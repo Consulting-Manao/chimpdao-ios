@@ -19,6 +19,9 @@ struct ChimpNetworkConfig: Equatable, Sendable {
     /// Testnet seulement : où obtenir de l'USDC de test à la main (`faucet` de l'USDC dans `chain/assets.ts`).
     /// `nil` sur mainnet (« mainnet: USDC must not carry a faucet »).
     let usdcFaucet: URL?
+    /// Repère de l'horloge des ledgers (revue de sécurité F3) : un ledger vu fermé à une heure connue. Sans repère, le
+    /// plafond ne s'appuie que sur le dernier ledger vu par ce téléphone.
+    var ledgerAnchor: LedgerAnchor? = nil
 
     struct Endpoints: Equatable, Sendable {
         let rpc: URL
@@ -68,7 +71,9 @@ struct ChimpNetworkConfig: Equatable, Sendable {
         feeSignerURL: URL(string: "https://chimpdao-signer.tansu-964.workers.dev/")!,
         feePayer: "GDZE7UWGO3PS6R6RI6F3XIJLX7WGIEFD3X4YQO4AJH4LS3KDY6LLFXG2",
         usdcIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-        usdcFaucet: URL(string: "https://faucet.circle.com/")!
+        usdcFaucet: URL(string: "https://faucet.circle.com/")!,
+        // Ledger 5 223 554, fermé le 2026-10-16 à 09:02:37 UTC (retrait XOXNO de la carte n°7, lu sur la chaîne).
+        ledgerAnchor: LedgerAnchor(ledger: 5_223_554, time: Date(timeIntervalSince1970: 1_792_141_357))
     )
 }
 

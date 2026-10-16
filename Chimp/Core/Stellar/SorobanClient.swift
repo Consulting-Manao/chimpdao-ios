@@ -83,6 +83,9 @@ struct SorobanClient {
 
     var network: Network { .custom(passphrase: config.passphrase) }
 
+    /// Le plafond des ledgers annoncés par le RPC, d'après l'horloge du téléphone (revue de sécurité F3).
+    var ledgerClock: LedgerClock { LedgerClock.shared(for: config) }
+
     // MARK: Construction
 
     /// Compte source avec son numéro de séquence à jour (`builderFor` : un `getAccount` neuf par transaction).
@@ -107,7 +110,8 @@ struct SorobanClient {
     /// Numéro du dernier ledger fermé (`getLatestLedger`), pour l'expiration des autorisations.
     func latestLedger() async throws -> UInt32 {
         switch await server.getLatestLedger() {
-        case .success(let response): return try Self.plausibleLedger(Int(response.sequence))
+        // Revue de sécurité F3 (partie 1) : ce ledger fixe l'expiration des autorisations, il doit coller à l'horloge.
+        case .success(let response): return try ledgerClock.checked(try Self.plausibleLedger(Int(response.sequence)))
         case .failure(let error): throw StellarError.rpc(Self.describe(error))
         }
     }

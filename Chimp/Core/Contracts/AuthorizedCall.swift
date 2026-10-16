@@ -57,7 +57,8 @@ enum AuthorizedCall {
         )
         let simulation = try await client.simulate(transaction)
         guard let entries = simulation.sorobanAuth, !entries.isEmpty else { throw CallError.missingAuthorization(function: function) }
-        let simulatedLedger = try SorobanClient.plausibleLedger(Int(simulation.latestLedger))
+        // L'expiration signée part de ce ledger : il doit coller à l'horloge du téléphone (revue de sécurité F3).
+        let simulatedLedger = try client.ledgerClock.checked(try SorobanClient.plausibleLedger(Int(simulation.latestLedger)))
         let expiration = simulatedLedger + SorobanAuth.expirationLedgers
         let expected = try expectedInvocation
             ?? SorobanAuth.contractInvocation(contract: contract, function: function, arguments: arguments)
