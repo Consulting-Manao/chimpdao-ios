@@ -235,6 +235,10 @@ struct VaultStatusView: View {
         }
     }
 
+    static func minimumLabel(lending: Bool) -> LocalizedStringKey {
+        lending ? "Expected back" : "At least"
+    }
+
     /// Mettre : depuis, ce qui part. Retirer : vers, ce qui est attendu, le minimum signé.
     private func details(_ summary: VaultSummary) -> [ChimpDetailItem] {
         var items = summary.kind == .lending
@@ -246,7 +250,7 @@ struct VaultStatusView: View {
         } else {
             items.append(ChimpDetailItem(id: "to", label: "Lands in", value: summary.drawerTitle))
             if let minimum = summary.minimumOut {
-                items.append(ChimpDetailItem(id: "minimum", label: summary.kind == .lending ? "Comes back" : "At least", value: summary.asset.displayedWithCode(minimum, locale: locale)))
+                items.append(ChimpDetailItem(id: "minimum", label: Self.minimumLabel(lending: summary.kind == .lending), value: summary.asset.displayedWithCode(minimum, locale: locale)))
             }
         }
         return items
@@ -347,7 +351,10 @@ struct VaultSentView: View {
         } else if let received = receipt.received {
             ("Came in", "+\(summary.asset.displayedWithCode(received, locale: locale))", Color(.chimpStampReceived))
         } else {
-            ("Came in", String(localized: "at least \(summary.asset.displayedWithCode(summary.minimumOut ?? summary.amount, locale: locale))"), Color(.chimpStampReceived))
+            // Prêt (F5) : rien n'est garanti, donc « about » ; vault : le minimum signé.
+            ("Came in", summary.kind == .lending
+                ? String(localized: "about \(summary.asset.displayedWithCode(summary.minimumOut ?? summary.amount, locale: locale))")
+                : String(localized: "at least \(summary.asset.displayedWithCode(summary.minimumOut ?? summary.amount, locale: locale))"), Color(.chimpStampReceived))
         }
         return HStack {
             Text(label).chimpFont(.bodyS).fontWeight(.black)

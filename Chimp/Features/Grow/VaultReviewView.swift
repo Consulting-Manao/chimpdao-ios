@@ -121,7 +121,7 @@ struct VaultReviewView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         // Prêt : un montant exact (pas de parts), sauf « tout », qui comprend les intérêts du moment.
                         if draft.vault.kind != .lending || draft.quote.all {
-                            Text(draft.vault.kind == .lending ? "at least" : "about").chimpFont(.rowTitle).foregroundStyle(.chimpTextSecondary)
+                            Text("about").chimpFont(.rowTitle).foregroundStyle(.chimpTextSecondary)
                         }
                         Text(verbatim: asset.displayedWithCode(draft.quote.expected ?? draft.amount, locale: locale))
                     }
@@ -150,7 +150,7 @@ struct VaultReviewView: View {
     /// Retirer : le minimum reçu, exact (7 décimales) : c'est ce que la carte signe.
     private func minimumCard(_ minimum: Decimal, asset: SendAsset, lending: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
-            Text(lending ? "Comes back" : "Minimum received").textCase(.uppercase).chimpFont(.label)
+            Text(Self.minimumLabel(lending: lending)).textCase(.uppercase).chimpFont(.label)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(verbatim: SwapReviewView.exact(minimum, locale: locale))
                     .chimpFont(.monoAmount)
@@ -158,7 +158,7 @@ struct VaultReviewView: View {
                     .minimumScaleFactor(0.5)
                 Text(verbatim: asset.code).chimpFont(.monoValue)
             }
-            Text(lending ? "This is what your card signs. If XOXNO can't pay it right now, nothing moves." : "This is what your card signs. If the vault would pay less, nothing moves.")
+            Text(Self.minimumNote(lending: lending))
                 .chimpFont(.caption)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -168,6 +168,17 @@ struct VaultReviewView: View {
         .padding(.horizontal, ChimpSpacing.l)
         .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.chimpCard), fill: Color(.chimpAccent), shadow: .card)
         .accessibilityElement(children: .combine)
+    }
+
+    /// Le titre de la carte du retrait : le minimum signé (vault), ce qui devrait revenir (prêt). Revue de sécurité F5 :
+    /// le contrat XOXNO ne garantit aucun minimum (un retrait est ramené à la position, qui peut baisser si un emprunteur
+    /// ne rembourse pas) ; l'écran ne le présente donc pas comme garanti.
+    static func minimumLabel(lending: Bool) -> LocalizedStringKey {
+        lending ? "Expected back" : "Minimum received"
+    }
+
+    static func minimumNote(lending: Bool) -> LocalizedStringKey {
+        lending ? "The contract doesn't guarantee a minimum. If XOXNO can't pay it right now, nothing moves." : "This is what your card signs. If the vault would pay less, nothing moves."
     }
 
     /// Vault, protocoles, (retirer : où ça revient), frais.

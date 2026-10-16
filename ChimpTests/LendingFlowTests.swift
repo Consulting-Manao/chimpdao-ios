@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import ChimpDAO
 
@@ -76,5 +77,18 @@ struct LendingFlowTests {
         pending.vault = PendingVault(action: "deposit", vaultName: "XOXNO USDC", shares: nil, minimumReceived: nil)
         #expect(VaultSummary(pending, network: .testnet)?.kind == .lending)
         #expect(VaultSummary(pending, network: .testnet)?.placeName == "XOXNO")
+    }
+}
+
+/// Revue de sécurité F5 (2026-10-16) : le contrat XOXNO ne garantit aucun minimum (un retrait est ramené à la position, qui
+/// peut baisser si un emprunteur ne rembourse pas) : l'écran ne doit pas le présenter comme garanti.
+struct LendingWordingTests {
+    @Test("F5 : « Expected back », et la mention que le contrat ne garantit pas de minimum")
+    func expectedBack() {
+        #expect(VaultReviewView.minimumLabel(lending: true) == "Expected back")
+        #expect(VaultReviewView.minimumNote(lending: true) == "The contract doesn't guarantee a minimum. If XOXNO can't pay it right now, nothing moves.")
+        #expect(VaultStatusView.minimumLabel(lending: true) == "Expected back")
+        // Le vault garde son minimum signé.
+        #expect(VaultReviewView.minimumLabel(lending: false) == "Minimum received")
     }
 }
