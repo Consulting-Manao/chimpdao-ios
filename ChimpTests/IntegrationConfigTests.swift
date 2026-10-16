@@ -56,6 +56,10 @@ struct IntegrationConfigTests {
                 api: URL(string: "http://intentapitestnet.rozo.ai")!, appId: "rozoDemo", sourceChainId: "84532", sourceChainName: "Base", sourceNetworkName: "Base Sepolia",
                 sourceToken: "0x036cbd", stellarChainId: "1500", stellarToken: base.rozo.stellarToken,
                 minimumAmount: 2, maximumAmount: 1, payoutAccounts: ["CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB"]
+            ),
+            xoxno: .init(
+                controller: base.cctp.tokenMessengerMinter, pool: "not-an-address", positionNFT: base.xoxno.positionNFT,
+                assetCode: "EURC", hubID: 1, spokeID: 1, name: "XOXNO EURC"
             )
         )
         let problems = broken.problems(passphrase: config.passphrase, knownAssetCodes: knownAssetCodes, reserved: reserved)
@@ -76,5 +80,8 @@ struct IntegrationConfigTests {
         #expect(problems.contains("rozo.payoutAccounts has a non-G address: \"CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB\""))
         #expect(problems.contains("rozo amount bounds are inverted"))
         #expect(problems.contains("rozo.sourceToken is not an EVM address"))
+        #expect(problems.contains("xoxno.controller repeats an address used elsewhere"))
+        #expect(problems.contains { $0.hasPrefix("xoxno.pool is not a C-address") })
+        #expect(problems.contains("xoxno names unknown asset \"EURC\""))
     }
 }

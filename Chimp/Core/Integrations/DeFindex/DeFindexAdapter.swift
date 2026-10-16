@@ -282,6 +282,8 @@ enum YieldError: Error, Equatable, LocalizedError {
     case wrongAsset
     /// Vault absent de `Config/`.
     case unknownVault
+    /// Le marché n'accepte plus de dépôt (plafond atteint, XOXNO).
+    case capReached
 
     var errorDescription: String? {
         switch self {
@@ -294,6 +296,7 @@ enum YieldError: Error, Equatable, LocalizedError {
         case .implausibleValue: "The vault's numbers don't look right."
         case .wrongAsset: "This vault holds a different asset than this app."
         case .unknownVault: "This vault isn't one the app knows."
+        case .capReached: "This market isn't taking more deposits right now."
         }
     }
 }

@@ -109,6 +109,26 @@ struct IntegrationConfig: Equatable, Sendable {
         let payoutAccounts: [String]
     }
 
+    /// XOXNO (prêt sur Stellar, phase 7, décision de Barth du 2026-10-16) : **dépôt et retrait seulement, jamais d'emprunt**,
+    /// USDC seulement, testnet seulement. Aucun audit publié de ses contrats Stellar : **pas de mainnet sans audit Stellar
+    /// publié et sans l'accord de Pamphile**, ni sans la prolongation des positions (`renew_account`). Adresses du dépôt
+    /// `XOXNO/rs-lending-xlm` (`configs/networks.json`, commit `76c31ab`), relues sur la chaîne le 2026-10-16 (code du
+    /// contrôleur `52ed959d…`, de la réserve `0be54b45…`). Absent de `reference/`.
+    struct Xoxno: Equatable, Sendable {
+        /// Le contrôleur : `supply`, `withdraw` et les lectures de position.
+        let controller: String
+        /// La réserve commune : reçoit les dépôts (`transfer` du tiroir vers elle), paie les retraits.
+        let pool: String
+        /// Le jeton de position (NFT OpenZeppelin « Enumerable ») : qui le détient contrôle la position.
+        let positionNFT: String
+        /// Le marché proposé : son actif (code de l'app) et son hub.
+        let assetCode: String
+        let hubID: UInt32
+        /// Le profil de risque des positions créées par l'app (1, « Blue Chip »).
+        let spokeID: UInt32
+        let name: String
+    }
+
     let soroswap: Soroswap
     let aquarius: Aquarius
     let defindexVaults: [DeFindexVault]
@@ -116,6 +136,7 @@ struct IntegrationConfig: Equatable, Sendable {
     let cctp: CCTP
     let nearIntents: NearIntents
     let rozo: Rozo
+    let xoxno: Xoxno
 
     static let testnet = IntegrationConfig(
         soroswap: Soroswap(
@@ -158,6 +179,12 @@ struct IntegrationConfig: Equatable, Sendable {
             stellarChainId: "1500", stellarToken: "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
             minimumAmount: Decimal(string: "0.01")!, maximumAmount: 1,
             payoutAccounts: ["GABWCTTOFK3TBVDLMVZER6JBXLOOCZ6PFDIUSYYU5GTJXP2CPMUYCQ37"]
+        ),
+        xoxno: Xoxno(
+            controller: "CCXRWJ6SIU2WPFEGLFGJVITPL57QAYIMIO6OAM2NBGNDQSSCK2FFV3F3",
+            pool: "CBSGF6QOQAMPFBEVSYPEQHSZRIHJ6RCGUPCRDMUX36DEKRWFAO2PZB5A",
+            positionNFT: "CDVN5JU675MEDPVRPCYC45AHFC275UH57WEU5OTFE4WFGZBNN7HTLPSY",
+            assetCode: "USDC", hubID: 1, spokeID: 1, name: "XOXNO USDC"
         )
     )
 
@@ -204,6 +231,10 @@ struct IntegrationConfig: Equatable, Sendable {
         if cctp.sourceChains[cctp.localDomain] != nil { problems.append("cctp.sourceChains names Stellar's own domain") }
         if nearIntents.api.scheme != "https" { problems.append("nearIntents.api is not https") }
         if (try? KeyPair(accountId: nearIntents.quoteRecipient)) == nil { problems.append("nearIntents.quoteRecipient is not a G-address") }
+        address("xoxno.controller", xoxno.controller)
+        address("xoxno.pool", xoxno.pool)
+        address("xoxno.positionNFT", xoxno.positionNFT)
+        if !knownAssetCodes.contains(xoxno.assetCode) { problems.append("xoxno names unknown asset \"\(xoxno.assetCode)\"") }
         if rozo.api.scheme != "https" { problems.append("rozo.api is not https") }
         if rozo.payoutAccounts.isEmpty { problems.append("rozo names no payout account") }
         for account in rozo.payoutAccounts where (try? KeyPair(accountId: account)) == nil {
