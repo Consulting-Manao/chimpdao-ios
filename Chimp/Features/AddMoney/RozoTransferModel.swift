@@ -44,14 +44,19 @@ final class RozoTransferModel {
     /// L'adresse du tiroir qui reçoit (le Main).
     let recipient: String
     private let client: RozoPaying
+    private let verifier: RozoPayoutVerifying
     private let debounce: Duration
     private let pollInterval: Duration
     private var quoteTask: Task<Void, Never>?
 
     static let fractionDigits = 2
 
-    init(client: RozoPaying, config: IntegrationConfig.Rozo, recipient: String, debounce: Duration = .milliseconds(500), pollInterval: Duration = .seconds(5)) {
+    init(
+        client: RozoPaying, verifier: RozoPayoutVerifying, config: IntegrationConfig.Rozo, recipient: String,
+        debounce: Duration = .milliseconds(500), pollInterval: Duration = .seconds(5)
+    ) {
         self.client = client
+        self.verifier = verifier
         self.config = config
         self.recipient = recipient
         self.debounce = debounce
@@ -61,6 +66,22 @@ final class RozoTransferModel {
     var order: RozoOrder? {
         if case .order(let order) = phase { order } else { nil }
     }
+
+    /// Revue de sécurité F6 : « payé » selon ROZO ne suffit pas, le paiement doit être vu sur Stellar.
+    enum ArrivalCheck: Equatable {
+        case none
+        case checking
+        case verified
+        /// Toujours introuvable après `maximumArrivalChecks` lectures : dit tel quel, avec le numéro de commande.
+        case notFound
+    }
+
+    private(set) var arrivalCheck: ArrivalCheck = .none
+    private var arrivalChecks = 0
+    static let maximumArrivalChecks = 12
+
+    /// « Arrived » : seulement quand le transfert du payeur ROZO vers le tiroir, du bon montant, a été vu sur Stellar.
+    var isArrivalVerified: Bool { arrivalCheck == .verified }
 
     /// « Get a deposit address » : seulement avec un devis valable, et dans les bornes.
     var canCreateOrder: Bool {
@@ -144,7 +165,8 @@ final class RozoTransferModel {
     /// Relit la commande jusqu'à son issue, tant que l'écran est affiché (tâche annulée en quittant). Une commande lue qui
     /// ne correspond plus à la demande n'est pas retenue.
     func track() async {
-        while let current = order, !current.status.isFinal, !Task.isCancelled {
+        while let current = order, !Task.isCancelled,
+              !current.status.isFinal || (current.status == .completed && arrivalCheck == .checking) || (current.status == .completed && arrivalCheck == .none) {
             try? await Task.sleep(for: pollInterval)
             guard !Task.isCancelled else { return }
             await readOrder(current)
@@ -161,6 +183,9 @@ final class RozoTransferModel {
             }
             isTrackingStale = false
             if order?.id == current.id { phase = .order(next) }
+            if next.status == .completed, arrivalCheck != .verified, arrivalCheck != .notFound {
+                await checkArrival(next)
+            }
         } catch is CancellationError {
         } catch {
             technicalDetails = SendFlowModel.details(error)
@@ -168,9 +193,28 @@ final class RozoTransferModel {
         }
     }
 
+    /// Le paiement de ROZO est-il sur Stellar ? Une panne réseau laisse « en cours » (on relira) ; introuvable après
+    /// `maximumArrivalChecks` essais : dit.
+    private func checkArrival(_ order: RozoOrder) async {
+        arrivalChecks += 1
+        do {
+            if try await verifier.isPaid(order, recipient: recipient) {
+                arrivalCheck = .verified
+                return
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            technicalDetails = SendFlowModel.details(error)
+        }
+        arrivalCheck = arrivalChecks >= Self.maximumArrivalChecks ? .notFound : .checking
+    }
+
     /// Après une commande expirée, renvoyée ou un refus : on recommence avec le même montant.
     func startOver() {
         phase = .entry
+        arrivalCheck = .none
+        arrivalChecks = 0
         technicalDetails = nil
         isTrackingStale = false
         amountChanged()

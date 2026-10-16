@@ -160,8 +160,12 @@ struct RozoTransferView: View {
                     instructions(order)
                 case .payinCompleted, .payoutStarted:
                     ChimpNoticeBanner(text: "ROZO got your USDC. Paying your Main now…", marker: .info) { ProgressView() }
-                case .completed:
+                case .completed where model.isArrivalVerified:
                     arrived(order)
+                case .completed where model.arrivalCheck == .notFound:
+                    ChimpySays(text: "ROZO says it paid, but I can't find the payment on Stellar. Write to ROZO's support with the order number below.", pose: .stop)
+                case .completed:
+                    ChimpNoticeBanner(text: "ROZO says it paid. Checking on Stellar…", marker: .info) { ProgressView() }
                 case .bounced:
                     ChimpySays(text: "ROZO sent this order back: nothing arrived. Write to ROZO's support with the order number below.", pose: .stop)
                 case .expired:
@@ -173,7 +177,7 @@ struct RozoTransferView: View {
                     Text("Can't reach ROZO right now. Still checking…").chimpFont(.caption).foregroundStyle(.chimpTextSecondary)
                 }
                 orderNumber(order)
-                if order.status == .completed {
+                if order.status == .completed, model.isArrivalVerified || model.arrivalCheck == .notFound {
                     ChimpButton("Done", action: onDone)
                 } else if order.status == .bounced || order.status == .expired {
                     ChimpButton("Start over", kind: .secondary) { model.startOver() }
@@ -240,7 +244,7 @@ struct RozoTransferView: View {
 
     private func arrived(_ order: RozoOrder) -> some View {
         VStack(alignment: .leading, spacing: ChimpSpacing.m) {
-            ChimpNoticeBanner(text: "Arrived in Main: \(amountText(order.destinationAmount))", marker: .success)
+            ChimpNoticeBanner(text: "Arrived via ROZO in Main: \(amountText(order.destinationAmount)) · checked on Stellar", marker: .success)
             if let hash = order.destinationTxHash {
                 ChimpPillButton("See ROZO's payment on Stellar") { openURL(explorerURL(hash)) }
             }

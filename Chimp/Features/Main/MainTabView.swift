@@ -520,8 +520,15 @@ private struct RozoTransferDestination: View {
 
     init(config: ChimpNetworkConfig, session: AppSession, onBack: @escaping () -> Void, onDone: @escaping () -> Void) {
         _model = State(initialValue: config.integrations.flatMap { integrations in
-            session.wallet.account.map { account in
-                RozoTransferModel(client: RozoClient(config: integrations.rozo), config: integrations.rozo, recipient: account.address)
+            session.wallet.account.flatMap { account in
+                // Revue de sécurité F6 : l'arrivée est vérifiée sur Stellar (SAC USDC de Config/, payeurs ROZO de Config/).
+                ((try? SACClient.stellarAssets(config: config)) ?? []).first { $0.code == "USDC" }.map { usdc in
+                    RozoTransferModel(
+                        client: RozoClient(config: integrations.rozo),
+                        verifier: StellarRozoPayoutVerifier(events: SorobanClient(config: config), usdc: usdc.contract, payoutAccounts: integrations.rozo.payoutAccounts),
+                        config: integrations.rozo, recipient: account.address
+                    )
+                }
             }
         })
         self.config = config

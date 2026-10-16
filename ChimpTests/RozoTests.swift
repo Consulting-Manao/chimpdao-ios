@@ -1,4 +1,5 @@
 import Foundation
+import stellarsdk
 import Testing
 @testable import ChimpDAO
 
@@ -146,9 +147,10 @@ struct RozoTests {
 
     // MARK: Écran N2
 
-    private func model(_ scenario: MockRozo.Scenario = .normal) -> (RozoTransferModel, MockRozo) {
+    private func model(_ scenario: MockRozo.Scenario = .normal, paidOnStellar: Bool = true) -> (RozoTransferModel, MockRozo) {
         let mock = MockRozo(scenario: scenario, delay: .zero)
-        return (RozoTransferModel(client: mock, config: config, recipient: main, debounce: .zero, pollInterval: .zero), mock)
+        let verifier = MockRozoPayoutVerifier(paid: paidOnStellar)
+        return (RozoTransferModel(client: mock, verifier: verifier, config: config, recipient: main, debounce: .zero, pollInterval: .zero), mock)
     }
 
     private func type(_ text: String, into model: RozoTransferModel) {
@@ -179,6 +181,7 @@ struct RozoTests {
         await model.track()
         #expect(model.order?.status == .completed)
         #expect(model.order?.destinationTxHash != nil)
+        #expect(model.isArrivalVerified)
     }
 
     @Test("Commande renvoyée ou expirée : l'issue est dite, on peut recommencer")
@@ -211,5 +214,61 @@ struct RozoTests {
         #expect(RozoTransferModel.countdown(545.7) == "9:05")
         #expect(RozoTransferModel.remaining(until: now.addingTimeInterval(-5), now: now) == 0)
         #expect(RozoTransferModel.remaining(until: nil, now: now) == nil)
+    }
+
+    @Test("F6 : l'API ROZO dit « payé » mais aucun paiement n'existe sur Stellar → jamais « Arrived »")
+    func lyingRozoIsNotEnough() async throws {
+        let (model, _) = model(paidOnStellar: false)
+        type("0.1", into: model)
+        await model.refreshQuote()
+        await model.createOrder()
+        await model.track()
+        // MockRozo annonce `payment_completed` avec un hash qui ne correspond à aucun paiement vérifié sur Stellar.
+        #expect(model.order?.status == .completed)
+        #expect(!model.isArrivalVerified)
+        #expect(model.arrivalCheck == .notFound, "Dit « introuvable » après les essais, jamais « Arrived »")
+    }
+
+    // MARK: Vérification sur Stellar (F6)
+
+    private static let payer = "GABWCTTOFK3TBVDLMVZER6JBXLOOCZ6PFDIUSYYU5GTJXP2CPMUYCQ37"
+    private static let usdcSAC = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"
+
+    private static func event(contract: String = usdcSAC, hash: String, units: Int128) -> ChimpDAO.SorobanClient.ContractEvent {
+        let value = Data(try! XDREncoder.encode(ContractArgument.i128(units))).base64EncodedString()
+        return ChimpDAO.SorobanClient.ContractEvent(id: "1", contractID: contract, ledger: 5_222_790, ledgerClosedAt: "2026-10-16T07:58:57Z", transactionHash: hash, topics: [], value: value)
+    }
+
+    private final class FakeEvents: RozoTransferEvents {
+        var events: [ChimpDAO.SorobanClient.ContractEvent] = []
+        private(set) var asked: [(String, String, String)] = []
+        func latestLedger() async throws -> UInt32 { 5_223_000 }
+        func transferEvents(token: String, from: String, to: String, startLedger: UInt32, endLedger: UInt32) async throws -> [ChimpDAO.SorobanClient.ContractEvent] {
+            asked.append((token, from, to))
+            return events
+        }
+    }
+
+    @Test("F6 : le vrai paiement de ROZO du 2026-10-16 (0,1 USDC, e7f98fad…) est reconnu ; autre transaction, autre montant, autre contrat : non")
+    func stellarVerification() async throws {
+        let hash = "e7f98fad7c045eabaf0d036d4ef5defef29798be51d14f383dd959838cb10151"
+        let order = MockRozo.order(status: .completed, amount: Decimal(string: "0.1")!, recipient: main, expiresAt: nil)
+        let paid = RozoOrder(
+            id: order.id, status: .completed, expiresAt: nil, sourceChainId: order.sourceChainId, sourceToken: order.sourceToken,
+            sourceAmount: order.sourceAmount, depositAddress: order.depositAddress, destinationChainId: order.destinationChainId,
+            destinationAddress: main, destinationToken: order.destinationToken, destinationAmount: Decimal(string: "0.1")!,
+            destinationTxHash: hash, errorMessage: nil
+        )
+        let events = FakeEvents()
+        let verifier = StellarRozoPayoutVerifier(events: events, usdc: Self.usdcSAC, payoutAccounts: [Self.payer])
+        events.events = [Self.event(hash: hash, units: 1_000_000)]
+        #expect(try await verifier.isPaid(paid, recipient: main))
+        #expect(events.asked.first?.0 == Self.usdcSAC && events.asked.first?.1 == Self.payer && events.asked.first?.2 == main)
+        events.events = [Self.event(hash: "autre", units: 1_000_000)]
+        #expect(try await !verifier.isPaid(paid, recipient: main))
+        events.events = [Self.event(hash: hash, units: 999_999)]
+        #expect(try await !verifier.isPaid(paid, recipient: main))
+        events.events = [Self.event(contract: "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC", hash: hash, units: 1_000_000)]
+        #expect(try await !verifier.isPaid(paid, recipient: main))
     }
 }

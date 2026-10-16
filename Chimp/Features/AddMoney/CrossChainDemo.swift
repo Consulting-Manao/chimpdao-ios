@@ -32,7 +32,7 @@ struct RozoDemoLaunch: ViewModifier {
                 NavigationStack {
                     RozoTransferView(
                         model: RozoTransferModel(
-                            client: MockRozo(scenario: scenario), config: IntegrationConfig.testnet.rozo,
+                            client: MockRozo(scenario: scenario), verifier: MockRozoPayoutVerifier(), config: IntegrationConfig.testnet.rozo,
                             recipient: "CASBWZTE3GU4VVBC2Q3V6VXCHTG7VLHG45AJXEJ64IVNQSDLEDRBD3RP", pollInterval: .seconds(2)
                         ),
                         explorerURL: ChimpNetworkConfig.testnet.explorerURL(transactionHash:),
