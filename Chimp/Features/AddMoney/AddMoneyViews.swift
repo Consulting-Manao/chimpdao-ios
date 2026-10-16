@@ -183,7 +183,7 @@ struct CrossChainQuoteView: View {
             .fixedSize(horizontal: false, vertical: true)
         case .failed(let issue):
             VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
-                ChimpFieldMessage(text: Self.message(for: issue, chain: CrossChainQuoteModel.chainName(model.chain)), kind: .error)
+                ChimpFieldMessage(text: Self.message(for: issue), kind: .error)
                 if issue == .unavailable {
                     ChimpPillButton("Retry") { Task { await model.refreshQuote() } }
                 }
@@ -196,9 +196,11 @@ struct CrossChainQuoteView: View {
         }
     }
 
-    static func message(for issue: CrossChainQuoteModel.QuoteIssue, chain: String) -> LocalizedStringKey {
+    /// Le refus « pas de prix » vient de NEAR Intents pour toutes les paires vers Stellar (constaté le 2026-10-16) : on ne
+    /// suggère donc pas d'essayer une autre chaîne.
+    static func message(for issue: CrossChainQuoteModel.QuoteIssue) -> LocalizedStringKey {
         switch issue {
-        case .pairUnavailable: "NEAR Intents has no price from \(chain) for this right now. Try another coin or chain."
+        case .pairUnavailable: "NEAR Intents has no price to Stellar right now. Try again later."
         case .amountTooLow: "That's too little for NEAR Intents to price. Try a bigger amount."
         case .unavailable: "NEAR Intents isn't answering right now."
         }
