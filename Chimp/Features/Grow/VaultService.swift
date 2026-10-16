@@ -23,9 +23,22 @@ struct VaultInfo: Equatable {
     /// « DeFindex → Blend ».
     var protocolChain: String { protocols.joined(separator: " → ") }
 
+    /// Un vault DeFindex, ou un marché de prêt XOXNO (phase 7 : dépôt seulement, sans parts, montant exact).
+    var kind: VaultKind = .vault
+    /// Prêt : ce que le marché laisse retirer maintenant (limite d'utilisation comprise), `nil` pour un vault.
+    var withdrawableNow: Decimal? = nil
+    /// Prêt : le marché refuse les dépôts (gel ou pause), ou les retraits (pause).
+    var depositsBlocked = false
+    var withdrawalsBlocked = false
+
     /// Ce que le vault peut rendre tout de suite : ce qui n'est pas prêté (le reste revient quand les emprunteurs
-    /// remboursent).
-    var availableNow: Decimal { max(0, totalManaged - invested) }
+    /// remboursent). Prêt : ce que le marché laisse retirer.
+    var availableNow: Decimal { withdrawableNow ?? max(0, totalManaged - invested) }
+}
+
+enum VaultKind: Equatable, Sendable {
+    case vault
+    case lending
 }
 
 /// Une position du compte : un tiroir qui détient des parts du vault.
@@ -40,8 +53,19 @@ struct VaultHolding: Equatable {
     let basis: VaultBasis?
     let readAt: Date
 
+    /// Prêt : une position avec dette (jamais créée par l'app) ou dont les données ont expiré ne se déplace pas.
+    var condition: HoldingCondition = .movable
+
     /// Évolution réelle depuis le dépôt (`nil` sans base connue).
     var change: Decimal? { basis?.change(value: value) }
+}
+
+enum HoldingCondition: Equatable, Sendable {
+    case movable
+    /// Une dette existe sur la position : montrée sans action possible (décision de Barth du 2026-10-16).
+    case hasDebt
+    /// Les données de la position ont expiré sur la chaîne : `value` n'est pas connue (jamais affichée comme zéro).
+    case needsRenewal
 }
 
 /// Ce que le parcours du vault a besoin de connaître avant de commencer.
@@ -52,7 +76,10 @@ struct VaultContext: Equatable {
     var vault: VaultInfo
     var holdings: [VaultHolding]
 
-    func holding(drawerID: String) -> VaultHolding? { holdings.first { $0.drawerID == drawerID } }
+    /// La position déplaçable du tiroir d'abord (un tiroir peut détenir une position à renouveler en plus).
+    func holding(drawerID: String) -> VaultHolding? {
+        holdings.first { $0.drawerID == drawerID && $0.condition == .movable } ?? holdings.first { $0.drawerID == drawerID }
+    }
 }
 
 /// Le devis d'un dépôt ou d'un retrait (lecture seule, rien n'est signé). Montants en `TokenAmount` (aucun montant

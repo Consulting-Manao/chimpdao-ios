@@ -10,9 +10,19 @@ extension IntegrationConfig.DeFindexVault {
     }
 }
 
+extension IntegrationConfig.Xoxno {
+    /// « XOXNO USDC », via « XOXNO ».
+    var label: ActivityRecord.VaultLabel {
+        ActivityRecord.VaultLabel(name: name, protocols: "XOXNO")
+    }
+}
+
 extension ChimpNetworkConfig {
     /// Les vaults de ce réseau, par adresse : pour reconnaître un dépôt ou un retrait relu sur la chaîne.
     var vaultLabels: [String: ActivityRecord.VaultLabel] {
-        Dictionary(uniqueKeysWithValues: (integrations?.defindexVaults ?? []).map { ($0.vault, $0.label) })
+        var labels = Dictionary(uniqueKeysWithValues: (integrations?.defindexVaults ?? []).map { ($0.vault, $0.label) })
+        // XOXNO : un dépôt envoie l'actif à la réserve commune, un retrait le fait revenir de la réserve.
+        if let xoxno = integrations?.xoxno { labels[xoxno.pool] = xoxno.label }
+        return labels
     }
 }
