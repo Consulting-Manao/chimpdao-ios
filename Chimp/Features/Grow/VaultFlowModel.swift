@@ -218,6 +218,12 @@ final class VaultFlowModel {
         return min(available, market)
     }
 
+    /// Prêt : le nombre de positions déplaçables du tiroir choisi (chaque dépôt en ouvre une) ; un retrait vise la plus grosse.
+    var movablePositionCount: Int {
+        guard let drawer = selectedDrawer else { return 0 }
+        return context?.holdings.filter { $0.drawerID == drawer.id && $0.condition == .movable }.count ?? 0
+    }
+
     /// Prêt : XOXNO refuse ce mouvement en ce moment (gel, pause, plafond).
     var isBlockedByMarket: Bool {
         guard isLending, let vault = context?.vault else { return false }

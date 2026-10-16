@@ -228,6 +228,8 @@ struct VaultAmountView: View {
                 text: isDeposit ? "XOXNO isn't taking deposits right now." : "XOXNO has paused withdrawals right now. Your money is still there.",
                 marker: .error
             )
+        } else if model.isLending, !isDeposit, model.movablePositionCount > 1 {
+            ChimpNoticeBanner(text: "\(drawerName) has \(model.movablePositionCount) positions. This takes money out of the biggest one (\(asset.displayedWithCode(model.available, locale: locale))); then you can take out the next.", marker: .info)
         } else if model.isLending, !isDeposit, let now = model.withdrawableNow, now < model.available {
             ChimpNoticeBanner(text: "Right now XOXNO can pay back up to \(asset.displayedWithCode(now, locale: locale)). The rest is lent out and comes back as borrowers repay.", marker: .info)
         } else if model.loadPhase == .unavailable {

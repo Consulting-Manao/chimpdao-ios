@@ -103,7 +103,11 @@ final class ChainLendingService: VaultService {
                 basis: VaultBasis.from(records: records, drawer: drawer.address, vault: pool), readAt: .now, condition: condition
             )
         }
-        .sorted { ($0.condition == .movable ? 0 : 1) < ($1.condition == .movable ? 0 : 1) }
+        // La plus grosse position déplaçable d'abord : c'est celle qu'un retrait vise.
+        .sorted { lhs, rhs in
+            let (left, right) = (lhs.condition == .movable ? 0 : 1, rhs.condition == .movable ? 0 : 1)
+            return left != right ? left < right : lhs.value > rhs.value
+        }
     }
 
     private static func unavailable(_ error: Error) -> Error {
@@ -136,10 +140,11 @@ final class ChainLendingService: VaultService {
         )
     }
 
-    /// La position déplaçable du tiroir, sa valeur et le marché, relus.
+    /// La plus grosse position déplaçable du tiroir (un tiroir peut en avoir plusieurs : chaque dépôt en ouvre une), sa
+    /// valeur et le marché, relus. Un retrait vise une position à la fois, la plus grosse d'abord.
     private func freshPosition(of drawer: SendDrawer, adapter: XoxnoAdapter) async throws -> (XoxnoPosition, Int128, XoxnoMarketState) {
         let positions = try await adapter.positions(holder: drawer.address)
-        guard let position = positions.first(where: \.canMove), let value = position.value, value > 0 else {
+        guard let position = positions.filter(\.canMove).max(by: { ($0.value ?? 0) < ($1.value ?? 0) }), let value = position.value, value > 0 else {
             throw positions.contains { $0.status == .needsRenewal } ? YieldError.vaultUnavailable : YieldError.notEnoughShares
         }
         return (position, value, try await adapter.state())
@@ -162,9 +167,8 @@ final class ChainLendingService: VaultService {
             let state = try await adapter.state()
             guard !state.paused, !state.frozen else { throw YieldError.vaultUnavailable }
             guard Int128(units) <= state.remainingCap else { throw YieldError.capReached }
-            let positions = try await adapter.positions(holder: draft.drawer.address)
-            let reusable = positions.first { $0.isReusable(spokeID: adapter.market.spokeID) }
-            call = try adapter.supplyCall(from: draft.drawer.address, units: TokenAmount(Int128(units)), reuse: reusable)
+            // Revue de sécurité F4 : chaque dépôt ouvre une nouvelle position, jamais un numéro lu sur le réseau.
+            call = try adapter.supplyCall(from: draft.drawer.address, units: TokenAmount(Int128(units)))
             shown = SignedTerms(
                 action: .deposit, contract: adapter.market.controller, authorizer: draft.drawer.address, assetIn: adapter.asset.contract,
                 amountIn: Int128(units), assetOut: adapter.market.controller, minimumOut: nil, route: [], deadline: nil

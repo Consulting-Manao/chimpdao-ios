@@ -46,11 +46,11 @@ struct LendingServiceTests {
             XoxnoPosition(accountID: 54, holder: drawer.address, status: .live(value: 10_000_000, spokeID: 1, hasDebt: false)),
         ]
         let holdings = ChainLendingService.holdings(positions, drawer: drawer, records: [], pool: market.pool)
-        #expect(holdings.map(\.condition) == [.movable, .needsRenewal, .hasDebt])
+        #expect(holdings.map(\.condition) == [.movable, .hasDebt, .needsRenewal])
         #expect(holdings[0].value == 1)
         let context = VaultContext(network: .testnet, drawers: [drawer], vault: MockVaultService.vault, holdings: holdings.reversed())
         #expect(context.holding(drawerID: drawer.id)?.condition == .movable)
-        let onlyExpired = VaultContext(network: .testnet, drawers: [drawer], vault: MockVaultService.vault, holdings: [holdings[1]])
+        let onlyExpired = VaultContext(network: .testnet, drawers: [drawer], vault: MockVaultService.vault, holdings: holdings.filter { $0.condition == .needsRenewal })
         #expect(onlyExpired.holding(drawerID: drawer.id)?.condition == .needsRenewal)
     }
 
@@ -71,5 +71,23 @@ struct LendingServiceTests {
         )
         #expect(rows.first?.event == .vaultDeposit)
         #expect(rows.first?.vaultName == "XOXNO USDC")
+    }
+
+    @Test("F4 : plusieurs positions d'un tiroir, regroupées ; un retrait vise la plus grosse")
+    func groupedPositions() async throws {
+        let drawer = try await MockSendService(delay: .zero, nfcDelay: .zero).fetchContext().drawers[0]
+        let positions = [
+            XoxnoPosition(accountID: 54, holder: drawer.address, status: .live(value: 10_000_000, spokeID: 1, hasDebt: false)),
+            XoxnoPosition(accountID: 60, holder: drawer.address, status: .live(value: 150_000_000, spokeID: 1, hasDebt: false)),
+            XoxnoPosition(accountID: 5, holder: drawer.address, status: .needsRenewal),
+        ]
+        let holdings = ChainLendingService.holdings(positions, drawer: drawer, records: [], pool: market.pool)
+        #expect(holdings.map(\.value) == [15, 1, 0], "La plus grosse position déplaçable d'abord")
+        let groups = LendingDrawerGroup.grouped(holdings)
+        #expect(groups.count == 1)
+        #expect(groups[0].value == 16, "Une position à renouveler n'est jamais comptée (ni à zéro)")
+        #expect(groups[0].needsRenewal && !groups[0].hasDebt)
+        let context = VaultContext(network: .testnet, drawers: [drawer], vault: MockLendingService().market, holdings: holdings)
+        #expect(context.holding(drawerID: drawer.id)?.value == 15)
     }
 }

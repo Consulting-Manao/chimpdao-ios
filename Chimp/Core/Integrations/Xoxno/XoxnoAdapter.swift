@@ -66,12 +66,6 @@ struct XoxnoPosition: Equatable, Sendable {
         if case .live(let value, _, _) = status { value } else { nil }
     }
 
-    /// Réutilisable pour un nouveau dépôt : lue, dans le profil de risque de l'app, sans dette.
-    func isReusable(spokeID: UInt32) -> Bool {
-        if case .live(_, let spoke, let hasDebt) = status { return spoke == spokeID && !hasDebt }
-        return false
-    }
-
     var canMove: Bool {
         if case .live(_, _, let hasDebt) = status { return !hasDebt }
         return false
@@ -182,11 +176,13 @@ final class XoxnoAdapter {
 
     // MARK: Appels
 
-    /// Dépôt dans la position réutilisable du tiroir, ou dans une nouvelle (`account_id = 0`).
-    func supplyCall(from holder: String, units: TokenAmount, reuse position: XoxnoPosition?) throws -> ContractCall {
+    /// Dépôt, **toujours dans une nouvelle position** (`account_id = 0`). Revue de sécurité F4 (2026-10-16) : le contrôleur
+    /// laisse un tiers alimenter n'importe quelle position existante (« Third parties may only top up existing supply
+    /// positions »), et la liste des positions d'un tiroir vient du RPC : réutiliser un numéro lu pourrait envoyer le dépôt
+    /// dans la position d'un autre. Vérifier le propriétaire n'aiderait pas, la réponse viendrait du même RPC.
+    func supplyCall(from holder: String, units: TokenAmount) throws -> ContractCall {
         guard units.units > 0 else { throw YieldError.amountTooSmall }
-        let accountID = position.flatMap { $0.isReusable(spokeID: market.spokeID) ? $0.accountID : nil } ?? 0
-        return try XoxnoCalls.supply(market: market, asset: asset.contract, from: holder, accountID: accountID, units: units.units)
+        return try XoxnoCalls.supply(market: market, asset: asset.contract, from: holder, accountID: 0, units: units.units)
     }
 
     /// Retrait de `units` (ou de tout, `all`) de la position.

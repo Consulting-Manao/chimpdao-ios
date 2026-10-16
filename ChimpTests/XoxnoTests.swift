@@ -34,11 +34,11 @@ struct XoxnoTests {
 
     @Test("Dépôt : l'arbre déclaré est exactement celui de la simulation (supply, puis transfer du tiroir vers la réserve)")
     func supplyTree() throws {
-        let call = try adapter().supplyCall(from: main, units: TokenAmount(10_000_000), reuse: nil)
+        let call = try adapter().supplyCall(from: main, units: TokenAmount(10_000_000))
         let expected = try DeclaredInvocations.invocation(of: call, from: main, shape: XoxnoAuthShape(market: market, asset: usdc))
         #expect(AuthTreeCheck.mismatch(try root(Self.supplyAuth), expected: expected) == nil)
         // Un autre montant ou un autre tiroir : refusé.
-        let other = try adapter().supplyCall(from: main, units: TokenAmount(10_000_001), reuse: nil)
+        let other = try adapter().supplyCall(from: main, units: TokenAmount(10_000_001))
         let wrong = try DeclaredInvocations.invocation(of: other, from: main, shape: XoxnoAuthShape(market: market, asset: usdc))
         #expect(AuthTreeCheck.mismatch(try root(Self.supplyAuth), expected: wrong) != nil)
     }
@@ -52,18 +52,13 @@ struct XoxnoTests {
         #expect(AuthTreeCheck.mismatch(try root(Self.withdrawAuth), expected: expected) == nil)
     }
 
-    @Test("Un deuxième dépôt réutilise la position du tiroir ; une position d'un autre profil, avec dette ou à renouveler, non")
-    func reuse() throws {
-        let live = XoxnoPosition(accountID: 54, holder: main, status: .live(value: 1, spokeID: 1, hasDebt: false))
-        let reused = try XoxnoCalls.decode(adapter().supplyCall(from: main, units: TokenAmount(5), reuse: live), market: market, asset: usdc)
-        #expect(reused?.accountID == 54)
-        for other in [
-            XoxnoPosition(accountID: 54, holder: main, status: .live(value: 1, spokeID: 3, hasDebt: false)),
-            XoxnoPosition(accountID: 54, holder: main, status: .live(value: 1, spokeID: 1, hasDebt: true)),
-            XoxnoPosition(accountID: 54, holder: main, status: .needsRenewal),
-        ] {
-            #expect(try XoxnoCalls.decode(adapter().supplyCall(from: main, units: TokenAmount(5), reuse: other), market: market, asset: usdc)?.accountID == 0)
-        }
+    @Test("F4 : un dépôt ne va jamais dans une position existante, même annoncée « à soi » par le RPC (account_id = 0)")
+    func depositAlwaysOpensANewPosition() throws {
+        // Le RPC annonce la position n°26 (celle d'un autre) comme une position du Main, vivante, sans dette.
+        let announced = XoxnoPosition(accountID: 26, holder: main, status: .live(value: 1, spokeID: 1, hasDebt: false))
+        _ = announced  // l'adaptateur ne prend plus aucun numéro de position pour un dépôt
+        let call = try adapter().supplyCall(from: main, units: TokenAmount(10_000_000))
+        #expect(XoxnoCalls.decode(call, market: market, asset: usdc)?.accountID == 0)
     }
 
     @Test("Une position avec dette ou à renouveler ne se retire pas")
@@ -78,7 +73,7 @@ struct XoxnoTests {
 
     @Test("Bornes : dépôt exact ; retrait exact ; « tout » avec la valeur relue comme minimum affiché")
     func terms() throws {
-        let deposit = try adapter().terms(of: try adapter().supplyCall(from: main, units: TokenAmount(10_000_000), reuse: nil))
+        let deposit = try adapter().terms(of: try adapter().supplyCall(from: main, units: TokenAmount(10_000_000)))
         #expect(deposit.action == .deposit && deposit.amountIn == 10_000_000 && deposit.assetIn == usdc && deposit.minimumOut == nil)
         let position = XoxnoPosition(accountID: 54, holder: main, status: .live(value: 30_000_000, spokeID: 1, hasDebt: false))
         let partial = try adapter().terms(of: try adapter().withdrawCall(position: position, units: TokenAmount(1_000_000), all: false))

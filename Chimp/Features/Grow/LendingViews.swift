@@ -93,8 +93,40 @@ struct LendingPlaceCard: View {
     }
 }
 
-/// La section « Lending » de Grow : le marché, puis une ligne par position (une position à renouveler ou avec dette
-/// reste visible, jamais à zéro).
+/// Les positions d'un tiroir, regroupées (chaque dépôt ouvre une position, revue de sécurité F4) : la valeur des positions
+/// qu'on peut déplacer, et celles qu'on ne peut pas (à renouveler, avec dette), jamais comptées à zéro.
+struct LendingDrawerGroup: Equatable {
+    let drawerID: String
+    let drawerAddress: String
+    let holdings: [VaultHolding]
+
+    var movable: [VaultHolding] { holdings.filter { $0.condition == .movable } }
+    var value: Decimal { movable.map(\.value).reduce(0, +) }
+    var needsRenewal: Bool { holdings.contains { $0.condition == .needsRenewal } }
+    var hasDebt: Bool { holdings.contains { $0.condition == .hasDebt } }
+    /// L'évolution depuis le dépôt : la base est celle du tiroir (tous ses dépôts), comparée à la valeur de toutes ses
+    /// positions déplaçables.
+    var change: Decimal? {
+        guard !movable.isEmpty else { return nil }
+        return movable.first?.basis?.change(value: value)
+    }
+
+    /// Un groupe par tiroir, dans l'ordre des positions.
+    static func grouped(_ holdings: [VaultHolding]) -> [LendingDrawerGroup] {
+        var order: [String] = []
+        var byDrawer: [String: [VaultHolding]] = [:]
+        for holding in holdings {
+            if byDrawer[holding.drawerID] == nil { order.append(holding.drawerID) }
+            byDrawer[holding.drawerID, default: []].append(holding)
+        }
+        return order.compactMap { id in
+            byDrawer[id].map { LendingDrawerGroup(drawerID: id, drawerAddress: $0[0].drawerAddress, holdings: $0) }
+        }
+    }
+}
+
+/// La section « Lending » de Grow : le marché, puis une ligne par tiroir, ses positions regroupées (une position à
+/// renouveler ou avec dette reste visible, jamais à zéro).
 struct GrowLendingSection: View {
     let model: GrowModel
     let onOpen: (GrowRoute) -> Void
@@ -118,34 +150,36 @@ struct GrowLendingSection: View {
             if let vault = model.vault {
                 Button { onOpen(.lending) } label: { LendingPlaceCard(vault: vault) }
                     .buttonStyle(ChimpPressableStyle())
-                ForEach(Array(model.holdings.enumerated()), id: \.offset) { _, holding in
-                    Button { onOpen(.lendingPosition(drawerAddress: holding.drawerAddress)) } label: { row(holding, asset: vault.asset) }
+                ForEach(LendingDrawerGroup.grouped(model.holdings), id: \.drawerID) { group in
+                    Button { onOpen(.lendingPosition(drawerAddress: group.drawerAddress)) } label: { row(group, asset: vault.asset) }
                         .buttonStyle(ChimpPressableStyle())
                 }
             }
         }
     }
 
-    private func row(_ holding: VaultHolding, asset: SendAsset) -> some View {
-        let drawer = model.drawer(id: holding.drawerID)
+    private func row(_ group: LendingDrawerGroup, asset: SendAsset) -> some View {
+        let drawer = model.drawer(id: group.drawerID)
         return HStack(spacing: ChimpSpacing.m) {
             ChimpDrawerIconView(icon: drawer?.icon ?? .main, size: CGSize(width: 34, height: 24), border: 2.5, cornerRadius: 6)
             VStack(alignment: .leading, spacing: 1) {
                 Text("In \(drawer.map(GrowView.shortTitle) ?? "")").chimpFont(.rowTitle).foregroundStyle(.chimpTextPrimary)
-                switch holding.condition {
-                case .movable:
-                    Text(GrowView.putInLine(holding, asset: asset, locale: locale)).chimpFont(.caption).foregroundStyle(.chimpTextSecondary)
-                case .needsRenewal:
-                    Text("Needs renewal · your money is still there").chimpFont(.caption).foregroundStyle(Color(.chimpNegative))
-                case .hasDebt:
-                    Text("Has a loan · can't be moved here").chimpFont(.caption).foregroundStyle(Color(.chimpNegative))
+                if let first = group.movable.first {
+                    Text(group.holdings.count > 1 ? "\(group.holdings.count) positions · \(GrowView.putInLine(first, asset: asset, locale: locale))" : GrowView.putInLine(first, asset: asset, locale: locale))
+                        .chimpFont(.caption).foregroundStyle(.chimpTextSecondary)
+                }
+                if group.needsRenewal {
+                    Text("A position needs renewal · your money is still there").chimpFont(.caption).foregroundStyle(Color(.chimpNegative))
+                }
+                if group.hasDebt {
+                    Text("A position has a loan · can't be moved here").chimpFont(.caption).foregroundStyle(Color(.chimpNegative))
                 }
             }
             Spacer(minLength: ChimpSpacing.s)
-            if holding.condition != .needsRenewal {
+            if !group.movable.isEmpty {
                 VStack(alignment: .trailing, spacing: 1) {
-                    Text(verbatim: asset.displayedWithCode(holding.value, locale: locale)).chimpFont(.monoValue).foregroundStyle(.chimpTextPrimary)
-                    if let change = holding.change, holding.condition == .movable {
+                    Text(verbatim: asset.displayedWithCode(group.value, locale: locale)).chimpFont(.monoValue).foregroundStyle(.chimpTextPrimary)
+                    if let change = group.change {
                         Text(verbatim: GrowView.changeText(change, asset: asset, locale: locale))
                             .chimpFont(.captionStrong)
                             .foregroundStyle(change < 0 ? Color(.chimpNegative) : Color(.chimpPositive))
@@ -274,6 +308,23 @@ struct LendingPositionView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: ChimpSpacing.l) {
                     if let vault = model.vault, !holdings.isEmpty {
+                        if holdings.count > 1, let group = LendingDrawerGroup.grouped(holdings).first {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("All positions").textCase(.uppercase).chimpFont(.label).foregroundStyle(.chimpTextSecondary)
+                                Text(verbatim: vault.asset.displayedWithCode(group.value, locale: locale))
+                                    .chimpFont(.amountL).foregroundStyle(.chimpTextPrimary).lineLimit(1).minimumScaleFactor(0.5)
+                                if let change = group.change {
+                                    Text("\(GrowView.changeText(change, asset: vault.asset, locale: locale)) since you put it in")
+                                        .chimpFont(.rowTitle)
+                                        .foregroundStyle(change < 0 ? Color(.chimpNegative) : Color(.chimpPositive))
+                                }
+                            }
+                            .accessibilityElement(children: .combine)
+                            ChimpNoticeBanner(
+                                text: "This drawer has \(holdings.count) positions: each deposit opens a new one. Taking money out works on one position at a time, the biggest first.",
+                                marker: .info
+                            )
+                        }
                         ForEach(Array(holdings.enumerated()), id: \.offset) { _, holding in
                             content(holding, vault: vault)
                         }
@@ -346,12 +397,13 @@ struct LendingPositionView: View {
                 .foregroundStyle(.chimpTextPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-            if let change = holding.change, holding.condition == .movable {
+            // La base est celle du tiroir (tous ses dépôts) : l'évolution n'a de sens que pour une position seule.
+            if let change = holding.change, holding.condition == .movable, holdings.count == 1 {
                 Text("\(GrowView.changeText(change, asset: vault.asset, locale: locale)) since you put it in")
                     .chimpFont(.rowTitle)
                     .foregroundStyle(change < 0 ? Color(.chimpNegative) : Color(.chimpPositive))
             }
-            if let basis = holding.basis, holding.condition == .movable {
+            if let basis = holding.basis, holding.condition == .movable, holdings.count == 1 {
                 Text("You put in \(vault.asset.displayedWithCode(basis.putIn, locale: locale)) on \(basis.since.formatted(.dateTime.day().month(.abbreviated)))")
                     .chimpFont(.caption)
                     .foregroundStyle(.chimpTextSecondary)
