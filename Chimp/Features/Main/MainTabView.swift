@@ -240,6 +240,24 @@ struct MainTabView: View {
     @ViewBuilder
     private func growDestination(_ route: GrowRoute) -> some View {
         switch route {
+        case .pot(let mark, let address):
+            // G2 arrive à l'étape suivante : en attendant, les pages actuelles de chaque pot.
+            switch mark {
+            case .defindex:
+                VaultPositionView(
+                    model: growModel, drawerAddress: address, onBack: popGrow,
+                    onWithdraw: { growPath.append(.withdraw(drawerID: $0)) }, onDeposit: { growPath.append(.deposit(drawerID: $0)) }
+                )
+            case .xoxno:
+                if let lending = growModel.lending {
+                    LendingPositionView(
+                        model: lending, drawerAddress: address, onBack: popGrow,
+                        onWithdraw: { growPath.append(.lendingWithdraw(drawerID: $0)) }, onDeposit: { growPath.append(.lendingDeposit(drawerID: $0)) }
+                    )
+                }
+            case .etherfuse:
+                SavingsView(model: growModel, drawerAddress: address, onBack: popGrow) { growPath.append(.swap($0)) }
+            }
         case .vault:
             VaultInfoView(model: growModel, onBack: popGrow) { growPath.append(.deposit(drawerID: nil)) }
         case .position(let address):

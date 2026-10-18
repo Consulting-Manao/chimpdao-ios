@@ -75,7 +75,10 @@ struct GrowDemoRoot: View {
         self.onClose = onClose
         let lendingService = MockLendingService(scenario: lending, cardSetup: SendMockSettings.cardSetup)
         self.lendingService = lendingService
-        _model = State(initialValue: GrowModel(service: service, savingsService: MockSavingsService(scenario: savings), lendingService: lendingService))
+        _model = State(initialValue: GrowModel(
+            service: service, savingsService: MockSavingsService(scenario: savings), lendingService: lendingService,
+            priceOracle: MockPriceOracle(), history: MemoryPotHistoryStore()
+        ))
         _path = State(initialValue: start)
     }
 
@@ -95,6 +98,23 @@ struct GrowDemoRoot: View {
     @ViewBuilder
     private func destination(_ route: GrowRoute) -> some View {
         switch route {
+        case .pot(let mark, let address):
+            switch mark {
+            case .defindex:
+                VaultPositionView(
+                    model: model, drawerAddress: address, onBack: pop,
+                    onWithdraw: { path.append(.withdraw(drawerID: $0)) }, onDeposit: { path.append(.deposit(drawerID: $0)) }
+                )
+            case .xoxno:
+                if let lending = model.lending {
+                    LendingPositionView(
+                        model: lending, drawerAddress: address, onBack: pop,
+                        onWithdraw: { path.append(.lendingWithdraw(drawerID: $0)) }, onDeposit: { path.append(.lendingDeposit(drawerID: $0)) }
+                    )
+                }
+            case .etherfuse:
+                SavingsView(model: model, drawerAddress: address, onBack: pop) { path.append(.swap($0)) }
+            }
         case .vault:
             VaultInfoView(model: model, onBack: pop) { path.append(.deposit(drawerID: nil)) }
         case .position(let address):

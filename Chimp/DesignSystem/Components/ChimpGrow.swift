@@ -95,9 +95,11 @@ struct ChimpPotAmount: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            Text(verbatim: amount).chimpFont(.potAmount).foregroundStyle(.chimpTextPrimary).lineLimit(1).minimumScaleFactor(0.6)
-            if let chip { ChimpGrowthChip(text: chip, isNegative: isNegative) }
+            Text(verbatim: amount).chimpFont(.potAmount).foregroundStyle(.chimpTextPrimary).lineLimit(1).fixedSize()
+            if let chip { ChimpGrowthChip(text: chip, isNegative: isNegative).fixedSize() }
         }
+        // Le montant garde sa taille : c'est le nom du protocole qui cède la place.
+        .layoutPriority(1)
     }
 }
 

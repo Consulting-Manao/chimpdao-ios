@@ -109,3 +109,12 @@ enum NetWorth {
         return result
     }
 }
+
+/// Prix fixes (catalogue, simulateur, tests) : XLM à 0,25 $.
+struct MockPriceOracle: PriceOracle {
+    var prices: [String: Decimal] = ["XLM": Decimal(string: "0.25")!, "USDC": 1]
+
+    func usdPrices(for codes: Set<String>) async -> [String: Decimal] {
+        prices.filter { codes.contains($0.key) }
+    }
+}
