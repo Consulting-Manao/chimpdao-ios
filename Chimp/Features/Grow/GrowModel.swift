@@ -25,12 +25,60 @@ final class GrowModel {
     let savingsService: SavingsService?
     /// Prêt XOXNO (phase 7) : le même modèle, sur le service de prêt ; lu à part, une panne de l'un ne cache pas l'autre.
     let lending: GrowModel?
+    /// Prix du XLM en dollars (oracle Reflector, lecture seule) : seulement pour le total « grown in total » (G1).
+    private let priceOracle: PriceOracle?
+    private(set) var xlmUSD: Decimal?
+    /// Les valeurs relevées une fois par jour (courbe et « THIS WEEK » de G2).
+    let history: PotHistoryStore?
     private var loadTask: Task<Void, Never>?
 
-    init(service: VaultService, savingsService: SavingsService? = nil, lendingService: VaultService? = nil) {
+    init(
+        service: VaultService, savingsService: SavingsService? = nil, lendingService: VaultService? = nil,
+        priceOracle: PriceOracle? = nil, history: PotHistoryStore? = nil
+    ) {
         self.service = service
         self.savingsService = savingsService
         lending = lendingService.map { GrowModel(service: $0) }
+        self.priceOracle = priceOracle
+        self.history = history
+    }
+
+    // MARK: Pots (maquette « Chimp Grow Final »)
+
+    /// Un pot par protocole et par tiroir.
+    var pots: [GrowPot] { GrowPots.build(vault: context, lending: lending?.context, savings: savings) }
+
+    /// Les tiroirs, Main d'abord.
+    var potDrawers: [SendDrawer] { GrowPots.drawers(vault: context, lending: lending?.context, savings: savings) }
+
+    func pot(_ mark: ChimpPotProtocol, drawerAddress: String) -> GrowPot? {
+        pots.first { $0.mark == mark && $0.drawerAddress == drawerAddress }
+    }
+
+    func readings(of pot: GrowPot) -> [PotReading] {
+        history?.readings(pot.historyKey) ?? []
+    }
+
+    /// Les protocoles qu'on peut planter : ceux dont le service a répondu.
+    var plantable: [ChimpPotProtocol] {
+        var marks: [ChimpPotProtocol] = []
+        if context != nil { marks.append(.defindex) }
+        if lending?.context != nil, lending?.vault?.depositsBlocked != true { marks.append(.xoxno) }
+        if savings != nil { marks.append(.etherfuse) }
+        return marks
+    }
+
+    /// Les relevés du jour, après une lecture.
+    private func recordHistory(now: Date = .now) {
+        guard let history else { return }
+        for pot in pots {
+            if let reading = PotHistory.reading(of: pot, day: now) { history.record(reading, potID: pot.historyKey) }
+        }
+    }
+
+    private func loadPrice() async {
+        guard let priceOracle else { return }
+        if let price = await priceOracle.usdPrices(for: ["XLM"])["XLM"] { xlmUSD = price }
     }
 
     /// Les CETES d'un tiroir (adresse), s'il en détient (ou s'ils sont gelés).
@@ -79,7 +127,9 @@ final class GrowModel {
             async let vault: Void = loadVault()
             async let bonds: Void = loadSavings()
             async let lent: Void = lending?.refresh() ?? ()
-            _ = await (vault, bonds, lent)
+            async let price: Void = loadPrice()
+            _ = await (vault, bonds, lent, price)
+            recordHistory()
         }
         loadTask = task
         await task.value

@@ -40,7 +40,8 @@ struct MainTabView: View {
         _growModel = State(initialValue: GrowModel(
             service: ChainVaultService(session: session, config: config),
             savingsService: config.integrations == nil ? nil : ChainSavingsService(session: session, config: config),
-            lendingService: config.integrations == nil ? nil : ChainLendingService(session: session, config: config)
+            lendingService: config.integrations == nil ? nil : ChainLendingService(session: session, config: config),
+            priceOracle: ReflectorPriceOracle(), history: DefaultsPotHistoryStore()
         ))
         // L'historique : téléphone + RPC de testnet ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
