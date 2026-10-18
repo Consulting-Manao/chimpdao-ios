@@ -55,6 +55,21 @@ enum ChimpFontFamily: Equatable {
 enum ChimpTextStyle: String, CaseIterable, Identifiable {
     // Luckiest Guy
     case celebration   // Swoosh!, Planted!, easter eggs (60–68)
+    // Grow (maquette « Chimp Grow Final », 2026-10-18)
+    case growTotal     // « +$1.51 » de l'en-tête de Grow (G1)
+    case plantAmount   // « 50 » du ticket de vérification (G3r)
+    case receiptBig    // « 50.12 » du ticket d'un pot (G2)
+    case growCelebration // « Planted! », « Back home! » (G4, G6)
+    case growTitle     // « Grow » (G1)
+    case plantUnit     // « XLM » à côté du montant planté (G3r)
+    case potAmount     // montant d'une carte de pot (G1)
+    case receiptUnit   // « XLM » à côté du montant d'un pot (G2)
+    case potName       // nom d'un pot sur sa carte (G1)
+    case potStamp      // tampon « GROWING » (G2)
+    case chip          // « +0.12 XLM » dans sa pastille verte (G1)
+    case potRow        // lignes du ticket d'un pot (G2, G3r)
+    case potFooter     // « DEFINDEX · IN MAIN » (G2)
+    case curveLabel    // « 22 SEP », « TODAY » sur la courbe (G2)
     case amountEntry   // montant en cours de saisie (C2)
     case displayXL     // solde du Wallet
     case amountL       // solde de Main, montant saisi
@@ -120,6 +135,10 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
 
     var family: ChimpFontFamily {
         switch self {
+        case .growTotal, .plantAmount, .receiptBig, .growCelebration, .growTitle, .plantUnit, .potAmount, .receiptUnit, .potName, .potStamp:
+            .luckiestGuy
+        case .chip: .nunito(weight: 900)
+        case .potRow, .potFooter, .curveLabel: .spaceMono(bold: true)
         case .celebration, .amountEntry, .displayXL, .amountL, .welcomeTitle, .tourTitle, .amountM, .displayL, .sheetTitle,
              .key, .brand, .displayM, .amountS, .greeting, .displayS, .pill, .buttonLarge, .button, .buttonSecondary, .tab,
              .link, .buttonSmall, .cardName, .tile, .tabTitle, .stamp, .seal, .segment, .stampL, .receiptTotal:
@@ -135,6 +154,19 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     /// Taille de la maquette, en points.
     var size: CGFloat {
         switch self {
+        case .plantAmount: 84
+        case .growTotal: 66
+        case .receiptBig: 58
+        case .growCelebration: 48
+        case .growTitle: 40
+        case .plantUnit: 26
+        case .potAmount, .receiptUnit: 20
+        case .potName: 19
+        case .potStamp: 17
+        case .chip: 12
+        case .potRow: 13.5
+        case .potFooter: 10.5
+        case .curveLabel: 10
         case .celebration, .amountEntry: 64
         case .displayXL: 50
         case .amountL: 44
@@ -179,6 +211,13 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
     /// Style système dont on suit la courbe de grossissement.
     var relativeTo: UIFont.TextStyle {
         switch self {
+        case .growTotal, .plantAmount, .receiptBig, .growCelebration, .growTitle: .largeTitle
+        case .plantUnit: .title2
+        case .potAmount, .receiptUnit: .title3
+        case .potName, .potStamp: .headline
+        case .potRow: .footnote
+        case .chip: .caption1
+        case .potFooter, .curveLabel: .caption2
         case .celebration, .amountEntry, .displayXL, .amountL, .welcomeTitle, .tourTitle: .largeTitle
         case .displayL: .title1
         case .sheetTitle, .key, .brand, .displayM, .amountM, .tabTitle, .stampL, .receiptTotal, .monoAmount: .title2
@@ -201,7 +240,8 @@ enum ChimpTextStyle: String, CaseIterable, Identifiable {
         case .tab: 0.3
         case .labelWide, .overline: 2
         case .label, .labelS: 1.6
-        case .cardNumber: 1.2
+        case .cardNumber, .potFooter, .curveLabel: 1.2
+        case .potRow, .potStamp: 1
         case .receiptLabel: 1
         default: 0
         }
