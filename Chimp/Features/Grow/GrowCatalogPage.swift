@@ -99,52 +99,22 @@ struct GrowDemoRoot: View {
     private func destination(_ route: GrowRoute) -> some View {
         switch route {
         case .pot(let mark, let address):
-            switch mark {
-            case .defindex:
-                VaultPositionView(
-                    model: model, drawerAddress: address, onBack: pop,
-                    onWithdraw: { path.append(.withdraw(drawerID: $0)) }, onDeposit: { path.append(.deposit(drawerID: $0)) }
-                )
-            case .xoxno:
-                if let lending = model.lending {
-                    LendingPositionView(
-                        model: lending, drawerAddress: address, onBack: pop,
-                        onWithdraw: { path.append(.lendingWithdraw(drawerID: $0)) }, onDeposit: { path.append(.lendingDeposit(drawerID: $0)) }
-                    )
-                }
-            case .etherfuse:
-                SavingsView(model: model, drawerAddress: address, onBack: pop) { path.append(.swap($0)) }
-            }
-        case .vault:
-            VaultInfoView(model: model, onBack: pop) { path.append(.deposit(drawerID: nil)) }
-        case .position(let address):
-            VaultPositionView(
-                model: model, drawerAddress: address, onBack: pop,
-                onWithdraw: { path.append(.withdraw(drawerID: $0)) }, onDeposit: { path.append(.deposit(drawerID: $0)) }
+            PotView(
+                model: model, mark: mark, drawerAddress: address, onBack: pop,
+                onAdd: { path.append(mark == .xoxno ? .lendingDeposit(drawerID: $0) : .deposit(drawerID: $0)) },
+                onTakeOut: { path.append(mark == .xoxno ? .lendingWithdraw(drawerID: $0) : .withdraw(drawerID: $0)) },
+                onSwap: { path.append(.swap($0)) }
             )
         case .deposit(let drawerID):
             VaultFlowRoot(service: service, action: .deposit, drawerID: drawerID, onSeePosition: showPosition, onExit: pop)
         case .withdraw(let drawerID):
             VaultFlowRoot(service: service, action: .withdraw, drawerID: drawerID, onSeePosition: showPosition, onExit: pop)
-        case .savings(let address):
-            SavingsView(model: model, drawerAddress: address, onBack: pop) { path.append(.swap($0)) }
         case .swap(let prefill):
             SwapFlowRoot(service: MockSwapService(), prefill: prefill, onExit: pop)
-        case .lending:
-            if let lending = model.lending {
-                LendingInfoView(model: lending, onBack: pop) { path.append(.lendingDeposit(drawerID: nil)) }
-            }
-        case .lendingPosition(let address):
-            if let lending = model.lending {
-                LendingPositionView(
-                    model: lending, drawerAddress: address, onBack: pop,
-                    onWithdraw: { path.append(.lendingWithdraw(drawerID: $0)) }, onDeposit: { path.append(.lendingDeposit(drawerID: $0)) }
-                )
-            }
         case .lendingDeposit(let drawerID):
-            VaultFlowRoot(service: lendingService, action: .deposit, drawerID: drawerID, onSeePosition: { path = [.lendingPosition(drawerAddress: $0)] }, onExit: pop)
+            VaultFlowRoot(service: lendingService, action: .deposit, drawerID: drawerID, onSeePosition: { path = [.pot(.xoxno, drawerAddress: $0)] }, onExit: pop)
         case .lendingWithdraw(let drawerID):
-            VaultFlowRoot(service: lendingService, action: .withdraw, drawerID: drawerID, onSeePosition: { path = [.lendingPosition(drawerAddress: $0)] }, onExit: pop)
+            VaultFlowRoot(service: lendingService, action: .withdraw, drawerID: drawerID, onSeePosition: { path = [.pot(.xoxno, drawerAddress: $0)] }, onExit: pop)
         }
     }
 
@@ -153,17 +123,17 @@ struct GrowDemoRoot: View {
     }
 
     private func showPosition(_ address: String) {
-        path = [.position(drawerAddress: address)]
+        path = [.pot(.defindex, drawerAddress: address)]
     }
 }
 
 /// Lancement direct de Grow factice (Debug et Testing), pour les captures et les essais :
 /// `xcrun simctl launch <appareil> com.consulting-manao.chimp -vaultDemo lentOut` (un scénario du vault ; suffixes
-/// `:deposit`, `:withdraw`, `:vault`, `:position` ou `:savings` pour ouvrir directement cet écran). Les CETES :
+/// `:deposit`, `:withdraw`, `:position` ou `:savings` pour ouvrir directement cet écran). Les CETES :
 /// `-savingsDemo frozen` (un scénario de `MockSavingsService`). Sans l'argument : rien.
 struct VaultDemoLaunch: ViewModifier {
     @State private var argument = UserDefaults.standard.string(forKey: "vaultDemo") ?? UserDefaults.standard.string(forKey: "lendingDemo").map { _ in "normal" }
-    /// Prêt XOXNO (phase 7) : `-lendingDemo lentOut` (un scénario de `MockLendingService`) ; suffixes `:lending`,
+    /// Prêt XOXNO (phase 7) : `-lendingDemo lentOut` (un scénario de `MockLendingService`) ; suffixes
     /// `:lendingPosition`, `:lendingDeposit`, `:lendingWithdraw` pour ouvrir directement cet écran.
     private let lending = UserDefaults.standard.string(forKey: "lendingDemo")
     private let savings = UserDefaults.standard.string(forKey: "savingsDemo").flatMap(MockSavingsService.Scenario.init(rawValue:)) ?? .normal
@@ -190,11 +160,9 @@ struct VaultDemoLaunch: ViewModifier {
         switch screen {
         case "deposit": [.deposit(drawerID: nil)]
         case "withdraw": [.withdraw(drawerID: "main")]
-        case "vault": [.vault]
-        case "position": [.position(drawerAddress: MockReceiveDataSource.mainAddress)]
-        case "savings": [.savings(drawerAddress: MockReceiveDataSource.mainAddress)]
-        case "lending": [.lending]
-        case "lendingPosition": [.lendingPosition(drawerAddress: MockReceiveDataSource.mainAddress)]
+        case "position": [.pot(.defindex, drawerAddress: MockReceiveDataSource.mainAddress)]
+        case "savings": [.pot(.etherfuse, drawerAddress: MockReceiveDataSource.mainAddress)]
+        case "lendingPosition": [.pot(.xoxno, drawerAddress: MockReceiveDataSource.mainAddress)]
         case "lendingDeposit": [.lendingDeposit(drawerID: nil)]
         case "lendingWithdraw": [.lendingWithdraw(drawerID: "main")]
         default: []

@@ -122,19 +122,11 @@ struct MainTabView: View {
                                 )
                             }
                         case .savings(let address):
-                            // F10 depuis la tuile CETES d'un tiroir.
-                            SavingsView(model: growModel, drawerAddress: address, onBack: { if !walletPath.isEmpty { walletPath.removeLast() } }) {
-                                walletPath.append(.prefilledSwap($0))
-                            }
-                            .toolbar(.hidden, for: .navigationBar)
+                            // G2 (Etherfuse) depuis la tuile CETES d'un tiroir.
+                            walletPot(.etherfuse, address: address)
                         case .vaultPosition(let address):
-                            // F6 depuis la tuile « GROWING » d'un tiroir.
-                            VaultPositionView(
-                                model: growModel, drawerAddress: address, onBack: { if !walletPath.isEmpty { walletPath.removeLast() } },
-                                onWithdraw: { walletPath.append(.vault(.withdraw, drawerID: $0)) },
-                                onDeposit: { walletPath.append(.vault(.deposit, drawerID: $0)) }
-                            )
-                            .toolbar(.hidden, for: .navigationBar)
+                            // G2 depuis la tuile « GROWING » d'un tiroir.
+                            walletPot(.defindex, address: address)
                         case .removeCard(let mode, let key):
                             // G6 / G7 : retirer une carte ou la déclarer perdue (testnet), depuis sa page (B3).
                             RemoveCardDestination(mode: mode, key: key, wallet: walletModel, session: session) { removed in
@@ -241,30 +233,12 @@ struct MainTabView: View {
     private func growDestination(_ route: GrowRoute) -> some View {
         switch route {
         case .pot(let mark, let address):
-            // G2 arrive à l'étape suivante : en attendant, les pages actuelles de chaque pot.
-            switch mark {
-            case .defindex:
-                VaultPositionView(
-                    model: growModel, drawerAddress: address, onBack: popGrow,
-                    onWithdraw: { growPath.append(.withdraw(drawerID: $0)) }, onDeposit: { growPath.append(.deposit(drawerID: $0)) }
-                )
-            case .xoxno:
-                if let lending = growModel.lending {
-                    LendingPositionView(
-                        model: lending, drawerAddress: address, onBack: popGrow,
-                        onWithdraw: { growPath.append(.lendingWithdraw(drawerID: $0)) }, onDeposit: { growPath.append(.lendingDeposit(drawerID: $0)) }
-                    )
-                }
-            case .etherfuse:
-                SavingsView(model: growModel, drawerAddress: address, onBack: popGrow) { growPath.append(.swap($0)) }
-            }
-        case .vault:
-            VaultInfoView(model: growModel, onBack: popGrow) { growPath.append(.deposit(drawerID: nil)) }
-        case .position(let address):
-            VaultPositionView(
-                model: growModel, drawerAddress: address, onBack: popGrow,
-                onWithdraw: { growPath.append(.withdraw(drawerID: $0)) },
-                onDeposit: { growPath.append(.deposit(drawerID: $0)) }
+            // G2 : la page d'un pot.
+            PotView(
+                model: growModel, mark: mark, drawerAddress: address, onBack: popGrow,
+                onAdd: { growPath.append(mark == .xoxno ? .lendingDeposit(drawerID: $0) : .deposit(drawerID: $0)) },
+                onTakeOut: { growPath.append(mark == .xoxno ? .lendingWithdraw(drawerID: $0) : .withdraw(drawerID: $0)) },
+                onSwap: { growPath.append(.swap($0)) }
             )
         case .deposit(let drawerID):
             pendingFirst(onExit: closeGrowFlow) {
@@ -280,25 +254,10 @@ struct MainTabView: View {
                     onSeePosition: showPositionInGrow, onExit: closeGrowFlow
                 )
             }
-        case .savings(let address):
-            SavingsView(model: growModel, drawerAddress: address, onBack: popGrow) { growPath.append(.swap($0)) }
         case .swap(let prefill):
             // « Get some », « Get more », « Swap back » (F9, F10) : la paire seule, montant vide.
             pendingFirst(onExit: closeGrowFlow) {
                 SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill, onExit: closeGrowFlow)
-            }
-        case .lending:
-            // Prêt XOXNO (phase 7) : USDC, dépôt et retrait seulement, testnet.
-            if let lending = growModel.lending {
-                LendingInfoView(model: lending, onBack: popGrow) { growPath.append(.lendingDeposit(drawerID: nil)) }
-            }
-        case .lendingPosition(let address):
-            if let lending = growModel.lending {
-                LendingPositionView(
-                    model: lending, drawerAddress: address, onBack: popGrow,
-                    onWithdraw: { growPath.append(.lendingWithdraw(drawerID: $0)) },
-                    onDeposit: { growPath.append(.lendingDeposit(drawerID: $0)) }
-                )
             }
         case .lendingDeposit(let drawerID):
             pendingFirst(onExit: closeGrowFlow) {
@@ -317,6 +276,17 @@ struct MainTabView: View {
         }
     }
 
+    /// G2 ouvert depuis la page d'un tiroir (Wallet) : ses parcours restent dans la pile du Wallet.
+    private func walletPot(_ mark: ChimpPotProtocol, address: String) -> some View {
+        PotView(
+            model: growModel, mark: mark, drawerAddress: address, onBack: { if !walletPath.isEmpty { walletPath.removeLast() } },
+            onAdd: { walletPath.append(.vault(.deposit, drawerID: $0)) },
+            onTakeOut: { walletPath.append(.vault(.withdraw, drawerID: $0)) },
+            onSwap: { walletPath.append(.prefilledSwap($0)) }
+        )
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
     private func popGrow() {
         if !growPath.isEmpty { growPath.removeLast() }
     }
@@ -330,14 +300,14 @@ struct MainTabView: View {
     /// « See my position » après un dépôt XOXNO : la position du tiroir dans l'onglet Grow, positions relues.
     private func showLendingInGrow(_ address: String) {
         refreshAll()
-        growPath = [.lendingPosition(drawerAddress: address)]
+        growPath = [.pot(.xoxno, drawerAddress: address)]
         selection = .grow
     }
 
     /// « See my position » (F5, reçu) : F6 du tiroir dans l'onglet Grow, positions relues.
     private func showPositionInGrow(_ address: String) {
         refreshAll()
-        growPath = [.position(drawerAddress: address)]
+        growPath = [.pot(.defindex, drawerAddress: address)]
         selection = .grow
     }
 

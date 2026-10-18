@@ -83,10 +83,9 @@ struct LendingServiceTests {
         ]
         let holdings = ChainLendingService.holdings(positions, drawer: drawer, records: [], pool: market.pool)
         #expect(holdings.map(\.value) == [15, 1, 0], "La plus grosse position déplaçable d'abord")
-        let groups = LendingDrawerGroup.grouped(holdings)
-        #expect(groups.count == 1)
-        #expect(groups[0].value == 16, "Une position à renouveler n'est jamais comptée (ni à zéro)")
-        #expect(groups[0].needsRenewal && !groups[0].hasDebt)
+        let movable = holdings.filter { $0.condition == .movable }
+        #expect(movable.map(\.value).reduce(0, +) == 16, "Une position à renouveler n'est jamais comptée (ni à zéro)")
+        #expect(holdings.contains { $0.condition == .needsRenewal } && !holdings.contains { $0.condition == .hasDebt })
         let context = VaultContext(network: .testnet, drawers: [drawer], vault: MockLendingService().market, holdings: holdings)
         #expect(context.holding(drawerID: drawer.id)?.value == 15)
     }

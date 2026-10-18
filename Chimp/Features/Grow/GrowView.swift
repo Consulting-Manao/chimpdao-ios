@@ -2,23 +2,15 @@ import SwiftUI
 
 /// Où l'onglet Grow emmène.
 enum GrowRoute: Hashable {
-    /// F2 · le vault.
-    case vault
-    /// F6 · la position d'un tiroir (adresse du tiroir ; une par tiroir, jamais fusionnées).
-    case position(drawerAddress: String)
     /// F3 · mettre, depuis un tiroir (ou le premier).
     case deposit(drawerID: String?)
     /// F7 · retirer, vers le tiroir qui détient la position.
     case withdraw(drawerID: String)
-    /// F10 · les CETES d'un tiroir (adresse du tiroir ; une page par tiroir).
-    case savings(drawerAddress: String)
-    /// Swap prérempli depuis F9 ou F10 (« Get some », « Get more », « Swap back ») : la paire seule, montant vide.
+    /// Swap prérempli depuis G1 ou G2 (« Get some », « Get more », « Swap back ») : la paire seule, montant vide.
     case swap(SwapPrefill)
     /// G2 · la page d'un pot (protocole, adresse du tiroir).
     case pot(ChimpPotProtocol, drawerAddress: String)
-    /// Prêt XOXNO (phase 7) : le marché, la position d'un tiroir, mettre, retirer.
-    case lending
-    case lendingPosition(drawerAddress: String)
+    /// Prêt XOXNO (phase 7) : mettre, retirer.
     case lendingDeposit(drawerID: String?)
     case lendingWithdraw(drawerID: String)
 }
@@ -299,13 +291,6 @@ struct GrowView: View {
         let sign = change > 0 ? "+" : (change < 0 ? "\u{2212}" : "")
         return sign + asset.displayedWithCode(abs(change), locale: locale)
     }
-
-    /// « 50 XLM put in · updated 09:00 », ou « updated 09:00 » si la base n'est pas connue.
-    static func putInLine(_ holding: VaultHolding, asset: SendAsset, locale: Locale) -> String {
-        let updated = String(localized: "updated \(holding.readAt.formatted(date: .omitted, time: .shortened))")
-        guard let basis = holding.basis else { return updated }
-        return String(localized: "\(asset.displayedWithCode(basis.putIn, locale: locale)) put in") + " · " + updated
-    }
 }
 
 /// G1 · l'en-tête vert : « Grow », ce qui a poussé en tout (en dollars, seulement s'il est connu en entier), Chimpy qui
@@ -360,100 +345,5 @@ struct GrowHeader: View {
         }
         .clipped()
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// L'en-tête vert de F1 : « GROWING NOW », la valeur, l'évolution réelle, Chimpy qui plante.
-struct GrowHero: View {
-    let value: Decimal
-    let change: Decimal?
-    let asset: SendAsset
-
-    @Environment(\.locale) private var locale
-    @Environment(\.chimpScreenInsets) private var screenInsets
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: ChimpSpacing.xxs) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Growing now").textCase(.uppercase).chimpFont(.label)
-                Text(verbatim: asset.displayedWithCode(value, locale: locale))
-                    .chimpFont(.displayXL)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                if let change {
-                    Text("\(GrowView.changeText(change, asset: asset, locale: locale)) since you put it in").chimpFont(.rowTitle)
-                }
-            }
-            Spacer(minLength: 0)
-            Image(.chimpyPlant)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 112)
-                .padding(.bottom, -10)
-                .chimpBob(duration: 5)
-                .accessibilityHidden(true)
-        }
-        .foregroundStyle(ChimpCardColor.leaf.ink)
-        .padding(ChimpSpacing.header(for: screenInsets))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            ChimpCardColor.leaf.fill
-                .overlay { ChimpPattern(opacity: 0.14) }
-                .ignoresSafeArea(edges: .top)
-        }
-        .clipped()
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// La carte jaune du vault (F1) : « D », nom, « Goes through 2 protocols: DeFindex, then Blend », où va l'argent.
-struct VaultPlaceCard: View {
-    let vault: VaultInfo
-
-    var body: some View {
-        HStack(alignment: .top, spacing: ChimpSpacing.m) {
-            Text(verbatim: String(vault.protocols.first?.prefix(1) ?? "D"))
-                .chimpFont(.displayS)
-                .frame(width: 40, height: 40)
-                .background(Circle().fill(.white))
-                .overlay { Circle().strokeBorder(Color(.chimpTicketInk), style: StrokeStyle(lineWidth: 2, dash: [4, 3])) }
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(vault.name) vault").chimpFont(.rowTitle)
-                Text(VaultInfoView.protocolsLine(vault))
-                    .chimpFont(.captionS)
-                    .fontWeight(.black)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(.white))
-                    .overlay { Capsule().strokeBorder(Color(.chimpTicketInk), lineWidth: 2) }
-                Text("This vault lends your \(vault.asset.code) on \(vault.protocols.last ?? "Blend") through \(vault.protocols.first ?? "DeFindex")")
-                    .chimpFont(.captionStrong)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right").fontWeight(.black)
-        }
-        .foregroundStyle(Color(.chimpTicketInk))
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
-        .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.panel), fill: Color(.chimpCardBanana), shadow: .tile)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// Le vault ne répond pas (F1, F2, F6 sans données) : décision de Barth du 2026-10-15.
-struct VaultUnanswered: View {
-    let details: String?
-    let onRetry: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: ChimpSpacing.m) {
-            ChimpySays(text: "DeFindex isn't answering right now. Your money stays in the vault.", pose: .unsure)
-            ChimpButton("Try again", kind: .secondary, action: onRetry)
-            if let details { ChimpTechnicalDetails(details: details) }
-        }
     }
 }

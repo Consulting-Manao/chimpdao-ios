@@ -56,8 +56,12 @@ final class GrowModel {
     }
 
     func readings(of pot: GrowPot) -> [PotReading] {
-        history?.readings(pot.historyKey) ?? []
+        // Le magasin n'est pas observé : ce compteur redessine la courbe après le relevé du jour.
+        _ = historyVersion
+        return history?.readings(pot.historyKey) ?? []
     }
+
+    private var historyVersion = 0
 
     /// Les protocoles qu'on peut planter : ceux dont le service a répondu.
     var plantable: [ChimpPotProtocol] {
@@ -74,6 +78,7 @@ final class GrowModel {
         for pot in pots {
             if let reading = PotHistory.reading(of: pot, day: now) { history.record(reading, potID: pot.historyKey) }
         }
+        historyVersion += 1
     }
 
     private func loadPrice() async {
