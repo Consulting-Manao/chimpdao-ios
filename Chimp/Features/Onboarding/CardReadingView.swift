@@ -123,6 +123,7 @@ struct CardReadingView: View {
         case .wrongCard: "That's not the card you started with. Tap the same card."
         case .notInAnAccount: "This card isn't in an account yet. Tap a card that already has one."
         case .alreadyOpen: "That card belongs to the account you're in. Tap a card of the other account."
+        case .duoxNotSupported: "This card is an NXP DUOX. ChimpDAO doesn't take DUOX cards yet: use an Infineon card for now. Nothing was sent."
         }
     }
 }

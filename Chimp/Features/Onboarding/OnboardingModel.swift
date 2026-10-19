@@ -81,6 +81,17 @@ struct OnboardingProblem: Equatable {
         case notInAnAccount
         /// « + Add an account » (I6) : la carte est dans le compte déjà affiché.
         case alreadyOpen
+        /// Carte DUOX sur un réseau qui ne les accepte pas encore (revue de sécurité F1) : rien n'a été envoyé.
+        case duoxNotSupported
+    }
+
+    /// Une DUOX refusée sur ce réseau (`NetworkFeatures.duoxCards`), sinon `nil`.
+    static func refusingDuox(_ card: ChipKeyInfo, on config: ChimpNetworkConfig) -> OnboardingProblem? {
+        guard card.kind == .duox, !config.features.duoxCards else { return nil }
+        return OnboardingProblem(
+            kind: .duoxNotSupported,
+            technicalDetails: "DUOX cards are refused on \(config.network.rawValue) until security finding F1 is fixed."
+        )
     }
 
     let kind: Kind
@@ -242,6 +253,10 @@ final class OnboardingModel {
             return
         }
 
+        if let problem = OnboardingProblem.refusingDuox(card, on: session.config) {
+            readingState = .failed(problem)
+            return
+        }
         readingState = .checking
         do {
             let inspection = try await service.inspect(card, hint: session.wallet.hint(for: card.publicKey))

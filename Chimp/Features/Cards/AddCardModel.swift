@@ -205,6 +205,10 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             handleReadError(error)
             return
         }
+        if let refusal = OnboardingProblem.refusingDuox(card, on: session.config) {
+            problem = AddCardProblem(kind: .card(refusal.kind), technicalDetails: refusal.technicalDetails)
+            return
+        }
         do {
             let found = try await service.checkNewCard(card, account: account)
             newCard = card
@@ -350,6 +354,11 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         }
         guard card.publicKey != newCard.publicKey else {
             problem = AddCardProblem(kind: .isTheNewCard, technicalDetails: card.publicKey.hex)
+            return
+        }
+        // La carte qui dit oui signe pour le compte (ordre 2) : une DUOX est refusée là aussi (revue F1).
+        if let refusal = OnboardingProblem.refusingDuox(card, on: session.config) {
+            problem = AddCardProblem(kind: .card(refusal.kind), technicalDetails: refusal.technicalDetails)
             return
         }
         do {

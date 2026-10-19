@@ -94,9 +94,12 @@ struct NetworkFeatures: Equatable, Sendable {
     var addMoney: Bool
     /// CETES (Etherfuse) : l'actif, son prix, son pot dans Grow.
     var cetes: Bool
+    /// Cartes DUOX acceptées (création de compte, ajout, reconnexion, carte qui dit oui). Éteint tant que F1 n'est pas
+    /// fait (revue de sécurité : une DUOX ne signe que 16 octets du digest ; décision de Pamphile du 2026-10-19).
+    var duoxCards: Bool
 
-    static let all = NetworkFeatures(swap: true, grow: true, addMoney: true, cetes: true)
-    static let none = NetworkFeatures(swap: false, grow: false, addMoney: false, cetes: false)
+    static let all = NetworkFeatures(swap: true, grow: true, addMoney: true, cetes: true, duoxCards: true)
+    static let none = NetworkFeatures(swap: false, grow: false, addMoney: false, cetes: false, duoxCards: false)
 }
 
 // MARK: Configuration de ce build
@@ -144,7 +147,8 @@ extension ChimpNetworkConfig {
         usdcFaucet: nil,
         // Un ledger mainnet et son heure de fermeture, lus sur la chaîne.
         ledgerAnchor: nil,
-        // Swap, Grow, Add money et CETES éteints sur le mainnet pour l'instant (décision de Barth du 2026-10-19).
+        // Swap, Grow, Add money et CETES éteints sur le mainnet pour l'instant, DUOX refusées tant que F1 n'est pas fait
+        // (décisions du 2026-10-19).
         features: .none
     )
 }
