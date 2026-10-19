@@ -40,6 +40,7 @@ struct ChimpApp: App {
                 #endif
                     // Les fonctions du réseau (Swap, Grow, Add money, CETES), pour tous les écrans, démos comprises.
                     .environment(\.chimpFeatures, session.config.features)
+                    .environment(\.chimpNetwork, session.network)
             case .misconfigured(let error):
                 MisconfiguredBuildView(error: error)
             }

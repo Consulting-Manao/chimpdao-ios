@@ -5,6 +5,8 @@ import SwiftUI
 /// texte « ROZO holds your money… » est obligatoire, sur les deux états ; Circle CCTP est présenté comme la voie sans
 /// intermédiaire. Quantités seulement, jamais de dollars. L'app n'envoie rien sur Base.
 struct RozoTransferView: View {
+    /// « testnet » dans les textes seulement sur le testnet.
+    @Environment(\.chimpNetwork) private var network
     @Bindable var model: RozoTransferModel
     let explorerURL: (String) -> URL
     let onBack: () -> Void
@@ -93,7 +95,9 @@ struct RozoTransferView: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(Text("You'd send"))
-            Text("on \(model.config.sourceNetworkName) · \(amountText(model.config.minimumAmount)) to \(amountText(model.config.maximumAmount)) on testnet")
+            Text(network == .testnet
+                 ? "on \(model.config.sourceNetworkName) · \(amountText(model.config.minimumAmount)) to \(amountText(model.config.maximumAmount)) on testnet"
+                 : "on \(model.config.sourceNetworkName) · \(amountText(model.config.minimumAmount)) to \(amountText(model.config.maximumAmount))")
                 .chimpFont(.captionStrong)
                 .foregroundStyle(.chimpTextSecondary)
         }
@@ -131,7 +135,9 @@ struct RozoTransferView: View {
     private var quoteDetails: some View {
         switch model.quoteState {
         case .quoted(let quote):
-            Text("ROZO's fee: \(amountText(quote.fee)) · price from ROZO, testnet")
+            Text(network == .testnet
+                 ? "ROZO's fee: \(amountText(quote.fee)) · price from ROZO, testnet"
+                 : "ROZO's fee: \(amountText(quote.fee)) · price from ROZO")
                 .chimpFont(.mono)
                 .foregroundStyle(.chimpTextSecondary)
         case .failed(let issue):
@@ -275,8 +281,10 @@ struct RozoTransferView: View {
 
     private func message(for issue: RozoTransferModel.Issue) -> LocalizedStringKey {
         switch issue {
-        case .tooLow: "That's below ROZO's testnet minimum of \(amountText(model.config.minimumAmount))."
-        case .tooHigh: "ROZO's testnet takes \(amountText(model.config.maximumAmount)) at most."
+        case .tooLow where network == .testnet: "That's below ROZO's testnet minimum of \(amountText(model.config.minimumAmount))."
+        case .tooLow: "That's below ROZO's minimum of \(amountText(model.config.minimumAmount))."
+        case .tooHigh where network == .testnet: "ROZO's testnet takes \(amountText(model.config.maximumAmount)) at most."
+        case .tooHigh: "ROZO takes \(amountText(model.config.maximumAmount)) at most."
         case .addressRefused: "ROZO doesn't accept this address."
         case .mismatch: "ROZO's order didn't match what you asked for, so I'm not showing it. Nothing was sent."
         case .unavailable: "ROZO isn't answering right now."

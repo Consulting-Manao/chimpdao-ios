@@ -31,6 +31,8 @@ struct AddMoneyView: View {
 /// N1 · « From another chain » : chaîne et jeton d'origine, montant, devis à blanc de NEAR Intents, la limite (texte validé
 /// par Barth le 2026-10-15), aucun bouton d'envoi. Quantités seulement, jamais de dollars.
 struct CrossChainQuoteView: View {
+    /// « testnet » dans les textes seulement sur le testnet.
+    @Environment(\.chimpNetwork) private var network
     @Bindable var model: CrossChainQuoteModel
     let onBack: () -> Void
 
@@ -91,7 +93,9 @@ struct CrossChainQuoteView: View {
     /// La limite, en clair, en haut de l'écran : rien ne peut partir vers une carte.
     private var limit: some View {
         ChimpNoticeBanner(
-            text: "Card addresses aren't accepted by NEAR Intents yet, and it has no testnet. This shows a live price only; nothing can be sent to your card this way.",
+            text: network == .testnet
+                ? "Card addresses aren't accepted by NEAR Intents yet, and it has no testnet. This shows a live price only; nothing can be sent to your card this way."
+                : "Card addresses aren't accepted by NEAR Intents yet. This shows a live price only; nothing can be sent to your card this way.",
             marker: .error
         )
     }
