@@ -729,6 +729,23 @@ final class VaultFlowModel {
         return pending?.trace.transactionHash.flatMap(service.explorerURL(transactionHash:))
     }
 
+    /// Revue de sécurité F3, partie 2 (décision de Pamphile du 2026-10-19), comme Envoyer et Swap, pour DeFindex et
+    /// XOXNO : tant que l'autorisation signée n'a pas expiré, « Try again » la renvoie telle quelle dans une nouvelle
+    /// transaction, sans nouvelle signature (même nonce : une seule exécution possible). Une nouvelle signature n'est
+    /// demandée qu'après « Nothing was moved » (expiration confirmée).
+    var canResend: Bool {
+        guard case .finished(.waiting) = stage else { return false }
+        return signed != nil
+    }
+
+    func resend() {
+        guard canResend, let signed else { return }
+        waitTask?.cancel()
+        technicalDetails = nil
+        failureReason = nil
+        Task { await send(signed) }
+    }
+
     var canTryAgain: Bool {
         stage == .finished(.nothingSent) && draft != nil && !resumedPending
     }

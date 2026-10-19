@@ -199,13 +199,22 @@ struct VaultStatusView: View {
         return steps
     }
 
-    /// « Not moved. Please wait until {heure} before trying again », avec un compte à rebours.
+    /// « Not moved. Please wait until {heure} before trying again », avec un compte à rebours. Signature encore en
+    /// mémoire (revue F3) : « Try again » la renvoie, sans nouveau tap, jusqu'à cette heure.
     private func waiting(until: Date) -> some View {
         VStack(alignment: .leading, spacing: ChimpSpacing.m) {
-            Text("Not moved. Please wait until \(until.formatted(date: .omitted, time: .shortened)) before trying again.")
+            Text(model.canResend
+                 ? "Not moved yet. Your card's signature still works until \(until.formatted(date: .omitted, time: .shortened))."
+                 : "Not moved. Please wait until \(until.formatted(date: .omitted, time: .shortened)) before trying again.")
                 .chimpFont(.sheetTitle)
                 .foregroundStyle(.chimpTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
+            if model.canResend {
+                Text("Try again sends that same signature again, with no new tap. It can only go through once.")
+                    .chimpFont(.body)
+                    .foregroundStyle(.chimpTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let seconds = max(0, until.timeIntervalSince(context.date))
                 Text(Duration.seconds(Int(seconds.rounded(.up))).formatted(.time(pattern: .minuteSecond)))
@@ -223,7 +232,12 @@ struct VaultStatusView: View {
         VStack(spacing: ChimpSpacing.xs) {
             switch model.stage {
             case .finished(.waiting):
-                ChimpButton("Back to my wallet", kind: .secondary, action: model.finish)
+                if model.canResend {
+                    ChimpButton("Try again", action: model.resend)
+                    ChimpButton("Back to my wallet", kind: .link, action: model.finish)
+                } else {
+                    ChimpButton("Back to my wallet", kind: .secondary, action: model.finish)
+                }
             default:
                 ChimpButton("Back to my wallet", isLoading: true) {}
                     .disabled(true)

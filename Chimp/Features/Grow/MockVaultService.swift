@@ -28,6 +28,8 @@ final class MockVaultService: VaultService {
     private var priceHasMoved = false
     private(set) var quoteCount = 0
     private(set) var prepareCount = 0
+    /// Chaque autorisation signée envoyée, dans l'ordre (tests de la revue F3).
+    private(set) var submitted: [SignedVault] = []
     private(set) var signCount = 0
     private(set) var submitCount = 0
     var nextSignError: Error?
@@ -144,6 +146,7 @@ final class MockVaultService: VaultService {
     }
 
     func submit(_ signed: SignedVault, onProgress: @escaping (PaymentProgress) -> Void) async throws -> VaultReceipt {
+        submitted.append(signed)
         submitCount += 1
         let draft = signed.prepared.draft
         let receipt = try await send.submit(SignedSend(prepared: sendEquivalent(signed.prepared), cardName: signed.cardName), onProgress: onProgress)

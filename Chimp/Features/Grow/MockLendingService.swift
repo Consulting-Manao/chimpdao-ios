@@ -29,6 +29,8 @@ final class MockLendingService: VaultService {
     var delay: Duration
     var pendingSend: PendingSend?
     private(set) var prepareCount = 0
+    /// Chaque autorisation signée envoyée, dans l'ordre (tests de la revue F3).
+    private(set) var submitted: [SignedVault] = []
 
     static let pool = "CBSGF6QOQAMPFBEVSYPEQHSZRIHJ6RCGUPCRDMUX36DEKRWFAO2PZB5A"
     static let positionValue = Decimal(string: "25.0312")!
@@ -119,6 +121,7 @@ final class MockLendingService: VaultService {
     }
 
     func submit(_ signed: SignedVault, onProgress: @escaping (PaymentProgress) -> Void) async throws -> VaultReceipt {
+        submitted.append(signed)
         let draft = signed.prepared.draft
         let receipt = try await send.submit(SignedSend(prepared: sendEquivalent(signed.prepared), cardName: signed.cardName), onProgress: onProgress)
         return VaultReceipt(
