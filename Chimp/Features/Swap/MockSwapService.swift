@@ -41,6 +41,8 @@ final class MockSwapService: SwapService {
     private(set) var prepareCount = 0
     private(set) var signCount = 0
     private(set) var submitCount = 0
+    /// Chaque autorisation signée envoyée, dans l'ordre (tests de la revue F3).
+    private(set) var submitted: [SignedSwap] = []
     private(set) var checkCount = 0
     /// Erreur de la prochaine signature (tests), consommée une fois.
     var nextSignError: Error?
@@ -148,6 +150,7 @@ final class MockSwapService: SwapService {
 
     func submit(_ signed: SignedSwap, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SwapReceipt {
         submitCount += 1
+        submitted.append(signed)
         let draft = signed.prepared.draft
         do {
             let receipt = try await send.submit(SignedSend(prepared: sendEquivalent(signed.prepared), cardName: signed.cardName), onProgress: onProgress)

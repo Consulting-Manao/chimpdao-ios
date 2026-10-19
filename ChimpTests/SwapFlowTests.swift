@@ -365,6 +365,36 @@ struct SwapFlowTests {
         #expect(model.canTryAgain)
     }
 
+    /// Revue de sécurité F3, partie 2 : signature retenue par le serveur de frais, puis « Try again ».
+    @Test("F3 : swap retenu puis « Try again » : la même autorisation est renvoyée, une seule exécution possible")
+    func withheldThenTryAgain() async throws {
+        let (model, service) = await reviewReady(result: .withheld)
+        service.send.authorizationWait = .seconds(30)
+        await signWithPin(model)
+        await waitUntil { if case .finished(.waiting) = model.stage { return true }; return false }
+        guard case .finished(.waiting) = model.stage else { Issue.record("expected waiting, got \(model.stage)"); return }
+        #expect(!model.canTryAgain, "Pas de nouvelle signature tant que la première peut servir")
+        #expect(model.canResend)
+
+        model.resend()
+        await waitUntil { isSent(model) }
+        #expect(isSent(model))
+        #expect(service.signCount == 1, "Aucune nouvelle signature")
+        #expect(service.prepareCount == 1, "Aucune nouvelle préparation")
+        #expect(service.submitted.count == 2)
+        let withheld = try #require(service.submitted.first)
+        #expect(service.submitted[1] == withheld, "Exactement la même autorisation signée")
+
+        var used = Set<String>()
+        func execute(_ signed: SignedSwap) throws -> Bool {
+            let trace = try service.trace(for: signed)
+            return used.insert("\(trace.from):\(trace.nonce)").inserted
+        }
+        #expect(try execute(service.submitted[1]))
+        #expect(try !execute(withheld), "L'autorisation retenue ne peut plus s'exécuter")
+        #expect(service.pendingSend == nil)
+    }
+
     @Test("Pas confirmé à temps : « Check again » le trouve confirmé")
     func notConfirmedThenSent() async {
         let (model, service) = await reviewReady(result: .notConfirmedThenSent)

@@ -761,6 +761,24 @@ final class SwapFlowModel {
         return pending?.trace.transactionHash.flatMap(service.explorerURL(transactionHash:))
     }
 
+    /// Revue de sécurité F3, partie 2 (décision de Pamphile du 2026-10-19), comme Envoyer : tant que l'autorisation
+    /// signée n'a pas expiré, « Try again » la renvoie telle quelle dans une nouvelle transaction, sans nouvelle signature
+    /// (même nonce : une seule exécution possible). Un swap Soroswap dont l'échéance (5 minutes au plus) est passée
+    /// échouera de nouveau : on attend alors l'expiration, puis « Nothing was sent » et une nouvelle signature.
+    var canResend: Bool {
+        guard case .finished(.waiting) = stage else { return false }
+        return signed != nil
+    }
+
+    func resend() {
+        guard canResend, let signed else { return }
+        waitTask?.cancel()
+        technicalDetails = nil
+        failureReason = nil
+        frozenAtSend = nil
+        Task { await send(signed) }
+    }
+
     /// « Try again » après « Nothing was sent » (certain) : retour à la vérification, avec le même brouillon.
     var canTryAgain: Bool {
         stage == .finished(.nothingSent) && draft != nil && !resumedPending
