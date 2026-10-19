@@ -40,8 +40,8 @@ struct MainTabView: View {
         _walletModel = State(initialValue: wallet)
         _growModel = State(initialValue: GrowModel(
             service: ChainVaultService(session: session),
-            savingsService: config.integrations == nil ? nil : ChainSavingsService(session: session),
-            lendingService: config.integrations == nil ? nil : ChainLendingService(session: session),
+            savingsService: config.features.grow && config.etherfuse != nil ? ChainSavingsService(session: session) : nil,
+            lendingService: config.features.grow && config.integrations != nil ? ChainLendingService(session: session) : nil,
             priceOracle: ReflectorPriceOracle(), history: DefaultsPotHistoryStore()
         ))
         // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
@@ -57,7 +57,7 @@ struct MainTabView: View {
                 WalletView(
                     model: walletModel, onSettings: settingsAction, onAction: openWalletAction,
                     onAddCard: { walletPath.append(.addCard) }, onOpenDrawer: { walletPath.append(.drawer($0)) },
-                    onAddMoney: config.integrations == nil ? nil : { walletPath.append(.addMoney) }
+                    onAddMoney: config.features.addMoney && config.integrations != nil ? { walletPath.append(.addMoney) } : nil
                 )
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
@@ -70,7 +70,7 @@ struct MainTabView: View {
                         case .addMoney:
                             AddMoneyView(
                                 onBack: { if !walletPath.isEmpty { walletPath.removeLast() } },
-                                onRozo: config.integrations == nil || session.wallet.account == nil ? nil : { walletPath.append(.rozoTransfer) }
+                                onRozo: !config.features.addMoney || config.integrations == nil || session.wallet.account == nil ? nil : { walletPath.append(.rozoTransfer) }
                             ) {
                                 walletPath.append(.crossChainQuote)
                             }
@@ -151,7 +151,7 @@ struct MainTabView: View {
                         case .drawer(let selection):
                             // B2 / B3 : le détail d'un tiroir, sur les soldes déjà lus par le Wallet.
                             DrawerDestination(
-                                selection: selection, wallet: walletModel, activity: activityModel, grow: growModel, session: session,
+                                selection: selection, wallet: walletModel, activity: activityModel, grow: config.features.grow ? growModel : nil, session: session,
                                 actions: drawerActions
                             )
                         case .addCard:
@@ -301,6 +301,7 @@ struct MainTabView: View {
     /// « See my position » après un dépôt XOXNO : la position du tiroir dans l'onglet Grow, positions relues.
     private func showLendingInGrow(_ address: String) {
         refreshAll()
+        guard config.features.grow else { return }
         growPath = [.pot(.xoxno, drawerAddress: address)]
         selection = .grow
     }
@@ -308,6 +309,7 @@ struct MainTabView: View {
     /// « See my position » (F5, reçu) : F6 du tiroir dans l'onglet Grow, positions relues.
     private func showPositionInGrow(_ address: String) {
         refreshAll()
+        guard config.features.grow else { return }
         growPath = [.pot(.defindex, drawerAddress: address)]
         selection = .grow
     }
@@ -331,7 +333,8 @@ struct MainTabView: View {
     private func refreshAll() {
         Task { await walletModel.refresh() }
         Task { await activityModel.refresh() }
-        Task { await growModel.refresh() }
+        // Grow éteint sur ce réseau : rien à relire (aucun écran ne le montre).
+        if config.features.grow { Task { await growModel.refresh() } }
     }
 
     /// Une opération signée attend son issue : son propre parcours d'abord (une seule à la fois, et chaque parcours
@@ -465,7 +468,7 @@ private struct ReceiveDestination: View {
 
     init(session: AppSession, initialDrawerID: String? = nil, onAddMoney: (() -> Void)? = nil) {
         _model = State(initialValue: ReceiveViewModel(dataSource: LocalReceiveDataSource(session: session), initialDrawerID: initialDrawerID))
-        self.onAddMoney = session.network == .testnet ? onAddMoney : nil
+        self.onAddMoney = session.config.features.addMoney ? onAddMoney : nil
     }
 
     var body: some View {
@@ -542,11 +545,12 @@ private struct RozoTransferDestination: View {
 private struct DrawerDestination: View {
     @State private var model: DrawerDetailModel
     let activity: ActivityViewModel
-    let grow: GrowModel
+    /// `nil` quand Grow est éteint sur ce réseau : ni tuile « GROWING » ni bouton « Grow ».
+    let grow: GrowModel?
     let actions: DrawerDetailActions
 
     init(
-        selection: DrawerSelection, wallet: WalletViewModel, activity: ActivityViewModel, grow: GrowModel, session: AppSession,
+        selection: DrawerSelection, wallet: WalletViewModel, activity: ActivityViewModel, grow: GrowModel?, session: AppSession,
         actions: DrawerDetailActions
     ) {
         _model = State(initialValue: DrawerDetailModel(selection: selection, wallet: wallet, session: session))

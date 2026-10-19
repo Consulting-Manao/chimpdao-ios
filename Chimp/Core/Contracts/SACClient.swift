@@ -26,7 +26,7 @@ struct SACClient {
     static func stellarAssets(config: ChimpNetworkConfig) throws -> [(code: String, contract: String)] {
         let network = Network.custom(passphrase: config.passphrase)
         let usdc = Asset(type: AssetType.ASSET_TYPE_CREDIT_ALPHANUM4, code: "USDC", issuer: try KeyPair(accountId: config.usdcIssuer))!
-        let stablebonds = config.integrations?.etherfuse.stablebonds.map { ($0.code, $0.contract) } ?? []
+        let stablebonds = config.etherfuse?.stablebonds.map { ($0.code, $0.contract) } ?? []
         return [
             ("XLM", try contractID(for: Asset(type: AssetType.ASSET_TYPE_NATIVE)!, network: network)),
             ("USDC", try contractID(for: usdc, network: network)),

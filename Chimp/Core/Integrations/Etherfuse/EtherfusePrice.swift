@@ -87,7 +87,7 @@ final class EtherfusePriceClient: StablebondPricing {
     }
 
     convenience init?(config: ChimpNetworkConfig) {
-        guard let etherfuse = config.integrations?.etherfuse else { return nil }
+        guard let etherfuse = config.etherfuse else { return nil }
         self.init(api: etherfuse.priceAPI, issuer: etherfuse.issuer)
     }
 

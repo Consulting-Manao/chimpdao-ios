@@ -185,7 +185,7 @@ struct StablebondWalletPrices {
     }
 
     init?(config: ChimpNetworkConfig) {
-        guard let etherfuse = config.integrations?.etherfuse else { return nil }
+        guard let etherfuse = config.etherfuse else { return nil }
         self.init(bonds: etherfuse.stablebonds, pricing: EtherfusePriceClient.shared(for: config))
     }
 

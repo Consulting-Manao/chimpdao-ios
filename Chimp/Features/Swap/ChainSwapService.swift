@@ -59,7 +59,7 @@ final class ChainSwapService: SwapService {
     /// Les stablebonds gelés par leur émetteur, tiroir par tiroir (`authorized` du SAC, lu en parallèle). Une lecture ratée
     /// ne bloque rien ici : `prepare` relit le gel avant toute signature et refuse s'il ne peut pas le lire.
     private func frozenStablebonds(in drawers: [SendDrawer]) async -> [String: Set<SendAsset>] {
-        guard let bonds = config.integrations?.etherfuse.stablebonds, !bonds.isEmpty,
+        guard let bonds = config.etherfuse?.stablebonds, !bonds.isEmpty,
               let source = try? Account(accountId: config.feePayer, sequenceNumber: 0) else { return [:] }
         let control = StablebondControl(client: client)
         return await withTaskGroup(of: (String, SendAsset)?.self) { group in
@@ -81,7 +81,7 @@ final class ChainSwapService: SwapService {
     }
 
     func frozenAsset(in drawer: SendDrawer, among assets: [SendAsset]) async -> SendAsset? {
-        let bonds = config.integrations?.etherfuse.stablebonds ?? []
+        let bonds = config.etherfuse?.stablebonds ?? []
         guard let source = try? Account(accountId: config.feePayer, sequenceNumber: 0) else { return nil }
         let control = StablebondControl(client: client)
         for asset in assets {
@@ -94,7 +94,7 @@ final class ChainSwapService: SwapService {
     /// Avant de signer : si l'un des deux actifs est un stablebond, son gel est relu pour ce tiroir. Gelé → rien n'est
     /// signé ; illisible → l'erreur remonte (jamais « pas gelé » par défaut).
     private func checkNotFrozen(_ draft: SwapDraft, request: SwapRequest, source: Account) async throws {
-        let bonds = Set(config.integrations?.etherfuse.stablebonds.map(\.contract) ?? [])
+        let bonds = Set(config.etherfuse?.stablebonds.map(\.contract) ?? [])
         let control = StablebondControl(client: client)
         for asset in [request.assetIn, request.assetOut] where bonds.contains(asset.contract) {
             if try await control.isFrozen(token: asset.contract, holder: draft.drawer.address, source: source) {
@@ -309,7 +309,7 @@ final class ChainSwapService: SwapService {
 
     /// Prix indicatif d'un jeton reçu, si c'est un stablebond de `Config/` et qu'Etherfuse répond.
     private func priceNow(of asset: SendAsset?) async -> Decimal? {
-        guard let asset, let bond = config.integrations?.etherfuse.stablebonds.first(where: { $0.code == asset.code }) else { return nil }
+        guard let asset, let bond = config.etherfuse?.stablebonds.first(where: { $0.code == asset.code }) else { return nil }
         return await pricing?.price(of: bond).price?.usd
     }
 

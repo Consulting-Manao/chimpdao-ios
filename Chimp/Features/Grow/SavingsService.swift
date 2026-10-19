@@ -61,7 +61,7 @@ final class ChainSavingsService: SavingsService {
     }
 
     func fetchSavings() async throws -> SavingsContext {
-        guard let etherfuse = config.integrations?.etherfuse, let bond = etherfuse.stablebonds.first,
+        guard let etherfuse = config.etherfuse, let bond = etherfuse.stablebonds.first,
               let asset = SendAsset(code: bond.code) else { throw SwapServiceError.unknownDrawer("stablebond") }
         let context = try await drawers.fetchContext()
         let client = SorobanClient(config: config)

@@ -112,7 +112,7 @@ struct TestnetFundingTests {
         let mainnet = ChimpNetworkConfig(
             network: .mainnet, passphrase: "Public Global Stellar Network ; September 2015",
             endpoints: testnet.endpoints, contracts: testnet.contracts, feeSignerURL: testnet.feeSignerURL,
-            feePayer: testnet.feePayer, usdcIssuer: testnet.usdcIssuer, usdcFaucet: nil
+            feePayer: testnet.feePayer, usdcIssuer: testnet.usdcIssuer, usdcFaucet: nil, features: .none
         )
         #expect(throws: CardEnrolmentError.notTestnet) { try ChainFundingNetwork(config: mainnet) }
     }

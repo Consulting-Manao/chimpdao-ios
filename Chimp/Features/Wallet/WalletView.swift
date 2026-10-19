@@ -5,6 +5,8 @@ import SwiftUI
 /// États : chargement (squelette), soldes, solde à zéro, aucune carte, erreur réseau
 /// (sans données : message + « Try again » ; avec des soldes plus anciens : bandeau + « Retry »).
 struct WalletView: View {
+    /// Swap éteint sur ce réseau : pas de tuile.
+    @Environment(\.chimpFeatures) private var features
     let model: WalletViewModel
     /// Roue dentée affichée seulement si une action est fournie.
     var onSettings: (() -> Void)?
@@ -107,7 +109,7 @@ struct WalletView: View {
             }
 
             HStack(spacing: ChimpSize.keypadSpacing) {
-                ForEach(model.availableActions) { action in
+                ForEach(model.availableActions.filter { $0 != .swap || features.swap }) { action in
                     ChimpActionTile(
                         title: action.title,
                         systemImage: action.systemImage,

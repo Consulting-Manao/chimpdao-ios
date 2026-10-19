@@ -18,6 +18,8 @@ struct ActivityReceiptSheet: View {
 
 /// Le reçu et ses boutons, sans la vue défilante.
 struct ActivityReceiptContent: View {
+    /// « Swap again » et « See my position » seulement si Swap et Grow sont allumés sur ce réseau.
+    @Environment(\.chimpFeatures) private var features
     let receipt: ActivityReceipt
     let model: ActivityViewModel
     let onAgain: (ReceiptAgain) -> Void
@@ -110,7 +112,7 @@ struct ActivityReceiptContent: View {
 
     @ViewBuilder
     private var buttons: some View {
-        if let again = receipt.again {
+        if let again = receipt.again, again.isOffered(features) {
             HStack(spacing: ChimpSpacing.sm) {
                 ChimpButton(again.title) { onAgain(again) }
                 share.frame(width: 96)

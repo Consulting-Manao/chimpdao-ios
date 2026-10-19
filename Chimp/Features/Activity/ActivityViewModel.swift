@@ -861,6 +861,15 @@ enum ReceiptAgain: Equatable {
     /// Vault (dépôt, retrait) : ouvrir la position de ce tiroir (F6), adresse du tiroir.
     case seePosition(drawerAddress: String)
 
+    /// Le bouton n'est proposé que si sa destination existe sur ce réseau (Swap, Grow).
+    func isOffered(_ features: NetworkFeatures) -> Bool {
+        switch self {
+        case .payAgain, .sendBack: true
+        case .swapAgain: features.swap
+        case .seePosition: features.grow
+        }
+    }
+
     /// Le texte du bouton.
     var title: LocalizedStringKey {
         switch self {

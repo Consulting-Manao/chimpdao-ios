@@ -22,6 +22,9 @@ struct ChimpNetworkConfig: Equatable, Sendable {
     /// Repère de l'horloge des ledgers (revue de sécurité F3) : un ledger vu fermé à une heure connue. Sans repère, le
     /// plafond ne s'appuie que sur le dernier ledger vu par ce téléphone.
     var ledgerAnchor: LedgerAnchor? = nil
+    /// Fonctions proposées sur ce réseau (décision de Barth du 2026-10-19) : sur le mainnet, toutes éteintes pour
+    /// l'instant (rien de visible, aucun onglet en erreur).
+    var features: NetworkFeatures
 
     struct Endpoints: Equatable, Sendable {
         let rpc: URL
@@ -73,8 +76,27 @@ struct ChimpNetworkConfig: Equatable, Sendable {
         usdcIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         usdcFaucet: URL(string: "https://faucet.circle.com/")!,
         // Ledger 5 223 554, fermé le 2026-10-16 à 09:02:37 UTC (retrait XOXNO de la carte n°7, lu sur la chaîne).
-        ledgerAnchor: LedgerAnchor(ledger: 5_223_554, time: Date(timeIntervalSince1970: 1_792_141_357))
+        ledgerAnchor: LedgerAnchor(ledger: 5_223_554, time: Date(timeIntervalSince1970: 1_792_141_357)),
+        features: .all
     )
+
+    /// Etherfuse (CETES), seulement si la fonction est allumée sur ce réseau : le seul accès à sa configuration.
+    var etherfuse: IntegrationConfig.Etherfuse? { features.cetes ? integrations?.etherfuse : nil }
+}
+
+/// Les fonctions de l'app qu'on peut allumer ou éteindre pour chaque réseau, séparément.
+struct NetworkFeatures: Equatable, Sendable {
+    /// Swap (E3 à E6) : tuile du Wallet, bouton des tiroirs, « Swap again ».
+    var swap: Bool
+    /// Grow : l'onglet, les tuiles et le bouton des tiroirs, « See my position ».
+    var grow: Bool
+    /// « Add money » : depuis une autre blockchain (NEAR Intents, ROZO, CCTP).
+    var addMoney: Bool
+    /// CETES (Etherfuse) : l'actif, son prix, son pot dans Grow.
+    var cetes: Bool
+
+    static let all = NetworkFeatures(swap: true, grow: true, addMoney: true, cetes: true)
+    static let none = NetworkFeatures(swap: false, grow: false, addMoney: false, cetes: false)
 }
 
 // MARK: Configuration de ce build
@@ -121,7 +143,9 @@ extension ChimpNetworkConfig {
         usdcIssuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
         usdcFaucet: nil,
         // Un ledger mainnet et son heure de fermeture, lus sur la chaîne.
-        ledgerAnchor: nil
+        ledgerAnchor: nil,
+        // Swap, Grow, Add money et CETES éteints sur le mainnet pour l'instant (décision de Barth du 2026-10-19).
+        features: .none
     )
 }
 
@@ -145,6 +169,7 @@ struct NetworkConfigDraft: Equatable, Sendable {
     let usdcIssuer: String?
     let usdcFaucet: URL?
     let ledgerAnchor: LedgerAnchor?
+    let features: NetworkFeatures
 
     /// Les valeurs qui manquent encore, par leur nom.
     var missing: [String] {
@@ -168,7 +193,8 @@ struct NetworkConfigDraft: Equatable, Sendable {
             network: network, passphrase: passphrase,
             endpoints: .init(rpc: rpc, horizon: horizon, explorer: explorer, friendbot: friendbot),
             contracts: .init(factory: factory, collection: collection, nfcNft: nfcNft, accountWasmHash: accountWasmHash, router: router, admin: admin),
-            feeSignerURL: feeSignerURL, feePayer: feePayer, usdcIssuer: usdcIssuer, usdcFaucet: usdcFaucet, ledgerAnchor: ledgerAnchor
+            feeSignerURL: feeSignerURL, feePayer: feePayer, usdcIssuer: usdcIssuer, usdcFaucet: usdcFaucet, ledgerAnchor: ledgerAnchor,
+            features: features
         )
     }
 }

@@ -22,10 +22,14 @@ enum ChimpTab: String, CaseIterable, Identifiable {
 struct ChimpTabBar: View {
     @Binding var selection: ChimpTab
     @Environment(\.chimpScreenInsets) private var screenInsets
+    @Environment(\.chimpFeatures) private var features
+
+    /// Grow éteint sur ce réseau : pas d'onglet (jamais un onglet en erreur).
+    private var tabs: [ChimpTab] { ChimpTab.allCases.filter { $0 != .grow || features.grow } }
 
     var body: some View {
         HStack(spacing: ChimpSpacing.sm) {
-            ForEach(ChimpTab.allCases) { tab in
+            ForEach(tabs) { tab in
                 ChimpTabButton(tab: tab, isSelected: tab == selection) {
                     if tab != selection { ChimpSoundPlayer.shared.rustle() }
                     selection = tab

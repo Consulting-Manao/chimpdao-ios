@@ -31,7 +31,7 @@ struct NetworkConfigTests {
             explorer: t.endpoints.explorer, friendbot: t.endpoints.friendbot, factory: factory,
             collection: t.contracts.collection, nfcNft: t.contracts.nfcNft, accountWasmHash: t.contracts.accountWasmHash,
             router: t.contracts.router, admin: t.contracts.admin, feeSignerURL: t.feeSignerURL, feePayer: t.feePayer,
-            usdcIssuer: t.usdcIssuer, usdcFaucet: t.usdcFaucet, ledgerAnchor: t.ledgerAnchor
+            usdcIssuer: t.usdcIssuer, usdcFaucet: t.usdcFaucet, ledgerAnchor: t.ledgerAnchor, features: t.features
         )
     }
 
@@ -63,5 +63,35 @@ struct NetworkConfigTests {
             }
         }
         #expect(violations.isEmpty, "\(violations)")
+    }
+
+    // MARK: Fonctions par réseau
+
+    @Test("Testnet : Swap, Grow, Add money et CETES allumés ; mainnet : tous éteints")
+    func features() {
+        #expect(ChimpNetworkConfig.testnet.features == .all)
+        #expect(ChimpNetworkConfig.mainnetDraft.features == .none)
+    }
+
+    @Test("CETES éteint : ni configuration Etherfuse ni actif CETES, le reste des actifs inchangé")
+    func cetesOff() throws {
+        var config = ChimpNetworkConfig.testnet
+        #expect(config.etherfuse != nil)
+        #expect(try SACClient.stellarAssets(config: config).contains { $0.code == "CETES" })
+        config.features.cetes = false
+        #expect(config.etherfuse == nil)
+        let codes = try SACClient.stellarAssets(config: config).map(\.code)
+        #expect(!codes.contains("CETES"))
+        #expect(codes.contains("XLM") && codes.contains("USDC"))
+    }
+
+    @Test("Reçus : « Swap again » et « See my position » seulement si Swap et Grow sont allumés")
+    func receiptButtons() {
+        let swapAgain = ReceiptAgain.swapAgain(SwapPrefill(drawerAddress: "C", given: .xlm, received: .usdc, amount: nil))
+        #expect(swapAgain.isOffered(.all) && !swapAgain.isOffered(.none))
+        #expect(ReceiptAgain.seePosition(drawerAddress: "C").isOffered(.all))
+        #expect(!ReceiptAgain.seePosition(drawerAddress: "C").isOffered(.none))
+        let payAgain = ReceiptAgain.payAgain(SendPrefill(address: MockSendService.mayaAddress, asset: .xlm, amount: 1, origin: .payAgain))
+        #expect(payAgain.isOffered(.none), "Envoyer existe sur tous les réseaux")
     }
 }

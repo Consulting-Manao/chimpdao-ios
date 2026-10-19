@@ -12,6 +12,8 @@ import SwiftUI
 /// depuis le dépôt) à côté des actifs, dans les deux tiroirs (le Main de l'app est en tuiles, B2r), « Plant more » et
 /// l'avertissement sous la grille ; le bouton Grow ouvre « Put money in » depuis ce tiroir.
 struct DrawerDetailView: View {
+    /// Swap éteint sur ce réseau : pas de bouton.
+    @Environment(\.chimpFeatures) private var features
     @Bindable var model: DrawerDetailModel
     let activity: ActivityViewModel
     var actions: DrawerDetailActions
@@ -334,8 +336,10 @@ struct DrawerDetailView: View {
             ChimpButton("Move", kind: .secondary, size: .compact) { actions.onMove(id) }
                 .disabled(isEmpty)
             // Maquette B2 / B3 « with Swap » : Swap s'ouvre avec ce tiroir déjà choisi.
-            ChimpButton("Swap", kind: .secondary, size: .compact) { actions.onSwap(id) }
-                .disabled(isEmpty)
+            if features.swap {
+                ChimpButton("Swap", kind: .secondary, size: .compact) { actions.onSwap(id) }
+                    .disabled(isEmpty)
+            }
             // Maquette B2 / B3 « Swap + Vault » : « Put money in » depuis ce tiroir.
             if grow != nil {
                 ChimpButton("Grow", kind: .secondary, size: .compact) { actions.onGrow(id) }
