@@ -77,6 +77,14 @@ final class LedgerClock {
         clocks[config.passphrase] = clock
         return clock
     }
+
+    /// « Erase everything on this phone » : les horloges en mémoire sont oubliées (le dernier ledger vu est effacé des
+    /// préférences par `PhoneData.eraseAll`). La suivante repart du repère de `Config/`.
+    static func forgetShared() {
+        lock.lock()
+        defer { lock.unlock() }
+        clocks = [:]
+    }
 }
 
 /// Le dernier ledger accepté, gardé dans les préférences du téléphone (un numéro et une heure, rien de secret).

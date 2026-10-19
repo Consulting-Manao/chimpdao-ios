@@ -17,12 +17,17 @@ final class AppSession {
     /// Réglages du téléphone (apparence, devise, Face ID), à part du `LocalWallet`.
     let preferences: AppPreferences
     private let store: LocalWalletStore
+    /// Efface ce que le téléphone garde hors des fichiers (`PhoneData.eraseAll` dans l'app ; rien dans les tests, qui ne
+    /// touchent pas aux préférences partagées).
+    private let erasePhoneData: () -> Void
 
     init(
         store: LocalWalletStore, config: ChimpNetworkConfig, activity: ActivityStore = InMemoryActivityStore(),
-        preferences: AppPreferences = AppPreferences(store: InMemoryPreferencesStore())
+        preferences: AppPreferences = AppPreferences(store: InMemoryPreferencesStore()),
+        erasePhoneData: @escaping () -> Void = {}
     ) {
         self.store = store
+        self.erasePhoneData = erasePhoneData
         self.config = config
         self.activity = activity
         self.preferences = preferences
@@ -40,11 +45,14 @@ final class AppSession {
         do {
             let activity: ActivityStore = (try? FileActivityStore(network: network)) ?? InMemoryActivityStore()
             return AppSession(
-                store: try FileLocalWalletStore(network: network), config: config, activity: activity, preferences: .live()
+                store: try FileLocalWalletStore(network: network), config: config, activity: activity, preferences: .live(),
+                erasePhoneData: { PhoneData.eraseAll() }
             )
         } catch {
             // Application Support inaccessible : l'app fonctionne, mais sans rien retenir.
-            let session = AppSession(store: InMemoryLocalWalletStore(), config: config, preferences: .live())
+            let session = AppSession(
+                store: InMemoryLocalWalletStore(), config: config, preferences: .live(), erasePhoneData: { PhoneData.eraseAll() }
+            )
             session.loadError = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             return session
         }
@@ -295,6 +303,8 @@ final class AppSession {
         try activity.erase()
         try store.erase()
         preferences.reset()
+        // Historique de Grow, dernier ledger vu, toutes les préférences : rien ne reste (pas seulement les réglages).
+        erasePhoneData()
         wallet = LocalWallet()
         isFinishingOnboarding = false
     }

@@ -184,23 +184,24 @@ enum PotHistory {
 }
 
 /// Les relevés dans les préférences du téléphone (des nombres et des dates, rien de secret).
+/// Relu à chaque fois, sans copie en mémoire : après « Erase everything », rien ne peut réécrire l'ancien historique.
 final class DefaultsPotHistoryStore: PotHistoryStore {
-    private let key = "potHistory"
-    private var cache: [String: [PotReading]]
+    static let key = "potHistory"
 
-    init() {
-        cache = UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode([String: [PotReading]].self, from: $0) } ?? [:]
+    private var all: [String: [PotReading]] {
+        UserDefaults.standard.data(forKey: Self.key).flatMap { try? JSONDecoder().decode([String: [PotReading]].self, from: $0) } ?? [:]
     }
 
-    func readings(_ potID: String) -> [PotReading] { cache[potID] ?? [] }
+    func readings(_ potID: String) -> [PotReading] { all[potID] ?? [] }
 
     func record(_ reading: PotReading, potID: String) {
+        var store = all
         let day = Calendar.current.startOfDay(for: reading.day)
-        var list = (cache[potID] ?? []).filter { $0.day != day }
+        var list = (store[potID] ?? []).filter { $0.day != day }
         list.append(PotReading(day: day, value: reading.value))
         let oldest = day.addingTimeInterval(-Double(PotHistory.keptDays) * 86_400)
-        cache[potID] = list.filter { $0.day >= oldest }.sorted { $0.day < $1.day }
-        if let data = try? JSONEncoder().encode(cache) { UserDefaults.standard.set(data, forKey: key) }
+        store[potID] = list.filter { $0.day >= oldest }.sorted { $0.day < $1.day }
+        if let data = try? JSONEncoder().encode(store) { UserDefaults.standard.set(data, forKey: Self.key) }
     }
 }
 
