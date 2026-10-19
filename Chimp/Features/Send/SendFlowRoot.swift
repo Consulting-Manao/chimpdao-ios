@@ -11,7 +11,7 @@ struct SendFlowRoot: View {
     private let signingOrder: SigningOrder
 
     init(
-        service: SendService = SendMockSettings.makeService(),
+        service: SendService,
         signingOrder: SigningOrder = SendMockSettings.signingOrder,
         kind: SendFlowModel.FlowKind = .send,
         prefill: SendPrefill? = nil,
@@ -109,12 +109,15 @@ enum SendMockSettings {
         #endif
     }
 
-    /// Parcours factice du catalogue (données, cartes, carte tapée et issue choisies dans la page « Send »).
+    #if DESIGN_CATALOG
+    /// Parcours factice du catalogue (données, cartes, carte tapée et issue choisies dans la page « Send »). Absent de la
+    /// Release : un service manquant y est une erreur de compilation, jamais un faux envoi.
     static func makeService() -> SendService {
         let service = MockSendService(dataScenario: dataScenario, cardSetup: cardSetup, resultScenario: resultScenario)
         service.tapScenario = tapScenario
         return service
     }
+    #endif
 
     private static func stored<Value: RawRepresentable>(_ key: String) -> Value? where Value.RawValue == String {
         UserDefaults.standard.string(forKey: key).flatMap(Value.init(rawValue:))

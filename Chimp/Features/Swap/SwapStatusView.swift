@@ -14,7 +14,10 @@ struct SwapStatusView: View {
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
     @Environment(ActivityViewModel.self) private var appActivity: ActivityViewModel?
+    #if DESIGN_CATALOG
+    /// Catalogue et aperçus, sans historique de l'app : l'historique factice, aux mêmes adresses que le parcours factice.
     @State private var mockActivity = ActivityViewModel(source: MockActivityDataSource(scenario: .standard))
+    #endif
     @State private var isReceiptPresented = false
     @State private var seed = ChimpyLines.seed()
 
@@ -24,11 +27,13 @@ struct SwapStatusView: View {
             case .finished(.sent(let receipt)):
                 SwapSentView(receipt: receipt, onDone: model.finish, onReceipt: { isReceiptPresented = true })
                     .chimpSheet(isPresented: $isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true) {
-                        if let printed = activity.receipt(forSent: receipt.activityRecord(venue: ""), locale: locale) {
+                        if let activity, let printed = activity.receipt(forSent: receipt.activityRecord(venue: ""), locale: locale) {
                             ActivityReceiptSheet(receipt: printed, model: activity) { again in
                                 isReceiptPresented = false
                                 model.receiptAgain(again)
                             }
+                        } else {
+                            ReceiptUnavailableNote()
                         }
                     }
             case .finished(.notConfirmed), .finished(.undetermined):
@@ -40,7 +45,15 @@ struct SwapStatusView: View {
         .blocksSwipeBack(true)
     }
 
-    private var activity: ActivityViewModel { appActivity ?? mockActivity }
+    /// L'historique de l'app ; sans lui (hors des onglets), aucun reçu, jamais un faux (Release). Le catalogue prend
+    /// l'historique factice.
+    private var activity: ActivityViewModel? {
+        #if DESIGN_CATALOG
+        appActivity ?? mockActivity
+        #else
+        appActivity
+        #endif
+    }
 
     // MARK: E6 · Not sure yet
 

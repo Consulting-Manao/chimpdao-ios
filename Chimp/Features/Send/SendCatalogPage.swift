@@ -153,7 +153,7 @@ private struct SendCatalogDemo: View {
     let onExit: () -> Void
 
     var body: some View {
-        SendFlowRoot(kind: kind, onExit: onExit)
+        SendFlowRoot(service: SendMockSettings.makeService(), kind: kind, onExit: onExit)
             .catalogOverrides(settings)
     }
 }

@@ -18,8 +18,10 @@ struct SendStatusView: View {
     @Environment(\.openURL) private var openURL
     /// L'historique de l'app (onglet Activity) : « See the receipt » ouvre le même reçu imprimé (I1.1d).
     @Environment(ActivityViewModel.self) private var appActivity: ActivityViewModel?
-    /// Catalogue et aperçus, sans historique de l'app : l'historique factice, aux mêmes adresses que l'envoi factice.
+    #if DESIGN_CATALOG
+    /// Catalogue et aperçus, sans historique de l'app : l'historique factice, aux mêmes adresses que le parcours factice.
     @State private var mockActivity = ActivityViewModel(source: MockActivityDataSource(scenario: .standard))
+    #endif
     @State private var seed = ChimpyLines.seed()
 
     var body: some View {
@@ -27,9 +29,11 @@ struct SendStatusView: View {
             if case .finished(.sent(let receipt)) = model.signingStage {
                 SendSentView(receipt: receipt, onDone: model.finish, onReceipt: { model.isReceiptPresented = true })
                     .chimpSheet(isPresented: $model.isReceiptPresented, height: ChimpSize.cardTapSheetHeight, fitsContent: true) {
-                        if let printed = activity.receipt(forSent: receipt.activityRecord, locale: locale) {
+                        if let activity, let printed = activity.receipt(forSent: receipt.activityRecord, locale: locale) {
                             // « Pay again » (envoi seulement, comme dans l'Activity) : un parcours neuf, prérempli.
                             ActivityReceiptSheet(receipt: printed, model: activity, onAgain: model.receiptAgain)
+                        } else {
+                            ReceiptUnavailableNote()
                         }
                     }
             } else {
@@ -39,7 +43,15 @@ struct SendStatusView: View {
         .blocksSwipeBack(true)
     }
 
-    private var activity: ActivityViewModel { appActivity ?? mockActivity }
+    /// L'historique de l'app ; sans lui (hors des onglets), aucun reçu, jamais un faux (Release). Le catalogue prend
+    /// l'historique factice.
+    private var activity: ActivityViewModel? {
+        #if DESIGN_CATALOG
+        appActivity ?? mockActivity
+        #else
+        appActivity
+        #endif
+    }
 
     // MARK: Écran d'état
 

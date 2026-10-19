@@ -94,4 +94,20 @@ struct NetworkConfigTests {
         let payAgain = ReceiptAgain.payAgain(SendPrefill(address: MockSendService.mayaAddress, asset: .xlm, amount: 1, origin: .payAgain))
         #expect(payAgain.isOffered(.none), "Envoyer existe sur tous les réseaux")
     }
+
+    // MARK: Pas de faux par défaut
+
+    /// Garde-fou de lecture du code (décision de Barth du 2026-10-19) : aucun paramètre de l'app ne prend un service
+    /// factice par défaut ; un service manquant doit être une erreur, jamais un faux envoi ou un faux reçu.
+    @Test("Aucun paramètre « = Mock… » ni « = SendMockSettings.makeService() » dans le code de l'app")
+    func noMockDefaults() throws {
+        let pattern = try Regex(#"(:\s*\w+\??\s*=\s*Mock\w*\()|(=\s*SendMockSettings\.makeService\(\))"#)
+        var violations: [String] = []
+        for (name, text) in try AsyncAmountRuleTests.sources() where !name.contains("Catalog") && !name.contains("/Admin/") {
+            for (index, line) in text.components(separatedBy: "\n").enumerated() where line.contains(pattern) {
+                violations.append("\(name):\(index + 1)")
+            }
+        }
+        #expect(violations.isEmpty, "\(violations)")
+    }
 }
