@@ -20,14 +20,13 @@ final class ChainSendService: SendService {
 
     init(
         session: AppSession,
-        config: ChimpNetworkConfig = .testnet,
         wallet: WalletDataSource? = nil,
         signer: ChipSigner = NFCChipSigner(),
         feeSigner: FeeSigner? = nil
     ) {
         self.session = session
-        self.config = config
-        self.wallet = wallet ?? ChainWalletDataSource(session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle(), config: config)
+        config = session.config
+        self.wallet = wallet ?? ChainWalletDataSource(session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle())
         payments = PaymentClient(client: SorobanClient(config: config), config: config)
         self.signer = signer
         self.feeSigner = feeSigner ?? WorkerFeeSigner(url: config.feeSignerURL)

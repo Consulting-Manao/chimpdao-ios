@@ -14,6 +14,7 @@ import stellarsdk
 final class ChainLendingService: VaultService {
     let session: AppSession
     let config: ChimpNetworkConfig
+    var network: StellarNetwork { config.network }
     private let drawers: ChainSendService
     private let client: SorobanClient
     private let integrations: IntegrationCallClient
@@ -24,14 +25,13 @@ final class ChainLendingService: VaultService {
 
     init(
         session: AppSession,
-        config: ChimpNetworkConfig = .testnet,
         drawers: ChainSendService? = nil,
         signer: ChipSigner = NFCChipSigner(),
         feeSigner: FeeSigner? = nil
     ) {
         self.session = session
-        self.config = config
-        self.drawers = drawers ?? ChainSendService(session: session, config: config, signer: signer)
+        config = session.config
+        self.drawers = drawers ?? ChainSendService(session: session, signer: signer)
         client = SorobanClient(config: config)
         integrations = IntegrationCallClient(client: client, config: config)
         let reader = SimulationReader(client: client, source: config.feePayer)

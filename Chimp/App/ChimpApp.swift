@@ -2,30 +2,45 @@ import SwiftUI
 
 @main
 struct ChimpApp: App {
-    @State private var session: AppSession
-    /// Verrou Face ID (I2), réglé par compte, désactivé par défaut.
-    @State private var lock: AppLock
+    /// La session et le verrou Face ID (I2), ou la raison pour laquelle ce build ne peut pas démarrer.
+    @State private var launch: Launch
+
+    enum Launch {
+        case ready(AppSession, AppLock)
+        /// Configuration réseau incomplète (mainnet pas encore prêt) : jamais de repli sur un autre réseau.
+        case misconfigured(NetworkConfigError)
+    }
 
     init() {
         ChimpFonts.register()
-        let session = AppSession.live()
-        _session = State(initialValue: session)
-        // Réglage « Sounds » (I2) : lu à chaque son, il prend effet aussitôt.
-        let preferences = session.preferences
-        ChimpSoundPlayer.shared.isEnabled = { preferences.soundsEnabled }
-        _lock = State(initialValue: AppLock(session: session))
+        do {
+            let session = AppSession.live(config: try ChimpNetworkConfig.forThisBuild())
+            // Réglage « Sounds » (I2) : lu à chaque son, il prend effet aussitôt.
+            let preferences = session.preferences
+            ChimpSoundPlayer.shared.isEnabled = { preferences.soundsEnabled }
+            _launch = State(initialValue: .ready(session, AppLock(session: session)))
+        } catch let error as NetworkConfigError {
+            _launch = State(initialValue: .misconfigured(error))
+        } catch {
+            _launch = State(initialValue: .misconfigured(.incomplete(network: .mainnet, missing: ["\(error)"])))
+        }
     }
 
     var body: some Scene {
         WindowGroup {
-            RootView(session: session, lock: lock)
-                .chimpReadsScreenInsets()
-            #if DESIGN_CATALOG
-                .modifier(SwapDemoLaunch())
-                .modifier(VaultDemoLaunch())
-                .modifier(CrossChainDemoLaunch())
-                .modifier(RozoDemoLaunch())
-            #endif
+            switch launch {
+            case let .ready(session, lock):
+                RootView(session: session, lock: lock)
+                    .chimpReadsScreenInsets()
+                #if DESIGN_CATALOG
+                    .modifier(SwapDemoLaunch())
+                    .modifier(VaultDemoLaunch())
+                    .modifier(CrossChainDemoLaunch())
+                    .modifier(RozoDemoLaunch())
+                #endif
+            case .misconfigured(let error):
+                MisconfiguredBuildView(error: error)
+            }
         }
     }
 }

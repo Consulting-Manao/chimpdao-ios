@@ -53,10 +53,10 @@ final class ChainSavingsService: SavingsService {
     private let drawers: ChainSendService
     private let pricing: StablebondPricing?
 
-    init(session: AppSession, config: ChimpNetworkConfig = .testnet, pricing: StablebondPricing? = nil) {
+    init(session: AppSession, pricing: StablebondPricing? = nil) {
         self.session = session
-        self.config = config
-        drawers = ChainSendService(session: session, config: config)
+        config = session.config
+        drawers = ChainSendService(session: session)
         self.pricing = pricing ?? EtherfusePriceClient.shared(for: config)
     }
 

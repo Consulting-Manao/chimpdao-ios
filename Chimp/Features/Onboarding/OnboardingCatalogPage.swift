@@ -52,7 +52,7 @@ struct OnboardingCatalogPage: View {
                     }
                     Toggle(isOn: $tourSeen) { Text(verbatim: "Tour already seen") }
                     Button {
-                        let session = AppSession(store: InMemoryLocalWalletStore(LocalWallet(tourSeen: tourSeen)), network: .testnet)
+                        let session = AppSession(store: InMemoryLocalWalletStore(LocalWallet(tourSeen: tourSeen)), config: .testnet)
                         runningSession = session
                         let setupScenario = self.setupScenario
                         let creationScenario = self.creationScenario

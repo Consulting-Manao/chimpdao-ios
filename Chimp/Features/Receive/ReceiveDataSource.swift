@@ -32,7 +32,7 @@ protocol ReceiveDataSource {
 struct LocalReceiveDataSource: ReceiveDataSource {
     let session: AppSession
     /// Pour vérifier qu'une Pocket gardée est bien celle de sa carte (F2).
-    var config: ChimpNetworkConfig = .testnet
+    var config: ChimpNetworkConfig { session.config }
 
     func fetchReceiveOptions() async throws -> ReceiveOptions {
         guard let account = session.wallet.account else { throw ChainWalletDataSource.ReadError.noAccount }

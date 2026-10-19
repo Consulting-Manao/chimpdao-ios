@@ -45,7 +45,7 @@ struct PreferencesTests {
         let store = InMemoryPreferencesStore()
         let preferences = AppPreferences(store: store)
         preferences.look = .jungleNight
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet, preferences: preferences)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet, preferences: preferences)
         try session.eraseEverything()
         #expect(preferences.look == .auto)
         #expect(store.values.isEmpty)
@@ -53,7 +53,7 @@ struct PreferencesTests {
 
     @Test("Réglages : changer « Look » depuis I2 change la préférence du téléphone")
     func settingsLook() {
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let model = SettingsModel(session: session, walletCards: [])
         model.look = .yellowBanana
         #expect(session.preferences.look == .yellowBanana)

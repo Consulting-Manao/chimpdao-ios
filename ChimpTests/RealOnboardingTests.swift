@@ -162,7 +162,7 @@ struct RealOnboardingTests {
     @Test("Création réussie : le compte n'est enregistré qu'après confirmation, avec prénom, nom et couleur")
     func savedOnlyAfterConfirmation() async throws {
         let store = InMemoryLocalWalletStore()
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         let chain = FakeChain()
         let model = try realModel(signer: RecordingSigner(), session: session, chain: chain)
         model.firstName = "Barth"
@@ -186,7 +186,7 @@ struct RealOnboardingTests {
     @Test("Échec de la création : rien n'est enregistré ; « Try again » reprend avec les mêmes signatures, sans nouveau tap")
     func failureThenRetry() async throws {
         let store = InMemoryLocalWalletStore()
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         let chain = FakeChain()
         chain.linkError = FeeSignerError.busy
         let signer = RecordingSigner()
@@ -268,7 +268,7 @@ struct RealOnboardingTests {
         let store = InMemoryLocalWalletStore()
         let chain = FakeChain()
         let signer = RecordingSigner()
-        let model = try realModel(signer: signer, session: AppSession(store: store, network: .testnet), chain: chain)
+        let model = try realModel(signer: signer, session: AppSession(store: store, config: .testnet), chain: chain)
         await model.pinEnter("1234", "1234")
         model.openTapSheet(.rehearsal)
         #expect(await model.scan() == .signed)

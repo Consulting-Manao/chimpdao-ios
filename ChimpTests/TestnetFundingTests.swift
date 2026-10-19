@@ -122,7 +122,7 @@ struct TestnetFundingTests {
     private func session(cards: [SavedCard]) -> AppSession {
         var wallet = LocalWallet()
         wallet.account = SavedAccount(address: Self.main, cards: cards)
-        return AppSession(store: InMemoryLocalWalletStore(wallet), network: .testnet)
+        return AppSession(store: InMemoryLocalWalletStore(wallet), config: .testnet)
     }
 
     private static let cardKey = MockChipReader.secp256k1Key
@@ -156,7 +156,7 @@ struct TestnetFundingTests {
 
     @Test("Sans compte sur le téléphone : rien à financer")
     func nothingToFund() async {
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let model = AdminFundModel(session: session, chain: FakeCardsChain(members: [], pockets: [:]), funder: MockTestnetFunding())
         await model.loadTargets()
         await model.fund()

@@ -29,7 +29,8 @@ final class ReceiveViewModel {
 
     private(set) var phase: Phase = .loading
     private(set) var drawers: [DrawerContent] = []
-    private(set) var network: StellarNetwork = .testnet
+    /// Le réseau des adresses, lu avec elles (`nil` tant qu'elles ne sont pas lues).
+    private(set) var network: StellarNetwork?
     private(set) var selectedDrawerID: String?
     /// Vrai pendant quelques secondes après une copie (pilule « Copied! »).
     private(set) var isCopied = false
@@ -67,7 +68,7 @@ final class ReceiveViewModel {
     var canChooseDrawer: Bool { drawers.count > 1 }
 
     /// Badge « Testnet » : tant qu'on n'est pas sur mainnet, de l'argent réel envoyé ici serait perdu.
-    var showsTestnetBadge: Bool { network != .mainnet }
+    var showsTestnetBadge: Bool { network == .testnet }
 
     // MARK: Actions
 
@@ -137,7 +138,9 @@ final class ReceiveViewModel {
 
     /// Message de « Share my address » pour le tiroir choisi.
     var shareText: String? {
-        selectedDrawer.map { Self.shareText(address: $0.address, drawerTitle: $0.icon == .main ? nil : $0.title, network: network) }
+        selectedDrawer.flatMap { drawer in
+            network.map { Self.shareText(address: drawer.address, drawerTitle: drawer.icon == .main ? nil : drawer.title, network: $0) }
+        }
     }
 
     /// Texte validé par Barth le 2026-10-01 : l'adresse **complète**, les actifs acceptés, et sur testnet l'avertissement

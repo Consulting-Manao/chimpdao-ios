@@ -204,7 +204,7 @@ struct SendErrorTests {
     @Test("ChainSendService.sign : `onlyCard` réduit les cartes acceptées à la carte lue, jamais hors du compte")
     func chainSignOnlyCard() async throws {
         let signer = KeysSpy()
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let service = ChainSendService(session: session, wallet: EmptyWallet(), signer: signer)
         let prepared = try preparedFromMain(acceptedKeys: [k1Key, r1Key])
         _ = try await service.sign(prepared, pin: "1234", onlyCard: nil)

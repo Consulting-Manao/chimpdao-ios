@@ -321,12 +321,12 @@ final class RemoveCardModel {
 }
 
 extension RemoveCardModel {
-    /// La vraie carte (Core NFC) et le testnet. Sur un appareil sans NFC (simulateur), les builds Debug et Testing prennent
+    /// La vraie carte (Core NFC) et le réseau de la session. Sur un appareil sans NFC (simulateur), les builds Debug et Testing prennent
     /// une carte et une chaîne factices, sur une copie en mémoire de la session (rien n'est écrit dans le vrai fichier).
     static func live(mode: Mode, account: String, target: RemovalTarget, members: [ChipPublicKey], session: AppSession) -> RemoveCardModel {
         #if DESIGN_CATALOG
         if !NFCTagReaderSession.readingAvailable {
-            let scratch = AppSession(store: InMemoryLocalWalletStore(session.wallet), network: session.network)
+            let scratch = AppSession(store: InMemoryLocalWalletStore(session.wallet), config: session.config)
             return RemoveCardModel(
                 mode: mode, account: account, target: target, session: scratch,
                 signer: MockChipSigner(), service: MockRemoveCardService(members: members)
@@ -335,7 +335,7 @@ extension RemoveCardModel {
         #endif
         return RemoveCardModel(
             mode: mode, account: account, target: target, session: session,
-            signer: NFCChipSigner(), service: ChainRemoveCardService(config: .testnet)
+            signer: NFCChipSigner(), service: ChainRemoveCardService(config: session.config)
         )
     }
 }

@@ -150,6 +150,8 @@ final class AccountSetupModel {
     private let creator: AccountCreator
     private let signer: ChipSigner
     private let session: AppSession?
+    /// Le réseau où le compte sera créé (`nil` dans le catalogue, sans session).
+    var network: StellarNetwork? { session?.network }
     private let accountSalt: Data
     private var plan: AccountSetupPlan?
     private var signatures: [ChipSignedDigest]?

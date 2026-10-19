@@ -8,7 +8,10 @@ final class AppSession {
     private(set) var wallet: LocalWallet
     /// Le fichier n'a pas pu être lu au lancement (texte technique) : l'app repart de l'onboarding.
     private(set) var loadError: String?
-    let network: StellarNetwork
+    /// Le réseau, ses contrats et ses URLs : la configuration de ce build (`ChimpNetworkConfig.forThisBuild`), passée à
+    /// tous les services. Aucun service ne choisit son réseau lui-même.
+    let config: ChimpNetworkConfig
+    var network: StellarNetwork { config.network }
     /// Historique (onglet Activity), dans son propre fichier.
     let activity: ActivityStore
     /// Réglages du téléphone (apparence, devise, Face ID), à part du `LocalWallet`.
@@ -16,11 +19,11 @@ final class AppSession {
     private let store: LocalWalletStore
 
     init(
-        store: LocalWalletStore, network: StellarNetwork, activity: ActivityStore = InMemoryActivityStore(),
+        store: LocalWalletStore, config: ChimpNetworkConfig, activity: ActivityStore = InMemoryActivityStore(),
         preferences: AppPreferences = AppPreferences(store: InMemoryPreferencesStore())
     ) {
         self.store = store
-        self.network = network
+        self.config = config
         self.activity = activity
         self.preferences = preferences
         do {
@@ -31,17 +34,17 @@ final class AppSession {
         }
     }
 
-    /// Session de l'app : fichier sur le téléphone, réseau testnet (V1, CLAUDE.md « Périmètre V1 »).
-    static func live() -> AppSession {
-        let network = ChimpNetworkConfig.testnet.network
+    /// Session de l'app : fichier sur le téléphone, réseau de ce build (`ChimpNetworkConfig.forThisBuild`).
+    static func live(config: ChimpNetworkConfig) -> AppSession {
+        let network = config.network
         do {
             let activity: ActivityStore = (try? FileActivityStore(network: network)) ?? InMemoryActivityStore()
             return AppSession(
-                store: try FileLocalWalletStore(network: network), network: network, activity: activity, preferences: .live()
+                store: try FileLocalWalletStore(network: network), config: config, activity: activity, preferences: .live()
             )
         } catch {
             // Application Support inaccessible : l'app fonctionne, mais sans rien retenir.
-            let session = AppSession(store: InMemoryLocalWalletStore(), network: network, preferences: .live())
+            let session = AppSession(store: InMemoryLocalWalletStore(), config: config, preferences: .live())
             session.loadError = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             return session
         }

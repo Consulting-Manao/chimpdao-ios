@@ -41,7 +41,7 @@ struct AppLockTests {
 
     private func make(_ wallet: LocalWallet, _ face: FakeAuthenticator) -> (AppLock, AppSession, InMemoryLocalWalletStore) {
         let store = InMemoryLocalWalletStore(wallet)
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         return (AppLock(session: session, authenticator: face), session, store)
     }
 

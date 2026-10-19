@@ -1,7 +1,8 @@
 import Foundation
 
 /// Réseau Stellar sur lequel vivent les adresses et les soldes affichés.
-/// Au jalon 5, il viendra de `Config/` (Testing → testnet, Release → mainnet, DESIGN_NOTES §12).
+/// Celui de la configuration de ce build (`ChimpNetworkConfig.forThisBuild` : Debug et Testing → testnet, Release →
+/// mainnet ; décision de Barth du 2026-10-19).
 enum StellarNetwork: String, Equatable, Sendable {
     case testnet
     case mainnet

@@ -51,9 +51,9 @@ final class ChainActivityDataSource: ActivityDataSource {
     /// Cartes lues par le Wallet (clé, nom, wallet) : complètent celles du téléphone.
     private let walletCards: () -> [CardBalance]
 
-    init(session: AppSession, config: ChimpNetworkConfig = .testnet, walletCards: @escaping () -> [CardBalance] = { [] }) {
+    init(session: AppSession, walletCards: @escaping () -> [CardBalance] = { [] }) {
         self.session = session
-        self.config = config
+        config = session.config
         self.walletCards = walletCards
     }
 
@@ -123,8 +123,8 @@ final class ChainActivityDataSource: ActivityDataSource {
     func checkPending(_ pending: PendingSend) async throws -> PaymentCheck {
         // Un swap en attente se vérifie comme un envoi ; le service du swap écrit sa ligne s'il est parti.
         let result = pending.swap == nil
-            ? try await ChainSendService(session: session, config: config).check(pending.trace)
-            : try await ChainSwapService(session: session, config: config).check(pending.trace)
+            ? try await ChainSendService(session: session).check(pending.trace)
+            : try await ChainSwapService(session: session).check(pending.trace)
         switch result {
         case .sent, .nothingSent:
             try? session.setPendingSend(nil)

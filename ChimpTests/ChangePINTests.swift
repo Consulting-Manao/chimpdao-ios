@@ -166,7 +166,7 @@ struct ChangePINTests {
                 SavedCard(publicKey: key.hex, chip: "infineon2Go", tokenID: 7, pocket: nil, name: "Banana", color: "banana"),
                 SavedCard(publicKey: MockChipReader.p256Key.hex, chip: "duox", tokenID: 9, pocket: nil, name: "Leaf", color: "leaf"),
             ])
-        )), network: .testnet)
+        )), config: .testnet)
         let model = SettingsModel(session: session, walletCards: [])
         #expect(model.pinCards.map(\.name) == ["Banana"])
     }

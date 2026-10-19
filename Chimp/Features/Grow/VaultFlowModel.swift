@@ -143,7 +143,7 @@ final class VaultFlowModel {
         hasLoaded = true
         if let waiting = service.pendingSend {
             pending = waiting
-            guard let vault = VaultSummary(waiting, network: context?.network ?? .testnet) else {
+            guard let vault = VaultSummary(waiting, network: context?.network ?? service.network) else {
                 blockedByPendingPayment = true
                 await load()
                 return
@@ -684,7 +684,7 @@ final class VaultFlowModel {
         do {
             switch try await service.check(pending.trace) {
             case .sent(let hash):
-                guard let summary = summary ?? VaultSummary(pending, network: context?.network ?? .testnet) else { return }
+                guard let summary = summary ?? VaultSummary(pending, network: context?.network ?? service.network) else { return }
                 finish(with: .sent(VaultReceipt(
                     summary: summary, transactionHash: hash, sentAt: pending.signedAt,
                     explorerURL: service.explorerURL(transactionHash: hash), shares: summary.shares, received: nil

@@ -818,14 +818,14 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
 }
 
 extension AddCardModel {
-    /// G1 depuis le Wallet : la vraie carte (Core NFC) et le testnet. Sur un appareil sans NFC (simulateur), les builds
+    /// G1 depuis le Wallet : la vraie carte (Core NFC) et le réseau de la session. Sur un appareil sans NFC (simulateur), les builds
     /// Debug et Testing prennent une carte et une chaîne factices ; en Release, l'erreur « pas de NFC » s'affiche.
     static func live(account: String, session: AppSession) -> AddCardModel {
         #if DESIGN_CATALOG
         if !NFCTagReaderSession.readingAvailable {
             // Carte et chaîne factices : une copie en mémoire de la session, pour que la fausse carte ne soit jamais
             // enregistrée dans le vrai fichier du téléphone.
-            let scratch = AppSession(store: InMemoryLocalWalletStore(session.wallet), network: session.network)
+            let scratch = AppSession(store: InMemoryLocalWalletStore(session.wallet), config: session.config)
             return AddCardModel(
                 entry: .wallet(account: account), session: scratch, reader: MockChipReader(scenario: .infineon),
                 signer: MockChipSigner(), service: MockAddCardService()
@@ -834,7 +834,7 @@ extension AddCardModel {
         #endif
         return AddCardModel(
             entry: .wallet(account: account), session: session, reader: NFCChipReader(), signer: NFCChipSigner(),
-            service: ChainAddCardService(config: .testnet)
+            service: ChainAddCardService(config: session.config)
         )
     }
 }

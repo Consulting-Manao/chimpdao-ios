@@ -241,7 +241,7 @@ struct SendOutcomeTests {
     @Test("Paiement en attente enregistré dans le fichier du téléphone, puis effacé")
     func pendingPersisted() throws {
         let store = InMemoryLocalWalletStore()
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         let pending = PendingSend(
             trace: PaymentTrace(token: "t", from: "C", destination: "G", units: 5_000_000, nonce: -42, preparedAtLedger: 10, expirationLedger: 130, transactionHash: "ab", transactionMaxTime: 99),
             recipient: MockSendService.mayaAddress, recipientName: nil, drawerTitle: "Main account",
@@ -274,7 +274,7 @@ struct SendOutcomeTests {
                 SavedCard(publicKey: infineon.hex, chip: ChipKind.infineon2Go.rawValue, tokenID: 7, pocket: "CPOCKET1", name: "Banana", color: "banana"),
                 SavedCard(publicKey: duox.hex, chip: ChipKind.duox.rawValue, tokenID: 8, pocket: "CPOCKET2", name: "Leaf", color: "leaf"),
             ]
-        ))), network: .testnet)
+        ))), config: .testnet)
         let snapshot = WalletSnapshot(
             currency: .usd,
             main: DrawerBalance(assets: [AssetAmount(code: "XLM", amount: 999), AssetAmount(code: "USDC", amount: 0)]),

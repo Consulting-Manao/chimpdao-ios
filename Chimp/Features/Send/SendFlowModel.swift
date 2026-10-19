@@ -135,7 +135,7 @@ final class SendFlowModel {
         if let waiting = service.pendingSend {
             // Un paiement signé attend encore son issue : on la vérifie au lieu de proposer un nouvel envoi.
             pending = waiting
-            summary = SendSummary(waiting, network: context?.network ?? .testnet)
+            summary = SendSummary(waiting, network: context?.network ?? service.config.network)
             resumedPending = true
             await check()
             return
@@ -240,8 +240,8 @@ final class SendFlowModel {
     var isScannerPresented = false
     /// Dernier code refusé, affiché sous le champ jusqu'à ce que l'adresse change.
     private(set) var scanIssue: ScanIssue?
-    /// Réseau et USDC attendus d'un lien de paiement : le testnet de `Config/` (seul réseau de l'app pour l'instant).
-    var scanRules = ScanRules(config: .testnet)
+    /// Réseau et USDC attendus d'un lien de paiement : ceux du service (le réseau de la session).
+    var scanRules: ScanRules { ScanRules(config: service.config) }
 
     /// Code lu par la caméra : une adresse (ou un lien SEP-7) remplit C1, et C2 pour l'actif et le montant ; sinon, la
     /// raison du refus. Rien n'est envoyé : C2 et C4 restent à passer.
@@ -686,7 +686,7 @@ final class SendFlowModel {
             switch try await service.check(pending.trace) {
             case .sent(let hash):
                 let receipt = SendReceipt(
-                    summary: summary ?? SendSummary(pending, network: context?.network ?? .testnet),
+                    summary: summary ?? SendSummary(pending, network: context?.network ?? service.config.network),
                     transactionHash: hash, sentAt: pending.signedAt, explorerURL: service.explorerURL(transactionHash: hash)
                 )
                 finish(with: .sent(receipt))

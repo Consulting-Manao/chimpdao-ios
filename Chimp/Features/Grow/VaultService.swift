@@ -248,6 +248,8 @@ enum VaultServiceError: Error, Equatable, LocalizedError {
 /// Service du vault. `ChainVaultService` (testnet, `Core/`) dans l'app, `MockVaultService` dans le catalogue et les tests.
 /// Mêmes étapes et mêmes garanties qu'Envoyer et Swap.
 protocol VaultService {
+    /// Le réseau du vault (celui de la session) : résumés d'une opération en attente.
+    var network: StellarNetwork { get }
     func fetchContext() async throws -> VaultContext
     /// Devis d'un dépôt de `amount` depuis `drawer` : parts attendues (lecture seule).
     func depositQuote(drawer: SendDrawer, amount: Decimal) async throws -> VaultQuote

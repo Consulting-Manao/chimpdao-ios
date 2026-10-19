@@ -125,16 +125,16 @@ extension OnboardingModel {
         }
         #endif
         return OnboardingModel(
-            session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: .testnet),
-            signer: NFCChipSigner(), joinService: ChainAddCardService(config: .testnet), oracle: ReflectorPriceOracle(), mode: mode,
+            session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: session.config),
+            signer: NFCChipSigner(), joinService: ChainAddCardService(config: session.config), oracle: ReflectorPriceOracle(), mode: mode,
             makeSetup: { choice in try Self.liveSetup(choice: choice, session: session) }
         )
     }
 
-    /// Cérémonie réelle : NFC, testnet, serveur de frais. En Debug et Testing, la répétition à blanc est proposée en plus.
+    /// Cérémonie réelle : NFC, réseau de la session, serveur de frais. En Debug et Testing, la répétition à blanc est proposée en plus.
     private static func liveSetup(choice: CardChoice, session: AppSession) throws -> AccountSetupModel {
-        let service = ChainAccountSetupService(config: .testnet)
-        let creator = AccountCreator(chain: ChainAccountCreation(config: .testnet))
+        let service = ChainAccountSetupService(config: session.config)
+        let creator = AccountCreator(chain: ChainAccountCreation(config: session.config))
         #if CHIMP_ADMIN
         return try AccountSetupModel(choice: choice, service: service, creator: creator, signer: NFCChipSigner(), session: session, rehearsal: service)
         #else

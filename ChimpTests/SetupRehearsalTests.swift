@@ -257,7 +257,7 @@ struct SetupRehearsalTests {
     @Test("Toute la répétition, de A3 à A7 : rien n'est enregistré sur le téléphone, retour à A1")
     func wholeRehearsalSavesNothing() async throws {
         let store = InMemoryLocalWalletStore()
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         let onboarding = OnboardingModel(
             session: session, reader: MockChipReader(scenario: .infineon, delay: .zero),
             service: MockOnboardingService(scenario: .fresh, delay: .zero), signer: RecordingSigner(),

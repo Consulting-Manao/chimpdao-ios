@@ -24,7 +24,7 @@ struct AccountSwitchTests {
 
     private func session(_ wallet: LocalWallet) -> (AppSession, InMemoryLocalWalletStore) {
         let store = InMemoryLocalWalletStore(wallet)
-        return (AppSession(store: store, network: .testnet), store)
+        return (AppSession(store: store, config: .testnet), store)
     }
 
     private var pending: PendingSend {

@@ -96,7 +96,7 @@ struct RemoveCardTests {
             wallet.pendingSend = PendingSend(trace: trace, recipient: "G", recipientName: nil, drawerTitle: "Main account", asset: "XLM", amount: 1, signedAt: .now)
         }
         let store = InMemoryLocalWalletStore(wallet)
-        return (AppSession(store: store, network: .testnet), store)
+        return (AppSession(store: store, config: .testnet), store)
     }
 
     private func target(_ key: ChipPublicKey, chip: ChipKind, name: String) -> RemovalTarget {

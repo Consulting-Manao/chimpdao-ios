@@ -224,7 +224,7 @@ struct ActivityHistoryTests {
 
     @Test("recordPayment : envoi confirmé écrit par le téléphone, rangé avec son compte, adresse exacte gardée (M)")
     func recordedPayment() {
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let m = "MAQAA5L65LSYH7CQ3VTJ7F3HHLGCL3DSLAR2Y47263D56MNNGHSQSAAAAAAAAAAE2LP26"
         session.recordActivity(.payment(
             hash: "abc", from: Self.pocket, to: m, assetCode: "USDC", amount: Decimal(string: "2.5")!, at: Date(timeIntervalSince1970: 5)

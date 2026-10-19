@@ -3,6 +3,8 @@ import Foundation
 /// Swap factice (catalogue, simulateur, tests) : les tiroirs de `MockSendService`, un prix fixe, et des scénarios pour
 /// chaque état (route introuvable, protocole indisponible, prix qui bouge, gros impact, issues après le tap).
 final class MockSwapService: SwapService {
+    /// Le service factice vit sur le testnet.
+    let network = StellarNetwork.testnet
     enum QuoteScenario: String, CaseIterable, Identifiable {
         /// Devis normal (1 XLM = 0,2492 USDC, comme la maquette E3 : 400 XLM → 99,68 USDC).
         case normal

@@ -77,6 +77,114 @@ struct ChimpNetworkConfig: Equatable, Sendable {
     )
 }
 
+// MARK: Configuration de ce build
+
+extension ChimpNetworkConfig {
+    /// La configuration de ce build, la seule de l'app (décision de Barth du 2026-10-19) : Debug et Testing → testnet,
+    /// Release → mainnet. Choisie par la condition de compilation `CHIMP_TESTNET` (`project.pbxproj`, Debug et Testing
+    /// seulement). Passée partout depuis `AppSession` : aucun service ne choisit son réseau lui-même.
+    /// Mainnet incomplet : une erreur qui empêche l'app de démarrer, **jamais** un retour au testnet.
+    static func forThisBuild() throws -> ChimpNetworkConfig {
+        #if CHIMP_TESTNET
+        .testnet
+        #else
+        try mainnetDraft.complete()
+        #endif
+    }
+
+    /// Mainnet. Les valeurs que ChimpDAO n'a pas encore sont **vides** (`nil`) : contrats à déployer par Pamphile
+    /// (`reference/chimp-contracts/docs/MAINNET-MIGRATION.md`), serveur de frais de production, repère de l'horloge
+    /// (à lire sur un ledger mainnet ; celui du testnet ferait refuser toutes les signatures). Valeurs connues reprises
+    /// de `reference/terminal/src/chain/contracts.ts` et `assets.ts` (bloc `mainnet`).
+    static let mainnetDraft = NetworkConfigDraft(
+        network: .mainnet,
+        passphrase: "Public Global Stellar Network ; September 2015",
+        rpc: URL(string: "https://rpc.lightsail.network")!,
+        horizon: URL(string: "https://horizon.stellar.org")!,
+        explorer: URL(string: "https://stellar.expert/explorer/public")!,
+        friendbot: nil,
+        // `make contract_deploy_factory network=mainnet`.
+        factory: nil,
+        // L'ancienne collection mainnet (`CCWQBP7U…7Y5Z`) est oubliée par la migration : la nouvelle vient du redéploiement.
+        collection: nil,
+        // `make contract_create_collection symbol=<campagne> network=mainnet` (l'ancien `chi1` est incompatible).
+        nfcNft: nil,
+        // `make contract_upload_account network=mainnet`.
+        accountWasmHash: nil,
+        // `make contract_deploy_router network=mainnet`.
+        router: nil,
+        // Admin mainnet actuel (ARCHITECTURE §2.4) ; seulement pour l'avertissement du mode admin, absent de la Release.
+        admin: "GAEUFBE244A4MFUCMGUPMHJ26MPHMDJSY4XX3UMKNVT4QTLSQHDPTN23",
+        // Serveur de frais de production (URL ChimpDAO) et son payeur de frais : à fournir par Pamphile.
+        feeSignerURL: nil,
+        feePayer: nil,
+        usdcIssuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        usdcFaucet: nil,
+        // Un ledger mainnet et son heure de fermeture, lus sur la chaîne.
+        ledgerAnchor: nil
+    )
+}
+
+/// Une configuration réseau en cours de remplissage : `nil` = pas encore connu. `complete()` refuse tant qu'une
+/// valeur manque, et dit lesquelles (comme `required` dans `chain/contracts.ts` du terminal).
+struct NetworkConfigDraft: Equatable, Sendable {
+    let network: StellarNetwork
+    let passphrase: String
+    let rpc: URL
+    let horizon: URL
+    let explorer: URL
+    let friendbot: URL?
+    let factory: String?
+    let collection: String?
+    let nfcNft: String?
+    let accountWasmHash: String?
+    let router: String?
+    let admin: String?
+    let feeSignerURL: URL?
+    let feePayer: String?
+    let usdcIssuer: String?
+    let usdcFaucet: URL?
+    let ledgerAnchor: LedgerAnchor?
+
+    /// Les valeurs qui manquent encore, par leur nom.
+    var missing: [String] {
+        let required: [(String, Any?)] = [
+            ("contracts.factory", factory), ("contracts.collection", collection), ("contracts.nfcNft", nfcNft),
+            ("contracts.accountWasmHash", accountWasmHash), ("contracts.router", router), ("contracts.admin", admin),
+            ("feeSignerURL", feeSignerURL), ("feePayer", feePayer), ("usdcIssuer", usdcIssuer), ("ledgerAnchor", ledgerAnchor),
+        ]
+        return required.compactMap { name, value in
+            if let text = value as? String { return text.isEmpty ? name : nil }
+            return value == nil ? name : nil
+        }
+    }
+
+    func complete() throws -> ChimpNetworkConfig {
+        guard missing.isEmpty, let factory, let collection, let nfcNft, let accountWasmHash, let router, let admin,
+              let feeSignerURL, let feePayer, let usdcIssuer, let ledgerAnchor else {
+            throw NetworkConfigError.incomplete(network: network, missing: missing)
+        }
+        return ChimpNetworkConfig(
+            network: network, passphrase: passphrase,
+            endpoints: .init(rpc: rpc, horizon: horizon, explorer: explorer, friendbot: friendbot),
+            contracts: .init(factory: factory, collection: collection, nfcNft: nfcNft, accountWasmHash: accountWasmHash, router: router, admin: admin),
+            feeSignerURL: feeSignerURL, feePayer: feePayer, usdcIssuer: usdcIssuer, usdcFaucet: usdcFaucet, ledgerAnchor: ledgerAnchor
+        )
+    }
+}
+
+enum NetworkConfigError: Error, Equatable, LocalizedError {
+    /// Des valeurs du réseau manquent : l'app ne démarre pas (écran « This build isn't ready »).
+    case incomplete(network: StellarNetwork, missing: [String])
+
+    var errorDescription: String? {
+        switch self {
+        case let .incomplete(network, missing):
+            "The \(network.rawValue) configuration is incomplete: \(missing.joined(separator: ", "))."
+        }
+    }
+}
+
 /// Oracles de prix Reflector (SEP-40), **toujours sur mainnet et en lecture seule**, quel que soit le réseau de l'app
 /// (décision du 2026-09-29, DESIGN_NOTES §12). Valeurs de `reference/terminal/src/chain/prices.ts`.
 struct PriceOracleConfig: Equatable, Sendable {

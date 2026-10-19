@@ -5,7 +5,7 @@ import Testing
 /// Écrans H atteignables : H1 (carte neuve chargée d'argent, depuis A2) et H2 (« Look who's back! », téléphone qui a
 /// déjà ouvert un compte fermé depuis).
 struct GiftCardAndNewPhoneTests {
-    private func makeModel(service: MockOnboardingService.Scenario, session: AppSession = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)) -> OnboardingModel {
+    private func makeModel(service: MockOnboardingService.Scenario, session: AppSession = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)) -> OnboardingModel {
         OnboardingModel(session: session, reader: MockChipReader(scenario: .infineon, delay: .zero),
                         service: MockOnboardingService(scenario: service, delay: .zero),
                         signer: MockChipSigner(delay: .zero), joinService: MockAddCardService(),
@@ -104,7 +104,7 @@ struct GiftCardAndNewPhoneTests {
             firstName: "Barth", tourSeen: true,
             account: SavedAccount(address: "CAAAA", cards: [SavedCard(publicKey: "04aa", chip: "infineon2Go", tokenID: 7, pocket: nil, name: "Banana", color: "banana")])
         ))
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         #expect(!makeModel(service: .fresh, session: session).isReturning)
         try session.disconnect()
         #expect(makeModel(service: .fresh, session: session).isReturning)

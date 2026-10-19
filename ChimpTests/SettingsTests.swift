@@ -11,7 +11,7 @@ struct SettingsTests {
 
     private func session(_ wallet: LocalWallet) -> (AppSession, InMemoryLocalWalletStore) {
         let store = InMemoryLocalWalletStore(wallet)
-        return (AppSession(store: store, network: .testnet), store)
+        return (AppSession(store: store, config: .testnet), store)
     }
 
     private var namedWallet: LocalWallet {
@@ -209,7 +209,7 @@ struct SettingsTests {
         let activity = InMemoryActivityStore()
         try activity.update(account) { $0.records = [ActivityRecord(id: "stellar:a", event: .transfer, hash: "a", from: account, to: "G", assetCode: "XLM", amount: 1, at: .now, isLocal: true)] }
         let store = InMemoryLocalWalletStore(wallet)
-        let session = AppSession(store: store, network: .testnet, activity: activity)
+        let session = AppSession(store: store, config: .testnet, activity: activity)
         let model = SettingsModel(session: session, walletCards: [])
         model.eraseEverything()
         #expect(model.saveError == nil)
@@ -228,7 +228,7 @@ struct SettingsTests {
         let activity = InMemoryActivityStore()
         try activity.update(account) { $0.records = [ActivityRecord(id: "stellar:a", event: .transfer, hash: "a", from: account, to: "G", assetCode: "XLM", amount: 1, at: .now, isLocal: true)] }
         let store = InMemoryLocalWalletStore(wallet)
-        let session = AppSession(store: store, network: .testnet, activity: activity)
+        let session = AppSession(store: store, config: .testnet, activity: activity)
         let model = SettingsModel(session: session, walletCards: [])
         model.eraseEverything()
         #expect(model.saveError != nil)
@@ -296,7 +296,7 @@ struct NetworkRowTests {
 
     @Test("Les tests tournent en Debug : la ligne des réglages suit le réseau de la session")
     func rowFollowsSession() {
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let model = SettingsModel(session: session, walletCards: [])
         #expect(SettingsModel.isDeveloperBuild)
         #expect(model.networkRow == SettingsModel.networkRow(current: .testnet, isDeveloperBuild: true))

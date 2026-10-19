@@ -63,7 +63,7 @@ struct CreateAccountConfirmView: View {
 
     private var steps: [Text] {
         var steps = [
-            Text("Your Main account is created on \(ChimpNetworkConfig.testnet.network.displayName). Network fees are paid by ChimpDAO."),
+            Text("Your Main account is created on \(model.network?.displayName ?? "Stellar"). Network fees are paid by ChimpDAO."),
             Text("\(model.displayCardName) becomes its first card."),
         ]
         switch model.pinMode {

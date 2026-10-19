@@ -10,6 +10,7 @@ import stellarsdk
 final class ChainSwapService: SwapService {
     let session: AppSession
     let config: ChimpNetworkConfig
+    var network: StellarNetwork { config.network }
     private let drawers: ChainSendService
     private let client: SorobanClient
     private let integrations: IntegrationCallClient
@@ -21,16 +22,15 @@ final class ChainSwapService: SwapService {
 
     init(
         session: AppSession,
-        config: ChimpNetworkConfig = .testnet,
         drawers: ChainSendService? = nil,
         signer: ChipSigner = NFCChipSigner(),
         feeSigner: FeeSigner? = nil,
         pricing: StablebondPricing? = nil
     ) {
         self.session = session
-        self.config = config
+        config = session.config
         self.pricing = pricing ?? EtherfusePriceClient.shared(for: config)
-        self.drawers = drawers ?? ChainSendService(session: session, config: config, signer: signer)
+        self.drawers = drawers ?? ChainSendService(session: session, signer: signer)
         client = SorobanClient(config: config)
         integrations = IntegrationCallClient(client: client, config: config)
         let reader = SimulationReader(client: client, source: config.feePayer)

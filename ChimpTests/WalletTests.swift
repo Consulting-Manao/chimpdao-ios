@@ -110,7 +110,7 @@ struct WalletTests {
         var wallet = LocalWallet()
         wallet.firstName = firstName
         wallet.account = SavedAccount(address: Self.account, cards: cards)
-        return AppSession(store: InMemoryLocalWalletStore(wallet), network: .testnet)
+        return AppSession(store: InMemoryLocalWalletStore(wallet), config: .testnet)
     }
 
     private static let savedCard = SavedCard(publicKey: cardKey.hex, chip: "infineon2Go", tokenID: 7, pocket: pocket, name: "Banana", color: "banana")
@@ -223,7 +223,7 @@ struct WalletTests {
             wallet.account = SavedAccount(address: Self.account, cards: [Self.savedCard])
             return wallet
         }())
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         let source = ChainWalletDataSource(session: session, chain: chain, oracle: FakeOracle(prices: [:]))
         _ = try await source.fetchWallet()
         #expect(session.wallet.hint(for: Self.cardKey) == Self.account)
@@ -234,7 +234,7 @@ struct WalletTests {
 
     @Test("Wallet : pas de compte sur le téléphone → erreur")
     @MainActor func noAccount() async {
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let source = ChainWalletDataSource(session: session, chain: FakeWalletChain(), oracle: FakeOracle(prices: [:]))
         await #expect(throws: ChainWalletDataSource.ReadError.self) { try await source.fetchWallet() }
     }
@@ -372,7 +372,7 @@ struct CetesWalletTests {
         var wallet = LocalWallet()
         wallet.account = SavedAccount(address: Self.account, cards: [])
         var source = ChainWalletDataSource(
-            session: AppSession(store: InMemoryLocalWalletStore(wallet), network: .testnet), chain: chain, oracle: oracle
+            session: AppSession(store: InMemoryLocalWalletStore(wallet), config: .testnet), chain: chain, oracle: oracle
         )
         source.stablebondPrices = StablebondWalletPrices(bonds: [Self.bond], pricing: pricing)
         return (try await source.fetchWallet(), oracle, pricing)

@@ -166,7 +166,7 @@ struct AddCardTests {
         ))
         let service = MockAddCardService(delay: .zero)
         let signer = MemberTapSigner(newCard: k1, member: r1)
-        let model = AddCardModel(entry: .wallet(account: account), session: AppSession(store: store, network: .testnet),
+        let model = AddCardModel(entry: .wallet(account: account), session: AppSession(store: store, config: .testnet),
                                  reader: MockChipReader(scenario: .infineonWithPIN, delay: .zero), signer: signer, service: service)
         await model.scanNewCard()
         model.cardName = "Leaf"
@@ -306,7 +306,7 @@ struct AddCardTests {
     @Test("Rejoindre : prénom, nom, PIN, une carte du compte (lecture), la nouvelle carte signe, la même carte du compte dit oui, A9")
     func joinHappyPath() async throws {
         let store = InMemoryLocalWalletStore(LocalWallet(tourSeen: true))
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         let service = MockAddCardService(delay: .zero)
         let signer = RecordingSigner()
         let newCard = ChipKeyInfo(kind: .infineon2Go, publicKey: k1, pinActive: false)
@@ -347,7 +347,7 @@ struct AddCardTests {
     @Test("Rejoindre : la nouvelle carte tapée en A8, ou une carte d'aucun compte : refus, on reste en A8")
     func joinWrongCards() async {
         let newCard = ChipKeyInfo(kind: .infineon2Go, publicKey: k1, pinActive: false)
-        let same = AddCardModel(entry: .join, session: AppSession(store: InMemoryLocalWalletStore(), network: .testnet),
+        let same = AddCardModel(entry: .join, session: AppSession(store: InMemoryLocalWalletStore(), config: .testnet),
                                 reader: MockChipReader(scenario: .infineon, delay: .zero), signer: RecordingSigner(),
                                 service: MockAddCardService(delay: .zero), newCard: newCard)
         await same.scanForAccount()
@@ -355,7 +355,7 @@ struct AddCardTests {
 
         let service = MockAddCardService(delay: .zero)
         service.memberAccount = nil
-        let stranger = AddCardModel(entry: .join, session: AppSession(store: InMemoryLocalWalletStore(), network: .testnet),
+        let stranger = AddCardModel(entry: .join, session: AppSession(store: InMemoryLocalWalletStore(), config: .testnet),
                                     reader: MockChipReader(scenario: .duox, delay: .zero), signer: RecordingSigner(),
                                     service: service, newCard: newCard)
         await stranger.scanForAccount()
@@ -366,7 +366,7 @@ struct AddCardTests {
     @Test("A3 : « Join » ouvre le parcours pour une carte neuve seulement, et seulement si le service existe")
     func joinFromA3() {
         let choice = CardChoice(kind: .fresh, card: ChipKeyInfo(kind: .infineon2Go, publicKey: k1, pinActive: false), tokenID: 913, pocket: nil, pocketIsEmpty: true)
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let withJoin = OnboardingModel(session: session, reader: MockChipReader(delay: .zero), service: MockOnboardingService(delay: .zero),
                                        signer: RecordingSigner(), joinService: MockAddCardService(delay: .zero), makeSetup: { _ in throw CancellationError() })
         withJoin.startJoin(with: choice)
@@ -393,7 +393,7 @@ struct AddCardTests {
                 SavedCard(publicKey: r1.hex, chip: "infineon2Go", tokenID: 7, pocket: "CPOCKET7", name: "Banana", color: "banana"),
             ])
         ))
-        return (AppSession(store: store, network: .testnet), store)
+        return (AppSession(store: store, config: .testnet), store)
     }
 
     /// Parcours Wallet arrêté sur G2, nouvelle carte Infineon avec PIN déjà défini.

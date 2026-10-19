@@ -160,7 +160,7 @@ final class SwapFlowModel {
         hasLoaded = true
         if let waiting = service.pendingSend {
             pending = waiting
-            guard let swap = SwapSummary(waiting, network: context?.network ?? .testnet) else {
+            guard let swap = SwapSummary(waiting, network: context?.network ?? service.network) else {
                 // Un envoi attend son issue : l'écran s'affiche (E3f), mais aucun swap ne se signe avant.
                 blockedByPendingPayment = true
                 await load()
@@ -715,7 +715,7 @@ final class SwapFlowModel {
         do {
             switch try await service.check(pending.trace) {
             case .sent(let hash):
-                let summary = summary ?? SwapSummary(pending, network: context?.network ?? .testnet)
+                let summary = summary ?? SwapSummary(pending, network: context?.network ?? service.network)
                 guard let summary else { return }
                 finish(with: .sent(SwapReceipt(
                     summary: summary, transactionHash: hash, sentAt: pending.signedAt,

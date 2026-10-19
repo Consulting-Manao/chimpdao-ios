@@ -50,7 +50,7 @@ struct ReconnectTests {
     @Test("Infineon avec PIN : PIN, second tap (VERIFY PIN), puis « Welcome back! » ; le compte n'est ouvert qu'à la fin")
     func infineonWithPIN() async throws {
         let store = InMemoryLocalWalletStore()
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         let signer = RecordingSigner()
         let model = await scannedMember(reader: .infineonWithPIN, session: session, signer: signer)
         #expect(model.path == [.reading, .reconnectPIN])
@@ -83,7 +83,7 @@ struct ReconnectTests {
     @Test("PIN faux : essais restants affichés, feuille fermée, rien d'ouvert ; carte bloquée : cadenas")
     func wrongAndLockedPIN() async throws {
         for (error, state) in [(ChipError.wrongPIN(retriesLeft: 2), ChimpPinState.wrong(triesLeft: 2)), (.pinLocked, .blocked)] {
-            let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+            let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
             let model = await scannedMember(reader: .infineonWithPIN, session: session, signer: RecordingSigner(error: error))
             let reconnect = try #require(model.reconnection)
             reconnect.pinCompleted("1234")
@@ -125,7 +125,7 @@ struct ReconnectTests {
         // Compte fermé dont le téléphone connaît le prénom, mais pas cette carte (ajoutée ailleurs).
         let closed = SavedAccount(address: MockOnboardingService.memberAccount, cards: [], firstName: "Léo")
         let store = InMemoryLocalWalletStore(LocalWallet(tourSeen: true, disconnectedAccounts: [closed]))
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         let model = await scannedMember(reader: .duox, session: session)
         let reconnect = try #require(model.reconnection)
         #expect(!reconnect.asksFirstName && reconnect.asksCard)
@@ -142,7 +142,7 @@ struct ReconnectTests {
             firstName: "Barth", tourSeen: true,
             account: SavedAccount(address: MockOnboardingService.memberAccount, cards: [named])
         ))
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         try session.disconnect()
         let model = await scannedMember(reader: .duox, session: session)
         #expect(model.reconnection?.needsWelcomeBack == false)
@@ -155,7 +155,7 @@ struct ReconnectTests {
 
     @Test("Écriture impossible : l'erreur s'affiche, le compte n'est pas ouvert")
     func saveFailure() async throws {
-        let session = AppSession(store: RefusingStore(), network: .testnet)
+        let session = AppSession(store: RefusingStore(), config: .testnet)
         let model = await scannedMember(reader: .duox, session: session)
         let reconnect = try #require(model.reconnection)
         reconnect.firstName = "Léo"
@@ -167,7 +167,7 @@ struct ReconnectTests {
 
     @Test("Retour depuis la reconnexion : A2, rien d'enregistré")
     func cancel() async {
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let model = await scannedMember(reader: .infineonWithPIN, session: session)
         model.cancelReconnection()
         #expect(model.path == [.reading])
@@ -180,7 +180,7 @@ struct ReconnectTests {
     private func scannedMember(reader: MockChipReader.Scenario, session: AppSession? = nil,
                                signer: ChipSigner? = nil) async -> OnboardingModel {
         let model = OnboardingModel(
-            session: session ?? AppSession(store: InMemoryLocalWalletStore(), network: .testnet),
+            session: session ?? AppSession(store: InMemoryLocalWalletStore(), config: .testnet),
             reader: MockChipReader(scenario: reader, delay: .zero),
             service: MockOnboardingService(scenario: .member, delay: .zero),
             signer: signer ?? MockChipSigner(delay: .zero),

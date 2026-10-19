@@ -102,7 +102,7 @@ struct DisplayCurrencyTests {
         let store = InMemoryPreferencesStore()
         let preferences = AppPreferences(store: store)
         #expect(preferences.currency == .usd)
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet, preferences: preferences)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet, preferences: preferences)
         let model = SettingsModel(session: session, walletCards: [])
         model.isChoosingCurrency = true
         model.choose(.gbp)
@@ -156,7 +156,7 @@ struct DisplayCurrencyTests {
         let account = "CDU45A6K2WTMLRDUEQ7SXGOUICJVRWSLZCYPLWB7W6FVQLD7LPNRVVFR"
         let session = AppSession(
             store: InMemoryLocalWalletStore(LocalWallet(account: SavedAccount(address: account, cards: []))),
-            network: .testnet, preferences: preferences
+            config: .testnet, preferences: preferences
         )
         let source = ChainWalletDataSource(session: session, chain: MainOnlyChain(), oracle: oracle)
         let snapshot = try await source.fetchWallet()

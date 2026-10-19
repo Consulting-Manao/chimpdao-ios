@@ -28,24 +28,25 @@ struct MainTabView: View {
     @State private var isShowingCatalog = false
     #endif
 
-    /// Le vrai Wallet : soldes lus sur le réseau de l'app (testnet), prix du XLM par l'oracle de mainnet.
-    init(session: AppSession, config: ChimpNetworkConfig = .testnet) {
+    /// Le vrai Wallet : soldes lus sur le réseau de la session (celui de ce build), prix du XLM par l’oracle de mainnet.
+    init(session: AppSession) {
+        let config = session.config
         self.session = session
         self.config = config
         let wallet = WalletViewModel(dataSource: ChainWalletDataSource(
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle(),
-            stablebondPrices: StablebondWalletPrices(config: config), config: config
+            stablebondPrices: StablebondWalletPrices(config: config)
         ))
         _walletModel = State(initialValue: wallet)
         _growModel = State(initialValue: GrowModel(
-            service: ChainVaultService(session: session, config: config),
-            savingsService: config.integrations == nil ? nil : ChainSavingsService(session: session, config: config),
-            lendingService: config.integrations == nil ? nil : ChainLendingService(session: session, config: config),
+            service: ChainVaultService(session: session),
+            savingsService: config.integrations == nil ? nil : ChainSavingsService(session: session),
+            lendingService: config.integrations == nil ? nil : ChainLendingService(session: session),
             priceOracle: ReflectorPriceOracle(), history: DefaultsPotHistoryStore()
         ))
-        // L'historique : téléphone + RPC de testnet ; les cartes lues par le Wallet complètent celles du téléphone.
+        // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
-            session: session, config: config, walletCards: { [weak wallet] in wallet?.cards ?? [] }
+            session: session, walletCards: { [weak wallet] in wallet?.cards ?? [] }
         )))
     }
 
@@ -117,7 +118,7 @@ struct MainTabView: View {
                             // F3 / F7 : mettre ou retirer (testnet), depuis ce tiroir. Un envoi en attente : F3c.
                             pendingFirst(onExit: closeFlow) {
                                 VaultFlowRoot(
-                                    service: ChainVaultService(session: session, config: config), action: action, drawerID: drawerID,
+                                    service: ChainVaultService(session: session), action: action, drawerID: drawerID,
                                     onSeePosition: showPositionFromWallet, onExit: closeFlow
                                 )
                             }
@@ -243,14 +244,14 @@ struct MainTabView: View {
         case .deposit(let drawerID):
             pendingFirst(onExit: closeGrowFlow) {
                 VaultFlowRoot(
-                    service: ChainVaultService(session: session, config: config), action: .deposit, drawerID: drawerID,
+                    service: ChainVaultService(session: session), action: .deposit, drawerID: drawerID,
                     onSeePosition: showPositionInGrow, onExit: closeGrowFlow
                 )
             }
         case .withdraw(let drawerID):
             pendingFirst(onExit: closeGrowFlow) {
                 VaultFlowRoot(
-                    service: ChainVaultService(session: session, config: config), action: .withdraw, drawerID: drawerID,
+                    service: ChainVaultService(session: session), action: .withdraw, drawerID: drawerID,
                     onSeePosition: showPositionInGrow, onExit: closeGrowFlow
                 )
             }
@@ -262,14 +263,14 @@ struct MainTabView: View {
         case .lendingDeposit(let drawerID):
             pendingFirst(onExit: closeGrowFlow) {
                 VaultFlowRoot(
-                    service: ChainLendingService(session: session, config: config), action: .deposit, drawerID: drawerID,
+                    service: ChainLendingService(session: session), action: .deposit, drawerID: drawerID,
                     onSeePosition: showLendingInGrow, onExit: closeGrowFlow
                 )
             }
         case .lendingWithdraw(let drawerID):
             pendingFirst(onExit: closeGrowFlow) {
                 VaultFlowRoot(
-                    service: ChainLendingService(session: session, config: config), action: .withdraw, drawerID: drawerID,
+                    service: ChainLendingService(session: session), action: .withdraw, drawerID: drawerID,
                     onSeePosition: showLendingInGrow, onExit: closeGrowFlow
                 )
             }
@@ -340,7 +341,7 @@ struct MainTabView: View {
     private func pendingFirst(onExit: @escaping () -> Void, @ViewBuilder content: () -> some View) -> some View {
         if hasPendingVault {
             VaultFlowRoot(
-                service: ChainVaultService(session: session, config: config), action: .deposit,
+                service: ChainVaultService(session: session), action: .deposit,
                 onSeePosition: showPositionInGrow, onExit: onExit
             )
         } else if hasPendingSwap {
@@ -650,7 +651,7 @@ private struct SettingsDestination: View {
     ) {
         let summaries = ChainAccountSummaryReader(wallet: ChainWalletDataSource(
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle(),
-            stablebondPrices: StablebondWalletPrices(config: config), config: config
+            stablebondPrices: StablebondWalletPrices(config: config)
         ))
         _model = State(initialValue: SettingsModel(
             session: session, walletCards: walletCards, walletTotal: walletTotal, summaries: summaries
@@ -675,5 +676,5 @@ private extension View {
 }
 
 #Preview {
-    MainTabView(session: AppSession(store: InMemoryLocalWalletStore(), network: .testnet))
+    MainTabView(session: AppSession(store: InMemoryLocalWalletStore(), config: .testnet))
 }

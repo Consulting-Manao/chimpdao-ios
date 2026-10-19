@@ -37,7 +37,7 @@ struct ChainWalletDataSource: WalletDataSource {
     var stablebondPrices: StablebondWalletPrices? = nil
     var now: () -> Date = { .now }
     /// Pour vérifier qu'une Pocket est bien celle de sa carte (F2).
-    var config: ChimpNetworkConfig = .testnet
+    var config: ChimpNetworkConfig { session.config }
 
     var firstName: String? { session.wallet.firstName }
 

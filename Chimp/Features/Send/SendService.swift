@@ -205,6 +205,8 @@ struct SendSummary: Equatable {
 
 /// Service d'envoi. `ChainSendService` (testnet, `Core/`) dans l'app, `MockSendService` dans le catalogue et les tests.
 protocol SendService {
+    /// Le réseau de l'envoi (celui de la session) : liens de paiement scannés, résumés. Jamais choisi par l'écran.
+    var config: ChimpNetworkConfig { get }
     /// Soldes, tiroirs et destinataires récents.
     func fetchContext() async throws -> SendContext
     /// Appels réseau à faire avant la session NFC (limite Apple de 60 s, règle 9) : rien n'est signé.
@@ -241,6 +243,8 @@ protocol SendService {
 /// (`sha256` d'un libellé, encodé en adresse Stellar) : elles n'appartiennent à personne.
 /// Les adresses des tiroirs sont celles de `MockReceiveDataSource`.
 final class MockSendService: SendService {
+    /// Le service factice vit sur le testnet (adresses et liens de la maquette).
+    let config = ChimpNetworkConfig.testnet
     enum DataScenario: String, CaseIterable, Identifiable {
         /// Maquette : Main + Jungle + Banana, trois destinataires récents.
         case standard

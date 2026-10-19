@@ -3,6 +3,8 @@ import Foundation
 /// Prêt XOXNO factice (catalogue, simulateur, tests) : les tiroirs de `MockSendService`, une position de 25 USDC dans Main
 /// (20 USDC mis le 10 oct.), et des scénarios pour chaque état de la phase 7.
 final class MockLendingService: VaultService {
+    /// Le service factice vit sur le testnet.
+    let network = StellarNetwork.testnet
     enum Scenario: String, CaseIterable, Identifiable {
         /// Une position dans Main, tout peut sortir.
         case normal

@@ -88,7 +88,7 @@ struct OnboardingFlowTests {
     @Test("signIn : compte et carte enregistrés, indice ajouté, compte ouvert")
     func sessionSignIn() throws {
         let store = InMemoryLocalWalletStore()
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         #expect(!session.hasAccount)
         try session.signIn(account: accountA, card: card, at: Date(timeIntervalSince1970: 5))
         #expect(session.hasAccount)
@@ -103,14 +103,14 @@ struct OnboardingFlowTests {
         named.name = "Jungle"
         named.color = "jungle"
         let store = InMemoryLocalWalletStore(LocalWallet(account: SavedAccount(address: accountA, cards: [named])))
-        let session = AppSession(store: store, network: .testnet)
+        let session = AppSession(store: store, config: .testnet)
         try session.signIn(account: accountA, card: card)
         #expect(store.wallet.account?.cards == [named])
     }
 
     @Test("Écriture impossible : l'erreur remonte et rien ne change en mémoire")
     func sessionSaveFailure() {
-        let session = AppSession(store: FailingStore(), network: .testnet)
+        let session = AppSession(store: FailingStore(), config: .testnet)
         #expect(throws: CocoaError.self) { try session.signIn(account: accountA, card: card) }
         #expect(!session.hasAccount)
     }
@@ -119,7 +119,7 @@ struct OnboardingFlowTests {
 
     @Test("Premier lancement : la visite ; ensuite (vue ou passée) : directement la lecture")
     func tourOnlyOnce() {
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let model = makeModel(session: session)
         model.start()
         #expect(model.path == [.tour])
@@ -158,7 +158,7 @@ struct OnboardingFlowTests {
 
     @Test("Carte déjà dans un compte (sans PIN) → « Welcome back! », puis compte ouvert sur le téléphone, sans rien signer")
     func routesMember() async throws {
-        let session = AppSession(store: InMemoryLocalWalletStore(), network: .testnet)
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let model = await scanned(.member, session: session)
         #expect(model.path == [.reading, .welcomeBack])
         #expect(!session.hasAccount)
@@ -196,7 +196,7 @@ struct OnboardingFlowTests {
         let key = MockChipReader.secp256k1Key.hex
         let store = InMemoryLocalWalletStore(LocalWallet(cardHints: [CardHint(key: key, account: accountB, at: .now)]))
         let service = RecordingService()
-        let model = OnboardingModel(session: AppSession(store: store, network: .testnet),
+        let model = OnboardingModel(session: AppSession(store: store, config: .testnet),
                                     reader: MockChipReader(scenario: .infineon, delay: .zero), service: service,
                                     signer: MockChipSigner(delay: .zero),
                                     makeSetup: { try AccountSetupModel(choice: $0, service: MockAccountSetupService(delay: .zero), creator: AccountCreator(chain: MockAccountCreationChain(delay: .zero)), signer: MockChipSigner(delay: .zero), session: nil) })
@@ -226,7 +226,7 @@ struct OnboardingFlowTests {
 
     private func scanned(_ service: MockOnboardingService.Scenario, reader: MockChipReader.Scenario = .infineon,
                          session: AppSession? = nil, signer: ChipSigner = MockChipSigner(delay: .zero)) async -> OnboardingModel {
-        let model = makeModel(session: session ?? AppSession(store: InMemoryLocalWalletStore(), network: .testnet),
+        let model = makeModel(session: session ?? AppSession(store: InMemoryLocalWalletStore(), config: .testnet),
                               reader: reader, service: service, signer: signer)
         model.path = [.reading]
         await model.scan()

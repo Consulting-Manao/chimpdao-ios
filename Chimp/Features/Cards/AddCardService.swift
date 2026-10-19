@@ -28,7 +28,7 @@ struct ChainAddCardService: AddCardService {
     let config: ChimpNetworkConfig
     let feeSigner: FeeSigner
 
-    init(config: ChimpNetworkConfig = .testnet, feeSigner: FeeSigner? = nil) {
+    init(config: ChimpNetworkConfig, feeSigner: FeeSigner? = nil) {
         self.config = config
         self.feeSigner = feeSigner ?? WorkerFeeSigner(url: config.feeSignerURL)
     }

@@ -3,6 +3,8 @@ import Foundation
 /// Vault factice (catalogue, simulateur, tests) : les tiroirs de `MockSendService`, une position dans Main (maquette F1 :
 /// 50 XLM mis le 22 sept., 50.12 XLM aujourd'hui), un prix de part fixe, et des scénarios pour chaque état.
 final class MockVaultService: VaultService {
+    /// Le service factice vit sur le testnet.
+    let network = StellarNetwork.testnet
     enum Scenario: String, CaseIterable, Identifiable {
         /// Une position dans Main.
         case normal

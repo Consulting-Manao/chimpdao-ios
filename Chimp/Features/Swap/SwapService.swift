@@ -221,6 +221,8 @@ enum SwapServiceError: Error, Equatable, LocalizedError {
 /// Service de swap. `ChainSwapService` (testnet, `Core/`) dans l'app, `MockSwapService` dans le catalogue et les tests.
 /// Mêmes étapes et mêmes garanties qu'Envoyer (`SendService`).
 protocol SwapService {
+    /// Le réseau du swap (celui de la session) : résumés d'une opération en attente.
+    var network: StellarNetwork { get }
     func fetchContext() async throws -> SwapContext
     /// Devis affiché (lecture seule, rien n'est signé). `SwapError.noRoute` s'il n'y a aucune route,
     /// `SwapServiceError.protocolUnavailable` si aucun protocole n'a répondu.

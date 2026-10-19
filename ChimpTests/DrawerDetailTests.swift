@@ -38,7 +38,7 @@ struct DrawerDetailTests {
             account: SavedAccount(address: account, cards: [
                 SavedCard(publicKey: k1, chip: "infineon2Go", tokenID: 7, pocket: "CPOCKET7", name: "Banana", color: "banana"),
             ])
-        )), network: .testnet)
+        )), config: .testnet)
         let wallet = WalletViewModel(dataSource: FixedWallet(snapshot: snapshot ?? self.snapshot()))
         await wallet.refresh()
         return DrawerDetailModel(selection: selection, wallet: wallet, session: session, clipboard: clipboard, copiedDuration: .zero)
