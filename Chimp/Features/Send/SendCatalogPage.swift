@@ -199,6 +199,7 @@ private extension MockSendService.ResultScenario {
         case .notConfirmedThenSent: "Not confirmed, then sent"
         case .rejectedThenNothingSent: "Not sent, wait, nothing sent"
         case .undetermined: "Can't tell"
+        case .withheld: "Held back, Try again"
         }
     }
 
@@ -208,6 +209,7 @@ private extension MockSendService.ResultScenario {
         case .notConfirmedThenSent: "Not confirmed yet; Check again finds it confirmed."
         case .rejectedThenNothingSent: "Refused after signing: a 15-second wait, then Nothing was sent."
         case .undetermined: "Stellar can't tell: Check again and Stellar Expert."
+        case .withheld: "The first send is held back: Not sent yet, then Try again sends the same signature (no new tap)."
         }
     }
 }

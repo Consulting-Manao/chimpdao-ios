@@ -736,6 +736,24 @@ final class SendFlowModel {
         return pending?.trace.transactionHash.flatMap(service.explorerURL(transactionHash:))
     }
 
+    /// Revue de sécurité F3, partie 2 (décision de Pamphile du 2026-10-19) : tant que l'autorisation signée n'a pas
+    /// expiré (« Not sent », `waiting`), « Try again » la renvoie **telle quelle** dans une nouvelle transaction, sans
+    /// nouvelle signature. Même nonce : quoi qu'il arrive à la première (retenue par un serveur, envoyée plus tard), une
+    /// seule des deux peut s'exécuter. Seulement si elle est encore en mémoire : après un redémarrage de l'app, on attend
+    /// son expiration (une nouvelle signature n'est demandée qu'après « Nothing was sent », expiration confirmée).
+    var canResend: Bool {
+        guard case .finished(.waiting) = signingStage else { return false }
+        return signed != nil
+    }
+
+    func resend() {
+        guard canResend, let signed else { return }
+        waitTask?.cancel()
+        technicalDetails = nil
+        failureReason = nil
+        Task { await send(signed) }
+    }
+
     /// « Try again » après « Nothing was sent » (certain) : retour à la vérification, avec le même brouillon.
     var canTryAgain: Bool {
         signingStage == .finished(.nothingSent) && draft != nil && !resumedPending

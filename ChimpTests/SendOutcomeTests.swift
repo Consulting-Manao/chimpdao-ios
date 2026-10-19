@@ -99,6 +99,56 @@ struct SendOutcomeTests {
         #expect(service.prepareCount == 2, "Nouvel envoi seulement une fois certain que rien n'est parti")
     }
 
+    /// Revue de sécurité F3, partie 2 (décision de Pamphile du 2026-10-19). L'attaque : le serveur de frais (ou le RPC)
+    /// garde l'autorisation signée et répond « échec » ; l'utilisateur tape « Try again ». Avant la correction, la seule
+    /// issue était une **nouvelle signature** (nouveau nonce) après l'attente : la première, gardée par l'attaquant, et la
+    /// seconde pouvaient alors s'exécuter toutes les deux si l'attente avait été mal jugée. Maintenant « Try again »
+    /// renvoie la même autorisation : un seul nonce, donc une seule exécution possible.
+    @Test("F3 : signature retenue puis « Try again » : la même autorisation est renvoyée, une seule exécution possible")
+    func withheldThenTryAgain() async throws {
+        let (model, service) = await reviewReady(.withheld)
+        service.authorizationWait = .seconds(30)
+        await signWithPIN(model)
+        await waitUntil { outcome(model) != nil }
+        guard case .waiting = outcome(model) else { Issue.record("expected waiting, got \(String(describing: outcome(model)))"); return }
+        #expect(!model.canTryAgain, "Pas de nouvelle signature tant que la première peut servir")
+        #expect(model.canResend)
+
+        model.resend()
+        await waitUntil { if case .sent = outcome(model) { true } else { false } }
+        guard case .sent = outcome(model) else { Issue.record("expected sent"); return }
+        #expect(service.signCount == 1, "Aucune nouvelle signature")
+        #expect(service.prepareCount == 1, "Aucune nouvelle préparation (même nonce, même expiration)")
+        #expect(service.submitted.count == 2)
+        let withheld = try #require(service.submitted.first)
+        #expect(service.submitted[1] == withheld, "Exactement la même autorisation signée")
+
+        // L'hôte n'accepte un nonce qu'une fois par adresse : l'attaquant soumet maintenant celle qu'il a gardée.
+        var used = Set<String>()
+        func execute(_ signed: SignedSend) throws -> Bool {
+            let trace = try service.trace(for: signed)
+            return used.insert("\(trace.from):\(trace.nonce)").inserted
+        }
+        #expect(try execute(service.submitted[1]), "Le renvoi s'exécute")
+        #expect(try !execute(withheld), "L'autorisation retenue ne peut plus s'exécuter")
+        #expect(service.pendingSend == nil)
+    }
+
+    @Test("F3 : après un redémarrage de l'app (signature plus en mémoire), on attend l'expiration, jamais de nouvelle signature")
+    func withheldAfterRestart() async {
+        let (first, service) = await reviewReady(.withheld)
+        service.authorizationWait = .seconds(30)
+        await signWithPIN(first)
+        await waitUntil { outcome(first) != nil }
+        #expect(service.pendingSend != nil)
+        let reopened = SendFlowModel(service: service, signingOrder: .pinThenTap)
+        await reopened.loadIfNeeded()
+        await waitUntil { if case .finished(.waiting) = reopened.signingStage { true } else { false } }
+        #expect(!reopened.canResend)
+        #expect(!reopened.canTryAgain)
+        #expect(service.signCount == 1)
+    }
+
     @Test("Impossible de trancher : « Can't tell yet », gardé sur le téléphone, jamais « Try again »")
     func undetermined() async {
         let (model, service) = await reviewReady(.undetermined)

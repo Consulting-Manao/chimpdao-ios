@@ -289,6 +289,9 @@ final class MockSendService: SendService {
         case rejectedThenNothingSent
         /// Le RPC ne peut pas trancher.
         case undetermined
+        /// Revue F3 : le premier envoi est retenu (le serveur de frais garde l'autorisation signée et dit « échec ») ;
+        /// l'autorisation reste valable (« Not sent », compte à rebours) ; un renvoi passe.
+        case withheld
 
         var id: String { rawValue }
     }
@@ -325,6 +328,8 @@ final class MockSendService: SendService {
     private(set) var readCount = 0
     private(set) var signCount = 0
     private(set) var submitCount = 0
+    /// Chaque autorisation signée envoyée, dans l'ordre (tests de la revue F3).
+    private(set) var submitted: [SignedSend] = []
     private(set) var checkCount = 0
     private(set) var refreshCount = 0
     /// PIN reçu par la dernière signature (tests uniquement : le vrai service ne le garde jamais).
@@ -435,6 +440,7 @@ final class MockSendService: SendService {
 
     func submit(_ signed: SignedSend, onProgress: @escaping (PaymentProgress) -> Void) async throws -> SendReceipt {
         submitCount += 1
+        submitted.append(signed)
         let draft = signed.prepared.draft
         for step: PaymentProgress in [.checking, .sending, .confirming] {
             onProgress(step)
@@ -449,6 +455,10 @@ final class MockSendService: SendService {
             throw PaymentFailure(trace: trace, underlying: StellarError.notConfirmed(hash: Self.fakeHash))
         case .rejectedThenNothingSent:
             throw PaymentFailure(trace: trace, underlying: StellarError.submitFailed("txBadAuth (mock)"))
+        case .withheld where submitCount == 1:
+            throw PaymentFailure(trace: trace, underlying: StellarError.submitFailed("fee server didn't answer (mock)"))
+        case .withheld:
+            return SendReceipt(summary: SendSummary(draft), transactionHash: Self.fakeHash, sentAt: .now, explorerURL: nil)
         }
     }
 
@@ -465,7 +475,7 @@ final class MockSendService: SendService {
             return checkCount == 1 ? .pending : .sent(hash: Self.fakeHash)
         case .undetermined:
             return .undetermined("mock: Stellar RPC no longer keeps these ledgers")
-        case .rejectedThenNothingSent:
+        case .rejectedThenNothingSent, .withheld:
             let end = waitingUntil ?? .now.addingTimeInterval(TimeInterval(authorizationWait.components.seconds))
             waitingUntil = end
             return end > .now ? .waiting(untilLedger: 121, estimatedEnd: end) : .nothingSent
