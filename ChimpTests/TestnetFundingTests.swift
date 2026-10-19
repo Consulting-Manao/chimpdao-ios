@@ -3,6 +3,9 @@ import stellarsdk
 import Testing
 @testable import ChimpDAO
 
+// Mode admin (CHIMP_ADMIN) : absent de la Release, donc du schéma « Chimp Release Tests ».
+#if CHIMP_ADMIN
+
 /// Étape 5B : argent de test (mode admin, testnet). Portage de `chain.fund` / `fundFromAdmin` (`chain/stellar.ts`) et du
 /// `FundBlock` (`Settings.tsx`). Vecteur XDR calculé avec `@stellar/stellar-sdk` 17.0.1.
 @MainActor
@@ -224,3 +227,4 @@ private final class FakeCardsChain: WalletChain {
     func pocket(of card: ChipPublicKey) async throws -> String? { pockets[card] }
     func tokenID(of card: ChipPublicKey) async throws -> UInt32 { 1 }
 }
+#endif

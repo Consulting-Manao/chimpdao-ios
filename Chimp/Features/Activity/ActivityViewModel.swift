@@ -683,7 +683,7 @@ final class ActivityViewModel {
 
     /// Qui a repris les jetons : l'émetteur connu de l'actif (« Etherfuse »), sinon « The issuer ».
     static func issuer(of record: ActivityRecord) -> String {
-        record.assetCode.flatMap(SendAsset.init(code:))?.issuerName ?? String(localized: "The issuer")
+        record.assetCode.flatMap({ SendAsset(code: $0) })?.issuerName ?? String(localized: "The issuer")
     }
 
     /// « Etherfuse took back 131.34 CETES ».
@@ -697,7 +697,7 @@ final class ActivityViewModel {
     /// 2026-10-01). Seulement pour un actif qu'on sait envoyer (XLM, USDC).
     static func prefill(for record: ActivityRecord, kind: ActivityKind) -> SendPrefill? {
         // CETES ne s'envoie pas (on le rend par un swap) : ni « Pay again » ni « Send back » pour lui.
-        let asset = record.assetCode.flatMap(SendAsset.init(code:)).flatMap { $0.isSendable ? $0 : nil }
+        let asset = record.assetCode.flatMap({ SendAsset(code: $0) }).flatMap { $0.isSendable ? $0 : nil }
         switch kind {
         case .sent:
             return SendPrefill(address: record.to, asset: asset, amount: asset == nil ? nil : record.amount, origin: .payAgain)
@@ -737,8 +737,8 @@ final class ActivityViewModel {
 
     /// « Swap again » : même tiroir, mêmes actifs, même montant (XLM et USDC seulement), au prix du moment.
     static func swapPrefill(for record: ActivityRecord) -> SwapPrefill? {
-        guard let given = record.assetCode.flatMap(SendAsset.init(code:)),
-              let received = record.receivedAssetCode.flatMap(SendAsset.init(code:)) else { return nil }
+        guard let given = record.assetCode.flatMap({ SendAsset(code: $0) }),
+              let received = record.receivedAssetCode.flatMap({ SendAsset(code: $0) }) else { return nil }
         return SwapPrefill(drawerAddress: record.from, given: given, received: received, amount: record.amount)
     }
 

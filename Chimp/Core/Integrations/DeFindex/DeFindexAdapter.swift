@@ -176,8 +176,8 @@ final class DeFindexAdapter: YieldAdapter {
 
     static func state(funds: SCValXDR, supply: SCValXDR, asset: String) throws -> VaultState {
         guard let rows = funds.vec, let row = rows.first(where: { field("asset", in: $0).flatMap { try? $0.address?.toStrKey() } == asset }),
-              let total = field("total_amount", in: row).flatMap(ContractArgument.int128),
-              let invested = field("invested_amount", in: row).flatMap(ContractArgument.int128) else {
+              let total = field("total_amount", in: row).flatMap({ ContractArgument.int128($0) }),
+              let invested = field("invested_amount", in: row).flatMap({ ContractArgument.int128($0) }) else {
             throw ContractArgument.ArgumentError.malformed("total managed funds are malformed")
         }
         return VaultState(totalManaged: total, invested: invested, totalSupply: try int128(supply, "total_supply"))

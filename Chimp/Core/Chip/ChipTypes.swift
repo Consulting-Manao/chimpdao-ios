@@ -31,7 +31,7 @@ enum ChipCurve: String, Equatable, Sendable {
 
 /// Clé publique d'une puce : 65 octets SEC1 non compressés (`04 ‖ X ‖ Y`), comme le bridge la renvoie
 /// (`pubBytesFromHex` dans `chain/env.ts` refuse toute autre longueur).
-struct ChipPublicKey: Equatable, Hashable, Sendable {
+nonisolated struct ChipPublicKey: Equatable, Hashable, Sendable {
     let bytes: Data
 
     init(_ bytes: Data) throws(ChipError) {

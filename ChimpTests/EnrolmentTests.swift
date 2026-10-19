@@ -3,6 +3,9 @@ import stellarsdk
 import Testing
 @testable import ChimpDAO
 
+// Mode admin (CHIMP_ADMIN) : absent de la Release, donc du schéma « Chimp Release Tests ».
+#if CHIMP_ADMIN
+
 // Code du mode admin : ces tests tournent avec l'action Test du schéma (configuration Debug, drapeau `CHIMP_ADMIN`).
 
 /// Étape B : attestation, encodages, signature de la puce, transaction `mint`, garde-fous.
@@ -255,3 +258,4 @@ struct EnrolmentTests {
         return try CardEnrolment.mintTransaction(source: source, plan: plan, auth: auth, maxTime: 1_800_000_000).encodedEnvelope()
     }
 }
+#endif

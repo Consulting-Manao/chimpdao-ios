@@ -294,12 +294,16 @@ struct NetworkRowTests {
         #expect(mainnet.options == [.mainnet] && mainnet.comingSoon.isEmpty)
     }
 
-    @Test("Les tests tournent en Debug : la ligne des réglages suit le réseau de la session")
+    @Test("La ligne des réglages suit le réseau de la session ; Debug et Testing montrent l'autre réseau, verrouillé")
     func rowFollowsSession() {
         let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
         let model = SettingsModel(session: session, walletCards: [])
+        #if DESIGN_CATALOG
         #expect(SettingsModel.isDeveloperBuild)
-        #expect(model.networkRow == SettingsModel.networkRow(current: .testnet, isDeveloperBuild: true))
+        #else
+        #expect(!SettingsModel.isDeveloperBuild, "Release (schéma « Chimp Release Tests ») : pas de build de développement")
+        #endif
+        #expect(model.networkRow == SettingsModel.networkRow(current: .testnet, isDeveloperBuild: SettingsModel.isDeveloperBuild))
         #expect(StellarNetwork.testnet.shortName == "Testnet" && StellarNetwork.mainnet.shortName == "Mainnet")
     }
 }

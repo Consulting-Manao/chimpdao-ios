@@ -243,7 +243,7 @@ final class RozoClient: RozoPaying {
             throw RozoError.malformed
         }
         return RozoOrder(
-            id: id, status: RozoOrder.Status(status), expiresAt: response.expiresAt.flatMap(date),
+            id: id, status: RozoOrder.Status(status), expiresAt: response.expiresAt.flatMap { Self.date($0) },
             sourceChainId: response.source.chainId ?? "", sourceToken: response.source.tokenAddress ?? "",
             sourceAmount: sourceAmount, depositAddress: response.source.receiverAddress ?? "",
             destinationChainId: response.destination.chainId ?? "", destinationAddress: response.destination.receiverAddress ?? "",

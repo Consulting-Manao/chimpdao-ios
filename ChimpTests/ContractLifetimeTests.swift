@@ -3,6 +3,9 @@ import stellarsdk
 import Testing
 @testable import ChimpDAO
 
+// Mode admin (CHIMP_ADMIN) : absent de la Release, donc du schéma « Chimp Release Tests ».
+#if CHIMP_ADMIN
+
 // Code du mode admin : ces tests tournent avec l'action Test du schéma (configuration Debug, drapeau `CHIMP_ADMIN`).
 
 /// Tranche 2, phase 4, étape 4 : prolongation de la durée de vie du vault (mode admin). Clés du ledger comparées à
@@ -31,3 +34,4 @@ struct ContractLifetimeTests {
         #expect(ContractLifetime.estimatedDate(of: 100, latest: 100, now: now) == now)
     }
 }
+#endif

@@ -2,7 +2,7 @@ import Foundation
 
 extension Data {
     /// Octets en hexadécimal minuscule, sans séparateur (format du bridge et du terminal).
-    var hexString: String {
+    nonisolated var hexString: String {
         map { String(format: "%02x", $0) }.joined()
     }
 

@@ -211,17 +211,17 @@ final class XoxnoAdapter {
         let malformed = ContractArgument.ArgumentError.malformed("XOXNO market data is malformed")
         guard let params = field("params", in: sync), let state = field("state", in: sync),
               field("asset_id", in: params)?.address.flatMap({ try? $0.toStrKey() }) == asset,
-              let decimals = field("asset_decimals", in: params).flatMap(u32Value), decimals <= 27,
-              let maxUtilization = field("max_utilization", in: params).flatMap(ContractArgument.int128),
-              let suppliedScaled = field("supplied", in: state).flatMap(ContractArgument.int128),
-              let supplyIndex = field("supply_index", in: state).flatMap(ContractArgument.int128),
-              let borrowedScaled = field("borrowed", in: state).flatMap(ContractArgument.int128),
-              let borrowIndex = field("borrow_index", in: state).flatMap(ContractArgument.int128),
-              let cash = field("cash", in: state).flatMap(ContractArgument.int128),
+              let decimals = field("asset_decimals", in: params).flatMap({ u32Value($0) }), decimals <= 27,
+              let maxUtilization = field("max_utilization", in: params).flatMap({ ContractArgument.int128($0) }),
+              let suppliedScaled = field("supplied", in: state).flatMap({ ContractArgument.int128($0) }),
+              let supplyIndex = field("supply_index", in: state).flatMap({ ContractArgument.int128($0) }),
+              let borrowedScaled = field("borrowed", in: state).flatMap({ ContractArgument.int128($0) }),
+              let borrowIndex = field("borrow_index", in: state).flatMap({ ContractArgument.int128($0) }),
+              let cash = field("cash", in: state).flatMap({ ContractArgument.int128($0) }),
               case .bool(let paused) = field("paused", in: spokeAsset) ?? .void,
               case .bool(let frozen) = field("frozen", in: spokeAsset) ?? .void,
-              let cap = field("supply_cap", in: spokeAsset).flatMap(ContractArgument.int128),
-              let spokeScaled = field("supplied_scaled_ray", in: spokeUsage).flatMap(ContractArgument.int128) else { throw malformed }
+              let cap = field("supply_cap", in: spokeAsset).flatMap({ ContractArgument.int128($0) }),
+              let spokeScaled = field("supplied_scaled_ray", in: spokeUsage).flatMap({ ContractArgument.int128($0) }) else { throw malformed }
         // Montants « RAY » (10^27 par jeton) × index (RAY) → unités de l'actif (10^décimales par jeton).
         var perUnit: Int128 = 1
         for _ in 0..<(27 - Int(decimals)) { perUnit *= 10 }

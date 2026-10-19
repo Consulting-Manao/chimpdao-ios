@@ -523,7 +523,7 @@ struct SorobanClient {
     private static func readable(_ value: SCValXDR) -> String {
         switch value {
         case .symbol(let text), .string(let text): return text
-        case .vec(let items): return "[" + (items ?? []).map(readable).joined(separator: ", ") + "]"
+        case .vec(let items): return "[" + (items ?? []).map { readable($0) }.joined(separator: ", ") + "]"
         case .u32(let number): return String(number)
         case .i32(let number): return String(number)
         case .error(let error): return "\(error)"

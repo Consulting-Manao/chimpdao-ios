@@ -21,7 +21,7 @@ struct PotView: View {
 
     private var pot: GrowPot? { model.pot(mark, drawerAddress: drawerAddress) }
     private var drawer: SendDrawer? { model.potDrawers.first { $0.address == drawerAddress } }
-    private var drawerName: String { drawer.map(GrowView.shortTitle) ?? String(localized: "Main") }
+    private var drawerName: String { drawer.map { GrowView.shortTitle($0) } ?? String(localized: "Main") }
     private var assetCode: String { pot?.asset.code ?? PotText.assetCode(mark) }
 
     /// La lecture du service de ce protocole.

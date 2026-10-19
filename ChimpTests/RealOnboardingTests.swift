@@ -263,6 +263,7 @@ struct RealOnboardingTests {
         #expect(model.unlockCode == nil)
     }
 
+    #if CHIMP_ADMIN
     @Test("La répétition ne crée rien : ni SET PIN, ni création, ni enregistrement")
     func rehearsalNeverCreates() async throws {
         let store = InMemoryLocalWalletStore()
@@ -277,6 +278,7 @@ struct RealOnboardingTests {
         #expect(chain.calls.isEmpty)
         #expect(store.saveCount == 0)
     }
+    #endif
 
     // MARK: Aides
 
@@ -286,12 +288,19 @@ struct RealOnboardingTests {
         chain: AccountCreationChain = FakeChain(),
         choice: CardChoice? = nil
     ) throws -> AccountSetupModel {
-        try AccountSetupModel(
-            choice: choice ?? CardChoice(kind: .fresh, card: ChipKeyInfo(kind: .infineon2Go, publicKey: k1Key, pinActive: false),
-                                         tokenID: 7, pocket: pocket, pocketIsEmpty: true),
-            service: MockAccountSetupService(delay: .zero), creator: AccountCreator(chain: chain),
+        let choice = choice ?? CardChoice(kind: .fresh, card: ChipKeyInfo(kind: .infineon2Go, publicKey: k1Key, pinActive: false),
+                                          tokenID: 7, pocket: pocket, pocketIsEmpty: true)
+        #if CHIMP_ADMIN
+        return try AccountSetupModel(
+            choice: choice, service: MockAccountSetupService(delay: .zero), creator: AccountCreator(chain: chain),
             signer: signer, session: session, rehearsal: MockAccountSetupService(delay: .zero)
         )
+        #else
+        return try AccountSetupModel(
+            choice: choice, service: MockAccountSetupService(delay: .zero), creator: AccountCreator(chain: chain),
+            signer: signer, session: session
+        )
+        #endif
     }
 
     /// Plan d'une carte Infineon, signature `set_owner` valable jusqu'au ledger 1000.

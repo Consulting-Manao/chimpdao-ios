@@ -5,9 +5,16 @@ import Testing
 /// Configuration par build (décision de Barth du 2026-10-19) : Debug et Testing → testnet, Release → mainnet ; passée
 /// partout depuis la session, sans valeur par défaut ; mainnet incomplet → l'app ne démarre pas, jamais de repli.
 struct NetworkConfigTests {
-    @Test("Les tests tournent en Debug : la configuration de ce build est celle du testnet")
+    @Test("La configuration de ce build : testnet en Debug et Testing ; mainnet en Release, refusé tant qu'il est incomplet")
     func thisBuild() throws {
+        #if CHIMP_TESTNET
         #expect(try ChimpNetworkConfig.forThisBuild() == .testnet)
+        #else
+        // Schéma « Chimp Release Tests » : la vraie Release. Jamais de repli sur le testnet.
+        #expect(throws: NetworkConfigError.incomplete(network: .mainnet, missing: ChimpNetworkConfig.mainnetDraft.missing)) {
+            try ChimpNetworkConfig.forThisBuild()
+        }
+        #endif
     }
 
     @Test("Mainnet : les contrats ChimpDAO, le serveur de frais et le repère de l'horloge manquent, et c'est dit")

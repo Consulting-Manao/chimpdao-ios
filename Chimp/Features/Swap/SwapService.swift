@@ -68,7 +68,7 @@ struct SwapQuoteSummary: Equatable {
 
     /// Au-delà de 5 % d'impact : avertissement fort (principe 5).
     var needsPriceImpactWarning: Bool {
-        priceImpactBasisPoints.map(Slippage.needsPriceImpactWarning) ?? false
+        priceImpactBasisPoints.map { Slippage.needsPriceImpactWarning($0) } ?? false
     }
 }
 

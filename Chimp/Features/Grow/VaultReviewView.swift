@@ -292,7 +292,7 @@ struct VaultReviewView: View {
                     what: whatIsSigned(draft),
                     pinStatus: pinStatus(for: step),
                     isScanning: model.isSigningLocked,
-                    problem: model.tapProblem.map(SendReviewView.message(for:)),
+                    problem: model.tapProblem.map { SendReviewView.message(for: $0) },
                     problemDetails: model.tapProblem == nil ? nil : model.technicalDetails,
                     onScan: model.scanCard,
                     onCancel: model.isSigningLocked ? nil : { model.cancelSigning() }

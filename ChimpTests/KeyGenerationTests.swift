@@ -2,6 +2,9 @@ import Foundation
 import Testing
 @testable import ChimpDAO
 
+// Mode admin (CHIMP_ADMIN) : absent de la Release, donc du schéma « Chimp Release Tests ».
+#if CHIMP_ADMIN
+
 // Code du mode admin : ces tests tournent avec l'action Test du schéma (configuration Debug, drapeau `CHIMP_ADMIN`).
 
 /// Génération de la clé n°1 d'une Infineon vierge (mode admin, exception à la règle 6 : slot 1 vide seulement).
@@ -191,3 +194,4 @@ private final class NotInfineon: APDUTransport {
         return status(0x6A82)
     }
 }
+#endif

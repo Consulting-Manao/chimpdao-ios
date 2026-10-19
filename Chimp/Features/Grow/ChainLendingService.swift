@@ -97,7 +97,7 @@ final class ChainLendingService: VaultService {
             case .needsRenewal: .needsRenewal
             case .live(_, _, let hasDebt): hasDebt ? .hasDebt : .movable
             }
-            let value = position.value.map(SwapUnits.amount(fromUnits:)) ?? 0
+            let value = position.value.map { SwapUnits.amount(fromUnits: $0) } ?? 0
             return VaultHolding(
                 drawerID: drawer.id, drawerAddress: drawer.address, shares: value, value: value,
                 basis: VaultBasis.from(records: records, drawer: drawer.address, vault: pool), readAt: .now, condition: condition

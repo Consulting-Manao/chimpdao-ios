@@ -17,7 +17,7 @@ struct VaultAmountView: View {
     private var isDeposit: Bool { model.action == .deposit }
     private var asset: SendAsset { model.asset }
     private var mark: ChimpPotProtocol { model.isLending ? .xoxno : .defindex }
-    private var drawerName: String { model.selectedDrawer.map(GrowView.shortTitle) ?? String(localized: "Main") }
+    private var drawerName: String { model.selectedDrawer.map { GrowView.shortTitle($0) } ?? String(localized: "Main") }
 
     var body: some View {
         VStack(spacing: 0) {
