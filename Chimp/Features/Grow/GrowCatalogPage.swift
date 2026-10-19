@@ -146,7 +146,7 @@ struct VaultDemoLaunch: ViewModifier {
                 let lendingParts = (lending ?? "noPosition").split(separator: ":").map(String.init)
                 let lendingScenario = MockLendingService.Scenario(rawValue: lendingParts.first ?? "noPosition") ?? .noPosition
                 GrowDemoRoot(
-                    service: GrowCatalogPage.service(scenario), savings: savings, lending: lendingScenario,
+                    service: GrowCatalogPage.service(scenario, result: SendMockSettings.resultScenario), savings: savings, lending: lendingScenario,
                     start: Self.start(lending == nil ? parts.dropFirst().first : lendingParts.dropFirst().first)
                 ) {
                     argument = nil
