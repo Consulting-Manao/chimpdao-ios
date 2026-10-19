@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// F4 et F7r · « Here's what happens » (maquettes du 2026-10-15) : ce qui part, le vault, les protocoles, les frais
-/// « On us », qui peut signer, l'avertissement. Retirer : le minimum reçu exact, mis en avant (c'est ce que la carte
-/// signe), comme le swap. Les parts ne s'affichent que sur les reçus (décision de Barth du 2026-10-15).
+/// G3r · « Check it over » (maquette « Chimp Grow Final », 2026-10-18) : le ticket (trajet, montant, ce qui reste ou ce
+/// qui revient, frais), qui peut signer dit par Chimpy, « Tap your card ». Retirer : le minimum exact (c'est ce que la
+/// carte signe), ou « Expected back » pour le prêt. Ni risques ni protocoles sous-jacents (décision de Barth du 2026-10-18).
 /// Puis les feuilles PIN et tap d'Envoyer (F4k, F4t, F7k, F7t). Par-dessus : « le montant a bougé » (comme E4p).
 struct VaultReviewView: View {
     @Bindable var model: VaultFlowModel
@@ -34,39 +34,32 @@ struct VaultReviewView: View {
         .chimpSound(.error, trigger: model.preparationIssue) { _, new in new != nil }
     }
 
+    private var mark: ChimpPotProtocol { model.isLending ? .xoxno : .defindex }
+
     private var review: some View {
         VStack(spacing: 0) {
             ChimpHeader(
-                title: "Here's what happens",
-                subtitle: model.draft.map { draft in
-                    draft.action == .deposit
-                        ? "Put money in · from \(GrowView.shortTitle(draft.drawer))"
-                        : "Take money out · back to \(GrowView.shortTitle(draft.drawer))"
-                },
+                title: "Check it over", step: 2, steps: 2,
                 onBack: model.isSigningLocked ? nil : { model.isReviewPresented = false }
             )
             if let draft = model.draft {
                 ScrollView {
                     content(draft)
-                        .padding(.horizontal, ChimpSpacing.xxl)
-                        .padding(.vertical, ChimpSpacing.lg)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 22)
+                        .padding(.bottom, ChimpSpacing.l)
                 }
+                .scrollBounceBehavior(.basedOnSize)
             }
         }
         .background(Color(.chimpBackground))
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: ChimpSpacing.sm) {
-                Text("Vaults can earn little or nothing. Not guaranteed.")
-                    .chimpFont(.caption)
-                    .foregroundStyle(.chimpTextSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                ChimpButton("Looks good", isLoading: model.stage == .preparing) { model.confirmReview() }
-                    .disabled(model.stage != .idle && model.stage != .preparing)
-            }
-            .padding(.horizontal, ChimpSpacing.bottomBar.leading)
-            .padding(.top, ChimpSpacing.sm)
-            .padding(.bottom, screenInsets.hasHomeIndicator ? ChimpSpacing.bottomBar.bottom : ChimpSpacing.xl)
-            .background(Color(.chimpBackground))
+            ChimpButton("Tap your card", isLoading: model.stage == .preparing) { model.confirmReview() }
+                .disabled(model.stage != .idle && model.stage != .preparing)
+                .padding(.horizontal, 22)
+                .padding(.top, 12)
+                .padding(.bottom, screenInsets.hasHomeIndicator ? ChimpSpacing.bottomBar.bottom : ChimpSpacing.xl)
+                .background(Color(.chimpBackground))
         }
         .blocksSwipeBack(model.isSigningLocked)
         .chimpSheet(
@@ -81,21 +74,68 @@ struct VaultReviewView: View {
         }
     }
 
-    // MARK: Vérification
+    // MARK: G3r · le ticket
 
+    /// Ce que la carte va signer, dit avant la session NFC : le trajet, le montant, ce qui reste ou ce qui revient, le
+    /// minimum signé (vault) ou ce qui devrait revenir (prêt), les frais.
     private func content(_ draft: VaultDraft) -> some View {
-        VStack(alignment: .leading, spacing: ChimpSpacing.m) {
-            amounts(draft)
-            if draft.action == .withdraw, let minimum = draft.quote.minimum {
-                minimumCard(minimum, asset: draft.vault.asset, lending: draft.vault.kind == .lending)
+        let asset = draft.vault.asset
+        let isDeposit = draft.action == .deposit
+        let drawerName = GrowView.shortTitle(draft.drawer)
+        return VStack(alignment: .leading, spacing: 0) {
+            ChimpPaperReceipt(padding: EdgeInsets(top: 26, leading: 20, bottom: 18, trailing: 20)) {
+                VStack(spacing: 0) {
+                    route(draft)
+                    ChimpReceiptRule().padding(.vertical, 18)
+                    Text(isDeposit ? "You plant" : "You take out")
+                        .textCase(.uppercase)
+                        .chimpFont(.label)
+                        .foregroundStyle(Color(.chimpTicketMuted))
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if !isDeposit, draft.vault.kind != .lending || draft.quote.all {
+                            Text("about").chimpFont(.rowTitle).foregroundStyle(Color(.chimpTicketMuted))
+                        }
+                        Text(verbatim: isDeposit ? asset.formatted(draft.amount, locale: locale) : asset.displayed(draft.quote.expected ?? draft.amount, locale: locale))
+                            .chimpFont(.plantAmount)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.4)
+                        Text(verbatim: asset.code).chimpFont(.plantUnit).foregroundStyle(Color(.chimpTicketMuted))
+                    }
+                    .padding(.top, 4)
+                    ChimpReceiptRule().padding(.vertical, 18)
+                    VStack(spacing: 0) {
+                        if isDeposit {
+                            ChimpReceiptRow(
+                                label: "\(drawerName) after",
+                                value: asset.displayedWithCode(max(0, draft.drawer.balance(of: asset) - draft.amount), locale: locale)
+                            )
+                            ChimpReceiptRow(label: "Grows", value: String(localized: "\(asset.code), in \(mark.name)"))
+                        } else {
+                            ChimpReceiptRow(label: "Lands in", value: drawerName)
+                            if let minimum = draft.quote.minimum {
+                                ChimpReceiptRow(
+                                    label: Self.minimumLabel(lending: draft.vault.kind == .lending),
+                                    value: draft.vault.kind == .lending
+                                        ? asset.displayedWithCode(minimum, locale: locale)
+                                        : SwapReviewView.exact(minimum, locale: locale) + " " + asset.code
+                                )
+                            }
+                        }
+                        ChimpReceiptRow(label: "Fees", value: asset.formattedWithCode(0, locale: locale), tone: .positive)
+                    }
+                    if !isDeposit, draft.quote.minimum != nil {
+                        Text(Self.minimumNote(lending: draft.vault.kind == .lending))
+                            .chimpFont(.caption)
+                            .foregroundStyle(Color(.chimpTicketMuted))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 6)
+                    }
+                }
+                .accessibilityElement(children: .combine)
             }
-            details(draft)
-            signerBanner(draft)
-            if draft.vault.kind == .lending {
-                LendingRiskNotice(asset: draft.vault.asset.code)
-            } else {
-                ChimpVaultNotice(asset: draft.vault.asset.code, protocols: draft.vault.protocols)
-            }
+            ChimpySays(text: "\(Self.chimpyLine(draft))", pose: .plant)
+                .padding(.top, 18)
             if let issue = model.preparationIssue {
                 VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
                     ChimpFieldMessage(text: Self.message(for: issue, draft: draft, locale: locale), kind: .error)
@@ -106,120 +146,103 @@ struct VaultReviewView: View {
                     }
                     if let details = model.technicalDetails { ChimpTechnicalDetails(details: details) }
                 }
+                .padding(.top, ChimpSpacing.m)
             }
         }
     }
 
-    /// Mettre : « You put in 50 XLM » (exact). Retirer : « You get about 50.12 XLM ».
-    private func amounts(_ draft: VaultDraft) -> some View {
-        let asset = draft.vault.asset
-        return VStack(spacing: 0) {
-            if draft.action == .deposit {
-                row(label: "You put in") { Text(verbatim: asset.formattedWithCode(draft.amount, locale: locale)) }
-            } else {
-                row(label: "You get") {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        // Prêt : un montant exact (pas de parts), sauf « tout », qui comprend les intérêts du moment.
-                        if draft.vault.kind != .lending || draft.quote.all {
-                            Text("about").chimpFont(.rowTitle).foregroundStyle(.chimpTextSecondary)
-                        }
-                        Text(verbatim: asset.displayedWithCode(draft.quote.expected ?? draft.amount, locale: locale))
+    /// Le trajet : le tiroir → le protocole (mettre), le protocole → le tiroir (retirer), une graine verte au milieu.
+    private func route(_ draft: VaultDraft) -> some View {
+        let isDeposit = draft.action == .deposit
+        let drawerTile = drawerTile(draft.drawer).rotationEffect(.degrees(4))
+        let protocolTile = ChimpProtocolLogo(mark: mark, size: 66)
+            .background { RoundedRectangle(cornerRadius: 15).fill(Color(.chimpTicketInk)).offset(x: 3, y: 4) }
+            .rotationEffect(.degrees(-6))
+        let drawerLabel = GrowView.shortTitle(draft.drawer).uppercased()
+        let protocolLabel = mark.name.uppercased()
+        return VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                if isDeposit { AnyView(drawerTile) } else { AnyView(protocolTile) }
+                RouteLine().frame(height: 28)
+                if isDeposit { AnyView(protocolTile) } else { AnyView(drawerTile) }
+            }
+            HStack {
+                Text(verbatim: isDeposit ? drawerLabel : protocolLabel)
+                Spacer()
+                Text(verbatim: isDeposit ? protocolLabel : drawerLabel)
+            }
+            .chimpFont(.curveLabel)
+            .foregroundStyle(Color(.chimpTicketMuted))
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(isDeposit ? "From \(drawerLabel) to \(mark.name)" : "From \(mark.name) to \(drawerLabel)"))
+    }
+
+    /// La tuile du tiroir : le logo sur jaune (Main) ou sur la couleur de la carte.
+    private func drawerTile(_ drawer: SendDrawer) -> some View {
+        let fill: Color = if case .card(_, let color) = drawer.kind { color.fill } else { Color(.chimpAccent) }
+        return Image(.tileLogo)
+            .resizable()
+            .scaledToFit()
+            .padding(4)
+            .frame(width: 66, height: 66)
+            .background(RoundedRectangle(cornerRadius: 15).fill(fill))
+            .overlay { RoundedRectangle(cornerRadius: 15).strokeBorder(Color(.chimpTicketInk), lineWidth: ChimpBorder.regular) }
+            .background { RoundedRectangle(cornerRadius: 15).fill(Color(.chimpTicketInk)).offset(x: 3, y: 4) }
+    }
+
+    /// Ligne pointillée, flèche au bout, graine verte au milieu.
+    private struct RouteLine: View {
+        var body: some View {
+            GeometryReader { proxy in
+                let midY = proxy.size.height / 2
+                ZStack {
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: midY))
+                        path.addLine(to: CGPoint(x: proxy.size.width - 8, y: midY))
                     }
+                    .stroke(Color(.chimpTicketInk), style: StrokeStyle(lineWidth: 3, dash: [6, 4]))
+                    Path { path in
+                        path.move(to: CGPoint(x: proxy.size.width + 4, y: midY))
+                        path.addLine(to: CGPoint(x: proxy.size.width - 9, y: midY - 9))
+                        path.addLine(to: CGPoint(x: proxy.size.width - 9, y: midY + 9))
+                        path.closeSubpath()
+                    }
+                    .fill(Color(.chimpTicketInk))
+                    Circle()
+                        .fill(Color(.chimpCardLeaf))
+                        .overlay { Circle().strokeBorder(Color(.chimpTicketInk), lineWidth: ChimpBorder.regular) }
+                        .frame(width: 22, height: 22)
+                        .position(x: proxy.size.width / 2, y: midY)
                 }
             }
         }
-        .padding(.vertical, 9)
-        .padding(.horizontal, ChimpSpacing.l)
-        .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.panel), fill: Color(.chimpSurface), shadow: .card)
     }
 
-    private func row(label: LocalizedStringKey, @ViewBuilder value: () -> some View) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: ChimpSpacing.m) {
-            Text(label).chimpFont(.bodyS).fontWeight(.heavy).foregroundStyle(.chimpTextSecondary)
-            Spacer(minLength: ChimpSpacing.s)
-            value()
-                .chimpFont(.displayM)
-                .foregroundStyle(.chimpTextPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
+    /// La ligne de Chimpy sous le ticket : qui peut signer (Main : n'importe quelle carte ; une carte : elle seule).
+    static func chimpyLine(_ draft: VaultDraft) -> String {
+        let isDeposit = draft.action == .deposit
+        switch draft.drawer.kind {
+        case .main:
+            return isDeposit
+                ? String(localized: "Tap any of your cards, then your PIN. And we plant!")
+                : String(localized: "Tap any of your cards, then your PIN. And it comes home!")
+        case .card(let name, _):
+            return isDeposit
+                ? String(localized: "Only your \(name) card can sign: it's in its own wallet. Tap it, and we plant!")
+                : String(localized: "Only your \(name) card can sign: it's in its own wallet. Tap it, and it comes home!")
         }
-        .padding(.vertical, 3)
-        .accessibilityElement(children: .combine)
     }
 
-    /// Retirer : le minimum reçu, exact (7 décimales) : c'est ce que la carte signe.
-    private func minimumCard(_ minimum: Decimal, asset: SendAsset, lending: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
-            Text(Self.minimumLabel(lending: lending)).textCase(.uppercase).chimpFont(.label)
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(verbatim: SwapReviewView.exact(minimum, locale: locale))
-                    .chimpFont(.monoAmount)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                Text(verbatim: asset.code).chimpFont(.monoValue)
-            }
-            Text(Self.minimumNote(lending: lending))
-                .chimpFont(.caption)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .foregroundStyle(Color(.chimpOnAccent))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 13)
-        .padding(.horizontal, ChimpSpacing.l)
-        .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.chimpCard), fill: Color(.chimpAccent), shadow: .card)
-        .accessibilityElement(children: .combine)
-    }
-
-    /// Le titre de la carte du retrait : le minimum signé (vault), ce qui devrait revenir (prêt). Revue de sécurité F5 :
+    /// Le titre de la ligne du retrait : le minimum signé (vault), ce qui devrait revenir (prêt). Revue de sécurité F5 :
     /// le contrat XOXNO ne garantit aucun minimum (un retrait est ramené à la position, qui peut baisser si un emprunteur
     /// ne rembourse pas) ; l'écran ne le présente donc pas comme garanti.
     static func minimumLabel(lending: Bool) -> LocalizedStringKey {
-        lending ? "Expected back" : "Minimum received"
+        lending ? "Expected back" : "At least"
     }
 
     static func minimumNote(lending: Bool) -> LocalizedStringKey {
         lending ? "The contract doesn't guarantee a minimum. If XOXNO can't pay it right now, nothing moves." : "This is what your card signs. If the vault would pay less, nothing moves."
-    }
-
-    /// Vault, protocoles, (retirer : où ça revient), frais.
-    private func details(_ draft: VaultDraft) -> some View {
-        VStack(spacing: 0) {
-            if draft.vault.kind == .lending {
-                detail("Market", Text(verbatim: draft.vault.name))
-            } else {
-                detail("Vault", Text(verbatim: "\(draft.vault.name) vault"))
-            }
-            detail("Protocols", Text(verbatim: draft.vault.protocolChain))
-            if draft.action == .withdraw {
-                detail("Lands in", Text(verbatim: GrowView.shortTitle(draft.drawer)))
-            }
-            detail("Fees", Text("On us").foregroundStyle(Color(.chimpPositive)))
-        }
-        .padding(.vertical, 2)
-        .padding(.horizontal, 15)
-        .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.control), fill: Color(.chimpSurface))
-    }
-
-    private func detail(_ label: LocalizedStringKey, _ value: Text) -> some View {
-        HStack(spacing: ChimpSpacing.m) {
-            Text(label).foregroundStyle(.chimpTextSecondary)
-            Spacer(minLength: ChimpSpacing.s)
-            value.fontWeight(.bold).foregroundStyle(.chimpTextPrimary).lineLimit(1).minimumScaleFactor(0.7)
-        }
-        .chimpFont(.mono)
-        .padding(.vertical, 8)
-        .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private func signerBanner(_ draft: VaultDraft) -> some View {
-        let what: LocalizedStringKey = draft.action == .deposit ? "The \(draft.vault.asset.code)" : "The position"
-        switch draft.drawer.kind {
-        case let .card(name, color):
-            ChimpNoticeBanner(text: "Only your \(name) card can sign. \(Text(what)) is in its own wallet.", marker: .card(color))
-        case .main:
-            ChimpNoticeBanner(text: "Any of your cards can sign. \(Text(what)) is in Main.", marker: .card(.banana))
-        }
     }
 
     static func message(for issue: VaultFlowModel.PreparationIssue, draft: VaultDraft, locale: Locale) -> LocalizedStringKey {
@@ -230,7 +253,7 @@ struct VaultReviewView: View {
         case .notEnoughLiquidity where draft.vault.kind == .lending:
             return "XOXNO can't pay that much back right now: it's lent out. Nothing was signed."
         case .notEnoughLiquidity:
-            return "The vault can give back \(asset.displayedWithCode(draft.vault.availableNow, locale: locale)) right now. The rest is lent on Blend and comes back as borrowers repay."
+            return "The vault can give back \(asset.displayedWithCode(draft.vault.availableNow, locale: locale)) right now. The rest comes back as borrowers repay."
         case .vaultUnavailable where draft.vault.kind == .lending:
             return "XOXNO is paused or unavailable right now. Nothing moved. Try again later."
         case .vaultUnavailable: return "The vault is unavailable right now. Nothing moved. Try again in a minute."

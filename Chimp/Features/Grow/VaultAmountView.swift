@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// F3 · « Put money in » et F7 · « Take money out » (maquettes du 2026-10-15) : tiroir (« FROM Main ▾ », ou « BACK TO
-/// Main » fixe pour un retrait : l'argent revient au tiroir qui détient la position), montant, solde avant → après,
-/// « Max » ou « All », l'avertissement du vault, pavé, « Check it over ».
-/// États : pas assez (F3a ; retrait : plus que la position, avec « All »), vault indisponible (F3b), une autre opération
-/// attend son issue (F3c). Les parts ne s'affichent que sur les reçus (décision de Barth du 2026-10-15).
+/// G3 · « How much to plant? » et G5 · « How much to take out? » (maquette « Chimp Grow Final », 2026-10-18) : le tiroir
+/// (« FROM Main ▾ », ou « TO Main » fixe pour un retrait : l'argent revient au tiroir qui détient la position) avec son
+/// solde avant → après, le montant au centre, la pastille du protocole, les raccourcis (10 · 50 · 100 · Max ; retrait :
+/// 10 · 50 · All, ou Max quand tout ne peut pas sortir), une note si tout ne peut pas sortir, le pavé, « Check it over ».
+/// États gardés : pas assez, plus que la position, protocole indisponible, une autre opération attend son issue.
+/// Ni risques ni protocoles sous-jacents (décision de Barth du 2026-10-18).
 struct VaultAmountView: View {
     @Bindable var model: VaultFlowModel
     let onBack: () -> Void
@@ -15,18 +16,12 @@ struct VaultAmountView: View {
 
     private var isDeposit: Bool { model.action == .deposit }
     private var asset: SendAsset { model.asset }
-    private var vaultName: String { model.context?.vault.name ?? "DeFindex XLM" }
+    private var mark: ChimpPotProtocol { model.isLending ? .xoxno : .defindex }
     private var drawerName: String { model.selectedDrawer.map(GrowView.shortTitle) ?? String(localized: "Main") }
 
     var body: some View {
         VStack(spacing: 0) {
-            ChimpHeader(
-                title: isDeposit ? "Put money in" : "Take money out",
-                subtitle: model.isLending
-                    ? (isDeposit ? "\(vaultName)" : "\(vaultName) · in \(drawerName)")
-                    : (isDeposit ? "\(vaultName) vault" : "\(vaultName) vault · in \(drawerName)"),
-                onBack: onBack
-            )
+            ChimpHeader(title: isDeposit ? "How much to plant?" : "How much to take out?", step: 1, steps: 2, onBack: onBack)
             content
         }
         .background(Color(.chimpBackground))
@@ -44,41 +39,35 @@ struct VaultAmountView: View {
         GeometryReader { proxy in
             let isSmallScreen = proxy.size.height < ChimpSize.compactAmountScreenHeight
             VStack(spacing: 0) {
+                drawerBar
+                    .padding(.horizontal, 22)
+                    .padding(.top, 16)
                 ScrollView {
-                    VStack(spacing: ChimpSpacing.sm) {
-                        drawerBar
-                        amountCard
+                    VStack(spacing: 0) {
+                        amountBlock
+                        quickPicks.padding(.top, 16)
                         notice
-                        if let vault = model.context?.vault {
-                            if vault.kind == .lending {
-                                LendingRiskNotice(asset: vault.asset.code).padding(.top, ChimpSpacing.xs)
-                            } else {
-                                ChimpVaultNotice(asset: vault.asset.code, protocols: vault.protocols)
-                                    .padding(.top, ChimpSpacing.xs)
-                            }
-                        }
+                            .padding(.top, 14)
+                            .padding(.horizontal, 22)
                     }
-                    .padding(.horizontal, ChimpSpacing.xxl)
-                    .padding(.top, ChimpSpacing.ml)
-                    .padding(.bottom, ChimpSpacing.s)
+                    .frame(maxWidth: .infinity, minHeight: max(0, proxy.size.height - (isSmallScreen ? 260 : 330)))
                     .redacted(reason: model.loadPhase == .loading ? .placeholder : [])
                 }
                 .scrollBounceBehavior(.basedOnSize)
-                .defaultScrollAnchor(.bottom, for: .sizeChanges)
                 if !dynamicTypeSize.isAccessibilitySize {
                     ChimpKeypad(mode: .amount, isCompact: isSmallScreen) { key in
                         ChimpSoundPlayer.shared.play(.tap)
                         model.press(key)
                     }
-                    .padding(.horizontal, ChimpSpacing.lg)
+                    .padding(.horizontal, 18)
                     .disabled(model.loadPhase != .loaded)
                 }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             mainButton
-                .padding(.horizontal, ChimpSpacing.bottomBar.leading)
-                .padding(.top, ChimpSpacing.l)
+                .padding(.horizontal, 22)
+                .padding(.top, 16)
                 .padding(.bottom, screenInsets.hasHomeIndicator ? ChimpSpacing.bottomBar.bottom : ChimpSpacing.xl)
                 .background(Color(.chimpBackground))
         }
@@ -86,44 +75,56 @@ struct VaultAmountView: View {
 
     // MARK: Tiroir
 
-    /// « FROM Main ▾ » (mettre) ; « BACK TO Main · 800 → 850.12 » (retirer, fixe).
+    /// « FROM Main · 800 → 750 XLM ▾ » (mettre) ; « TO Main · 800 → 830 XLM » (retirer, fixe).
     private var drawerBar: some View {
         let drawer = model.selectedDrawer
         return Button {
             model.showDrawerSheet()
         } label: {
-            HStack(spacing: ChimpSpacing.sm) {
-                Text(isDeposit ? "From" : "Back to")
+            HStack(spacing: 10) {
+                Text(isDeposit ? "From" : "To")
                     .textCase(.uppercase)
                     .chimpFont(.label)
                     .foregroundStyle(.chimpTextSecondary)
                 ChimpDrawerIconView(icon: drawer?.icon ?? .main, size: CGSize(width: 30, height: 20), border: 2.5, cornerRadius: 6)
-                Text(verbatim: drawerName)
+                Text(verbatim: drawer?.title ?? drawerName)
                     .chimpFont(.rowTitle)
                     .foregroundStyle(.chimpTextPrimary)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
-                if !isDeposit, let drawer {
-                    balanceChange(before: drawer.balance(of: asset), after: model.currentQuote?.expected.map { drawer.balance(of: asset) + $0 })
-                } else if model.canChooseDrawer {
+                if let drawer {
+                    balanceChange(before: drawer.balance(of: asset), after: balanceAfter(drawer))
+                }
+                if isDeposit, model.canChooseDrawer {
                     Image(systemName: "chevron.down").font(.system(size: 12, weight: .black)).foregroundStyle(.chimpTextPrimary)
                 }
             }
-            .padding(.vertical, 9)
+            .padding(.vertical, 10)
             .padding(.horizontal, 13)
-            .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.key), fill: Color(.chimpSurfaceSecondary))
+            .cartoonSurface(RoundedRectangle(cornerRadius: 16), fill: Color(.chimpSurfaceSecondary))
             .contentShape(Rectangle())
         }
         .buttonStyle(ChimpPressableStyle())
         .disabled(!isDeposit || !model.canChooseDrawer)
-        .accessibilityLabel(Text(isDeposit ? "From \(drawerName)" : "Back to \(drawerName)"))
+        .accessibilityLabel(Text(isDeposit ? "From \(drawerName)" : "To \(drawerName)"))
+    }
+
+    /// Mettre : le solde moins le montant. Retirer : le solde plus ce qui est attendu.
+    private func balanceAfter(_ drawer: SendDrawer) -> Decimal? {
+        let before = drawer.balance(of: asset)
+        if isDeposit {
+            let value = model.withdrawAll ? model.available : model.amount.value
+            return value > 0 && value <= before ? before - value : nil
+        }
+        return model.currentQuote?.expected.map { before + $0 }
     }
 
     private func balanceChange(before: Decimal, after: Decimal?) -> some View {
         HStack(spacing: 4) {
-            Text(verbatim: asset.displayed(before, locale: locale))
+            Text(verbatim: after == nil ? asset.displayedWithCode(before, locale: locale) : asset.displayed(before, locale: locale))
             if let after {
-                Text(verbatim: "→")
-                Text(verbatim: asset.displayed(after, locale: locale)).fontWeight(.black).foregroundStyle(Color(.chimpPositive))
+                Text(verbatim: "→").chimpFont(.pill)
+                Text(verbatim: asset.displayedWithCode(after, locale: locale)).fontWeight(.black).foregroundStyle(.chimpTextPrimary)
             }
         }
         .chimpFont(.captionStrong)
@@ -134,60 +135,72 @@ struct VaultAmountView: View {
 
     // MARK: Montant
 
-    private var amountCard: some View {
+    /// Le montant au centre (rouge s'il dépasse), puis « XLM into DeFindex » / « XLM out of DeFindex ».
+    private var amountBlock: some View {
         let issue = model.amountIssue
-        return VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
-            Text(isDeposit ? "You put in" : "You take out")
-                .chimpFont(.caption)
-                .foregroundStyle(.chimpTextSecondary)
-            HStack(alignment: .firstTextBaseline, spacing: ChimpSpacing.m) {
+        return VStack(spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: ChimpSpacing.s) {
                 if !isDeposit, model.withdrawAll {
                     Text("about").chimpFont(.rowTitle).foregroundStyle(.chimpTextSecondary)
                 }
-                ChimpTabularText.text(model.amount.displayText(locale: locale), style: .displayL, dynamicTypeSize: dynamicTypeSize)
-                    .chimpFont(.displayL)
+                ChimpTabularText.text(model.amount.displayText(locale: locale), style: .amountEntry, dynamicTypeSize: dynamicTypeSize)
+                    .chimpFont(.amountEntry)
                     .foregroundStyle(issue != nil ? Color(.chimpNegative) : (model.amount.isEmpty ? Color(.chimpTextSecondary) : Color(.chimpTextPrimary)))
                     .lineLimit(1)
                     .minimumScaleFactor(0.4)
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.15), value: model.amount)
-                    .accessibilityLabel(Text(isDeposit ? "You put in" : "You take out"))
+                    .accessibilityLabel(Text(isDeposit ? "You plant" : "You take out"))
                     .accessibilityValue(Text(verbatim: "\(model.amount.displayText(locale: locale)) \(asset.code)"))
-                Spacer(minLength: ChimpSpacing.s)
-                ChimpAssetPill(glyph: asset.glyph, title: asset.code, isChoosable: false) {}
-                    .fixedSize()
-                    .allowsHitTesting(false)
-                maxButton(highlighted: issue != nil)
             }
+            .padding(.horizontal, 22)
+            HStack(spacing: 8) {
+                ChimpProtocolLogo(mark: mark, size: 24, border: ChimpBorder.regular)
+                Text(isDeposit ? "\(asset.code) into \(mark.name)" : "\(asset.code) out of \(mark.name)")
+                    .chimpFont(.pill)
+                    .foregroundStyle(.chimpTextPrimary)
+            }
+            .padding(.leading, 6)
+            .padding(.trailing, 13)
+            .padding(.vertical, 5)
+            .cartoonSurface(Capsule(), fill: Color(.chimpSurface))
             if let issue {
                 Text(issueLine(issue))
                     .chimpFont(.captionStrong)
                     .foregroundStyle(Color(.chimpNegative))
-            } else {
-                balanceLine
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 22)
             }
         }
-        .padding(.horizontal, ChimpSpacing.l)
-        .padding(.vertical, 11)
-        .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.panel), fill: Color(.chimpSurface))
+        .padding(.top, ChimpSpacing.l)
     }
 
-    /// « 800 → 750 XLM in Main » (mettre) ; « 50.12 → 0 XLM in the vault » (retirer).
-    private var balanceLine: some View {
-        let value = model.withdrawAll ? model.available : model.amount.value
-        let after: Decimal? = value > 0 && value <= model.available ? model.available - value : nil
-        return HStack(spacing: 4) {
-            Text(verbatim: asset.displayed(model.available, locale: locale))
-            if let after {
-                Text(verbatim: "→")
-                Text(verbatim: asset.displayed(after, locale: locale)).fontWeight(.black).foregroundStyle(.chimpTextPrimary)
+    /// Mettre : 10 · 50 · 100 · Max. Retirer : 10 · ce qui peut sortir maintenant (s'il y a une limite) · All.
+    private var quickPicks: some View {
+        let picks = VaultAmountView.quickPicks(deposit: isDeposit, available: model.available, now: model.withdrawableNow)
+        return HStack(spacing: 8) {
+            ForEach(picks, id: \.self) { pick in
+                ChimpQuickPick(title: asset.displayed(pick, locale: locale), isSelected: !model.withdrawAll && model.amount.value == pick) {
+                    model.setAmount(pick)
+                }
             }
-            Text(isDeposit ? "\(asset.code) in \(drawerName)" : (model.isLending ? "\(asset.code) in XOXNO" : "\(asset.code) in the vault"))
+            ChimpQuickPick(title: maxTitle, isSelected: model.withdrawAll || (isDeposit && model.available > 0 && model.amount.value == model.available)) {
+                model.setMax()
+            }
+            .disabled(model.available <= 0)
         }
-        .chimpFont(.captionStrong)
-        .foregroundStyle(.chimpTextSecondary)
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
+        .disabled(model.loadPhase != .loaded)
+    }
+
+    /// Les raccourcis chiffrés : ceux qui tiennent dans ce qu'on a (et, pour un retrait, dans ce qui peut sortir
+    /// maintenant). « Max » met déjà ce qui peut sortir maintenant : pas de raccourci en double.
+    static func quickPicks(deposit: Bool, available: Decimal, now: Decimal?) -> [Decimal] {
+        if deposit { return [10, 50, 100].filter { $0 < available } }
+        return [10, 50].filter { $0 < min(available, now ?? available) }
+    }
+
+    private var maxTitle: String {
+        isDeposit || (model.withdrawableNow.map { $0 < model.available } ?? false) ? String(localized: "Max") : String(localized: "All")
     }
 
     private func issueLine(_ issue: VaultFlowModel.AmountIssue) -> LocalizedStringKey {
@@ -195,29 +208,13 @@ struct VaultAmountView: View {
         case let .insufficient(drawer, available, asset):
             "Only \(asset.displayedWithCode(available, locale: locale)) in \(drawer)"
         case let .moreThanPosition(available, asset):
-            model.isLending
-                ? "Only \(asset.displayedWithCode(available, locale: locale)) in XOXNO."
-                : "Only \(asset.displayedWithCode(available, locale: locale)) in the vault. Tap All to take everything."
+            "Only \(asset.displayedWithCode(available, locale: locale)) in \(mark.name). Tap All to take everything."
         case let .moreThanAvailableNow(available, asset):
-            "XOXNO can pay back \(asset.displayedWithCode(available, locale: locale)) right now. The rest is lent out."
+            "\(mark.name) can give back \(asset.displayedWithCode(available, locale: locale)) right now."
         }
     }
 
-    private func maxButton(highlighted: Bool) -> some View {
-        // Prêt : « All » seulement si toute la position peut sortir maintenant ; sinon « Max » (le plus qui peut sortir).
-        Button(isDeposit || (model.withdrawableNow.map { $0 < model.available } ?? false) ? "Max" : "All") { model.setMax() }
-            .chimpFont(.buttonSmall)
-            .foregroundStyle(Color(highlighted || model.withdrawAll ? .chimpOnAccent : .chimpTextPrimary))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 3)
-            .cartoonSurface(Capsule(), fill: highlighted || model.withdrawAll ? Color(.chimpAccent) : Color(.chimpSurfaceSecondary), border: ChimpBorder.thin)
-            .buttonStyle(ChimpPressableStyle())
-            .fixedSize()
-            .disabled(model.available <= 0)
-            .accessibilityHint(Text(isDeposit ? "Puts everything in this drawer in the vault" : "Takes every share out of the vault"))
-    }
-
-    // MARK: États (F3b, F3c)
+    // MARK: États
 
     @ViewBuilder
     private var notice: some View {
@@ -229,9 +226,10 @@ struct VaultAmountView: View {
                 marker: .error
             )
         } else if model.isLending, !isDeposit, model.movablePositionCount > 1 {
-            ChimpNoticeBanner(text: "\(drawerName) has \(model.movablePositionCount) positions. This takes money out of the biggest one (\(asset.displayedWithCode(model.available, locale: locale))); then you can take out the next.", marker: .info)
+            ChimpGrowNote(text: "\(drawerName) has \(model.movablePositionCount) positions. This takes money out of the biggest one (\(asset.displayedWithCode(model.available, locale: locale))); then you can take out the next.")
         } else if model.isLending, !isDeposit, let now = model.withdrawableNow, now < model.available {
-            ChimpNoticeBanner(text: "Right now XOXNO can pay back up to \(asset.displayedWithCode(now, locale: locale)). The rest is lent out and comes back as borrowers repay.", marker: .info)
+            // G5 : une note dans l'écran, pas un écran d'erreur.
+            ChimpGrowNote(text: "XOXNO can give back \(asset.displayedWithCode(now, locale: locale)) right now. The rest comes back as borrowers repay.")
         } else if model.loadPhase == .unavailable {
             problem(title: "The vault is unavailable right now", line: "Nothing moved. Try again in a minute.")
         } else if case .failed(let issue) = model.quoteState {

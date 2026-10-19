@@ -4,8 +4,7 @@ import SwiftUI
 /// décision de Barth du 2026-10-15). Rien ne peut interrompre ces écrans : on n'en sort que par leurs boutons.
 ///
 /// - « Putting it in… » / « Taking it out… » : les étapes (signé par la carte, vérification, envoi, confirmation).
-/// - F5 « Planted! » : ce qui est entré ; « See my position ».
-/// - F7s « Back home! » : ce qui est revenu.
+/// - G4 « Planted! », G6 « Back home! » : ce qui est entré ou revenu ; « Done », « See my pot ».
 /// - F8a, F8b « Not sure yet » : pas confirmé, ou impossible de trancher → « Check again », jamais un nouveau dépôt.
 /// - « Not moved » : l'autorisation signée peut encore servir → attendre l'heure dite.
 /// - F8c « Nothing was moved » : certain → « Try again ».
@@ -25,7 +24,7 @@ struct VaultStatusView: View {
         Group {
             switch model.stage {
             case .finished(.sent(let receipt)):
-                VaultSentView(receipt: receipt, protocols: model.protocols, onPosition: model.seePosition, onDone: model.finish)
+                VaultSentView(receipt: receipt, onPosition: model.seePosition, onDone: model.finish)
             case .finished(.notConfirmed), .finished(.undetermined):
                 notSureYet
             case .finished(.nothingSent):
@@ -101,8 +100,6 @@ struct VaultStatusView: View {
                         .foregroundStyle(Color(.chimpOnHeaderPrimary))
                         .multilineTextAlignment(.center)
                 }
-                GrowPlaceNotice(lending: model.summary?.kind == .lending, asset: assetCode, protocols: model.protocols, ink: Color(.chimpOnHeaderPrimary))
-                    .padding(.top, ChimpSpacing.xs)
                 if let details = model.technicalDetails {
                     ChimpTechnicalDetails(details: details)
                 }
@@ -131,7 +128,6 @@ struct VaultStatusView: View {
                     if let summary = model.summary {
                         ChimpDetailList(items: details(summary))
                     }
-                    GrowPlaceNotice(lending: model.summary?.kind == .lending, asset: assetCode, protocols: model.protocols)
                     if let details = model.technicalDetails, showsTechnicalDetails {
                         ChimpTechnicalDetails(details: details)
                     }
@@ -257,12 +253,10 @@ struct VaultStatusView: View {
     }
 }
 
-/// F5 « Planted! » et F7s « Back home! » : fond Leaf et motif, Chimpy, ce qui est entré (−50 XLM) ou revenu
-/// (+50.13 XLM), « From Main · date » / « In Main · date », l'avertissement, puis « See my position » (F5) ou
-/// « Back to my wallet » (F7s).
+/// G4 « Planted! » et G6 « Back home! » (maquette « Chimp Grow Final », 2026-10-18) : fond vert et motif, Chimpy (qui
+/// plante, ou qui salue), ce qui est entré ou revenu, « Done » et « See my pot ».
 struct VaultSentView: View {
     let receipt: VaultReceipt
-    let protocols: [String]
     let onPosition: () -> Void
     let onDone: () -> Void
 
@@ -275,114 +269,60 @@ struct VaultSentView: View {
         VStack(spacing: 0) {
             Spacer(minLength: ChimpSpacing.l)
             VStack(spacing: 0) {
-                Image(isDeposit ? .chimpyPlant : .chimpyUnsure)
+                Image(isDeposit ? .chimpyPlantHero : .chimpyWaveHero)
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 190)
+                    .frame(height: 230)
                     .chimpBob(duration: 3.5)
                     .accessibilityHidden(true)
                 Text(isDeposit ? "Planted!" : "Back home!")
-                    .chimpFont(.welcomeTitle)
-                    .padding(.top, ChimpSpacing.l)
+                    .chimpFont(.growCelebration)
+                    .padding(.top, 16)
                     .accessibilityAddTraits(.isHeader)
-                Text(lead)
-                    .chimpFont(.lead)
+                Text(verbatim: Self.lead(summary, received: receipt.received, locale: locale))
+                    .chimpFont(.bodyL)
+                    .fontWeight(.heavy)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, ChimpSpacing.s)
-                amountRow
-                    .padding(.top, ChimpSpacing.l)
-                Text(place)
-                    .chimpFont(.captionStrong)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 14)
-                    .background(Capsule().fill(.white.opacity(0.35)))
-                    .overlay { Capsule().strokeBorder(ChimpCardColor.leaf.ink, lineWidth: 2) }
-                    .padding(.top, ChimpSpacing.m)
-                GrowPlaceNotice(lending: summary.kind == .lending, asset: summary.asset.code, protocols: protocols, ink: ChimpCardColor.leaf.ink)
-                    .multilineTextAlignment(.leading)
-                    .padding(.top, ChimpSpacing.l)
+                    .padding(.top, 10)
             }
             .multilineTextAlignment(.center)
-            .foregroundStyle(ChimpCardColor.leaf.ink)
-            .padding(.horizontal, ChimpSpacing.xxl + 6)
+            .foregroundStyle(Color(.chimpTicketInk))
+            .padding(.horizontal, 28)
             Spacer(minLength: ChimpSpacing.l)
-            VStack(spacing: ChimpSpacing.m) {
-                if isDeposit {
-                    ChimpButton("See my position", action: onPosition)
-                    link("Back to my wallet", action: onDone)
-                } else {
-                    ChimpButton("Back to my wallet", action: onDone)
+            VStack(spacing: 14) {
+                ChimpButton("Done", action: onDone)
+                Button(action: onPosition) {
+                    Text("See my pot")
+                        .chimpFont(.link)
+                        .foregroundStyle(Color(.chimpTicketInk))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, ChimpSpacing.fullScreenMargin)
+            .padding(.horizontal, 24)
             .padding(.bottom, ChimpSpacing.l)
         }
         .frame(maxWidth: .infinity)
         .background {
-            ChimpCardColor.leaf.fill
+            Color(.chimpCardLeaf)
                 .overlay { ChimpPattern(opacity: 0.14) }
                 .ignoresSafeArea()
         }
     }
 
-    /// « 50 XLM is in the DeFindex vault. From now on I'll show you what it really does. » / « Your XLM is back in
-    /// Main, ready to use. »
-    private var lead: LocalizedStringKey {
-        let runner = protocols.first ?? "DeFindex"
-        if isDeposit, summary.kind == .lending {
-            return "\(summary.asset.formattedWithCode(summary.amount, locale: locale)) is lent through \(runner). From now on I'll show you what it really does."
+    /// « 50 XLM is growing in DeFindex. I'll show you what it really does. » / « 30 XLM is back in Main, ready to use. »
+    /// Retrait sans montant lu : « Your XLM is back in Main, ready to use. »
+    static func lead(_ summary: VaultSummary, received: Decimal?, locale: Locale) -> String {
+        let place = summary.kind == .lending ? "XOXNO" : "DeFindex"
+        if summary.action == .deposit {
+            return String(localized: "\(summary.asset.formattedWithCode(summary.amount, locale: locale)) is growing in \(place). I'll show you what it really does.")
         }
-        if isDeposit {
-            return "\(summary.asset.formattedWithCode(summary.amount, locale: locale)) is in the \(runner) vault. From now on I'll show you what it really does."
+        if let received {
+            return String(localized: "\(summary.asset.displayedWithCode(received, locale: locale)) is back in \(summary.drawerShortTitle), ready to use.")
         }
-        return "Your \(summary.asset.code) is back in \(summary.drawerShortTitle), ready to use."
-    }
-
-    private var place: LocalizedStringKey {
-        let when = receipt.sentAt.formatted(.dateTime.day().month(.abbreviated).hour().minute())
-        return isDeposit ? "From \(summary.drawerShortTitle) · \(when)" : "In \(summary.drawerShortTitle) · \(when)"
-    }
-
-    /// Mettre : « Went in −50 XLM ». Retirer : « Came in +50.13 XLM », ou le minimum signé s'il n'a pas pu être lu.
-    private var amountRow: some View {
-        let (label, value, color): (LocalizedStringKey, String, Color) = if isDeposit {
-            ("Went in", "\u{2212}\(summary.asset.formattedWithCode(summary.amount, locale: locale))", Color(.chimpStampPaid))
-        } else if let received = receipt.received {
-            ("Came in", "+\(summary.asset.displayedWithCode(received, locale: locale))", Color(.chimpStampReceived))
-        } else {
-            // Prêt (F5) : rien n'est garanti, donc « about » ; vault : le minimum signé.
-            ("Came in", summary.kind == .lending
-                ? String(localized: "about \(summary.asset.displayedWithCode(summary.minimumOut ?? summary.amount, locale: locale))")
-                : String(localized: "at least \(summary.asset.displayedWithCode(summary.minimumOut ?? summary.amount, locale: locale))"), Color(.chimpStampReceived))
-        }
-        return HStack {
-            Text(label).chimpFont(.bodyS).fontWeight(.black)
-            Spacer(minLength: ChimpSpacing.s)
-            Text(verbatim: value)
-                .chimpFont(.key)
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-        }
-        .foregroundStyle(Color(.chimpTicketInk))
-        .padding(.vertical, 10)
-        .padding(.horizontal, ChimpSpacing.l)
-        .background(RoundedRectangle(cornerRadius: ChimpRadius.key).fill(Color(.chimpTicketPaper)))
-        .overlay { RoundedRectangle(cornerRadius: ChimpRadius.key).strokeBorder(Color(.chimpTicketInk), lineWidth: ChimpBorder.regular) }
-        .background { RoundedRectangle(cornerRadius: ChimpRadius.key).fill(Color(.chimpTicketInk)).offset(x: 3, y: 3) }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func link(_ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .chimpFont(.link)
-                .foregroundStyle(ChimpCardColor.leaf.ink)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        return String(localized: "Your \(summary.asset.code) is back in \(summary.drawerShortTitle), ready to use.")
     }
 }
 

@@ -55,19 +55,3 @@ enum LendingText {
     static let needsRenewal: LocalizedStringKey = "This position needs to be renewed before you can see or move it. Your money is still there."
     static let hasDebt: LocalizedStringKey = "This position has a loan on it. ChimpDAO never borrows, so it can't be moved from here."
 }
-
-/// L'avertissement du lieu : celui du vault, ou les risques du prêt.
-struct GrowPlaceNotice: View {
-    let lending: Bool
-    let asset: String
-    let protocols: [String]
-    var ink: Color?
-
-    var body: some View {
-        if lending {
-            LendingRiskNotice(asset: asset, ink: ink)
-        } else {
-            ChimpVaultNotice(asset: asset, protocols: protocols, ink: ink)
-        }
-    }
-}

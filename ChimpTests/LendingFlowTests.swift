@@ -89,6 +89,6 @@ struct LendingWordingTests {
         #expect(VaultReviewView.minimumNote(lending: true) == "The contract doesn't guarantee a minimum. If XOXNO can't pay it right now, nothing moves.")
         #expect(VaultStatusView.minimumLabel(lending: true) == "Expected back")
         // Le vault garde son minimum signé.
-        #expect(VaultReviewView.minimumLabel(lending: false) == "Minimum received")
+        #expect(VaultReviewView.minimumLabel(lending: false) == "At least")
     }
 }
