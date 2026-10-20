@@ -63,9 +63,11 @@ struct PrepareCardsTests {
     }
 
     private func model(card: FakeCard, chain: FakeChain, signer: RecordingSigner = RecordingSigner(),
-                       store: MemoryPreparedCardsStore = MemoryPreparedCardsStore()) -> PrepareCardsModel {
-        PrepareCardsModel(reader: card, generator: card, signer: signer, makeService: { chain }, store: store,
-                          now: { Date(timeIntervalSince1970: 1_792_500_000) })
+                       store: MemoryPreparedCardsStore = MemoryPreparedCardsStore(),
+                       funder: MockTestnetFunding = MockTestnetFunding()) -> PrepareCardsModel {
+        funder.delay = .zero
+        return PrepareCardsModel(reader: card, generator: card, signer: signer, makeService: { chain }, store: store, funder: funder,
+                                 now: { Date(timeIntervalSince1970: 1_792_500_000) })
     }
 
     @Test("Carte vierge : clé générée, état lu, la carte signe sans PIN, enregistrée ; journal #001 avec wallet et hash")
@@ -87,6 +89,41 @@ struct PrepareCardsTests {
         #expect(chain.mints == 1)
         #expect(store.cards == model.cards && model.cards.count == 1)
         #expect(model.nextNumber == 2, "Le numéro suivant s'incrémente")
+    }
+
+    @Test("Argent de test : 50 XLM vers le wallet de la carte après l'enregistrement, noté au journal ; jamais deux fois")
+    func funding() async throws {
+        let card = FakeCard(.blank, key: key(10))
+        let funder = MockTestnetFunding()
+        let model = model(card: card, chain: FakeChain(), funder: funder)
+        await model.scan()
+        await model.signAndRegister()
+        guard case .done(let done) = model.step else { Issue.record("expected done, got \(model.step)"); return }
+        #expect(done.isFunded && done.fundingText == "50 XLM")
+        #expect(funder.funded == [done.wallet], "Le wallet de la carte, une fois")
+        await model.scan()
+        #expect(funder.funded.count == 1, "Retapée : rien n'est renvoyé")
+        #expect(model.fundedCount == 1)
+    }
+
+    @Test("Argent de test raté : la carte reste enregistrée ; retapée, seul l'argent repart (pas de second enregistrement)")
+    func fundingRetry() async throws {
+        let card = FakeCard(.blank, key: key(11))
+        let chain = FakeChain()
+        let funder = MockTestnetFunding()
+        let model = model(card: card, chain: chain, funder: funder)
+        await model.scan()
+        guard case .readyToSign(let entry, _) = model.step else { Issue.record("expected readyToSign"); return }
+        funder.failing = [entry.wallet]
+        await model.signAndRegister()
+        guard case .done(let failed) = model.step else { Issue.record("expected done"); return }
+        #expect(failed.status == .prepared && !failed.isFunded)
+        #expect(model.failedCount == 1, "À retaper")
+        funder.failing = []
+        await model.scan()
+        guard case .done(let retried) = model.step else { Issue.record("expected done"); return }
+        #expect(retried.isFunded && chain.mints == 1)
+        #expect(model.failedCount == 0)
     }
 
     @Test("Carte déjà enregistrée sur la chaîne : « already ready », rien n'est signé ni écrit")
@@ -180,10 +217,10 @@ struct PrepareCardsTests {
         await model.scan()
         await model.signAndRegister()
         let lines = model.csv.split(separator: "\n").map(String.init)
-        #expect(lines.first == "number,public_key,wallet_address,transaction_hash,status,date")
+        #expect(lines.first == "number,public_key,wallet_address,transaction_hash,status,test_money,test_money_hash,date")
         #expect(lines.count == 2)
         #expect(lines[1].hasPrefix("#001,04"))
-        #expect(lines[1].contains(",prepared,"))
+        #expect(lines[1].contains(",prepared,50 XLM,"))
         #expect(PrepareCardsModel.csvField("failed: a, b") == "\"failed: a, b\"")
     }
 }

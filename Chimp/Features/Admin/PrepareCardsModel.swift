@@ -25,6 +25,31 @@ struct PreparedCard: Codable, Equatable, Identifiable {
     var transactionHash: String?
     var status: Status
     var date: Date
+    /// Argent de test envoyé au wallet de la carte après l'enregistrement (`nil` : pas encore essayé).
+    var funding: Funding? = nil
+
+    enum Funding: Codable, Equatable {
+        case funded(hash: String)
+        case failed(String)
+    }
+
+    var isFunded: Bool {
+        if case .funded = funding { return true }
+        return false
+    }
+
+    var fundingText: String {
+        switch funding {
+        case .funded: "\(PrepareCardsModel.fundingXLM) XLM"
+        case .failed(let reason): "failed: \(reason)"
+        case nil: ""
+        }
+    }
+
+    var fundingHash: String {
+        if case .funded(let hash) = funding { return hash }
+        return ""
+    }
 
     var numberText: String { Self.numberText(number) }
 
@@ -32,6 +57,9 @@ struct PreparedCard: Codable, Equatable, Identifiable {
 
     /// Une carte prête ne doit plus jamais être enregistrée.
     var isDone: Bool { status == .prepared || status == .alreadyReady }
+
+    /// Une carte enregistrée attend encore son argent de test (pas essayé, ou raté).
+    func needsFunding(_ funds: Bool) -> Bool { funds && isDone && !isFunded }
 
     var statusText: String {
         switch status {
@@ -83,7 +111,9 @@ final class MemoryPreparedCardsStore: PreparedCardsStore {
 /// 1. **lecture** : une Infineon vierge (slot 1 vide, `6A88`, revérifié sur la carte) reçoit sa clé dans la même session
 ///    (exception de Pamphile du 2026-09-29, mode admin, slot 1 vide) ; une carte qui a déjà une clé est simplement lue ;
 /// 2. **signature** : après la lecture de l'état sur testnet (réseau avant la session NFC), la carte signe son
-///    enregistrement (`nfc-nft.mint`, attestation), envoyé et payé par la clé admin.
+///    enregistrement (`nfc-nft.mint`, attestation), envoyé et payé par la clé admin ;
+/// puis, sans tap, 50 XLM de testnet partent de la clé admin vers le wallet de la carte (de quoi faire un envoi dès
+/// l'activation ; l'app y reconnaît une carte chargée, H1).
 ///
 /// Jamais de PIN : c'est l'utilisateur qui le choisira à la création de son compte (une carte qui en a déjà un est mise de
 /// côté). Une carte déjà enregistrée sur la chaîne n'est jamais réécrite ; le journal est écrit **avant** l'envoi, et
@@ -100,6 +130,8 @@ final class PrepareCardsModel {
         case readyToSign(PreparedCard, EnrolmentPlan)
         case signing(PreparedCard)
         case submitting(PreparedCard)
+        /// Envoi de l'argent de test au wallet de la carte.
+        case funding(PreparedCard)
         /// Dernière carte traitée (prête, déjà prête, ou mise de côté).
         case done(PreparedCard)
         /// Rien n'a été écrit pour cette carte (lecture, refus) : message.
@@ -117,17 +149,25 @@ final class PrepareCardsModel {
     private let signer: ChipSigner
     private let makeService: () throws -> CardEnrolmentService
     private let store: PreparedCardsStore
+    /// Argent de test : 50 XLM vers le wallet de chaque carte, depuis la clé admin (`nil` : aucun envoi).
+    private let funder: TestnetFunding?
     private let now: () -> Date
+
+    /// 50 XLM de testnet par carte (décision de Barth du 2026-10-20) : de quoi faire un envoi tout de suite.
+    static let fundingXLM = 50
+    static let fundingUnits: UInt64 = 50 * 10_000_000
 
     init(
         reader: ChipReader, generator: ChipKeyGenerator, signer: ChipSigner,
-        makeService: @escaping () throws -> CardEnrolmentService, store: PreparedCardsStore, now: @escaping () -> Date = { .now }
+        makeService: @escaping () throws -> CardEnrolmentService, store: PreparedCardsStore, funder: TestnetFunding?,
+        now: @escaping () -> Date = { .now }
     ) {
         self.reader = reader
         self.generator = generator
         self.signer = signer
         self.makeService = makeService
         self.store = store
+        self.funder = funder
         self.now = now
         let saved = store.load()
         cards = saved
@@ -136,13 +176,15 @@ final class PrepareCardsModel {
 
     var isBusy: Bool {
         switch step {
-        case .reading, .checking, .signing, .submitting: true
+        case .reading, .checking, .signing, .submitting, .funding: true
         default: false
         }
     }
 
     var preparedCount: Int { cards.filter(\.isDone).count }
-    var failedCount: Int { cards.filter { if case .failed = $0.status { true } else { false } }.count }
+    var fundedCount: Int { cards.filter(\.isFunded).count }
+    /// À retaper : enregistrement raté, ou carte enregistrée dont l'argent de test n'est pas parti.
+    var failedCount: Int { cards.filter { if case .failed = $0.status { true } else { $0.isDone && $0.needsFunding(funder != nil) } }.count }
 
     /// Le numéro demandé est déjà pris par une autre carte.
     func numberIsTaken(_ number: Int, by publicKey: String? = nil) -> Bool {
@@ -171,7 +213,8 @@ final class PrepareCardsModel {
         }
         let key = card.publicKey.hex
         if let known = cards.first(where: { $0.publicKey == key }), known.isDone {
-            step = .done(known)
+            // Déjà enregistrée : jamais réenregistrée ; seulement l'argent de test, s'il n'est pas encore parti.
+            await fundIfNeeded(known)
             return
         }
         let number = cards.first { $0.publicKey == key }?.number ?? nextNumber
@@ -183,9 +226,13 @@ final class PrepareCardsModel {
         do {
             switch try await makeService().inspect(card) {
             case let .alreadyEnrolled(_, pocket):
-                // Déjà enregistrée (avant ce lot, ou envoi d'une reprise) : rien à écrire.
-                finish(PreparedCard(number: number, publicKey: key, wallet: pocket, transactionHash: known(key)?.transactionHash,
-                                    status: .alreadyReady, date: now()))
+                // Déjà enregistrée (avant ce lot, ou envoi d'une reprise) : rien à écrire sur la carte ; l'argent de test
+                // part s'il n'est pas encore parti.
+                var entry = PreparedCard(number: number, publicKey: key, wallet: pocket, transactionHash: known(key)?.transactionHash,
+                                         status: .alreadyReady, date: now())
+                entry.funding = known(key)?.funding
+                record(entry)
+                await fundIfNeeded(entry)
             case .ready(let plan):
                 if card.pinActive {
                     // On ne connaît pas son PIN, et on n'en définit jamais : mise de côté.
@@ -234,7 +281,8 @@ final class PrepareCardsModel {
             done.transactionHash = result.transactionHash
             done.status = .prepared
             done.date = now()
-            finish(done)
+            record(done)
+            await fundIfNeeded(done)
         } catch {
             // Peut-être parti : on garde « en attente » ; le prochain tap relira la chaîne avant tout envoi.
             var pending = entry
@@ -254,11 +302,12 @@ final class PrepareCardsModel {
 
     /// CSV du journal : numéro, clé publique, wallet, hash, statut, date (ISO 8601), du plus petit numéro au plus grand.
     var csv: String {
-        let header = "number,public_key,wallet_address,transaction_hash,status,date"
+        let header = "number,public_key,wallet_address,transaction_hash,status,test_money,test_money_hash,date"
         let formatter = ISO8601DateFormatter()
         let rows = cards.sorted { $0.number < $1.number }.map { card in
-            [card.numberText, card.publicKey, card.wallet, card.transactionHash ?? "", card.statusText, formatter.string(from: card.date)]
-                .map(Self.csvField).joined(separator: ",")
+            [card.numberText, card.publicKey, card.wallet, card.transactionHash ?? "", card.statusText, card.fundingText, card.fundingHash,
+             formatter.string(from: card.date)]
+                .map { Self.csvField($0) }.joined(separator: ",")
         }
         return ([header] + rows).joined(separator: "\n") + "\n"
     }
@@ -269,6 +318,24 @@ final class PrepareCardsModel {
     }
 
     private func known(_ key: String) -> PreparedCard? { cards.first { $0.publicKey == key } }
+
+    /// Après l'enregistrement, dans le même parcours : 50 XLM de testnet vers le wallet de la carte, depuis la clé admin
+    /// (rechargée par friendbot si elle descend sous 2000 XLM). Noté dans le journal. Déjà parti : rien n'est renvoyé.
+    private func fundIfNeeded(_ entry: PreparedCard) async {
+        guard let funder, entry.needsFunding(true) else {
+            step = .done(entry)
+            return
+        }
+        step = .funding(entry)
+        var funded = entry
+        do {
+            let hash = try await funder.fund(entry.wallet, units: Self.fundingUnits)
+            funded.funding = .funded(hash: hash ?? "")
+        } catch {
+            funded.funding = .failed(Self.message(error))
+        }
+        finish(funded)
+    }
 
     private func failed(_ entry: PreparedCard, _ reason: String) -> PreparedCard {
         var copy = entry

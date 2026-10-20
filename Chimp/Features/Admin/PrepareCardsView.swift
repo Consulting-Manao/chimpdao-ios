@@ -23,13 +23,16 @@ struct PrepareCardsView: View {
             return PrepareCardsModel(
                 reader: NFCChipReader(), generator: NFCChipKeyGenerator(), signer: NFCChipSigner(),
                 makeService: { try CardEnrolment(config: .testnet, keyStore: KeychainAdminKeyStore(network: .testnet)) },
-                store: store
+                store: store,
+                funder: (try? ChainFundingNetwork(config: .testnet)).map {
+                    TestnetFunder(keyStore: KeychainAdminKeyStore(network: .testnet), network: $0)
+                }
             )
         }
         return PrepareCardsModel(
             reader: MockChipReader(scenario: .infineon), generator: MockChipKeyGenerator(scenario: .noKey),
             signer: MockChipSigner(outcome: .success(.secp256k1(signature: Data(repeating: 0x11, count: 64)))),
-            makeService: { MockCardEnrolmentService() }, store: MemoryPreparedCardsStore()
+            makeService: { MockCardEnrolmentService() }, store: MemoryPreparedCardsStore(), funder: MockTestnetFunding()
         )
     }
 
@@ -37,7 +40,7 @@ struct PrepareCardsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: ChimpSpacing.l) {
                 ChimpNoticeBanner(text: untranslated(
-                    "Stellar Testnet · blank Infineon cards get their key, then are registered. No PIN is ever set: the user picks it."
+                    "Stellar Testnet · blank Infineon cards get their key, are registered, then get \(PrepareCardsModel.fundingXLM) test XLM on their wallet. No PIN is ever set: the user picks it."
                 ))
                 if !hasAdminKey {
                     ChimpNoticeBanner(text: untranslated("No admin key on this iPhone. Enter it in Admin first."), marker: .error)
@@ -72,6 +75,7 @@ struct PrepareCardsView: View {
     private var counters: some View {
         HStack(spacing: ChimpSpacing.l) {
             counter("\(model.preparedCount)", "ready")
+            counter("\(model.fundedCount)", "funded")
             counter("\(model.failedCount)", "to retry")
             counter("\(model.cards.count)", "in the journal")
         }
@@ -125,12 +129,22 @@ struct PrepareCardsView: View {
             progress("\(entry.numberText) · the card is signing…")
         case .submitting(let entry):
             progress("\(entry.numberText) · registering on testnet…")
+        case .funding(let entry):
+            progress("\(entry.numberText) · sending \(PrepareCardsModel.fundingXLM) test XLM to its wallet…")
         case .done(let entry):
             VStack(alignment: .leading, spacing: 6) {
                 Text(verbatim: "\(entry.numberText) · \(entry.statusText)").chimpFont(.sheetTitle)
                     .foregroundStyle(entry.isDone ? Color(.chimpPositive) : Color(.chimpNegative))
                 line("Its wallet", entry.wallet)
                 if let hash = entry.transactionHash { line("Transaction", hash) }
+                if entry.funding != nil {
+                    line("Test money", entry.fundingText)
+                        .foregroundStyle(entry.isFunded ? Color(.chimpPositive) : Color(.chimpNegative))
+                }
+                if entry.needsFunding(true), case .failed = entry.funding {
+                    Text(verbatim: "Tap the card again to retry the test money. It won't be registered twice.")
+                        .chimpFont(.caption).foregroundStyle(.chimpTextSecondary)
+                }
             }
         case .problem(let message):
             ChimpNoticeBanner(text: untranslated(message), marker: .error)
@@ -185,8 +199,8 @@ struct PrepareCardsView: View {
             ForEach(model.cards.sorted { $0.number > $1.number }) { card in
                 HStack(alignment: .firstTextBaseline) {
                     Text(verbatim: card.numberText).chimpFont(.mono)
-                    Text(verbatim: card.statusText).chimpFont(.caption)
-                        .foregroundStyle(card.isDone ? Color(.chimpPositive) : Color(.chimpNegative))
+                    Text(verbatim: card.isFunded ? "\(card.statusText) · funded" : card.statusText).chimpFont(.caption)
+                        .foregroundStyle(card.isDone && card.isFunded ? Color(.chimpPositive) : Color(.chimpNegative))
                     Spacer()
                     Text(verbatim: String(card.wallet.prefix(6)) + "…" + String(card.wallet.suffix(4))).chimpFont(.mono)
                         .foregroundStyle(.chimpTextSecondary)

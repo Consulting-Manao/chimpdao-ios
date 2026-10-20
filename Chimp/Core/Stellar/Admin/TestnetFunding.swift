@@ -7,8 +7,16 @@ import stellarsdk
 /// Pocket) reçoit 1000 XLM de testnet par un `transfer` du SAC XLM, signé et payé par la clé admin. L'admin est d'abord
 /// rechargé par friendbot s'il a moins de 2000 XLM. Aucune clé n'est créée : il n'y a que l'admin.
 protocol TestnetFunding {
-    /// G → friendbot ; C → 1000 XLM depuis l'admin. Renvoie le hash de la transaction de l'admin (`nil` pour friendbot).
-    @discardableResult func fund(_ address: String) async throws -> String?
+    /// G → friendbot ; C → `units` (en stroops) de XLM depuis l'admin. Renvoie le hash de la transaction de l'admin
+    /// (`nil` pour friendbot).
+    @discardableResult func fund(_ address: String, units: UInt64) async throws -> String?
+}
+
+extension TestnetFunding {
+    /// « Testnet money » : 1000 XLM (`FUND_STROOPS` du terminal).
+    @discardableResult func fund(_ address: String) async throws -> String? {
+        try await fund(address, units: TestnetFunder.fundUnits)
+    }
 }
 
 /// Ce que le financement demande au réseau (faux dans les tests).
@@ -50,7 +58,7 @@ struct TestnetFunder: TestnetFunding {
     let network: FundingNetwork
     var sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
 
-    func fund(_ address: String) async throws -> String? {
+    func fund(_ address: String, units: UInt64) async throws -> String? {
         if (try? KeyPair(accountId: address)) != nil {
             try await fundG(address)
             return nil
@@ -58,7 +66,7 @@ struct TestnetFunder: TestnetFunding {
         guard address.hasPrefix("C"), (try? SCAddressXDR(contractId: address)) != nil else {
             throw FundingError.unsupportedAddress
         }
-        return try await fundFromAdmin(address)
+        return try await fundFromAdmin(address, units: units)
     }
 
     /// `fundG` : friendbot, avec quelques nouvelles tentatives.
@@ -76,13 +84,13 @@ struct TestnetFunder: TestnetFunding {
         throw FundingError.friendbot(last.isEmpty ? "Friendbot failed" : last)
     }
 
-    /// `fundFromAdmin` : recharge de l'admin si besoin, puis `transfer` de 1000 XLM signé par l'admin.
-    private func fundFromAdmin(_ address: String) async throws -> String {
+    /// `fundFromAdmin` : recharge de l’admin si besoin, puis `transfer` du montant demandé, signé par l’admin.
+    private func fundFromAdmin(_ address: String, units: UInt64) async throws -> String {
         guard let admin = try keyStore.keyPair() else { throw FundingError.noAdminKey }
         // Solde illisible (compte absent, panne) : 0, comme le terminal, donc une recharge par friendbot.
         let held = (try? await network.nativeBalance(of: admin.accountId)) ?? 0
         if held < Self.adminFloor { try await fundG(admin.accountId) }
-        return try await network.transferXLM(from: admin, to: address, units: Self.fundUnits)
+        return try await network.transferXLM(from: admin, to: address, units: units)
     }
 }
 
@@ -139,7 +147,7 @@ final class MockTestnetFunding: TestnetFunding {
         self.failing = failing
     }
 
-    func fund(_ address: String) async throws -> String? {
+    func fund(_ address: String, units: UInt64) async throws -> String? {
         try await Task.sleep(for: delay)
         if failing.contains(address) { throw FundingError.friendbot("Friendbot refused: 502") }
         funded.append(address)
