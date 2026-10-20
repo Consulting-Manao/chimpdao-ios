@@ -262,6 +262,15 @@ struct SettingsTests {
         #expect(url.absoluteString.contains(SettingsModel.versionText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!))
     }
 
+    @Test("Pages web : adresses HTTPS de privacy.html et support.html, une fois remplies")
+    func publicPages() {
+        for (url, page) in [(PublicPages.privacy, "privacy.html"), (PublicPages.support, "support.html")] {
+            guard let url else { continue }
+            #expect(url.scheme == "https", "\(page) : HTTPS obligatoire")
+            #expect(url.lastPathComponent == page)
+        }
+    }
+
     @Test("Version : « 1.1.0 (1) », lue dans le paquet de l'app")
     func version() {
         #expect(SettingsModel.versionText.range(of: #"^\d+\.\d+(\.\d+)? \(\d+\)$"#, options: .regularExpression) != nil)

@@ -3,8 +3,8 @@ import SwiftUI
 /// I2 · Settings (maquette) : prénom, changement de compte (I6), nom et couleur des cartes, devise (I3), apparence,
 /// réseau (affichage seulement), Face ID pour ouvrir l'app, visite, « Disconnect », « Erase everything on this phone », liens (licences, aide),
 /// version. Les lignes de la maquette pas encore faisables (paranoid mode, shop mode, raw signing) ne sont pas affichées :
-/// aucune ligne sans destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision
-/// de Barth du 2026-09-30). « Network » montre le réseau de la configuration de build, jamais un interrupteur
+/// aucune ligne sans destination. « Support » et « Privacy » ouvrent les pages web (`PublicPages`) ; « to add » tant que
+/// leurs adresses manquent (décisions de Barth du 2026-09-30 et du 2026-10-20 : pas de page « Terms »). « Network » montre le réseau de la configuration de build, jamais un interrupteur
 /// (2026-09-30). En Debug et dans Chimp Admin, une section « Developer » ouvre le catalogue et le mode admin.
 struct SettingsView: View {
     @Bindable var model: SettingsModel
@@ -377,7 +377,7 @@ struct SettingsView: View {
         AccessibilityNotification.Announcement(String(localized: "Real bananas are coming soon!")).post()
     }
 
-    // MARK: Liens (maquette : « Terms Privacy Licenses Help »)
+    // MARK: Liens (maquette : « Terms Privacy Licenses Help » ; « Terms » remplacé par « Support », 2026-10-20)
 
     private var links: some View {
         ViewThatFits(in: .horizontal) {
@@ -389,9 +389,9 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var linkItems: some View {
-        // TODO(avant l'App Store et les testeurs externes) : URLs des conditions et de la politique de confidentialité.
-        toAdd("Terms")
-        toAdd("Privacy")
+        // TODO(avant le TestFlight externe) : remplir les adresses dans Config/PublicPages.swift.
+        webLink("Support", PublicPages.support)
+        webLink("Privacy", PublicPages.privacy)
         Button { isShowingLicenses = true } label: { linkLabel("Licenses") }
             .buttonStyle(ChimpPressableStyle())
         if let help = SettingsModel.helpURL {
@@ -406,6 +406,16 @@ struct SettingsView: View {
             .underline()
             .foregroundStyle(.chimpTextPrimary)
             .frame(minHeight: ChimpSize.minimumTouchTarget)
+    }
+
+    /// Une page web publique, ou « to add » tant que son adresse manque.
+    @ViewBuilder
+    private func webLink(_ title: LocalizedStringKey, _ url: URL?) -> some View {
+        if let url {
+            Link(destination: url) { linkLabel(title) }
+        } else {
+            toAdd(title)
+        }
     }
 
     /// Lien prévu dont l'URL manque encore : affiché pour qu'on y pense, pas un bouton.
