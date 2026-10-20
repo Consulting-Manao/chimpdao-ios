@@ -25,6 +25,8 @@ struct AdminView: View {
     @State private var fundModel: AdminFundModel?
     /// Durée de vie du vault DeFindex et de sa stratégie (tranche 2, D1).
     @State private var lifetimeModel = AdminLifetimeModel()
+    /// « Prepare cards » : un lot de cartes à la suite (Meridian).
+    @State private var prepareCardsModel: PrepareCardsModel?
     @Environment(AppSession.self) private var session
 
     var body: some View {
@@ -32,6 +34,9 @@ struct AdminView: View {
             VStack(alignment: .leading, spacing: ChimpSpacing.sectionGap) {
                 ChimpNoticeBanner(text: untranslated("Admin mode · Stellar Testnet · Debug and Chimp Admin builds only"))
                 AdminKeyPanel(model: keyModel)
+                ChimpNavigationRow(title: untranslated("Prepare cards"), subtitle: untranslated("A batch of blank Infineon cards, one after the other")) {
+                    prepareCardsModel = PrepareCardsView.live()
+                }
                 readerPicker
                 ChimpButton(untranslated("Read a card"), isLoading: model.state == .reading) {
                     copied = false
@@ -60,6 +65,11 @@ struct AdminView: View {
         }
         .background(Color(.chimpBackground))
         .onAppear { if fundModel == nil { fundModel = makeFundModel() } }
+        .navigationDestination(isPresented: Binding(get: { prepareCardsModel != nil }, set: { if !$0 { prepareCardsModel = nil } })) {
+            if let prepareCardsModel {
+                PrepareCardsView(model: prepareCardsModel, hasAdminKey: keyModel.hasKey || isSimulator)
+            }
+        }
         .navigationTitle(Text(verbatim: "Admin"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
