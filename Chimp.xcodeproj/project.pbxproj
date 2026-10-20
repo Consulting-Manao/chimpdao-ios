@@ -99,6 +99,7 @@
 				276DCDF52EEB0063009A1DA5 /* Sources */,
 				276DCDF62EEB0063009A1DA5 /* Frameworks */,
 				276DCDF72EEB0063009A1DA5 /* Resources */,
+				3C4D5E012F5000000000B001 /* Build number (archive) */,
 			);
 			buildRules = (
 			);
@@ -197,6 +198,29 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		3C4D5E012F5000000000B001 /* Build number (archive) */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Build number (archive)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Numéro de build (CFBundleVersion) : à chaque archive, l heure UTC en AAMMJJ.HHMM, toujours croissante.\n# Écrit dans l Info.plist de l app construite, jamais dans Info.plist du dépôt.\n# Les builds de développement gardent CURRENT_PROJECT_VERSION.\nif [ \"$ACTION\" = \"install\" ]; then\n  BUILD=$(date -u +%y%m%d.%H%M)\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $BUILD\" \"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n  echo \"CFBundleVersion = $BUILD\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		276DCDF52EEB0063009A1DA5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -291,6 +315,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PNT7K5H3H3;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
@@ -459,6 +484,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PNT7K5H3H3;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
@@ -501,6 +527,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PNT7K5H3H3;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
@@ -674,6 +701,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PNT7K5H3H3;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -798,6 +826,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PNT7K5H3H3;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
