@@ -114,17 +114,23 @@ final class AppLock {
     /// Dernier échec technique (texte pour « Technical details »).
     private(set) var lastFailure: String?
 
-    init(session: AppSession, authenticator: DeviceAuthenticator = LocalDeviceAuthenticator()) {
+    /// Chimp Admin (`CHIMP_ADMIN_APP`, décision de Barth du 2026-10-20) : verrouillée à **chaque ouverture**, avec ou
+    /// sans compte, quel que soit le réglage (la clé admin testnet est dans le trousseau de ce téléphone). Sans code sur
+    /// l'iPhone, elle reste verrouillée.
+    let alwaysLocked: Bool
+
+    init(session: AppSession, authenticator: DeviceAuthenticator = LocalDeviceAuthenticator(), alwaysLocked: Bool = false) {
         self.session = session
         self.authenticator = authenticator
-        let enabled = Self.isEnabled(in: session)
+        self.alwaysLocked = alwaysLocked
+        let enabled = alwaysLocked || Self.isEnabled(in: session)
         isLocked = enabled
         promptsWhenActive = enabled
         lockedAccount = session.wallet.account?.address
     }
 
-    /// Le compte affiché a activé Face ID. Faux sans compte ouvert.
-    var isEnabled: Bool { Self.isEnabled(in: session) }
+    /// Le compte affiché a activé Face ID (faux sans compte ouvert), ou Chimp Admin.
+    var isEnabled: Bool { alwaysLocked || Self.isEnabled(in: session) }
 
     private static func isEnabled(in session: AppSession) -> Bool {
         session.wallet.account?.opensWithFaceID == true
@@ -158,6 +164,8 @@ final class AppLock {
         let account = session.wallet.account?.address
         guard account != lockedAccount else { return }
         lockedAccount = account
+        // Chimp Admin : déjà ouverte par Face ID pour cette ouverture de l'app, quel que soit le compte.
+        if alwaysLocked { return }
         lastFailure = nil
         guard isEnabled else {
             isLocked = false
@@ -185,6 +193,10 @@ final class AppLock {
             isLocked = false
             return
         }
+        if authenticator.kind() == .unavailable, alwaysLocked {
+            lastFailure = "This iPhone has no passcode, so Chimp Admin stays locked. Set a passcode in Settings."
+            return
+        }
         if authenticator.kind() == .unavailable {
             // Plus de code sur l'iPhone : impossible de vérifier qui ouvre l'app. Celui qui l'a retiré avait l'iPhone
             // déverrouillé ; le compte s'ouvre et son réglage se coupe (DESIGN_NOTES §12).
@@ -199,6 +211,8 @@ final class AppLock {
         case .success:
             lastFailure = nil
             isLocked = false
+        case .unavailable where alwaysLocked:
+            lastFailure = "This iPhone has no passcode, so Chimp Admin stays locked. Set a passcode in Settings."
         case .unavailable:
             try? session.setOpensWithFaceID(false)
             isLocked = false

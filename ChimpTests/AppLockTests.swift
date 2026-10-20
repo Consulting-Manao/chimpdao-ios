@@ -45,6 +45,33 @@ struct AppLockTests {
         return (AppLock(session: session, authenticator: face), session, store)
     }
 
+    // MARK: Chimp Admin
+
+    @Test("Chimp Admin : verrouillée à chaque ouverture, même sans compte ni réglage")
+    func adminAppAlwaysLocked() async {
+        let face = FakeAuthenticator()
+        let session = AppSession(store: InMemoryLocalWalletStore(LocalWallet()), config: .testnet)
+        let lock = AppLock(session: session, authenticator: face, alwaysLocked: true)
+        #expect(lock.isEnabled && lock.isLocked, "Verrouillée au lancement, sans compte")
+        await lock.didBecomeActive()
+        #expect(!lock.isLocked && face.faceIDRequests == 1)
+        lock.didEnterBackground()
+        #expect(lock.isLocked, "De nouveau verrouillée au retour d'arrière-plan")
+        await lock.didBecomeActive()
+        #expect(!lock.isLocked && face.faceIDRequests == 2)
+    }
+
+    @Test("Chimp Admin sans code sur l'iPhone : reste verrouillée")
+    func adminAppNoPasscodeStaysLocked() async {
+        let face = FakeAuthenticator()
+        face.lockKind = .unavailable
+        let session = AppSession(store: InMemoryLocalWalletStore(LocalWallet()), config: .testnet)
+        let lock = AppLock(session: session, authenticator: face, alwaysLocked: true)
+        await lock.didBecomeActive()
+        #expect(lock.isLocked)
+        #expect(lock.lastFailure?.contains("no passcode") == true)
+    }
+
     // MARK: Par compte
 
     @Test("Désactivé par défaut : jamais verrouillé, jamais de Face ID")

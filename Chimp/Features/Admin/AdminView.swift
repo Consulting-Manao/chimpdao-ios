@@ -30,7 +30,7 @@ struct AdminView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ChimpSpacing.sectionGap) {
-                ChimpNoticeBanner(text: untranslated("Admin mode · Stellar Testnet · Debug and Testing builds only"))
+                ChimpNoticeBanner(text: untranslated("Admin mode · Stellar Testnet · Debug and Chimp Admin builds only"))
                 AdminKeyPanel(model: keyModel)
                 readerPicker
                 ChimpButton(untranslated("Read a card"), isLoading: model.state == .reading) {

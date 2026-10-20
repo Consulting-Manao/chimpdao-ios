@@ -5,7 +5,7 @@ import SwiftUI
 /// version. Les lignes de la maquette pas encore faisables (paranoid mode, shop mode, raw signing) ne sont pas affichées :
 /// aucune ligne sans destination. « Terms » et « Privacy » sont marqués « to add » tant que leurs URLs manquent (décision
 /// de Barth du 2026-09-30). « Network » montre le réseau de la configuration de build, jamais un interrupteur
-/// (2026-09-30). En Debug et Testing, une section « Developer » ouvre le catalogue et le mode admin.
+/// (2026-09-30). En Debug et dans Chimp Admin, une section « Developer » ouvre le catalogue et le mode admin.
 struct SettingsView: View {
     @Bindable var model: SettingsModel
     let onBack: () -> Void
@@ -89,12 +89,14 @@ struct SettingsView: View {
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
+                    #if DESIGN_CATALOG
                     if let onDeveloper {
                         sectionLabel("Developer")
                             .padding(.top, ChimpSpacing.sectionGap)
-                        ChimpNavigationRow(title: "Design system and admin mode", subtitle: "Debug and Testing builds only", action: onDeveloper)
+                        ChimpNavigationRow(title: "Design system and admin mode", subtitle: "Debug and Chimp Admin builds only", action: onDeveloper)
                             .padding(.top, ChimpSpacing.s)
                     }
+                    #endif
 
                     ChimpButton(disconnectButtonTitle, kind: .destructive) { model.isConfirmingDisconnect = true }
                         .padding(.top, ChimpSpacing.sectionGap)

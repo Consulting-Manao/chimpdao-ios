@@ -11,6 +11,15 @@ struct ChimpApp: App {
         case misconfigured(NetworkConfigError)
     }
 
+    /// Chimp Admin (configuration Admin) : verrouillée par Face ID à chaque ouverture.
+    static var isAdminApp: Bool {
+        #if CHIMP_ADMIN_APP
+        true
+        #else
+        false
+        #endif
+    }
+
     init() {
         ChimpFonts.register()
         do {
@@ -18,7 +27,7 @@ struct ChimpApp: App {
             // Réglage « Sounds » (I2) : lu à chaque son, il prend effet aussitôt.
             let preferences = session.preferences
             ChimpSoundPlayer.shared.isEnabled = { preferences.soundsEnabled }
-            _launch = State(initialValue: .ready(session, AppLock(session: session)))
+            _launch = State(initialValue: .ready(session, AppLock(session: session, alwaysLocked: Self.isAdminApp)))
         } catch let error as NetworkConfigError {
             _launch = State(initialValue: .misconfigured(error))
         } catch {
