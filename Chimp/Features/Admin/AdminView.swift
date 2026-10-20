@@ -34,7 +34,7 @@ struct AdminView: View {
             VStack(alignment: .leading, spacing: ChimpSpacing.sectionGap) {
                 ChimpNoticeBanner(text: untranslated("Admin mode · Stellar Testnet · Debug and Chimp Admin builds only"))
                 AdminKeyPanel(model: keyModel)
-                ChimpNavigationRow(title: untranslated("Prepare cards"), subtitle: untranslated("A batch of blank Infineon cards, one after the other")) {
+                ChimpNavigationRow(title: untranslated("Prepare cards"), subtitle: untranslated("Blank Infineon cards, step by step, one after the other")) {
                     prepareCardsModel = PrepareCardsView.live()
                 }
                 readerPicker

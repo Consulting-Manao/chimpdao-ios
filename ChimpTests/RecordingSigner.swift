@@ -15,6 +15,9 @@ final class RecordingSigner: ChipSigner, @unchecked Sendable {
 
     init(error: ChipError? = nil) { self.error = error }
 
+    /// Erreur renvoyée une seule fois, au prochain `sign` (puis la carte signe normalement).
+    var failNext: ChipError?
+
     /// Appels à SET PIN (onboarding réel) : le PIN transmis.
     private(set) var newPINs: [String] = []
     /// Erreur à renvoyer à la place de `setPINAndSign` (ex. : PIN défini puis signature ratée).
@@ -25,6 +28,10 @@ final class RecordingSigner: ChipSigner, @unchecked Sendable {
     func sign(digests: [Data], expectedKey: ChipPublicKey, pin: String?) async throws -> [ChipSignedDigest] {
         calls.append(Call(digests: digests, expectedKey: expectedKey, pin: pin))
         if let error { throw error }
+        if let failNext {
+            self.failNext = nil
+            throw failNext
+        }
         return digests.map { _ in .secp256k1(signature: Data(repeating: 0x11, count: 64)) }
     }
 
