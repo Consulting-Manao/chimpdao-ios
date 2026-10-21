@@ -51,6 +51,19 @@ struct PreferencesTests {
         #expect(store.values.isEmpty)
     }
 
+    @Test("Fenêtre « testnet » du premier lancement : à valider une fois, gardée, et de retour après « Erase everything »")
+    func testnetNotice() throws {
+        let store = InMemoryPreferencesStore()
+        let preferences = AppPreferences(store: store)
+        #expect(!preferences.hasAcceptedTestnetNotice, "Montrée au premier lancement")
+        preferences.hasAcceptedTestnetNotice = true
+        #expect(store.values[.testnetNotice] == "accepted")
+        #expect(AppPreferences(store: store).hasAcceptedTestnetNotice, "Plus jamais ensuite")
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet, preferences: preferences)
+        try session.eraseEverything()
+        #expect(!preferences.hasAcceptedTestnetNotice && store.values.isEmpty)
+    }
+
     @Test("Réglages : changer « Look » depuis I2 change la préférence du téléphone")
     func settingsLook() {
         let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)

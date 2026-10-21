@@ -7,6 +7,8 @@ import SwiftUI
 struct WalletView: View {
     /// Swap éteint sur ce réseau : pas de tuile.
     @Environment(\.chimpFeatures) private var features
+    /// Testnet : bandeau permanent « TESTNET » (Chimp Test sur l'App Store).
+    @Environment(\.chimpNetwork) private var network
     let model: WalletViewModel
     /// Roue dentée affichée seulement si une action est fournie.
     var onSettings: (() -> Void)?
@@ -87,6 +89,12 @@ struct WalletView: View {
 
     private func balances(_ content: WalletContent) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            if network == .testnet {
+                ChimpTestnetBanner()
+                    // Lisible même pendant le chargement (le reste est en squelette).
+                    .unredacted()
+                    .padding(.bottom, ChimpSpacing.l)
+            }
             if let problem = model.securityProblem {
                 ChimpNoticeBanner(text: LocalizedStringKey(problem), marker: .error)
                     .padding(.bottom, ChimpSpacing.m)

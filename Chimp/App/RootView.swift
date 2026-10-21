@@ -24,6 +24,15 @@ struct RootView: View {
         .onChange(of: session.wallet.account?.address) {
             Task { await lock.accountDidChange() }
         }
+        // Testnet (Chimp Test, Chimp Dev) : au premier lancement, une fenêtre à valider. Jamais sur le mainnet.
+        .alert(TestnetNotice.title, isPresented: Binding(
+            get: { session.network == .testnet && !session.preferences.hasAcceptedTestnetNotice },
+            set: { _ in }
+        )) {
+            Button(TestnetNotice.accept) { session.preferences.hasAcceptedTestnetNotice = true }
+        } message: {
+            Text(TestnetNotice.message)
+        }
         .environment(session)
         .environment(lock)
     }

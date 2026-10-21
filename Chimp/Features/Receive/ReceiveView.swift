@@ -49,6 +49,12 @@ struct ReceiveView: View {
                     drawerPicker(drawer)
                         .redacted(reason: isLoading ? .placeholder : [])
 
+                    if model.showsTestnetBadge {
+                        // Le même avertissement qu'au premier lancement : jamais d'argent réel vers cette adresse.
+                        ChimpNoticeBanner(text: TestnetNotice.message, marker: .error)
+                            .padding(.top, ChimpSpacing.m)
+                    }
+
                     Spacer(minLength: ChimpSpacing.xl)
 
                     qrCode(drawer, isLoading: isLoading)

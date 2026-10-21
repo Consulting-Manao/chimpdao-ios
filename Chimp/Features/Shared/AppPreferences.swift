@@ -45,11 +45,18 @@ final class AppPreferences {
         didSet { store.set(soundsEnabled ? nil : "off", for: .sounds) }
     }
 
+    /// Fenêtre « testnet » du premier lancement validée (Chimp Test). Effacée avec le reste : elle revient après
+    /// « Erase everything on this phone ».
+    var hasAcceptedTestnetNotice: Bool {
+        didSet { store.set(hasAcceptedTestnetNotice ? "accepted" : nil, for: .testnetNotice) }
+    }
+
     init(store: PreferencesStore) {
         self.store = store
         look = store.string(for: .look).flatMap(ChimpLook.init(rawValue:)) ?? .auto
         currency = store.string(for: .currency).flatMap(DisplayCurrency.init(rawValue:)) ?? .usd
         soundsEnabled = store.string(for: .sounds) != "off"
+        hasAcceptedTestnetNotice = store.string(for: .testnetNotice) == "accepted"
     }
 
     /// Préférences gardées dans `UserDefaults` (l'app) ; en mémoire pour les tests et le catalogue.
@@ -62,6 +69,7 @@ final class AppPreferences {
         look = .auto
         currency = .usd
         soundsEnabled = true
+        hasAcceptedTestnetNotice = false
         // Après les valeurs par défaut (leur `didSet` les écrit) : rien ne reste dans le stockage.
         store.removeAll()
     }
@@ -72,6 +80,7 @@ enum PreferenceKey: String, CaseIterable {
     case look = "chimp.look"
     case currency = "chimp.currency"
     case sounds = "chimp.sounds"
+    case testnetNotice = "chimp.testnetNotice"
 }
 
 /// Lecture et écriture des préférences. Implémenté par `UserDefaultsPreferencesStore` et `InMemoryPreferencesStore`.
