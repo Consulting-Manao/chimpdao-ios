@@ -309,7 +309,7 @@
 		275B8EE92F112521000C039C /* Admin */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconTest;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconAdmin;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Chimp/Chimp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -477,7 +477,7 @@
 		276DCE052EEB0065009A1DA5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconTest;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconDev;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Chimp/Chimp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -501,7 +501,8 @@
 				);
 				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.consulting-manao.chimp";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = ChimpDAO;
+				PRODUCT_NAME = "Chimp Dev";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -580,7 +581,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChimpDAO.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ChimpDAO";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Chimp Dev.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Chimp Dev";
 			};
 			name = Debug;
 		};
