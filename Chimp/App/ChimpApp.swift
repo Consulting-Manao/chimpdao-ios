@@ -39,6 +39,13 @@ struct ChimpApp: App {
         WindowGroup {
             switch launch {
             case let .ready(session, lock):
+                #if CHIMP_ADMIN_APP
+                // Chimp Admin : les cartes et les outils, jamais le wallet.
+                AdminAppRoot(session: session, lock: lock)
+                    .chimpReadsScreenInsets()
+                    .environment(\.chimpFeatures, session.config.features)
+                    .environment(\.chimpNetwork, session.network)
+                #else
                 RootView(session: session, lock: lock)
                     .chimpReadsScreenInsets()
                 #if DESIGN_CATALOG
@@ -50,6 +57,7 @@ struct ChimpApp: App {
                     // Les fonctions du réseau (Swap, Grow, Add money, CETES), pour tous les écrans, démos comprises.
                     .environment(\.chimpFeatures, session.config.features)
                     .environment(\.chimpNetwork, session.network)
+                #endif
             case .misconfigured(let error):
                 MisconfiguredBuildView(error: error)
             }

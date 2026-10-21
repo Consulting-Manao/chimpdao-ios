@@ -13,20 +13,24 @@ struct AdminFundPanel: View {
 
     var body: some View {
         AdminPanel(title: "Testnet money") {
-            Text(verbatim: "Tops up the Main account and every card's wallet with 1000 testnet XLM each, sent by the admin key. "
+            Text(verbatim: "Sends 1000 testnet XLM, paid by the admin key. "
                 + "The admin is topped up by friendbot first if it holds less than 2000 XLM.")
                 .chimpFont(.caption).foregroundStyle(.chimpTextSecondary)
-            ForEach(model.targets) { target in
-                AdminValue(label: target.label, value: target.address)
-            }
             if !hasAdminKey {
                 Text(verbatim: "Save the admin key above first: it signs and pays the transfers.")
                     .chimpFont(.caption).foregroundStyle(Color(.chimpNegative))
             }
-            ChimpButton(untranslated(buttonTitle), isLoading: model.isBusy || model.isLoadingTargets) {
-                Task { await model.fund() }
+            if !model.targets.isEmpty {
+                Text(verbatim: "This phone's account: the Main account and every card's wallet.").chimpFont(.rowTitle)
+                ForEach(model.targets) { target in
+                    AdminValue(label: target.label, value: target.address)
+                }
+                ChimpButton(untranslated(buttonTitle), isLoading: model.isBusy || model.isLoadingTargets) {
+                    Task { await model.fund() }
+                }
+                .disabled(model.isBusy || !hasAdminKey)
             }
-            .disabled(model.isBusy || model.targets.isEmpty || !hasAdminKey)
+            customAddress
             switch model.message {
             case .ok(let text):
                 Text(verbatim: text).chimpFont(.body).foregroundStyle(Color(.chimpPositive)).textSelection(.enabled)
@@ -38,6 +42,29 @@ struct AdminFundPanel: View {
             if let usdcFaucet { usdc(usdcFaucet) }
         }
         .task { await model.loadTargets() }
+    }
+
+    /// Une adresse quelconque (G… ou C…), collée ou tapée.
+    private var customAddress: some View {
+        VStack(alignment: .leading, spacing: ChimpSpacing.s) {
+            Text(verbatim: "Any address").chimpFont(.rowTitle)
+            ChimpInputField {
+                TextField(text: Binding(get: { model.customAddress }, set: { model.customAddress = $0 })) {
+                    Text(verbatim: "G… or C…")
+                }
+                .chimpFont(.address)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+            } accessory: {
+                Button {
+                    model.customAddress = UIPasteboard.general.string ?? ""
+                } label: { Text(verbatim: "Paste").chimpFont(.buttonSmall) }
+            }
+            ChimpButton(untranslated("Send 1000 test XLM"), kind: .secondary, isLoading: model.isBusy) {
+                Task { await model.fundCustom() }
+            }
+            .disabled(model.isBusy || model.customTarget == nil || !hasAdminKey)
+        }
     }
 
     private var buttonTitle: String {

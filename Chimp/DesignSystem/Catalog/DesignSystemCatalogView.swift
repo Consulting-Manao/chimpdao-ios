@@ -17,8 +17,8 @@ struct DesignSystemCatalogView: View {
     var body: some View {
         CatalogPage("Design System", settings: settings, scrolls: false) {
             List {
-                #if CHIMP_ADMIN
-                // Textes du mode admin hors String Catalog (voir `AdminView`).
+                #if CHIMP_ADMIN && !CHIMP_ADMIN_APP
+                // Dans Chimp Admin, ces outils sont dans l'onglet Tools. Textes du mode admin hors String Catalog (voir `AdminView`).
                 Section {
                     link(untranslated("Admin mode (testnet)"), systemImage: "wrench.and.screwdriver.fill") { AdminView() }
                     if let session, session.hasAccount {

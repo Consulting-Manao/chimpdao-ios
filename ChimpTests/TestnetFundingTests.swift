@@ -166,6 +166,26 @@ struct TestnetFundingTests {
         #expect(model.targets.isEmpty)
         #expect(model.message == .failed("Nothing to fund yet — sign in or add a card first"))
     }
+
+    @Test("« Any address » (Chimp Admin, sans compte) : seule une adresse G ou C de 56 caractères est financée")
+    func customAddress() async {
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
+        let funding = MockTestnetFunding()
+        funding.delay = .zero
+        let model = AdminFundModel(session: session, chain: FakeCardsChain(members: [], pockets: [:]), funder: funding)
+        let wallet = String(repeating: "C", count: 56)
+        for bad in ["", "hello", String(repeating: "S", count: 56), String(wallet.dropLast())] {
+            model.customAddress = bad
+            #expect(model.customTarget == nil, "Refusé : \(bad)")
+            await model.fundCustom()
+        }
+        #expect(funding.funded.isEmpty)
+        model.customAddress = "  " + wallet.lowercased() + "\n"
+        #expect(model.customTarget == wallet)
+        await model.fundCustom()
+        #expect(funding.funded == [wallet])
+        #expect(model.message == .ok("Sent 1000 test XLM to CCCCCC…CCCC."))
+    }
 }
 
 // MARK: Faux

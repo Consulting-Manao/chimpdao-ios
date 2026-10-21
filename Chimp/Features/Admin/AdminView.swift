@@ -16,7 +16,9 @@ struct AdminView: View {
     @State private var model = AdminCardReadModel(nfcAvailable: NFCTagReaderSession.readingAvailable)
     @State private var copied = false
     @State private var isConfirmingKeyGeneration = false
-    @State private var keyModel = AdminKeyModel(store: KeychainAdminKeyStore(network: .testnet))
+    @State private var keyModel: AdminKeyModel
+    /// `false` dans Chimp Admin, où « Prepare cards » est un onglet à part.
+    let showsPrepareCards: Bool
     /// Enregistrement de la carte lue ; recréé à chaque lecture.
     @State private var enrolModel: AdminEnrolModel?
     /// Diagnostic en lecture seule de la carte lue (onboarding, arrêt 1) ; recréé à chaque lecture.
@@ -29,13 +31,21 @@ struct AdminView: View {
     @State private var prepareCardsModel: PrepareCardsModel?
     @Environment(AppSession.self) private var session
 
+    /// `keyModel` partagé avec l'onglet Cards de Chimp Admin (une clé enregistrée ici y est vue aussitôt).
+    init(keyModel: AdminKeyModel = AdminKeyModel(store: KeychainAdminKeyStore(network: .testnet)), showsPrepareCards: Bool = true) {
+        _keyModel = State(initialValue: keyModel)
+        self.showsPrepareCards = showsPrepareCards
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ChimpSpacing.sectionGap) {
                 ChimpNoticeBanner(text: untranslated("Admin mode · Stellar Testnet · Debug and Chimp Admin builds only"))
                 AdminKeyPanel(model: keyModel)
-                ChimpNavigationRow(title: untranslated("Prepare cards"), subtitle: untranslated("Blank Infineon cards, step by step, one after the other")) {
-                    prepareCardsModel = PrepareCardsView.live()
+                if showsPrepareCards {
+                    ChimpNavigationRow(title: untranslated("Prepare cards"), subtitle: untranslated("Blank Infineon cards, step by step, one after the other")) {
+                        prepareCardsModel = PrepareCardsView.live()
+                    }
                 }
                 readerPicker
                 ChimpButton(untranslated("Read a card"), isLoading: model.state == .reading) {
@@ -55,7 +65,7 @@ struct AdminView: View {
                 if let card = model.cardForEnrolment, let enrolModel {
                     AdminEnrolPanel(card: card, model: enrolModel, hasAdminKey: keyModel.hasKey || isMock)
                 }
-                if session.hasAccount, let fundModel {
+                if let fundModel {
                     AdminFundPanel(model: fundModel, hasAdminKey: keyModel.hasKey || isSimulator, usdcFaucet: ChimpNetworkConfig.testnet.usdcFaucet)
                 }
                 AdminLifetimePanel(model: lifetimeModel, hasAdminKey: keyModel.hasKey)

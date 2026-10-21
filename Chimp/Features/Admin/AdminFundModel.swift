@@ -24,6 +24,8 @@ final class AdminFundModel {
     private(set) var isLoadingTargets = false
     private(set) var isBusy = false
     private(set) var message: Message?
+    /// « Any address » : une adresse G ou C saisie (Chimp Admin n'a pas de compte ouvert).
+    var customAddress = ""
 
     private let session: AppSession
     private let chain: WalletChain
@@ -87,6 +89,27 @@ final class AdminFundModel {
         message = funded == total
             ? .ok("Funded \(total) balance\(total == 1 ? "" : "s"). Pull to refresh the Wallet.")
             : .failed("\(funded)/\(total) funded — \(reasons.first ?? "unknown")")
+    }
+
+    /// L'adresse saisie, si elle a la forme d'une adresse Stellar (G… ou C…, 56 caractères) ; sinon `nil`.
+    var customTarget: String? {
+        let address = customAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard address.count == 56, address.hasPrefix("G") || address.hasPrefix("C") else { return nil }
+        return address
+    }
+
+    /// « Send 1000 test XLM » vers l'adresse saisie (même financement que les autres : friendbot pour G, l'admin pour C).
+    func fundCustom() async {
+        guard !isBusy, let address = customTarget else { return }
+        isBusy = true
+        message = nil
+        defer { isBusy = false }
+        do {
+            try await funder.fund(address)
+            message = .ok("Sent 1000 test XLM to \(address.prefix(6))…\(address.suffix(4)).")
+        } catch {
+            message = .failed(Self.describe(error))
+        }
     }
 
     static func describe(_ error: Error) -> String {
