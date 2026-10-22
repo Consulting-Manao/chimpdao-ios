@@ -111,7 +111,13 @@ extension ChimpNetworkConfig {
     /// Mainnet incomplet : une erreur qui empêche l'app de démarrer, **jamais** un retour au testnet.
     static func forThisBuild() throws -> ChimpNetworkConfig {
         #if CHIMP_TESTNET
-        .testnet
+        var config = ChimpNetworkConfig.testnet
+        #if CHIMP_TESTNET_STORE
+        // Chimp Test sur l'App Store (2026-10-22) : pas d'« Add money from another chain » (vrais prix et dépôts depuis
+        // d'autres blockchains : on pourrait croire y déposer du vrai argent). Gardé dans Chimp Dev.
+        config.features.addMoney = false
+        #endif
+        return config
         #else
         try mainnetDraft.complete()
         #endif

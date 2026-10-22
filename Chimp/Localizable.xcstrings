@@ -389,6 +389,30 @@
     "+$6.20 this week" : {
 
     },
+    "Asking %@ for a price…" : {
+
+    },
+    "Debug and Chimp Admin builds only" : {
+
+    },
+    "I understand" : {
+
+    },
+    "Support" : {
+
+    },
+    "Test money only" : {
+
+    },
+    "Test money, no real value" : {
+
+    },
+    "TESTNET" : {
+
+    },
+    "This app runs on the Stellar testnet. Money here has no value. Never send real money to this wallet: it would be lost." : {
+
+    },
     "≈ %@" : {
 
     },

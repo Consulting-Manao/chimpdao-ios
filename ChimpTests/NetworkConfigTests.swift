@@ -7,8 +7,14 @@ import Testing
 struct NetworkConfigTests {
     @Test("La configuration de ce build : testnet en Debug et Testing ; mainnet en Release, refusé tant qu'il est incomplet")
     func thisBuild() throws {
-        #if CHIMP_TESTNET
+        #if CHIMP_TESTNET_STORE
+        // Chimp Test (App Store) : le testnet, sans « Add money from another chain ».
+        var store = ChimpNetworkConfig.testnet
+        store.features.addMoney = false
+        #expect(try ChimpNetworkConfig.forThisBuild() == store)
+        #elseif CHIMP_TESTNET
         #expect(try ChimpNetworkConfig.forThisBuild() == .testnet)
+        #expect(try ChimpNetworkConfig.forThisBuild().features.addMoney, "Chimp Dev garde « Add money »")
         #else
         // Schéma « Chimp Release Tests » : la vraie Release. Jamais de repli sur le testnet.
         #expect(throws: NetworkConfigError.incomplete(network: .mainnet, missing: ChimpNetworkConfig.mainnetDraft.missing)) {
