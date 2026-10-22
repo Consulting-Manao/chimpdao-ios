@@ -421,13 +421,15 @@ final class ActivityViewModel {
     /// conversion au prix du jour (décision de Barth du 2026-09-30). Signe « + » ou « − » (moins typographique).
     /// Lignes de la liste : 2 décimales au plus, tronquées, « < 0.01 » (`SendAsset.displayed`, décision du 2026-10-01) ;
     /// reçu (`exact`) : le montant exact, 7 décimales au plus.
-    static func amountText(_ amount: Decimal, code: String, sign: ActivityTone?, exact: Bool = false, locale: Locale = .autoupdatingCurrent) -> String {
+    /// `showsDollars` faux (Chimp Test) : l'USDC aussi en quantité (« 25 USDC »).
+    static func amountText(_ amount: Decimal, code: String, sign: ActivityTone?, exact: Bool = false, locale: Locale = .autoupdatingCurrent,
+                           showsDollars: Bool = AmountDisplay.showsDollars) -> String {
         let prefix = switch sign {
         case .positive: "+"
         case .negative: "\u{2212}"
         default: ""
         }
-        let isUSDC = code == SendAsset.usdc.code
+        let isUSDC = code == SendAsset.usdc.code && showsDollars
         let body: String
         if exact {
             body = isUSDC

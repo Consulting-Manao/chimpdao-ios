@@ -76,7 +76,7 @@ struct NameYourCardView<Model: CardNaming>: View {
                         name: model.trimmedCardName.isEmpty ? String(localized: "Jungle") : model.trimmedCardName,
                         color: model.cardColor,
                         number: model.cardNumber,
-                        amount: model.pocketIsEmpty == true ? Decimal(0).formatted(.currency(code: "USD").presentation(.narrow)) : nil,
+                        amount: model.pocketIsEmpty == true ? AmountDisplay.emptyText : nil,
                         subtitle: model.pocketIsEmpty == true ? "on card" : nil
                     )
                     .frame(width: 250)

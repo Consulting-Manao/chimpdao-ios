@@ -110,7 +110,8 @@ struct WalletView: View {
                 .padding(.bottom, ChimpSpacing.l)
             }
 
-            if content.isShowingAssetAmounts {
+            // Chimp Test (quantités seulement) : ce n'est pas une panne de prix, pas de bandeau.
+            if content.isShowingAssetAmounts && AmountDisplay.showsDollars {
                 // État absent de la maquette (décision du 2026-09-29) : pas de total partiel en dollars.
                 ChimpNoticeBanner(text: "Prices are unavailable right now, so amounts are shown per asset.")
                     .padding(.bottom, ChimpSpacing.l)

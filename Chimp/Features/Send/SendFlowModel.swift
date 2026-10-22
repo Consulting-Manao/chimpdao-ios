@@ -360,7 +360,7 @@ final class SendFlowModel {
     }
 
     private func usdEquivalent(of value: Decimal, asset: SendAsset) -> String? {
-        guard asset.hasVariablePrice, let price = context?.usdPrices[asset] else { return nil }
+        guard AmountDisplay.showsDollars, asset.hasVariablePrice, let price = context?.usdPrices[asset] else { return nil }
         let usd = (value * price).truncated(to: 2)
         return usd.formatted(.currency(code: "USD").presentation(.narrow))
     }
