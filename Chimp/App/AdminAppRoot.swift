@@ -1,27 +1,32 @@
 #if CHIMP_ADMIN_APP
-import CoreNFC
 import SwiftUI
 
-/// Chimp Admin (configuration Admin) : l'app de l'équipe pour les cartes, sans aucun écran du wallet (demande de Barth du
-/// 2026-10-21). Trois onglets : Cards (« Prepare cards »), Tools (clé admin, argent de test, enregistrement manuel,
-/// durée de vie du vault), Design (le catalogue). Verrouillée par Face ID à chaque ouverture, comme avant.
+/// Chimp Admin (configuration Admin) : l'app de l'équipe pour les cartes, par tâche et en langage simple (demande de
+/// Barth du 2026-10-22). Sans clé : « Set up Chimp Admin ». Avec la clé : la ligne d'état en haut et les onglets.
+/// Aucun écran du wallet, pas de catalogue (il reste dans Chimp Dev). Verrouillée par Face ID à chaque ouverture.
 struct AdminAppRoot: View {
     let session: AppSession
     let lock: AppLock
-    /// Partagé par Cards et Tools : une clé admin enregistrée dans Tools est vue aussitôt par Cards.
-    @State private var keyModel = AdminKeyModel(store: KeychainAdminKeyStore(network: .testnet))
+    @State private var admin = AdminSession.live()
     @State private var prepareCards = PrepareCardsView.live()
 
     var body: some View {
-        TabView {
-            NavigationStack { cards }
-                .tabItem { Label { Text(verbatim: "Cards") } icon: { Image(systemName: "creditcard.fill") } }
-            NavigationStack { AdminView(keyModel: keyModel, showsPrepareCards: false) }
-                .tabItem { Label { Text(verbatim: "Tools") } icon: { Image(systemName: "wrench.and.screwdriver.fill") } }
-            NavigationStack { DesignSystemCatalogView() }
-                .tabItem { Label { Text(verbatim: "Design") } icon: { Image(systemName: "paintpalette.fill") } }
+        Group {
+            if admin.hasKey {
+                VStack(spacing: 0) {
+                    AdminStatusLine(session: admin)
+                    TabView {
+                        NavigationStack { cards }
+                            .tabItem { Label { Text(verbatim: "Cards") } icon: { Image(systemName: "creditcard.fill") } }
+                    }
+                    .tint(Color(.chimpTextPrimary))
+                }
+                .background(Color(.chimpSurfaceSecondary))
+                .onAppear { admin.refreshBalance() }
+            } else {
+                AdminSetupView(session: admin)
+            }
         }
-        .tint(Color(.chimpTextPrimary))
         .chimpWindowStyle(session.preferences.look.interfaceStyle)
         .chimpAppLock(lock, style: session.preferences.look.interfaceStyle)
         .environment(session)
@@ -31,19 +36,13 @@ struct AdminAppRoot: View {
     @ViewBuilder
     private var cards: some View {
         if let prepareCards {
-            PrepareCardsView(model: prepareCards, hasAdminKey: keyModel.hasKey || Self.isSimulator)
+            PrepareCardsView(model: prepareCards, hasAdminKey: admin.hasKey)
+                // L'argent de départ part de l'admin : son solde change.
+                .onChange(of: prepareCards.cards) { admin.refreshBalance() }
         } else {
-            ChimpNoticeBanner(text: untranslated("The card journal couldn't be opened on this iPhone."), marker: .error)
+            ChimpNoticeBanner(text: untranslated("The list of cards couldn't be opened on this iPhone."), marker: .error)
                 .padding(ChimpSpacing.screenMargin)
         }
-    }
-
-    private static var isSimulator: Bool {
-        #if targetEnvironment(simulator)
-        true
-        #else
-        false
-        #endif
     }
 }
 #endif
