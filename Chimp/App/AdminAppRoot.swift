@@ -10,6 +10,7 @@ struct AdminAppRoot: View {
     @State private var admin = AdminSession.live()
     @State private var prepareCards = PrepareCardsView.live()
     @State private var money = AdminMoneyModel.live()
+    @State private var vault = VaultHealthModel.live()
 
     var body: some View {
         Group {
@@ -21,6 +22,8 @@ struct AdminAppRoot: View {
                             .tabItem { Label { Text(verbatim: "Cards") } icon: { Image(systemName: "creditcard.fill") } }
                         NavigationStack { AdminMoneyView(session: admin, model: money) }
                             .tabItem { Label { Text(verbatim: "Money") } icon: { Image(systemName: "banknote.fill") } }
+                        NavigationStack { AdminMaintenanceView(session: admin, vault: vault) }
+                            .tabItem { Label { Text(verbatim: "Maintenance") } icon: { Image(systemName: "wrench.and.screwdriver.fill") } }
                     }
                     .tint(Color(.chimpTextPrimary))
                 }

@@ -36,6 +36,8 @@ final class AdminLifetimeModel {
             entries = read.entries
             costs = (try? await lifetime.estimate(read.entries)) ?? [:]
         } catch {
+            // Lecture interrompue (écran quitté) : pas une panne, elle reprendra au prochain affichage.
+            if VaultHealthModel.isCancellation(error) { return }
             message = .failed("Couldn't read the contracts' lifetime: \((error as? LocalizedError)?.errorDescription ?? "\(error)")")
         }
     }

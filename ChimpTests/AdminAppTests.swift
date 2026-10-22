@@ -80,5 +80,61 @@ struct AdminAppTests {
         await model.send()
         #expect(model.message == .failed("Stellar testnet isn't available in this build."))
     }
+
+    private func entry(until ledger: UInt32) -> ContractLifetime.Entry {
+        ContractLifetime.Entry(label: "Vault", contract: "C", wasmHash: Data(), instanceLiveUntil: ledger, codeLiveUntil: ledger + 10)
+    }
+
+    @Test("Vault : vert au-delà de deux semaines, orange en dessous (avec Extend), rouge une fois expiré")
+    func vaultState() {
+        let now = Date(timeIntervalSince1970: 1_792_500_000)
+        let perDay = UInt32(86_400 / ContractLifetime.secondsPerLedger)
+        let latest: UInt32 = 1_000_000
+        guard case .ok = VaultHealthModel.state(entries: [entry(until: latest + perDay * 30)], latest: latest, now: now) else {
+            Issue.record("expected ok"); return
+        }
+        guard case .soon = VaultHealthModel.state(entries: [entry(until: latest + perDay * 30), entry(until: latest + perDay * 10)], latest: latest, now: now) else {
+            Issue.record("expected soon: the first contract to expire counts"); return
+        }
+        guard case .expired = VaultHealthModel.state(entries: [entry(until: latest - 1)], latest: latest, now: now) else {
+            Issue.record("expected expired"); return
+        }
+    }
+
+    @Test("Vault : une lecture interrompue n'est pas une panne ; Extend prolonge puis relit")
+    func vaultReadAndExtend() async {
+        let latest: UInt32 = 1_000_000
+        var reads = 0
+        var extended: [ContractLifetime.Entry] = []
+        var firstFails = true
+        var until: UInt32 = latest + 1000
+        let model = VaultHealthModel(
+            read: {
+                reads += 1
+                if firstFails {
+                    firstFails = false
+                    throw StellarError.rpc("cancelled")
+                }
+                return (latest, [self.entry(until: until)])
+            },
+            estimate: { _ in ["C": 245] },
+            extend: { entries in
+                extended = entries
+                until = latest + 1_555_200
+                return ["hash"]
+            }
+        )
+        model.refresh()
+        await model.waitForRefresh()
+        #expect(model.state == .loading, "« cancelled » : on relira, pas d'erreur affichée")
+        model.refresh()
+        await model.waitForRefresh()
+        guard case .soon = model.state else { Issue.record("expected soon, got \(model.state)"); return }
+        #expect(model.extendCost == 245)
+        await model.extendVault()
+        #expect(extended.count == 1 && model.extendResult == .extended)
+        guard case .ok = model.state else { Issue.record("expected ok after extending, got \(model.state)"); return }
+        #expect(reads == 3)
+    }
 }
 #endif
