@@ -9,6 +9,7 @@ struct AdminAppRoot: View {
     let lock: AppLock
     @State private var admin = AdminSession.live()
     @State private var prepareCards = PrepareCardsView.live()
+    @State private var money = AdminMoneyModel.live()
 
     var body: some View {
         Group {
@@ -18,11 +19,16 @@ struct AdminAppRoot: View {
                     TabView {
                         NavigationStack { cards }
                             .tabItem { Label { Text(verbatim: "Cards") } icon: { Image(systemName: "creditcard.fill") } }
+                        NavigationStack { AdminMoneyView(session: admin, model: money) }
+                            .tabItem { Label { Text(verbatim: "Money") } icon: { Image(systemName: "banknote.fill") } }
                     }
                     .tint(Color(.chimpTextPrimary))
                 }
                 .background(Color(.chimpSurfaceSecondary))
-                .onAppear { admin.refreshBalance() }
+                .onAppear {
+                    admin.refreshBalance()
+                    money.onSent = { [admin] in admin.refreshBalance() }
+                }
             } else {
                 AdminSetupView(session: admin)
             }

@@ -49,6 +49,24 @@ struct TestnetFundingTests {
         #expect(network.transfers == [.init(from: Self.admin.accountId, to: Self.pocket, units: 10_000_000_000)])
     }
 
+    @Test("Send test money : le montant demandé vers une adresse C ou un compte G ouvert ; un G inconnu est ouvert par friendbot")
+    func sendTestMoney() async throws {
+        let account = try KeyPair.generateRandomKeyPair().accountId
+        let fresh = try KeyPair.generateRandomKeyPair().accountId
+        let network = FakeFundingNetwork(adminBalance: 5000)
+        network.openAccounts = [Self.admin.accountId, account]
+        let (funder, _) = funder(network)
+        #expect(try await funder.send(Self.pocket, units: 1_200_000_000) == .sent(hash: "hash"))
+        #expect(try await funder.send(account, units: 50_000_000) == .sent(hash: "hash"))
+        #expect(network.transfers == [
+            .init(from: Self.admin.accountId, to: Self.pocket, units: 1_200_000_000),
+            .init(from: Self.admin.accountId, to: account, units: 50_000_000),
+        ])
+        #expect(try await funder.send(fresh, units: 50_000_000) == .openedByFriendbot)
+        #expect(network.friendbotCalls == [fresh] && network.transfers.count == 2, "Pas de transfert vers un compte G pas encore ouvert")
+        await #expect(throws: FundingError.unsupportedAddress) { try await funder.send("SNOTANADDRESS", units: 1) }
+    }
+
     @Test("Admin sous 2000 XLM : rechargé par friendbot, puis le transfert")
     func topsUpAdmin() async throws {
         let network = FakeFundingNetwork(adminBalance: Decimal(string: "1999.9999999")!)
@@ -204,6 +222,8 @@ private final class FakeFundingNetwork: FundingNetwork {
     }
 
     let adminBalance: Decimal?
+    /// Comptes G ouverts sur le réseau (`nil` : tous) ; un autre compte n'a pas de solde lisible.
+    var openAccounts: Set<String>?
     var friendbotFailures: Int
     private(set) var friendbotCalls: [String] = []
     private(set) var transfers: [Transfer] = []
@@ -214,6 +234,7 @@ private final class FakeFundingNetwork: FundingNetwork {
     }
 
     func nativeBalance(of account: String) async throws -> Decimal {
+        if let openAccounts, !openAccounts.contains(account) { throw StellarError.rpc("404 not found") }
         guard let adminBalance else { throw URLError(.timedOut) }
         return adminBalance
     }

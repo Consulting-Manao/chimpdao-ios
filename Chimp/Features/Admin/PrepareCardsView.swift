@@ -619,7 +619,7 @@ struct CheckCardView: View {
 // MARK: - Mise en page commune
 
 /// Un écran d'étape : surtitre, titre, phrase, contenu, puis les actions en bas.
-private struct PrepareStepScreen<Content: View, Actions: View>: View {
+struct PrepareStepScreen<Content: View, Actions: View>: View {
     let overline: String
     let title: String
     let lead: String
@@ -654,7 +654,7 @@ private struct PrepareStepScreen<Content: View, Actions: View>: View {
 }
 
 /// La fiche d'une carte : libellé à gauche, valeur à droite.
-private struct PrepareFacts: View {
+struct PrepareFacts: View {
     let rows: [(String, String)]
 
     var body: some View {

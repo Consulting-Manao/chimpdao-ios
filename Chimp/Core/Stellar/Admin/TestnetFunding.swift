@@ -10,6 +10,17 @@ protocol TestnetFunding {
     /// G → friendbot ; C → `units` (en stroops) de XLM depuis l'admin. Renvoie le hash de la transaction de l'admin
     /// (`nil` pour friendbot).
     @discardableResult func fund(_ address: String, units: UInt64) async throws -> String?
+    /// « Send test money » (Chimp Admin, onglet Money) : `units` depuis l'admin vers une adresse C, ou vers un compte G
+    /// déjà ouvert. Un compte G pas encore ouvert sur le réseau est ouvert par friendbot (10 000 XLM, montant imposé).
+    func send(_ address: String, units: UInt64) async throws -> TestMoneySend
+}
+
+/// Résultat de `send`.
+enum TestMoneySend: Equatable {
+    /// `transfer` du montant demandé, depuis l'admin (hash de la transaction).
+    case sent(hash: String)
+    /// Compte G inconnu du réseau : friendbot l'a ouvert avec 10 000 XLM de testnet (le montant demandé ne compte pas).
+    case openedByFriendbot
 }
 
 extension TestnetFunding {
@@ -67,6 +78,21 @@ struct TestnetFunder: TestnetFunding {
             throw FundingError.unsupportedAddress
         }
         return try await fundFromAdmin(address, units: units)
+    }
+
+    func send(_ address: String, units: UInt64) async throws -> TestMoneySend {
+        if (try? KeyPair(accountId: address)) != nil {
+            // Un compte G doit exister pour recevoir un `transfer` : sinon friendbot l'ouvre (Horizon ne le connaît pas).
+            guard (try? await network.nativeBalance(of: address)) != nil else {
+                try await fundG(address)
+                return .openedByFriendbot
+            }
+            return .sent(hash: try await fundFromAdmin(address, units: units))
+        }
+        guard address.hasPrefix("C"), (try? SCAddressXDR(contractId: address)) != nil else {
+            throw FundingError.unsupportedAddress
+        }
+        return .sent(hash: try await fundFromAdmin(address, units: units))
     }
 
     /// `fundG` : friendbot, avec quelques nouvelles tentatives.
@@ -152,6 +178,16 @@ final class MockTestnetFunding: TestnetFunding {
         if failing.contains(address) { throw FundingError.friendbot("Friendbot refused: 502") }
         funded.append(address)
         return String(repeating: "0", count: 64)
+    }
+
+    /// Envois de `send` (adresse, montant en stroops).
+    private(set) var sent: [(address: String, units: UInt64)] = []
+
+    func send(_ address: String, units: UInt64) async throws -> TestMoneySend {
+        try await Task.sleep(for: delay)
+        if failing.contains(address) { throw FundingError.friendbot("Friendbot refused: 502") }
+        sent.append((address, units))
+        return .sent(hash: String(repeating: "0", count: 64))
     }
 }
 #endif
