@@ -320,6 +320,51 @@ struct PrepareCardsTests {
         #expect(PrepareCardsModel.csvField("failed: a, b") == "\"failed: a, b\"")
     }
 
+    @Test("Check a card : carte prête de la liste → numéro, note, solde ; « Send test money » 50 XLM, noté ; rien d'écrit sur la carte")
+    func checkReadyCard() async throws {
+        let card = FakeCard(.blank, key: key(30))
+        let chain = FakeChain()
+        let funder = MockTestnetFunding()
+        let model = model(card: card, chain: chain, funder: funder)
+        await goToFinishing(model, note: "Demo", xlm: nil)
+        await model.signAndRegister()
+        await model.checkCard()
+        guard case .result(let result) = model.check else { Issue.record("expected result, got \(model.check)"); return }
+        #expect(result.readiness == .ready && result.entry?.numberText == "#001" && result.entry?.note == "Demo")
+        #expect(result.canReceiveMoney)
+        #expect(model.balances[result.wallet ?? ""] == .xlm(50))
+        await model.sendTestMoneyToCheckedCard()
+        guard case .result(let after) = model.check else { Issue.record("expected result"); return }
+        #expect(after.sent == .sent(xlm: 50) && funder.funded == [result.wallet!])
+        #expect(model.cards.first?.isFunded == true && model.cards.first?.fundingText == "50 XLM")
+        #expect(card.generated == 1 && chain.mints == 1, "Check ne crée ni clé ni enregistrement")
+    }
+
+    @Test("Check a card : vierge (jamais de clé créée), pas encore préparée, avec PIN, DUOX ; pas d'argent possible")
+    func checkOtherCards() async {
+        let blank = FakeCard(.blank, key: key(31))
+        let blankModel = model(card: blank, chain: FakeChain())
+        await blankModel.checkCard()
+        #expect(blankModel.check == .result(.init(readiness: .blank, entry: nil, wallet: nil)))
+        #expect(blank.generated == 0, "Check ne crée jamais de clé")
+
+        let keyed = model(card: FakeCard(.keyed, key: key(32)), chain: FakeChain())
+        await keyed.checkCard()
+        guard case .result(let notPrepared) = keyed.check else { Issue.record("expected result"); return }
+        #expect(notPrepared.readiness == .notPrepared && !notPrepared.canReceiveMoney)
+
+        let withPIN = model(card: FakeCard(.keyedWithPIN, key: key(33)), chain: FakeChain())
+        await withPIN.checkCard()
+        guard case .result(let pin) = withPIN.check else { Issue.record("expected result"); return }
+        #expect(pin.readiness == .hasPIN)
+
+        let duox = model(card: FakeCard(.duox, key: key(34)), chain: FakeChain())
+        await duox.checkCard()
+        guard case .result(let other) = duox.check else { Issue.record("expected result"); return }
+        #expect(other.readiness == .otherChip(ChipKind.duox.displayName))
+        #expect(CheckCardView.verdict(.hasPIN).contains("PIN"))
+    }
+
     @Test("Ancien journal (sans note ni montant) : relu, 50 XLM par défaut")
     func oldJournal() throws {
         let json = #"[{"number":3,"publicKey":"04ab","wallet":"CABC","status":{"prepared":{}},"date":0,"funding":{"funded":{"hash":"aa"}}}]"#

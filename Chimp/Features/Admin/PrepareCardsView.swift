@@ -9,6 +9,7 @@ struct PrepareCardsView: View {
     @State private var isConfirmingStart = false
     @State private var hasConfirmed = false
     @State private var isShowingAllCards = false
+    @State private var isCheckingCard = false
     /// Taille du lot affichée sur l'accueil (« 37 / 195 cards ready »), réglable dans « See all cards ».
     @AppStorage("prepareCards.batchSize") private var batchSize = 195
     let hasAdminKey: Bool
@@ -50,12 +51,15 @@ struct PrepareCardsView: View {
         content
             .animation(.easeInOut(duration: 0.2), value: model.step)
             .background(Color(.chimpBackground))
-            .navigationTitle(Text(verbatim: "Prepare cards"))
+            .navigationTitle(Text(verbatim: "Cards"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .navigationBarBackButtonHidden(model.isBusy)
             .navigationDestination(isPresented: $isShowingAllCards) {
                 PreparedCardsListView(model: model, batchSize: $batchSize)
+            }
+            .navigationDestination(isPresented: $isCheckingCard) {
+                CheckCardView(model: model)
             }
             .confirmationDialog(Text(verbatim: "Prepare cards?"), isPresented: $isConfirmingStart, titleVisibility: .visible) {
                 Button(role: .destructive) {
@@ -96,7 +100,7 @@ struct PrepareCardsView: View {
     // MARK: Accueil
 
     private var home: some View {
-        PrepareStepScreen(overline: "Stellar Testnet", title: "Prepare cards",
+        PrepareStepScreen(overline: "Stellar Testnet", title: "Cards",
                           lead: "Each card gets its key, is registered, and receives a little test money. Then it's ready to give away.") {
             VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
                 HStack(alignment: .firstTextBaseline, spacing: ChimpSpacing.s) {
@@ -110,7 +114,7 @@ struct PrepareCardsView: View {
             .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.panel), fill: Color(.chimpSurface), shadow: .card)
             .accessibilityElement(children: .combine)
             if !hasAdminKey {
-                ChimpNoticeBanner(text: untranslated("No admin key on this iPhone. Enter it in Admin first."), marker: .error)
+                ChimpNoticeBanner(text: untranslated("No admin key on this iPhone yet."), marker: .error)
             }
             if let error = model.saveError {
                 ChimpNoticeBanner(text: untranslated("The journal couldn't be saved: \(error)"), marker: .error)
@@ -118,6 +122,10 @@ struct PrepareCardsView: View {
         } actions: {
             ChimpButton(untranslated("Prepare a card"), size: .large) { prepareCard() }
                 .disabled(!hasAdminKey)
+            ChimpButton(untranslated("Check a card"), kind: .secondary) {
+                model.resetCheck()
+                isCheckingCard = true
+            }
             ChimpButton(untranslated("See all cards"), kind: .link) { isShowingAllCards = true }
         }
     }
@@ -502,6 +510,108 @@ struct PreparedCardsListView: View {
             return url
         } catch {
             return nil
+        }
+    }
+}
+
+// MARK: - « Check a card »
+
+/// « Check a card » : tap d'une carte (lecture seule), puis sa fiche en langage simple et une seule action,
+/// « Send test money ».
+struct CheckCardView: View {
+    let model: PrepareCardsModel
+
+    var body: some View {
+        content
+            .animation(.easeInOut(duration: 0.2), value: model.check)
+            .background(Color(.chimpBackground))
+            .navigationTitle(Text(verbatim: "Check a card"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
+            .navigationBarBackButtonHidden(model.isChecking)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch model.check {
+        case .idle, .reading, .checking, .failed:
+            tap
+        case .result(let result):
+            sheet(result)
+        }
+    }
+
+    private var tap: some View {
+        PrepareStepScreen(overline: "Check a card", title: "Tap the card", lead: tapLead) {
+            ChimpNFCRings(size: 220) { ChimpCardThumbnail(color: nil) }
+                .frame(maxWidth: .infinity)
+            if case .failed(let message) = model.check {
+                ChimpNoticeBanner(text: untranslated("The card couldn't be read. Try again."), marker: .error)
+                ChimpTechnicalDetails(details: message)
+            }
+        } actions: {
+            ChimpButton(untranslated(model.isChecking ? "Reading…" : "Scan the card"), size: .large, isLoading: model.isChecking) {
+                Task { await model.checkCard() }
+            }
+            .disabled(model.isChecking)
+        }
+    }
+
+    private var tapLead: String {
+        model.check == .checking
+            ? "Looking the card up on Stellar testnet…"
+            : "Hold the card flat on the top of the iPhone. Nothing is written on it."
+    }
+
+    private func sheet(_ result: PrepareCardsModel.CardCheck) -> some View {
+        PrepareStepScreen(overline: "Check a card", title: Self.title(result), lead: Self.verdict(result.readiness)) {
+            PrepareFacts(rows: rows(result))
+            switch result.sent {
+            case .sent(let xlm):
+                ChimpNoticeBanner(text: untranslated("\(xlm) test XLM sent to this card's wallet."), marker: .success)
+            case .failed(let message):
+                ChimpNoticeBanner(text: untranslated("The test money wasn't sent. Try again."), marker: .error)
+                ChimpTechnicalDetails(details: message)
+            case nil:
+                EmptyView()
+            }
+        } actions: {
+            if result.canReceiveMoney {
+                ChimpButton(untranslated("Send test money (\(PrepareCardsModel.defaultStartingXLM) XLM)"), size: .large,
+                            isLoading: model.isSendingCheckMoney) {
+                    Task { await model.sendTestMoneyToCheckedCard() }
+                }
+            }
+            ChimpButton(untranslated("Check another card"), kind: result.canReceiveMoney ? .link : .primary,
+                        size: result.canReceiveMoney ? .regular : .large) {
+                model.resetCheck()
+                Task { await model.checkCard() }
+            }
+            .disabled(model.isChecking)
+        }
+    }
+
+    private func rows(_ result: PrepareCardsModel.CardCheck) -> [(String, String)] {
+        var rows: [(String, String)] = [("Number", result.entry?.numberText ?? "Not in this iPhone's list")]
+        if let note = result.entry?.note { rows.append(("Note", note)) }
+        rows.append(("Ready", result.readiness == .ready ? "Yes" : "No"))
+        if result.readiness == .ready, let wallet = result.wallet {
+            rows.append(("Balance", PreparedCardsListView.balanceText(model.balances[wallet])))
+        }
+        return rows
+    }
+
+    static func title(_ result: PrepareCardsModel.CardCheck) -> String {
+        result.entry.map { "Card \($0.numberText)" } ?? "This card"
+    }
+
+    static func verdict(_ readiness: PrepareCardsModel.CardCheck.Readiness) -> String {
+        switch readiness {
+        case .ready: "Ready to give away. Its owner creates an account by tapping it."
+        case .notPrepared: "Not prepared yet. Use Prepare a card to finish it."
+        case .blank: "Blank: it has no key yet. Use Prepare a card."
+        case .hasPIN: "It already has a PIN, so someone is using it. It can't be prepared."
+        case .otherChip(let name): "This is a \(name) card. Only Infineon cards are used here."
         }
     }
 }

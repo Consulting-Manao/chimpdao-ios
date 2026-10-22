@@ -472,6 +472,123 @@ final class PrepareCardsModel {
         showSheet(funded)
     }
 
+    // MARK: « Check a card »
+
+    /// Fiche d'une carte tapée, en langage simple (onglet Cards de Chimp Admin, 2026-10-22).
+    struct CardCheck: Equatable {
+        enum Readiness: Equatable {
+            /// Enregistrée : prête à donner.
+            case ready
+            /// A une clé, mais pas encore enregistrée.
+            case notPrepared
+            /// Vierge : pas encore de clé.
+            case blank
+            /// A un PIN : quelqu'un l'utilise déjà, ou elle a été réglée ailleurs.
+            case hasPIN
+            /// Pas une carte Infineon (DUOX…).
+            case otherChip(String)
+        }
+
+        let readiness: Readiness
+        /// Sa ligne de la liste, si cette carte y est.
+        var entry: PreparedCard?
+        /// Wallet de la carte (connu dès qu'elle a une clé).
+        let wallet: String?
+        /// Résultat du dernier « Send test money ».
+        var sent: SendResult?
+
+        enum SendResult: Equatable {
+            case sent(xlm: Int)
+            case failed(String)
+        }
+
+        var canReceiveMoney: Bool { readiness == .ready && wallet != nil }
+    }
+
+    enum CheckState: Equatable {
+        case idle
+        case reading
+        case checking
+        case result(CardCheck)
+        case failed(String)
+    }
+
+    private(set) var check: CheckState = .idle
+    private(set) var isSendingCheckMoney = false
+
+    var isChecking: Bool { check == .reading || check == .checking || isSendingCheckMoney }
+
+    /// « Check a card » : lit la carte **sans jamais créer de clé**, retrouve sa ligne dans la liste, lit son état sur
+    /// testnet et le solde de son wallet. Rien n'est écrit, ni sur la carte ni sur la chaîne.
+    func checkCard() async {
+        guard !isChecking, !isBusy else { return }
+        check = .reading
+        let card: ChipKeyInfo
+        do {
+            card = try await reader.readKey()
+        } catch ChipError.cancelled {
+            check = .idle
+            return
+        } catch ChipError.noKey {
+            check = .result(CardCheck(readiness: .blank, entry: nil, wallet: nil))
+            return
+        } catch {
+            check = .failed(Self.message(error))
+            return
+        }
+        guard card.kind == .infineon2Go else {
+            check = .result(CardCheck(readiness: .otherChip(card.kind.displayName), entry: nil, wallet: nil))
+            return
+        }
+        let entry = known(card.publicKey.hex)
+        check = .checking
+        do {
+            let result: CardCheck
+            switch try await makeService().inspect(card) {
+            case let .alreadyEnrolled(_, pocket):
+                result = CardCheck(readiness: .ready, entry: entry, wallet: pocket)
+            case .ready(let plan):
+                result = CardCheck(readiness: card.pinActive ? .hasPIN : .notPrepared, entry: entry, wallet: plan.predictedPocket)
+            }
+            check = .result(result)
+            if result.readiness == .ready, let wallet = result.wallet {
+                await loadBalance(of: wallet, force: true)
+            }
+        } catch {
+            check = .failed(Self.message(error))
+        }
+    }
+
+    /// « Send test money » depuis la fiche : 50 XLM de l'admin vers le wallet d'une carte prête. Notée dans la liste
+    /// si la carte y est et n'avait pas encore reçu son argent de départ.
+    func sendTestMoneyToCheckedCard() async {
+        guard case .result(var result) = check, result.canReceiveMoney, let wallet = result.wallet, let funder,
+              !isSendingCheckMoney else { return }
+        isSendingCheckMoney = true
+        defer { isSendingCheckMoney = false }
+        let xlm = Self.defaultStartingXLM
+        do {
+            let hash = try await funder.fund(wallet, units: Self.units(xlm))
+            result.sent = .sent(xlm: xlm)
+            if var entry = result.entry, !entry.isFunded {
+                entry.startingXLM = xlm
+                entry.funding = .funded(hash: hash ?? "")
+                record(entry)
+                result.entry = entry
+            }
+        } catch {
+            result.sent = .failed(Self.message(error))
+        }
+        check = .result(result)
+        await loadBalance(of: wallet, force: true)
+    }
+
+    /// Retour à « Check a card » (une autre carte).
+    func resetCheck() {
+        guard !isChecking else { return }
+        check = .idle
+    }
+
     // MARK: Soldes
 
     /// Lit le solde XLM d'un wallet (une fois ; `force` pour relire).
