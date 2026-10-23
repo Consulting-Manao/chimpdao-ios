@@ -680,15 +680,9 @@ final class PrepareCardsModel {
     }
 
     /// Une Infineon vierge reçoit sa clé (slot 1 vide revérifié sur la carte) ; sinon, la carte est simplement lue.
+    /// Une seule session NFC (une carte déjà munie de sa clé, par exemple à reprendre, passait par deux sessions).
     private func readOrGenerate() async throws -> ChipKeyInfo {
-        do {
-            return try await generator.generateKeyOnEmptySlot()
-        } catch ChipError.keyAlreadyPresent {
-            return try await reader.readKey()
-        } catch ChipError.keyGenerationUnsupported {
-            // DUOX (clé d'usine) : lue, puis refusée plus haut (Infineon seulement).
-            return try await reader.readKey()
-        }
+        try await generator.readOrGenerateKey()
     }
 
     private static func message(_ error: Error) -> String {

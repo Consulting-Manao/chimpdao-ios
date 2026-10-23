@@ -52,6 +52,27 @@ struct KeyGenerationTests {
         #expect(card.generateCount == 0)
     }
 
+    @Test("Prepare a card, une seule session : slot 1 vide → clé créée ; clé déjà là → lue, aucun GENERATE KEY")
+    func readOrGenerateInOneSession() async throws {
+        let blank = BlankInfineon(newKey: newKey)
+        #expect(try await ChipKeyGeneration.readOrGenerateKey(blank) == ChipKeyInfo(kind: .infineon2Go, publicKey: newKey, pinActive: false))
+        #expect(blank.generateCount == 1)
+
+        let keyed = BlankInfineon(newKey: MockChipReader.p256Key, existingKey: newKey)
+        let info = try await ChipKeyGeneration.readOrGenerateKey(keyed)
+        #expect(info.publicKey == newKey && info.kind == .infineon2Go)
+        #expect(keyed.generateCount == 0)
+        #expect(!keyed.sent.contains(Infineon2Go.generateKeyAPDU), "Jamais de GENERATE KEY sur une carte qui a une clé")
+
+        // Autre statut que 6A88 (6A82, 6985) : refus, comme la génération seule.
+        let odd = BlankInfineon(newKey: newKey, emptySlotStatus: 0x6A82)
+        await #expect(throws: ChipError.status(command: "GET KEY INFO", statusWord: 0x6A82)) {
+            try await ChipKeyGeneration.readOrGenerateKey(odd)
+        }
+        #expect(odd.generateCount == 0)
+        await #expect(throws: ChipError.unknownChip) { try await ChipKeyGeneration.readOrGenerateKey(NotInfineon(isDuox: false)) }
+    }
+
     @Test("Autres statuts « pas de clé » du bridge (6A82, 6985) : refus, aucun GENERATE KEY envoyé")
     func refusesOtherMissingKeyStatuses() async {
         for sw: UInt16 in [0x6A82, 0x6985] {

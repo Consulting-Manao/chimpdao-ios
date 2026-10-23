@@ -79,11 +79,32 @@ enum ChipKeyGeneration {
         }
         throw ChipError.unknownChip
     }
+
+    /// « Prepare a card » (Chimp Admin), **dans une seule session NFC** : la clé n°1 est créée seulement si le slot 1 est
+    /// vide (`6A88`, même garde que `generateKey`) ; une carte qui a déjà une clé est simplement lue, sans rien générer.
+    /// Avant (2026-10-23) : une session de génération qui se terminait en erreur (« already has a key »), puis une
+    /// seconde session de lecture ; sur iPhone, la seconde ne s'enchaînait pas et la carte ne pouvait pas être reprise.
+    /// Une DUOX (clé d'usine) est lue ; une carte inconnue est refusée.
+    static func readOrGenerateKey(_ transport: some APDUTransport) async throws -> ChipKeyInfo {
+        if try await Infineon2Go.detect(transport) != nil {
+            do {
+                return try await Infineon2Go.generateKeyOnEmptySlot(transport)
+            } catch ChipError.keyAlreadyPresent {
+                return try await ChipDetector.readKey(transport)
+            }
+        }
+        if try await Duox.detect(transport) {
+            return try await ChipDetector.readKey(transport)
+        }
+        throw ChipError.unknownChip
+    }
 }
 
 /// Génère la clé n°1 d'une carte vierge. Implémenté par `NFCChipKeyGenerator` et `MockChipKeyGenerator`.
 protocol ChipKeyGenerator {
     func generateKeyOnEmptySlot() async throws -> ChipKeyInfo
+    /// Lit la carte, et crée sa clé n°1 seulement si le slot 1 est vide : une seule session NFC.
+    func readOrGenerateKey() async throws -> ChipKeyInfo
 }
 
 /// Génération par Core NFC : une feuille NFC, une carte.
@@ -94,6 +115,15 @@ struct NFCChipKeyGenerator: ChipKeyGenerator {
             successMessage: "Key generated."
         ) { transport in
             try await ChipKeyGeneration.generateKey(transport)
+        }
+    }
+
+    func readOrGenerateKey() async throws -> ChipKeyInfo {
+        try await NFCTagSession.run(
+            alertMessage: "Hold the card near the top of your iPhone. Don't move it until it's done.",
+            successMessage: "Card ready."
+        ) { transport in
+            try await ChipKeyGeneration.readOrGenerateKey(transport)
         }
     }
 }
@@ -115,6 +145,11 @@ struct MockChipKeyGenerator: ChipKeyGenerator {
         case .unknownChip, .cardRemoved, .cancelled:
             return try await MockChipReader(scenario: scenario, delay: .zero).readKey()
         }
+    }
+
+    func readOrGenerateKey() async throws -> ChipKeyInfo {
+        if scenario == .noKey { return try await generateKeyOnEmptySlot() }
+        return try await MockChipReader(scenario: scenario, delay: delay).readKey()
     }
 }
 #endif

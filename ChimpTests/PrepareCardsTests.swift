@@ -32,6 +32,14 @@ struct PrepareCardsTests {
             }
         }
 
+        /// Une seule session : génération si vierge, sinon lecture (comme `ChipKeyGeneration.readOrGenerateKey`).
+        private(set) var sessions = 0
+        func readOrGenerateKey() async throws -> ChipKeyInfo {
+            sessions += 1
+            if kind == .blank { return try await generateKeyOnEmptySlot() }
+            return try await readKey()
+        }
+
         func readKey() async throws -> ChipKeyInfo {
             switch kind {
             case .blank: throw ChipError.noKey(statusWord: 0x6A88)
@@ -292,6 +300,7 @@ struct PrepareCardsTests {
         await reopened.startCard()
         guard case .identify(let draft) = reopened.step else { Issue.record("expected identify, got \(reopened.step)"); return }
         #expect(draft.entry.number == 1 && draft.entry.note == "Apple Demo" && card.generated == 1)
+        #expect(card.sessions == 2, "Une seule session NFC par tap 1, même pour une carte qui a déjà sa clé")
         reopened.confirmIdentity(number: 1, note: "Apple Demo")
         reopened.chooseStartingMoney(50)
         await reopened.signAndRegister()
