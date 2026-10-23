@@ -462,11 +462,17 @@ struct PreparedCardsListView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// En langage simple, sans détail technique (le message d'erreur complet reste dans le CSV).
     static func status(_ card: PreparedCard) -> String {
+        let state: String = switch card.status {
+        case .prepared, .alreadyReady: "Ready"
+        case .pending, .failed: "Not registered yet · tap it in Prepare a card to finish"
+        }
+        guard card.isDone else { return state }
         switch card.funding {
-        case .funded: "\(card.statusText) · \(card.fundingText) sent"
-        case .failed: "\(card.statusText) · test money not sent"
-        case .declined, nil: card.statusText
+        case .funded: return "\(state) · \(card.fundingText) sent"
+        case .failed: return "\(state) · test money not sent"
+        case .declined, nil: return state
         }
     }
 

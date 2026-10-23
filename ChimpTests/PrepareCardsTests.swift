@@ -47,11 +47,17 @@ struct PrepareCardsTests {
         var enrolled: Set<ChipPublicKey> = []
         private(set) var mints = 0
         var failNextEnrol = false
+        /// Simulation refusée par le contrat (ex. : « UnexpectedSize ») : rien n'est envoyé.
+        var rejectNextEnrol = false
         func inspect(_ card: ChipKeyInfo) async throws -> EnrolmentInspection {
             let mock = MockCardEnrolmentService(alreadyEnrolled: enrolled.contains(card.publicKey), delay: .zero)
             return try await mock.inspect(card)
         }
         func enrol(_ plan: EnrolmentPlan, signed: ChipSignedDigest) async throws -> EnrolmentResult {
+            if rejectNextEnrol {
+                rejectNextEnrol = false
+                throw StellarError.rpc("Simulation failed: HostError: Error(WasmVm, UnexpectedSize) (mock)")
+            }
             mints += 1
             enrolled.insert(plan.card.publicKey)
             if failNextEnrol {
@@ -267,6 +273,31 @@ struct PrepareCardsTests {
         guard case .alreadyReady(let done) = reopened.step else { Issue.record("expected alreadyReady, got \(reopened.step)"); return }
         #expect(done.number == 1 && done.note == "Booth" && done.status == .alreadyReady && done.needsFunding)
         #expect(chain.mints == 1, "Aucun second enregistrement")
+    }
+
+    @Test("Enregistrement raté puis app rouverte : la carte retapée reprend à l'étape 2 (numéro et note gardés), puis s'enregistre une fois")
+    func resumeAfterFailedRegistration() async throws {
+        let card = FakeCard(.blank, key: key(40))
+        let chain = FakeChain()
+        let signer = RecordingSigner()
+        let store = MemoryPreparedCardsStore()
+        let first = model(card: card, chain: chain, signer: signer, store: store)
+        await goToFinishing(first, note: "Apple Demo")
+        chain.rejectNextEnrol = true
+        await first.signAndRegister()
+        #expect(chain.mints == 0 && !(store.cards.first?.isDone ?? true))
+
+        let reopened = model(card: card, chain: chain, signer: signer, store: store)
+        #expect(PreparedCardsListView.status(try #require(reopened.cards.first)).hasPrefix("Not registered yet"))
+        await reopened.startCard()
+        guard case .identify(let draft) = reopened.step else { Issue.record("expected identify, got \(reopened.step)"); return }
+        #expect(draft.entry.number == 1 && draft.entry.note == "Apple Demo" && card.generated == 1)
+        reopened.confirmIdentity(number: 1, note: "Apple Demo")
+        reopened.chooseStartingMoney(50)
+        await reopened.signAndRegister()
+        guard case .ready(let done) = reopened.step else { Issue.record("expected ready, got \(reopened.step)"); return }
+        #expect(done.status == .prepared && chain.mints == 1 && reopened.cards.count == 1)
+        #expect(PreparedCardsListView.status(done) == "Ready · 50 XLM sent")
     }
 
     @Test("Carte qui a déjà un PIN : « can't be prepared », rien n'est signé ni noté")
