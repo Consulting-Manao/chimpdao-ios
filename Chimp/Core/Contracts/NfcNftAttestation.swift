@@ -21,9 +21,12 @@ enum NfcNftAttestation {
         return Data(SHA256.hash(data: preimage))
     }
 
-    /// Arguments attestés par `mint` : `[clé publique, courbe, politique]` (la politique fait partie de ce que la carte signe).
+    /// Arguments attestés par `mint` : `[clé publique, courbe, politique, uri]` (tout fait partie de ce que la carte signe).
+    /// `uri` : `Option<String>` ajouté au contrat nfc-nft déployé sur testnet (`reference/chimp-contracts` e9e6c84,
+    /// `mint_digest` des tests du contrat). Toujours `None` (`ScVal::Void`) : la carte garde l'image par défaut
+    /// `{base_uri}/{token_id}`, comme avant (décision de Barth du 2026-10-23 : le même système qu'avant).
     static func mintAttestedArguments(publicKey: ChipPublicKey, curve: ChipCurve, managed: Bool) -> [SCValXDR] {
-        [.bytes(publicKey.bytes), ChipAuthEncoding.curve(curve), ChipAuthEncoding.upgradePolicy(managed: managed)]
+        [.bytes(publicKey.bytes), ChipAuthEncoding.curve(curve), ChipAuthEncoding.upgradePolicy(managed: managed), .void]
     }
 
     /// Digest que la carte signe pour `mint`.
@@ -37,7 +40,7 @@ enum NfcNftAttestation {
         )
     }
 
-    /// Arguments complets de `mint(auth, public_key, curve, upgrade_policy, nonce)`.
+    /// Arguments complets de `mint(auth, public_key, curve, upgrade_policy, uri, nonce)`.
     static func mintArguments(auth: SCValXDR, publicKey: ChipPublicKey, curve: ChipCurve, managed: Bool, nonce: UInt32) -> [SCValXDR] {
         [auth] + mintAttestedArguments(publicKey: publicKey, curve: curve, managed: managed) + [.u32(nonce)]
     }

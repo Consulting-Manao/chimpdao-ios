@@ -35,13 +35,20 @@ struct EnrolmentTests {
         #expect(digest.hexString == "2b23d024c62e7c8d1d37f118e574ef030ffc7b37efc8bb77439c09b93c97ce7c")
     }
 
-    @Test("Digest de mint (v3, [clé, courbe, Managed], nonce 7) identique au terminal, Infineon et DUOX")
+    /// Contrat nfc-nft de testnet mis à jour (`reference/chimp-contracts` e9e6c84) : `uri: Option<String>` est attesté
+    /// après la politique. Vecteurs : `callDigest`, `scCurve`, `scUpgradePolicy` du terminal recopiés tels quels, liste
+    /// d'arguments du `mint_digest` des tests du contrat, `uri` = `None` (`ScVal::Void`). Le même script redonne les
+    /// anciens vecteurs à 3 arguments (f8a98f…, 1986079…), qui ne sont plus acceptés par le contrat.
+    @Test("Digest de mint (v3, [clé, courbe, Managed, uri None], nonce 7) : contrat à jour, Infineon et DUOX")
     func mintDigest() throws {
         #expect(NfcNftAttestation.domain == "chimpdao.nfc-nft.v3")
         #expect(try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: k1Key, curve: .secp256k1, managed: true, nonce: 7).hexString
-            == "f8a98f69a51e80772fc964f2533f41bf3f371cafb45e879ad1c04f488f5fcb61")
+            == "99fd618f3126b96165bbc3b75b9ee9fa80d467564ccbe72e1a30ccc570b70f1d")
         #expect(try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: r1Key, curve: .p256, managed: true, nonce: 7).hexString
-            == "1986079dc5c5e52d58058b0a246a08f9f51ecba4fc19866032da6c516c0bbe2e")
+            == "f85088d7846cedf56f535d471e1a48a04aba30cae3a1c1179172bda0c88b6012")
+        let arguments = NfcNftAttestation.mintArguments(auth: .void, publicKey: k1Key, curve: .secp256k1, managed: true, nonce: 7)
+        #expect(arguments.count == 6, "mint(auth, public_key, curve, upgrade_policy, uri, nonce)")
+        #expect(try xdr(arguments[4]) == "AAAAAQ==", "uri = None")
     }
 
     // MARK: Encodages ScVal
@@ -65,18 +72,18 @@ struct EnrolmentTests {
 
     // MARK: Transaction mint
 
-    @Test("Transaction mint complète (Infineon) : enveloppe identique au terminal (compte et bornes de temps fixes)")
+    @Test("Transaction mint complète (Infineon) : enveloppe du terminal, avec uri = None avant le nonce (compte et bornes fixes)")
     func mintEnvelopeK1() throws {
         let auth = try ChipAuthEncoding.chipAuthSecp256k1(signature: signature, recoveryID: 1)
         #expect(try mintEnvelope(card: k1Key, kind: .infineon2Go, auth: auth)
-            == "AAAAAgAAAABXZ5r1Pz+DMcNFD5T8pJxRItNzD9JgDnFDKb85dk/fggAAAGQAAAAASZYC0wAAAAEAAAAAAAAAAAAAAABrSdIAAAAAAAAAAAEAAAAAAAAAGAAAAAAAAAABvZ+kd76jei0amzH3GSnv7XmGIoDjHluIKROc/k8wn4QAAAAEbWludAAAAAUAAAAQAAAAAQAAAAIAAAAPAAAACVNlY3AyNTZrMQAAAAAAABEAAAABAAAAAgAAAA8AAAALcmVjb3ZlcnlfaWQAAAAAAwAAAAEAAAAPAAAACXNpZ25hdHVyZQAAAAAAAA0AAABAEREREREREREREREREREREREREREREREREREREREREREiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIgAAAA0AAABBBHm+Zn753LusVaBilc6HCwcCm/zbLc4o2VnygVsW+BeYSDradyajxGVdpPv8DhEIqP0XtEimhVQZnEfQj/sQ1LgAAAAAAAAQAAAAAQAAAAEAAAAPAAAACVNlY3AyNTZrMQAAAAAAABAAAAABAAAAAQAAAA8AAAAHTWFuYWdlZAAAAAADAAAABwAAAAAAAAAAAAAAAA==")
+            == "AAAAAgAAAABXZ5r1Pz+DMcNFD5T8pJxRItNzD9JgDnFDKb85dk/fggAAAGQAAAAASZYC0wAAAAEAAAAAAAAAAAAAAABrSdIAAAAAAAAAAAEAAAAAAAAAGAAAAAAAAAABvZ+kd76jei0amzH3GSnv7XmGIoDjHluIKROc/k8wn4QAAAAEbWludAAAAAYAAAAQAAAAAQAAAAIAAAAPAAAACVNlY3AyNTZrMQAAAAAAABEAAAABAAAAAgAAAA8AAAALcmVjb3ZlcnlfaWQAAAAAAwAAAAEAAAAPAAAACXNpZ25hdHVyZQAAAAAAAA0AAABAEREREREREREREREREREREREREREREREREREREREREREiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIgAAAA0AAABBBHm+Zn753LusVaBilc6HCwcCm/zbLc4o2VnygVsW+BeYSDradyajxGVdpPv8DhEIqP0XtEimhVQZnEfQj/sQ1LgAAAAAAAAQAAAAAQAAAAEAAAAPAAAACVNlY3AyNTZrMQAAAAAAABAAAAABAAAAAQAAAA8AAAAHTWFuYWdlZAAAAAABAAAAAwAAAAcAAAAAAAAAAAAAAAA=")
     }
 
-    @Test("Transaction mint complète (DUOX) : enveloppe identique au terminal")
+    @Test("Transaction mint complète (DUOX) : enveloppe du terminal, avec uri = None avant le nonce")
     func mintEnvelopeR1() throws {
         let auth = try ChipAuthEncoding.chipAuthSecp256r1(signature: signature, rndB: rndB)
         #expect(try mintEnvelope(card: r1Key, kind: .duox, auth: auth)
-            == "AAAAAgAAAABXZ5r1Pz+DMcNFD5T8pJxRItNzD9JgDnFDKb85dk/fggAAAGQAAAAASZYC0wAAAAEAAAAAAAAAAAAAAABrSdIAAAAAAAAAAAEAAAAAAAAAGAAAAAAAAAABvZ+kd76jei0amzH3GSnv7XmGIoDjHluIKROc/k8wn4QAAAAEbWludAAAAAUAAAAQAAAAAQAAAAIAAAAPAAAACVNlY3AyNTZyMQAAAAAAABEAAAABAAAAAgAAAA8AAAAFcm5kX2IAAAAAAAANAAAAEKurq6urq6urq6urq6urq6sAAAAPAAAACXNpZ25hdHVyZQAAAAAAAA0AAABAEREREREREREREREREREREREREREREREREREREREREREiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIgAAAA0AAABBBGsX0fLhLEJH+Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7Oy7ZAaDe/UfUAAAAAAAAQAAAAAQAAAAEAAAAPAAAACVNlY3AyNTZyMQAAAAAAABAAAAABAAAAAQAAAA8AAAAHTWFuYWdlZAAAAAADAAAABwAAAAAAAAAAAAAAAA==")
+            == "AAAAAgAAAABXZ5r1Pz+DMcNFD5T8pJxRItNzD9JgDnFDKb85dk/fggAAAGQAAAAASZYC0wAAAAEAAAAAAAAAAAAAAABrSdIAAAAAAAAAAAEAAAAAAAAAGAAAAAAAAAABvZ+kd76jei0amzH3GSnv7XmGIoDjHluIKROc/k8wn4QAAAAEbWludAAAAAYAAAAQAAAAAQAAAAIAAAAPAAAACVNlY3AyNTZyMQAAAAAAABEAAAABAAAAAgAAAA8AAAAFcm5kX2IAAAAAAAANAAAAEKurq6urq6urq6urq6urq6sAAAAPAAAACXNpZ25hdHVyZQAAAAAAAA0AAABAEREREREREREREREREREREREREREREREREREREREREREiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIgAAAA0AAABBBGsX0fLhLEJH+Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7Oy7ZAaDe/UfUAAAAAAAAQAAAAAQAAAAEAAAAPAAAACVNlY3AyNTZyMQAAAAAAABAAAAABAAAAAQAAAA8AAAAHTWFuYWdlZAAAAAABAAAAAwAAAAcAAAAAAAAAAAAAAAA=")
     }
 
     @Test("Adresse de la Pocket calculée hors ligne : identique à predictPocket")

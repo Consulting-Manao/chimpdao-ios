@@ -176,7 +176,7 @@ struct CardEnrolment: CardEnrolmentService {
 
     // MARK: Transaction
 
-    /// `nfc-nft.mint(auth, public_key, curve, Managed, nonce)`, source = admin, frais de base 100 stroops.
+    /// `nfc-nft.mint(auth, public_key, curve, Managed, uri = None, nonce)`, source = admin, frais de base 100 stroops.
     static func mintTransaction(source: Account, plan: EnrolmentPlan, auth: SCValXDR, maxTime: UInt64) throws -> Transaction {
         let operation = try InvokeHostFunctionOperation.forInvokingContract(
             contractId: plan.nfcNft,

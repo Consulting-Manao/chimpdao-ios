@@ -176,6 +176,9 @@ struct ChainActivityHistory {
     static let transferTopic = symbolTopic("transfer")
     static let clawbackTopic = symbolTopic("clawback")
     static let cardAddedTopic = symbolTopic("card_added")
+    /// Même événement renommé `add_card` par le contrat de compte mis à jour (`reference/chimp-contracts` e9e6c84,
+    /// `events::AddCard { key }`) : les anciens comptes émettent `card_added`, les nouveaux `add_card`. Les deux sont lus.
+    static let addCardTopic = symbolTopic("add_card")
 
     /// Filtres de la requête : pour chaque tiroir, un motif « expéditeur » et un motif « destinataire »
     /// (`[transfer, adresse, *, *]`, `[transfer, *, adresse, *]`), 5 motifs au plus par filtre ; plus un filtre `card_added`.
@@ -190,7 +193,9 @@ struct ChainActivityHistory {
         var filters: [EventFilter] = stride(from: 0, to: matchers.count, by: 5).map { index in
             EventFilter(type: "contract", topics: matchers[index..<min(index + 5, matchers.count)].map { TopicFilter(segmentMatchers: $0) })
         }
-        filters.append(EventFilter(type: "contract", topics: [TopicFilter(segmentMatchers: [cardAddedTopic])]))
+        filters.append(EventFilter(type: "contract", topics: [
+            TopicFilter(segmentMatchers: [cardAddedTopic]), TopicFilter(segmentMatchers: [addCardTopic]),
+        ]))
         // `clawback` d'un SAC depuis le protocole 23 (CAP-67) : `[clawback, détenteur, actif]`, montant `i128`. Un seul
         // filtre, limité aux contrats de la liste blanche (5 au plus) ; le détenteur est trié à la lecture.
         if !clawbackContracts.isEmpty {
@@ -253,7 +258,7 @@ struct ChainActivityHistory {
                     id: id, event: .clawback, hash: event.transactionHash, from: from, to: "", assetCode: code,
                     amount: SACClient.amount(fromUnits: SACClient.decimal(parts)), at: at, isLocal: false, ledger: event.ledger
                 )
-            case ("card_added", 1):
+            case ("card_added", 1), ("add_card", 1):
                 guard event.contractID == account, let key = cardKey(decode(event.value)) else { return nil }
                 return ActivityRecord(
                     id: id, event: .cardAdded, hash: event.transactionHash, from: account, to: "", cardKey: key, at: at, isLocal: false,

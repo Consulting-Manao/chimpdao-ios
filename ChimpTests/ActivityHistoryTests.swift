@@ -29,6 +29,8 @@ struct ActivityHistoryTests {
     /// Valeur d'un `transfer` vers une adresse M (CAP-67) : `{ amount: 12345678, to_muxed_id: 42 }`.
     static let muxedValue = "AAAAEQAAAAEAAAACAAAADwAAAAZhbW91bnQAAAAAAAoAAAAAAAAAAAAAAAAAvGFOAAAADwAAAAt0b19tdXhlZF9pZAAAAAAFAAAAAAAAACo="
     static let cardAddedTopic = "AAAADwAAAApjYXJkX2FkZGVkAAA="
+    /// `symTopic("add_card")` : nom de l'événement dans le contrat de compte à jour (e9e6c84).
+    static let addCardTopic = "AAAADwAAAAhhZGRfY2FyZA=="
     /// `CardAdded { key: 04 07…07 }` tel que rendu par la simulation.
     static let cardAddedValue = "AAAAEQAAAAEAAAABAAAADwAAAANrZXkAAAAADQAAAEEEBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwAAAA=="
     static let cardAddedKey = "04" + String(repeating: "07", count: 64)
@@ -86,6 +88,7 @@ struct ActivityHistoryTests {
     func topics() throws {
         #expect(ChainActivityHistory.transferTopic == Self.transferTopic)
         #expect(ChainActivityHistory.cardAddedTopic == Self.cardAddedTopic)
+        #expect(ChainActivityHistory.addCardTopic == Self.addCardTopic)
         #expect(try ChainActivityHistory.addressTopic(Self.account) == Self.accountTopic)
         #expect(try ChainActivityHistory.addressTopic(Self.pocket) == Self.pocketTopic)
         #expect(try ChainActivityHistory.addressTopic(Self.admin) == Self.adminTopic)
@@ -102,7 +105,7 @@ struct ActivityHistoryTests {
             [Self.transferTopic, Self.pocketTopic, "*", "*"], [Self.transferTopic, "*", Self.pocketTopic, "*"],
         ])
         #expect(two[0][0].contractIds == nil)
-        #expect(two[0][1].topics!.map(\.segmentMatchers) == [[Self.cardAddedTopic]])
+        #expect(two[0][1].topics!.map(\.segmentMatchers) == [[Self.cardAddedTopic], [Self.addCardTopic]])
         // Sans liste blanche (appel direct), pas de filtre clawback ; avec, un seul, limité à ses contrats.
         let withClawback = try ChainActivityHistory.filterGroups(drawers: [Self.account, Self.pocket], clawbackContracts: [Self.usdcSAC, Self.xlmSAC])
         #expect(withClawback[0].count == 3)
@@ -171,7 +174,7 @@ struct ActivityHistoryTests {
         #expect(records([Self.transfer(from: Self.adminTopic, to: Self.adminTopic)]).isEmpty)
     }
 
-    @Test("card_added du Main account : clé de la carte ; émis par un autre contrat : ignoré")
+    @Test("card_added (ou add_card) du Main account : clé de la carte ; émis par un autre contrat : ignoré")
     func cardAdded() throws {
         let event = ChimpDAO.SorobanClient.ContractEvent(
             id: "2-0", contractID: Self.account, ledger: 200, ledgerClosedAt: "2026-09-30T11:00:00Z", transactionHash: "hc",
@@ -179,6 +182,12 @@ struct ActivityHistoryTests {
         )
         let row = try #require(records([event]).first)
         #expect(row.event == .cardAdded)
+        // Nouveau contrat de compte : le même événement s'appelle `add_card`.
+        let renamed = ChimpDAO.SorobanClient.ContractEvent(
+            id: "2-1", contractID: Self.account, ledger: 201, ledgerClosedAt: "2026-09-30T11:00:00Z", transactionHash: "hc2",
+            topics: [Self.addCardTopic], value: Self.cardAddedValue
+        )
+        #expect(try #require(records([renamed]).first).cardKey == Self.cardAddedKey)
         #expect(row.cardKey == Self.cardAddedKey)
         #expect(row.from == Self.account)
         #expect(row.amount == nil)
