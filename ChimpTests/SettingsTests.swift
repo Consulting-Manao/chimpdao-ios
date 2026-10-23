@@ -262,11 +262,12 @@ struct SettingsTests {
         #expect(url.absoluteString.contains(SettingsModel.versionText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!))
     }
 
-    @Test("Pages web : adresses HTTPS de privacy.html et support.html, une fois remplies")
-    func publicPages() {
-        for (url, page) in [(PublicPages.privacy, "privacy.html"), (PublicPages.support, "support.html")] {
-            guard let url else { continue }
+    @Test("Pages web : en ligne sur chimpdao.xyz, en HTTPS ; plus de « to add » dans les Réglages")
+    func publicPages() throws {
+        for (url, page) in [(PublicPages.privacy, "privacy"), (PublicPages.support, "support")] {
+            let url = try #require(url, "\(page) : adresse manquante, Réglages afficherait « to add »")
             #expect(url.scheme == "https", "\(page) : HTTPS obligatoire")
+            #expect(url.host() == "chimpdao.xyz")
             #expect(url.lastPathComponent == page)
         }
     }

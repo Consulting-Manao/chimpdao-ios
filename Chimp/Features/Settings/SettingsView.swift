@@ -389,7 +389,6 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var linkItems: some View {
-        // TODO(avant le TestFlight externe) : remplir les adresses dans Config/PublicPages.swift.
         webLink("Support", PublicPages.support)
         webLink("Privacy", PublicPages.privacy)
         Button { isShowingLicenses = true } label: { linkLabel("Licenses") }
