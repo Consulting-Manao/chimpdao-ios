@@ -2,7 +2,8 @@ import Foundation
 import Testing
 @testable import ChimpDAO
 
-/// Configuration par build (décision de Barth du 2026-10-19) : Debug et Testing → testnet, Release → mainnet ; passée
+/// Configuration par build (décisions de Barth du 2026-10-19 et du 2026-10-23) : tous les builds sur le testnet, la Release
+/// (ChimpDAO 2.0.0, app publique) comme Chimp Test ; le mainnet prêt pour plus tard ; passée
 /// partout depuis la session, sans valeur par défaut ; mainnet incomplet → l'app ne démarre pas, jamais de repli.
 struct NetworkConfigTests {
     @Test("La configuration de ce build : testnet en Debug et Testing ; mainnet en Release, refusé tant qu'il est incomplet")
@@ -16,11 +17,18 @@ struct NetworkConfigTests {
         #expect(try ChimpNetworkConfig.forThisBuild() == .testnet)
         #expect(try ChimpNetworkConfig.forThisBuild().features.addMoney, "Chimp Dev garde « Add money »")
         #else
-        // Schéma « Chimp Release Tests » : la vraie Release. Jamais de repli sur le testnet.
+        // Un futur build mainnet (sans CHIMP_TESTNET) : jamais de repli sur le testnet.
         #expect(throws: NetworkConfigError.incomplete(network: .mainnet, missing: ChimpNetworkConfig.mainnetDraft.missing)) {
             try ChimpNetworkConfig.forThisBuild()
         }
         #endif
+    }
+
+    @Test("Mainnet prêt pour plus tard : tant qu'une valeur manque, il refuse de démarrer, dans tous les builds")
+    func mainnetStillRefused() {
+        #expect(throws: NetworkConfigError.incomplete(network: .mainnet, missing: ChimpNetworkConfig.mainnetDraft.missing)) {
+            try ChimpNetworkConfig.mainnetDraft.complete()
+        }
     }
 
     @Test("Mainnet : les contrats ChimpDAO, le serveur de frais et le repère de l'horloge manquent, et c'est dit")

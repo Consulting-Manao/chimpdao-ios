@@ -105,10 +105,14 @@ struct NetworkFeatures: Equatable, Sendable {
 // MARK: Configuration de ce build
 
 extension ChimpNetworkConfig {
-    /// La configuration de ce build, la seule de l'app (décision de Barth du 2026-10-19) : Debug et Testing → testnet,
-    /// Release → mainnet. Choisie par la condition de compilation `CHIMP_TESTNET` (`project.pbxproj`, Debug et Testing
-    /// seulement). Passée partout depuis `AppSession` : aucun service ne choisit son réseau lui-même.
-    /// Mainnet incomplet : une erreur qui empêche l'app de démarrer, **jamais** un retour au testnet.
+    /// La configuration de ce build, la seule de l'app (décision de Barth du 2026-10-19), choisie par la condition de
+    /// compilation `CHIMP_TESTNET` (`project.pbxproj`). Passée partout depuis `AppSession` : aucun service ne choisit
+    /// son réseau lui-même.
+    ///
+    /// Depuis le 2026-10-23, **toutes** les configurations sont sur le testnet : ChimpDAO 2.0.0 (Release) est l'app
+    /// publique testnet (`CHIMP_TESTNET CHIMP_TESTNET_STORE`, comme Chimp Test). Le mainnet reste prêt pour une version
+    /// future : retirer ces deux conditions de la Release, et il démarre avec `mainnetDraft`. Mainnet incomplet : une
+    /// erreur qui empêche l'app de démarrer, **jamais** un retour au testnet.
     static func forThisBuild() throws -> ChimpNetworkConfig {
         #if CHIMP_TESTNET
         var config = ChimpNetworkConfig.testnet
