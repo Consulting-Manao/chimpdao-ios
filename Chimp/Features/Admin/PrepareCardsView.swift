@@ -10,8 +10,6 @@ struct PrepareCardsView: View {
     @State private var hasConfirmed = false
     @State private var isShowingAllCards = false
     @State private var isCheckingCard = false
-    /// Taille du lot affichée sur l'accueil (« 37 / 195 cards ready »), réglable dans « See all cards ».
-    @AppStorage("prepareCards.batchSize") private var batchSize = 195
     let hasAdminKey: Bool
 
     init(model: PrepareCardsModel, hasAdminKey: Bool) {
@@ -56,7 +54,7 @@ struct PrepareCardsView: View {
             .toolbar(.visible, for: .navigationBar)
             .navigationBarBackButtonHidden(model.isBusy)
             .navigationDestination(isPresented: $isShowingAllCards) {
-                PreparedCardsListView(model: model, batchSize: $batchSize)
+                PreparedCardsListView(model: model)
             }
             .navigationDestination(isPresented: $isCheckingCard) {
                 CheckCardView(model: model)
@@ -103,11 +101,9 @@ struct PrepareCardsView: View {
         PrepareStepScreen(overline: "Stellar Testnet", title: "Cards",
                           lead: "Each card gets its key, is registered, and receives a little test money. Then it's ready to give away.") {
             VStack(alignment: .leading, spacing: ChimpSpacing.xs) {
-                HStack(alignment: .firstTextBaseline, spacing: ChimpSpacing.s) {
-                    Text(verbatim: "\(model.readyCount)").chimpFont(.displayXL)
-                    Text(verbatim: "/ \(batchSize)").chimpFont(.amountM).foregroundStyle(.chimpTextSecondary)
-                }
-                Text(verbatim: "cards ready").chimpFont(.bodyL).foregroundStyle(.chimpTextSecondary)
+                // Pas de taille de lot (Barth, 2026-10-23) : seulement les cartes prêtes, sans limite.
+                Text(verbatim: "\(model.readyCount)").chimpFont(.displayXL)
+                Text(verbatim: model.readyCount == 1 ? "card ready" : "cards ready").chimpFont(.bodyL).foregroundStyle(.chimpTextSecondary)
             }
             .padding(ChimpSpacing.lg + ChimpBorder.regular)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -412,30 +408,13 @@ private struct PrepareMoneyStep: View {
 
 // MARK: - « See all cards »
 
-/// La liste du journal : numéro, note, solde, statut ; export CSV ; taille du lot.
+/// La liste du journal : numéro, note, solde, statut ; export CSV.
 struct PreparedCardsListView: View {
     let model: PrepareCardsModel
-    @Binding var batchSize: Int
-    @State private var batchText = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ChimpSpacing.blockGap) {
-                HStack {
-                    Text(verbatim: "Cards in this batch").chimpFont(.rowTitle)
-                    Spacer()
-                    TextField(text: $batchText) { Text(verbatim: "195") }
-                        .keyboardType(.numberPad)
-                        .chimpFont(.mono)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 70)
-                        .onChange(of: batchText) {
-                            if let size = Int(batchText), size > 0 { batchSize = size }
-                        }
-                }
-                .padding(.vertical, ChimpSpacing.sm)
-                .padding(.horizontal, ChimpSpacing.ml)
-                .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.control), fill: Color(.chimpSurface))
                 if model.cards.isEmpty {
                     Text(verbatim: "No card yet.").chimpFont(.body).foregroundStyle(.chimpTextSecondary)
                 }
@@ -456,7 +435,6 @@ struct PreparedCardsListView: View {
                 }
             }
         }
-        .onAppear { batchText = String(batchSize) }
         .task { await model.loadAllBalances() }
         .refreshable {
             for card in model.cards { await model.loadBalance(of: card.wallet, force: true) }

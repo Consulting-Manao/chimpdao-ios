@@ -16,7 +16,7 @@ struct PreparedCard: Codable, Equatable, Identifiable {
     }
 
     var id: String { publicKey }
-    /// Numéro imprimé sur la carte (#001 à #195).
+    /// Numéro imprimé sur la carte (#001, #002…, sans limite).
     var number: Int
     /// Clé publique de la puce, en hexadécimal (130 caractères).
     let publicKey: String
