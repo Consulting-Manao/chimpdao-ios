@@ -62,11 +62,8 @@ struct SettingsView: View {
                     sectionLabel("Display")
                         .padding(.top, ChimpSpacing.sectionGap)
                     ChimpGroupedBox {
-                        // Chimp Test : quantités seulement, pas de devise à choisir.
-                        if AmountDisplay.showsDollars {
-                            ChimpSettingsRow(title: "Currency", value: model.currency.settingsValue) {
-                                model.isChoosingCurrency = true
-                            }
+                        ChimpSettingsRow(title: "Currency", value: model.currency.settingsValue) {
+                            model.isChoosingCurrency = true
                         }
                         ChimpSettingsControlRow(title: "Look") {
                             ChimpSegmentedPicker(segments: Self.lookSegments, selection: $model.look)

@@ -78,7 +78,7 @@ struct CardChoiceView: View {
 
     /// Montant seulement quand on sait la Pocket vide (« $0.00, empty ») ; sinon rien (prix du XLM : étape 5).
     private var cardAmount: String? {
-        choice.pocketIsEmpty == true ? AmountDisplay.emptyText : nil
+        choice.pocketIsEmpty == true ? Decimal(0).formatted(.currency(code: "USD").presentation(.narrow)) : nil
     }
 
     private var cardSubtitle: LocalizedStringKey? {

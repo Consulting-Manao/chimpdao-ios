@@ -71,8 +71,7 @@ struct GrowView: View {
 
     private var pots: [GrowPot] { model.pots }
     private var drawers: [SendDrawer] { model.potDrawers }
-    /// Pas de total en dollars dans Chimp Test (quantités seulement).
-    private var total: Decimal? { pots.isEmpty || !AmountDisplay.showsDollars ? nil : GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD) }
+    private var total: Decimal? { pots.isEmpty ? nil : GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD) }
 
     // MARK: Pastilles
 
@@ -158,7 +157,7 @@ struct GrowView: View {
     /// « MAIN · +$1.48 » (le total du tiroir seulement s'il est connu en entier).
     private func drawerLabel(_ drawer: SendDrawer, pots: [GrowPot]) -> String {
         let name = Self.pillTitle(drawer)
-        guard AmountDisplay.showsDollars, let total = GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD) else { return name }
+        guard let total = GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD) else { return name }
         return "\(name) · \(Self.dollars(total, locale: locale))"
     }
 

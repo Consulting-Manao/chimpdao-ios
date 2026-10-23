@@ -64,25 +64,6 @@ struct PreferencesTests {
         #expect(!preferences.hasAcceptedTestnetNotice && store.values.isEmpty)
     }
 
-    @Test("Chimp Test (quantités seulement) : aucune valeur convertie ni « $ », même pour l'USDC")
-    func quantitiesOnly() {
-        var money = DisplayMoney(currency: .usd, usdPrices: ["USDC": 1, "XLM": Decimal(string: "0.25")!])
-        #expect(money.value([AssetAmount(code: "XLM", amount: 100)]) == 25)
-        money.showsDollars = false
-        #expect(money.rate == nil)
-        #expect(money.value([AssetAmount(code: "XLM", amount: 100)]) == nil)
-        #expect(money.value([]) == nil, "Même un wallet vide n'est pas « $0.00 »")
-        #expect(money.value(usd: 5) == nil)
-        let usdc = ActivityViewModel.amountText(25, code: "USDC", sign: .positive, locale: Locale(identifier: "en_US"), showsDollars: false)
-        #expect(usdc == "+25 USDC")
-        #expect(ActivityViewModel.amountText(25, code: "USDC", sign: .positive, locale: Locale(identifier: "en_US"), showsDollars: true) == "+$25.00")
-        #if CHIMP_TESTNET_STORE
-        #expect(!AmountDisplay.showsDollars)
-        #else
-        #expect(AmountDisplay.showsDollars, "Chimp Dev et ChimpDAO gardent les dollars")
-        #endif
-    }
-
     @Test("Réglages : changer « Look » depuis I2 change la préférence du téléphone")
     func settingsLook() {
         let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)

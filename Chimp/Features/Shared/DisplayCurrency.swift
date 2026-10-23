@@ -64,12 +64,9 @@ struct DisplayMoney: Equatable {
     let usdPrices: [String: Decimal]
     /// Région des séparateurs (celle du téléphone ; fixée dans les tests).
     var locale: Locale = .autoupdatingCurrent
-    /// `false` (Chimp Test sur l'App Store) : jamais de valeur convertie, les écrans montrent les quantités.
-    var showsDollars: Bool = AmountDisplay.showsDollars
 
     /// Prix en dollars d'une unité de la devise (USD = 1). `nil` ou nul : la devise ne peut pas être affichée.
     var rate: Decimal? {
-        guard showsDollars else { return nil }
         if currency == .usd { return 1 }
         guard let rate = usdPrices[currency.code], rate > 0 else { return nil }
         return rate

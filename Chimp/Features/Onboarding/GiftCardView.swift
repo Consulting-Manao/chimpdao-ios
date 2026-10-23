@@ -36,8 +36,7 @@ final class GiftCardModel {
 
     /// Prix des actifs détenus (une seule fois). Une lecture ratée laisse les montants par actif.
     func load() async {
-        // Chimp Test : quantités seulement, aucun prix lu.
-        guard !hasLoaded, AmountDisplay.showsDollars, let oracle else { return }
+        guard !hasLoaded, let oracle else { return }
         hasLoaded = true
         let codes = Set(held.map(\.code))
         guard !codes.isEmpty else { return }
