@@ -112,16 +112,14 @@ enum BlockchainError: LocalizedError {
     }
 }
 
-// MARK: - Contract Errors (NonFungibleTokenError 200–203, 210–212)
+// MARK: - Contract Errors (nfc-nft NonFungibleTokenError 101–109)
 
 enum ContractError: LocalizedError {
-    case invalidSignature       // 200
-    case nonExistentToken       // 201
-    case incorrectOwner        // 202
-    case tokenIDsAreDepleted    // 203
-    case tokenAlreadyMinted     // 210
-    case tokenAlreadyClaimed    // 211 (claim: was already claimed)
-    case tokenNotClaimed        // 212
+    case invalidSignature       // 101
+    case nonExistentToken       // 102
+    case tokenIDsAreDepleted    // 103
+    case tokenAlreadyMinted     // 104
+    case tokenNotClaimed        // 109
 
     case unknown(code: UInt32)
 
@@ -131,14 +129,10 @@ enum ContractError: LocalizedError {
             return "Invalid signature detected."
         case .nonExistentToken:
             return "This token does not exist."
-        case .incorrectOwner:
-            return "You do not own this token."
         case .tokenIDsAreDepleted:
             return "No more tokens can be minted."
         case .tokenAlreadyMinted:
             return "Token was already minted."
-        case .tokenAlreadyClaimed:
-            return "NFT already claimed."
         case .tokenNotClaimed:
             return "Token exists but has not been claimed yet."
         case .unknown(let code):
@@ -148,26 +142,24 @@ enum ContractError: LocalizedError {
 
     var code: UInt32 {
         switch self {
-        case .invalidSignature: return 200
-        case .nonExistentToken: return 201
-        case .incorrectOwner: return 202
-        case .tokenIDsAreDepleted: return 203
-        case .tokenAlreadyMinted: return 210
-        case .tokenAlreadyClaimed: return 211
-        case .tokenNotClaimed: return 212
+        case .invalidSignature: return 101
+        case .nonExistentToken: return 102
+        case .tokenIDsAreDepleted: return 103
+        case .tokenAlreadyMinted: return 104
+        case .tokenNotClaimed: return 109
         case .unknown(let code): return code
         }
     }
 
     static func fromCode(_ code: UInt32) -> ContractError {
         switch code {
-        case 200: return .invalidSignature
-        case 201: return .nonExistentToken
-        case 202: return .incorrectOwner
-        case 203: return .tokenIDsAreDepleted
-        case 210: return .tokenAlreadyMinted
-        case 211: return .tokenAlreadyClaimed
-        case 212: return .tokenNotClaimed
+        // The 2xx codes are the numbers before the contracts were renumbered. Mainnet runs
+        // them until the upgrade lands; delete these once it has.
+        case 101, 200: return .invalidSignature
+        case 102, 201: return .nonExistentToken
+        case 103, 203: return .tokenIDsAreDepleted
+        case 104, 210: return .tokenAlreadyMinted
+        case 109, 212: return .tokenNotClaimed
         default: return .unknown(code: code)
         }
     }
@@ -186,11 +178,11 @@ enum ContractError: LocalizedError {
                   let captureRange = Range(match.range(at: 1), in: errorString),
                   let code = UInt32(errorString[captureRange]) else { continue }
             if pattern == #"(?<!\d)(\d{3})(?!\d)"# {
-                guard code >= 200 && code <= 220 else { continue }
+                guard (101...109).contains(code) || (200...220).contains(code) else { continue }
             }
             return ContractError.fromCode(code)
         }
-        // Fallbacks only when string looks like a contract/Stellar error; match exact codes to avoid false positives (e.g. 2100 → 210)
+        // Fallbacks only when string looks like a contract/Stellar error; match exact codes to avoid false positives (e.g. 1040 → 104)
         let looksLikeContractError = errorString.contains("Contract") ||
             errorString.contains("contract") ||
             errorString.contains("failing") ||
@@ -198,29 +190,21 @@ enum ContractError: LocalizedError {
             errorString.contains("NonExistentToken") ||
             errorString.contains("TokenIDsAreDepleted") ||
             errorString.contains("TokenAlreadyMinted") ||
-            errorString.contains("TokenAlreadyClaimed") ||
-            errorString.contains("TokenNotClaimed") ||
-            errorString.contains("IncorrectOwner")
+            errorString.contains("TokenNotClaimed")
         guard looksLikeContractError else { return nil }
         if errorString.contains("InvalidSignature") { return .invalidSignature }
         if errorString.contains("NonExistentToken") { return .nonExistentToken }
-        if errorString.contains("IncorrectOwner") { return .incorrectOwner }
         if errorString.contains("TokenIDsAreDepleted") { return .tokenIDsAreDepleted }
         if errorString.contains("TokenAlreadyMinted") { return .tokenAlreadyMinted }
-        if errorString.contains("TokenAlreadyClaimed") { return .tokenAlreadyClaimed }
         if errorString.contains("TokenNotClaimed") { return .tokenNotClaimed }
-        // Exact code match (whole number, not 2100 or 2030)
-        if ContractError.fromErrorStringMatchesExactCode(errorString, 200) { return .invalidSignature }
-        if ContractError.fromErrorStringMatchesExactCode(errorString, 201) { return .nonExistentToken }
-        if ContractError.fromErrorStringMatchesExactCode(errorString, 202) { return .incorrectOwner }
-        if ContractError.fromErrorStringMatchesExactCode(errorString, 203) { return .tokenIDsAreDepleted }
-        if ContractError.fromErrorStringMatchesExactCode(errorString, 210) { return .tokenAlreadyMinted }
-        if ContractError.fromErrorStringMatchesExactCode(errorString, 211) { return .tokenAlreadyClaimed }
-        if ContractError.fromErrorStringMatchesExactCode(errorString, 212) { return .tokenNotClaimed }
+        // Exact code match (whole number, not 1040 or 1030)
+        for code in [101, 102, 103, 104, 109, 200, 201, 203, 210, 212] as [UInt32] {
+            if ContractError.fromErrorStringMatchesExactCode(errorString, code) { return fromCode(code) }
+        }
         return nil
     }
 
-    /// Returns true if the string contains the given contract error code as a whole number (not e.g. 210 inside 2100).
+    /// Returns true if the string contains the given contract error code as a whole number (not e.g. 104 inside 1040).
     private static func fromErrorStringMatchesExactCode(_ errorString: String, _ code: UInt32) -> Bool {
         let codeStr = String(code)
         guard let range = errorString.range(of: codeStr) else { return false }
