@@ -14,6 +14,8 @@ final class AppSession {
     var network: StellarNetwork { config.network }
     /// Historique (onglet Activity), dans son propre fichier.
     let activity: ActivityStore
+    /// Derniers soldes lus, pour afficher le Wallet tout de suite au lancement (affichage seulement).
+    let balances: BalanceStore
     /// Réglages du téléphone (apparence, devise, Face ID), à part du `LocalWallet`.
     let preferences: AppPreferences
     private let store: LocalWalletStore
@@ -23,6 +25,7 @@ final class AppSession {
 
     init(
         store: LocalWalletStore, config: ChimpNetworkConfig, activity: ActivityStore = InMemoryActivityStore(),
+        balances: BalanceStore = InMemoryBalanceStore(),
         preferences: AppPreferences = AppPreferences(store: InMemoryPreferencesStore()),
         erasePhoneData: @escaping () -> Void = {}
     ) {
@@ -30,6 +33,7 @@ final class AppSession {
         self.erasePhoneData = erasePhoneData
         self.config = config
         self.activity = activity
+        self.balances = balances
         self.preferences = preferences
         do {
             wallet = try store.load()
@@ -44,8 +48,10 @@ final class AppSession {
         let network = config.network
         do {
             let activity: ActivityStore = (try? FileActivityStore(network: network)) ?? InMemoryActivityStore()
+            let balances: BalanceStore = (try? FileBalanceStore(network: network)) ?? InMemoryBalanceStore()
             return AppSession(
-                store: try FileLocalWalletStore(network: network), config: config, activity: activity, preferences: .live(),
+                store: try FileLocalWalletStore(network: network), config: config, activity: activity, balances: balances,
+                preferences: .live(),
                 erasePhoneData: { PhoneData.eraseAll() }
             )
         } catch {
@@ -301,6 +307,7 @@ final class AppSession {
     func eraseEverything() throws {
         guard wallet.pendingSend == nil else { throw SettingsError.pendingPayment }
         try activity.erase()
+        try balances.erase()
         try store.erase()
         preferences.reset()
         // Historique de Grow, dernier ledger vu, toutes les préférences : rien ne reste (pas seulement les réglages).

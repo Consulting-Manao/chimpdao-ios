@@ -51,6 +51,10 @@ struct ChainWalletDataSource: WalletDataSource {
         ReadCache.shared.clear()
     }
 
+    func storedWallet() -> WalletSnapshot? {
+        session.wallet.account.flatMap { session.balances.snapshot(of: $0.address) }
+    }
+
     func fetchWallet() async throws -> WalletSnapshot {
         guard let account = session.wallet.account else { throw ReadError.noAccount }
         return try await fetchWallet(for: account)
@@ -63,10 +67,12 @@ struct ChainWalletDataSource: WalletDataSource {
         async let membersRead = chain.cards(of: account.address)
         async let mainRead = chain.balances(of: account.address)
         // Les wallets des cartes déjà connues du téléphone sont lus sans attendre `cards()`. Seule la liste du compte
-        // compte pour l'affichage : une lecture d'une carte qui n'y est plus est jetée.
+        // compte pour l'affichage : une lecture d'une carte qui n'y est plus est jetée. Revue de sécurité F2 : seulement
+        // une Pocket qui est bien l'adresse prédite pour sa carte (rien n'est lu à une adresse refusée).
         var early: [String: Task<[AssetAmount], Error>] = [:]
         for saved in account.cards {
-            guard let pocket = saved.pocket else { continue }
+            guard let pocket = saved.pocket, let key = try? ChipPublicKey(Data(hex: saved.publicKey) ?? Data()),
+                  (try? config.checkedPocket(pocket, of: key)) != nil else { continue }
             early[pocket] = Task { [chain] in try await chain.balances(of: pocket) }
         }
         defer { early.values.forEach { $0.cancel() } }
@@ -104,6 +110,8 @@ struct ChainWalletDataSource: WalletDataSource {
         async let etherfuse = stablebondPrices?.usdPrices(for: held)
         priced.usdPrices = await reflector
         if let bonds = await etherfuse { priced.usdPrices.merge(bonds) { _, etherfuse in etherfuse } }
+        // Gardés pour le prochain lancement (affichage seulement, `BalanceStore`).
+        session.balances.save(priced, of: account.address)
         return priced
     }
 

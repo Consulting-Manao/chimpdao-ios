@@ -79,18 +79,78 @@ final class WalletViewModel {
     private let dataSource: WalletDataSource
     private var hasLoaded = false
 
+    /// Les soldes affichés viennent du téléphone (dernier lancement) et sont en train d'être relus sur la chaîne.
+    private(set) var isUpdatingStoredData = false
+
     /// Prénom du téléphone, indépendant du réseau (« Hey Barth » même si le premier chargement échoue).
     var firstName: String? { dataSource.firstName }
 
-    init(dataSource: WalletDataSource) {
+    private let preferences: AppPreferences?
+    /// Sans préférences (catalogue, aperçus) : l'œil ne vaut que pour cet écran.
+    private var localHidesBalances = false
+
+    init(dataSource: WalletDataSource, preferences: AppPreferences? = nil) {
         self.dataSource = dataSource
+        self.preferences = preferences
     }
 
-    /// Premier affichage : ne recharge pas si les soldes sont déjà là (retour sur l'onglet).
+    // MARK: L'œil
+
+    /// Montants remplacés par « **** » (gardé d'un lancement à l'autre).
+    var hidesBalances: Bool {
+        get { preferences?.hidesBalances ?? localHidesBalances }
+        set {
+            if let preferences { preferences.hidesBalances = newValue } else { localHidesBalances = newValue }
+        }
+    }
+
+    func toggleBalancesHidden() {
+        hidesBalances.toggle()
+    }
+
+    /// Ce que l'écran montre : `content`, ou ses montants masqués.
+    var displayedContent: WalletContent? {
+        guard let content else { return nil }
+        return hidesBalances ? Self.masked(content) : content
+    }
+
+    static let hiddenAmount = "****"
+
+    /// Tous les montants remplacés par « **** », variation de la semaine comprise (« **** this week » : l'en-tête garde sa
+    /// hauteur).
+    static func masked(_ content: WalletContent) -> WalletContent {
+        var masked = content
+        masked.total = hiddenAmount
+        masked.weeklyChange = content.weeklyChange.map { _ in hiddenAmount }
+        masked.mainAmount = hiddenAmount
+        masked.mainReady = content.mainReady.map { _ in hiddenAmount }
+        masked.mainGrowing = content.mainGrowing.map { _ in hiddenAmount }
+        masked.cards = content.cards.map { card in
+            WalletContent.Card(id: card.id, number: card.number, name: card.name, color: card.color, amount: hiddenAmount)
+        }
+        return masked
+    }
+
+    // MARK: Chargement
+
+    /// Premier affichage : ne recharge pas si les soldes sont déjà là (retour sur l'onglet). Les derniers soldes gardés
+    /// sur le téléphone s'affichent tout de suite, pendant la lecture sur la chaîne.
     func loadIfNeeded() async {
         guard !hasLoaded else { return }
         hasLoaded = true
+        if content == nil, let stored = dataSource.storedWallet() {
+            show(stored)
+            isUpdatingStoredData = true
+        }
         await refresh()
+        isUpdatingStoredData = false
+    }
+
+    private func show(_ snapshot: WalletSnapshot) {
+        content = Self.format(snapshot)
+        cards = snapshot.cards
+        self.snapshot = snapshot
+        phase = .loaded
     }
 
     /// « Tirer pour rafraîchir » : tout est relu sur la chaîne, rien n'est repris de la mémoire courte (`ReadCache`).
@@ -104,12 +164,9 @@ final class WalletViewModel {
         if content == nil { phase = .loading }
         do {
             let snapshot = try await dataSource.fetchWallet()
-            content = Self.format(snapshot)
-            cards = snapshot.cards
-            self.snapshot = snapshot
+            show(snapshot)
             isShowingStaleData = false
             securityProblem = nil
-            phase = .loaded
         } catch is CancellationError {
             // Rafraîchissement interrompu (écran quitté) : on garde l'état actuel.
         } catch {

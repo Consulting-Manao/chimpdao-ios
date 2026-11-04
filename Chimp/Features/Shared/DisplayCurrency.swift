@@ -4,7 +4,7 @@ import Foundation
 /// montants signés, envoyés et ceux de l'Activity restent ceux des actifs réellement bougés.
 /// Liste de la maquette I3, **limitée aux devises cotées par Reflector** comme `listDenominations` du terminal : le franc
 /// suisse de la maquette est retiré, le flux FX ne le cote pas (vérifié le 2026-09-30, DESIGN_NOTES §13).
-enum DisplayCurrency: String, CaseIterable, Identifiable, Sendable {
+enum DisplayCurrency: String, CaseIterable, Identifiable, Sendable, Codable {
     case usd, eur, gbp, jpy
     /// « Show everything in XLM ».
     case xlm

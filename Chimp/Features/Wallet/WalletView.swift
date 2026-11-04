@@ -45,7 +45,7 @@ struct WalletView: View {
                     case .failed:
                         failure
                     case .loading, .loaded:
-                        balances(model.content ?? .placeholder)
+                        balances(model.displayedContent ?? .placeholder)
                             .redacted(reason: model.content == nil ? .placeholder : [])
                             .accessibilityHidden(model.content == nil)
                     }
@@ -73,14 +73,17 @@ struct WalletView: View {
     // MARK: En-tête
 
     private func header(topSafeArea: CGFloat) -> some View {
-        let content = model.content
+        let content = model.displayedContent
         return ChimpBalanceHeader(
             firstName: model.firstName,
             label: "Your whole banana pile",
             total: content?.total ?? "—",
             change: content?.weeklyChange.map { "\($0) this week" },
             onSettings: onSettings,
-            topSafeArea: topSafeArea
+            topSafeArea: topSafeArea,
+            isHidingAmounts: model.hidesBalances,
+            onToggleAmounts: model.toggleBalancesHidden,
+            isUpdating: model.isUpdatingStoredData
         )
         .redacted(reason: model.phase == .loading ? .placeholder : [])
     }

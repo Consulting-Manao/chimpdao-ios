@@ -19,6 +19,11 @@ struct ChimpBalanceHeader: View {
     var onSettings: (() -> Void)?
     /// Hauteur de la zone sûre du haut de l'écran qui l'affiche (barre d'état).
     var topSafeArea: CGFloat = 0
+    /// L'œil : montants masqués (« **** ») ou visibles. Bouton affiché seulement si une action est fournie.
+    var isHidingAmounts = false
+    var onToggleAmounts: (() -> Void)?
+    /// Montants d'un lancement précédent, en cours de relecture : petite roue à côté du libellé.
+    var isUpdating = false
 
     @Environment(\.chimpScreenInsets) private var screenInsets
 
@@ -41,9 +46,17 @@ struct ChimpBalanceHeader: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(label)
-                    .chimpFont(.bodyS)
-                    .foregroundStyle(.chimpOnHeaderSecondary)
+                HStack(spacing: ChimpSpacing.xs) {
+                    Text(label)
+                        .chimpFont(.bodyS)
+                        .foregroundStyle(.chimpOnHeaderSecondary)
+                    if isUpdating {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .tint(.chimpOnHeaderSecondary)
+                            .accessibilityLabel("Updating")
+                    }
+                }
                 Text(verbatim: total)
                     .chimpFont(.displayXL)
                     .foregroundStyle(.chimpOnHeaderPrimary)
@@ -57,8 +70,23 @@ struct ChimpBalanceHeader: View {
                         .foregroundStyle(.chimpOnHeaderAccent)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, ChimpSpacing.lg)
             .accessibilityElement(children: .combine)
+            // Hors du bloc lu d'un coup par VoiceOver : le bouton reste atteignable.
+            .overlay(alignment: .topTrailing) {
+                if let onToggleAmounts {
+                    Button(action: onToggleAmounts) {
+                        Image(systemName: isHidingAmounts ? "eye.slash.fill" : "eye.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.chimpOnHeaderSecondary)
+                            .expandedTouchTarget(visualSize: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, ChimpSpacing.lg)
+                    .accessibilityLabel(isHidingAmounts ? "Show amounts" : "Hide amounts")
+                }
+            }
         }
         .padding(ChimpSpacing.header(for: screenInsets, bottom: ChimpSpacing.xxl))
         .padding(.top, topSafeArea)
@@ -91,7 +119,8 @@ private struct ChimpBalanceHeaderPreview: View {
                     total: "$1,485.00",
                     change: change,
                     onSettings: {},
-                    topSafeArea: proxy.safeAreaInsets.top
+                    topSafeArea: proxy.safeAreaInsets.top,
+                    onToggleAmounts: {}
                 )
             }
             .ignoresSafeArea(edges: .top)

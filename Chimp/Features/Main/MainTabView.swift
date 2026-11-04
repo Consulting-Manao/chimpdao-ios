@@ -36,7 +36,7 @@ struct MainTabView: View {
         let wallet = WalletViewModel(dataSource: ChainWalletDataSource(
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle.shared,
             stablebondPrices: StablebondWalletPrices(config: config)
-        ))
+        ), preferences: session.preferences)
         _walletModel = State(initialValue: wallet)
         _growModel = State(initialValue: GrowModel(
             service: ChainVaultService(session: session),

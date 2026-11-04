@@ -184,6 +184,7 @@ struct WalletTests {
         ]
         let source = ChainWalletDataSource(session: session(cards: [tampered]), chain: chain, oracle: FakeOracle(prices: [:]))
         await #expect(throws: (any Error).self) { try await source.fetchWallet() }
+        #expect(!chain.balanceReads.contains(Self.attackerPocket), "Rien n'est lu à l'adresse refusée, même en avance")
         await #expect(throws: (any Error).self) { try await LocalReceiveDataSource(session: session(cards: [tampered])).fetchReceiveOptions() }
     }
 
@@ -297,6 +298,80 @@ struct WalletTests {
         #expect(!content.isShowingAssetAmounts)
     }
 
+    // MARK: Soldes gardés et l'œil (2026-11-04)
+
+    @Test("Lancement : les derniers soldes gardés s'affichent tout de suite, puis ceux de la chaîne les remplacent")
+    @MainActor func storedBalancesShowFirst() async throws {
+        let session = session(cards: [Self.savedCard])
+        var old = snapshot(prices: ["XLM": Decimal(string: "0.2")!, "USDC": 1])
+        old.cards = []
+        session.balances.save(old, of: Self.account)
+        let chain = FakeWalletChain()
+        chain.members = [Self.cardKey]
+        chain.balances = [
+            Self.account: [AssetAmount(code: "XLM", amount: 100), AssetAmount(code: "USDC", amount: 0)],
+            Self.pocket: [AssetAmount(code: "USDC", amount: 25)],
+        ]
+        let source = SlowSource(ChainWalletDataSource(session: session, chain: chain, oracle: FakeOracle(prices: ["XLM": 1, "USDC": 1])))
+        let model = WalletViewModel(dataSource: source)
+        let loading = Task { await model.loadIfNeeded() }
+        for _ in 0..<100 where model.content == nil { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.phase == .loaded, "Pas de squelette : les soldes du téléphone d'abord")
+        #expect(model.content == WalletViewModel.format(old))
+        #expect(model.isUpdatingStoredData)
+        await loading.value
+        #expect(!model.isUpdatingStoredData)
+        #expect(model.snapshot?.cards.count == 1, "Remplacés par la lecture de la chaîne")
+        #expect(session.balances.snapshot(of: Self.account)?.cards.count == 1, "La nouvelle lecture est gardée")
+    }
+
+    @Test("Lancement sans soldes gardés : squelette, comme avant")
+    @MainActor func noStoredBalances() async {
+        let model = WalletViewModel(dataSource: SlowSource(MockWalletDataSource()))
+        #expect(model.phase == .loading)
+        #expect(model.content == nil)
+    }
+
+    @Test("L'œil : chaque montant devient « **** », variation comprise ; rien d'autre ne change")
+    @MainActor func maskedAmounts() {
+        let content = WalletViewModel.format(snapshot(prices: ["XLM": Decimal(string: "0.2")!, "USDC": 1]))
+        let masked = WalletViewModel.masked(content)
+        #expect(masked.total == "****")
+        #expect(masked.mainAmount == "****")
+        #expect(masked.weeklyChange == "****")
+        #expect(masked.cards.map(\.amount) == ["****"])
+        #expect(masked.cards.map(\.name) == content.cards.map(\.name))
+        #expect(masked.isZeroBalance == content.isZeroBalance)
+    }
+
+    @Test("L'œil : gardé dans les préférences, effacé par « Erase everything »")
+    @MainActor func hiddenPreference() {
+        let store = InMemoryPreferencesStore()
+        let preferences = AppPreferences(store: store)
+        let model = WalletViewModel(dataSource: MockWalletDataSource(), preferences: preferences)
+        #expect(!model.hidesBalances)
+        model.toggleBalancesHidden()
+        #expect(AppPreferences(store: store).hidesBalances, "Retrouvé au prochain lancement")
+        preferences.reset()
+        #expect(!AppPreferences(store: store).hidesBalances)
+    }
+
+    @Test("Fichier des soldes : relu tel quel, effacé avec le reste")
+    @MainActor func balanceFile() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let store = try FileBalanceStore(network: .testnet, directory: folder)
+        let saved = snapshot(prices: ["USDC": 1])
+        store.save(saved, of: Self.account)
+        #expect(try FileBalanceStore(network: .testnet, directory: folder).snapshot(of: Self.account) == saved)
+        try store.erase()
+        #expect(store.snapshot(of: Self.account) == nil)
+
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet, balances: InMemoryBalanceStore())
+        session.balances.save(saved, of: Self.account)
+        try session.eraseEverything()
+        #expect(session.balances.snapshot(of: Self.account) == nil)
+    }
+
     // MARK: Recevoir
 
     @Test("Recevoir : le Main account puis la Pocket de chaque carte connue, noms et couleurs locaux")
@@ -312,6 +387,18 @@ struct WalletTests {
 // MARK: Faux
 
 @MainActor
+/// Une source dont la lecture prend un moment, pour voir ce que l'écran montre en attendant.
+private struct SlowSource: WalletDataSource {
+    let wrapped: WalletDataSource
+    init(_ wrapped: WalletDataSource) { self.wrapped = wrapped }
+    var firstName: String? { wrapped.firstName }
+    func storedWallet() -> WalletSnapshot? { wrapped.storedWallet() }
+    func fetchWallet() async throws -> WalletSnapshot {
+        try await Task.sleep(for: .milliseconds(200))
+        return try await wrapped.fetchWallet()
+    }
+}
+
 private final class FakeWalletChain: WalletChain {
     var members: [ChipPublicKey] = []
     var balances: [String: [AssetAmount]] = [:]

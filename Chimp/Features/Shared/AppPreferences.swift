@@ -51,12 +51,18 @@ final class AppPreferences {
         didSet { store.set(hasAcceptedTestnetNotice ? "accepted" : nil, for: .testnetNotice) }
     }
 
+    /// L'œil du Wallet : montants remplacés par « **** » (demande de Barth du 2026-11-04). Visibles par défaut.
+    var hidesBalances: Bool {
+        didSet { store.set(hidesBalances ? "hidden" : nil, for: .hidesBalances) }
+    }
+
     init(store: PreferencesStore) {
         self.store = store
         look = store.string(for: .look).flatMap(ChimpLook.init(rawValue:)) ?? .auto
         currency = store.string(for: .currency).flatMap(DisplayCurrency.init(rawValue:)) ?? .usd
         soundsEnabled = store.string(for: .sounds) != "off"
         hasAcceptedTestnetNotice = store.string(for: .testnetNotice) == "accepted"
+        hidesBalances = store.string(for: .hidesBalances) == "hidden"
     }
 
     /// Préférences gardées dans `UserDefaults` (l'app) ; en mémoire pour les tests et le catalogue.
@@ -70,6 +76,7 @@ final class AppPreferences {
         currency = .usd
         soundsEnabled = true
         hasAcceptedTestnetNotice = false
+        hidesBalances = false
         // Après les valeurs par défaut (leur `didSet` les écrit) : rien ne reste dans le stockage.
         store.removeAll()
     }
@@ -81,6 +88,7 @@ enum PreferenceKey: String, CaseIterable {
     case currency = "chimp.currency"
     case sounds = "chimp.sounds"
     case testnetNotice = "chimp.testnetNotice"
+    case hidesBalances = "chimp.hidesBalances"
 }
 
 /// Lecture et écriture des préférences. Implémenté par `UserDefaultsPreferencesStore` et `InMemoryPreferencesStore`.

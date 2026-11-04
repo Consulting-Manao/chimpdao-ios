@@ -1,7 +1,7 @@
 import Foundation
 
 /// Montant d'un actif, en unités de l'actif (« 25 » USDC), jamais en unités on-chain.
-struct AssetAmount: Hashable, Sendable {
+struct AssetAmount: Hashable, Sendable, Codable {
     var code: String
     var amount: Decimal
 }
@@ -10,7 +10,7 @@ struct AssetAmount: Hashable, Sendable {
 ///
 /// Donnée encore sans source décidée (DESIGN_NOTES §12, question 8) : `weeklyChange`, facultatif et masqué s'il manque.
 /// Le prénom n'en fait pas partie : il vient du téléphone (`WalletDataSource.firstName`), même si la lecture échoue.
-struct WalletSnapshot: Equatable {
+struct WalletSnapshot: Equatable, Codable {
     /// Devise d'affichage choisie dans les réglages (I3) au moment de la lecture ; son prix est dans `usdPrices`.
     var currency: DisplayCurrency
     /// Main : le compte partagé par toutes les cartes.
@@ -34,14 +34,14 @@ struct WalletSnapshot: Equatable {
 }
 
 /// Solde d'un tiroir : ses actifs, plus une part en épargne (Grow, facultative, en dollars).
-struct DrawerBalance: Equatable {
+struct DrawerBalance: Equatable, Codable {
     var assets: [AssetAmount]
     /// Pas encore lue sur la chaîne (Grow n'est pas construit) : seulement dans les données factices.
     var growing: Decimal?
 }
 
 /// Wallet d'une carte.
-struct CardBalance: Equatable, Identifiable {
+struct CardBalance: Equatable, Identifiable, Codable {
     /// Clé publique de la carte (hexadécimal) : identité stable.
     var id: String
     /// Numéro de la carte (`token_id` de son NFT) sur 4 chiffres, « ···· » s'il est inconnu.
@@ -65,10 +65,13 @@ protocol WalletDataSource {
     func fetchWallet() async throws -> WalletSnapshot
     /// « Tirer pour rafraîchir » : oublier les lectures gardées en mémoire, pour tout relire sur la chaîne.
     func discardCachedReads()
+    /// Les derniers soldes lus du compte affiché, gardés sur le téléphone (`BalanceStore`), à montrer en attendant la chaîne.
+    func storedWallet() -> WalletSnapshot?
 }
 
 extension WalletDataSource {
     func discardCachedReads() {}
+    func storedWallet() -> WalletSnapshot? { nil }
 }
 
 /// Données factices (noms et montants de la maquette), avec des scénarios pour tester chaque état.
