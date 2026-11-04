@@ -91,9 +91,8 @@ struct SendErrorTests {
         #expect(service.submitCount == 0)
 
         model.retryAfterWrongCard()
-        #expect(model.signingStage == .waitingForTap(.tapToSign))
+        #expect(model.signingStage == .scanning(.tapToSign), "« Try again » relance le scan")
         #expect(model.pin == "1234", "Le PIN reste pour retaper la bonne carte")
-        model.scanCard()
         await waitUntil { isSent(model) }
         #expect(service.lastPin == "1234")
         #expect(model.pin.isEmpty)
@@ -144,13 +143,11 @@ struct SendErrorTests {
         let (model, service) = await reviewReady(drawerID: "0421", order: .tapThenPin)
         service.nextReadError = ChipError.cardNotAccepted(tapped: k1Key)
         model.confirmReview()
-        await waitUntil { model.signingStage == .waitingForTap(.tapToRead) }
-        model.scanCard()
         await waitUntil { wrongCard(model) != nil }
         #expect(wrongCard(model)?.1 == .tapToRead)
         #expect(service.signCount == 0)
         model.retryAfterWrongCard()
-        #expect(model.signingStage == .waitingForTap(.tapToRead))
+        #expect(model.signingStage == .scanning(.tapToRead))
     }
 
     @Test("Tap puis PIN : le second tap n'accepte que la carte lue au premier (son PIN)")
@@ -158,8 +155,6 @@ struct SendErrorTests {
         let (model, service) = await reviewReady(drawerID: "main", order: .tapThenPin)
         service.readCardKey = k1Key
         model.confirmReview()
-        await waitUntil { model.signingStage == .waitingForTap(.tapToRead) }
-        model.scanCard()
         await waitUntil { model.signingStage == .enteringPin }
         model.pinEntered("4321")
         model.scanCard()
@@ -173,8 +168,6 @@ struct SendErrorTests {
         let (model, service) = await reviewReady(drawerID: "main", order: .tapThenPin)
         service.readCardKey = r1Key
         model.confirmReview()
-        await waitUntil { model.signingStage == .waitingForTap(.tapToRead) }
-        model.scanCard()
         await waitUntil { model.signingStage == .enteringPin }
         model.pinEntered("4321")
         service.nextSignError = ChipError.cardNotAccepted(tapped: k1Key)
@@ -189,8 +182,6 @@ struct SendErrorTests {
         let (model, service) = await reviewReady(drawerID: "main", order: .tapThenPin, cards: .mixed)
         service.readCardUsesPin = false
         model.confirmReview()
-        await waitUntil { model.signingStage == .waitingForTap(.tapToRead) }
-        model.scanCard()
         await waitUntil { isSent(model) }
         #expect(isSent(model))
         #expect(service.readCount == 1)

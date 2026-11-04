@@ -16,8 +16,8 @@ struct ChangePINScreen: View {
     }
 }
 
-/// Changer le PIN d'une carte (non dessiné ; mise en page d'A6 et des revues G6/G7) : PIN actuel, nouveau PIN deux fois,
-/// revue, un tap, nouveau code de déblocage. Textes proposés : DESIGN_NOTES §12.
+/// Changer le PIN d'une carte (non dessiné ; mise en page d'A6 et des revues G6/G7) : revue, PIN actuel, nouveau PIN deux
+/// fois, un tap qui démarre tout seul, nouveau code de déblocage. Textes proposés : DESIGN_NOTES §12.
 struct ChangePINFlowView: View {
     @Bindable var model: ChangePINModel
     let onExit: () -> Void
@@ -116,7 +116,7 @@ struct ChangePINFlowView: View {
             ChimpHeader(title: "Change \(model.card.name)'s PIN?", subtitle: "N°\(model.card.number)", onBack: model.isBusy ? nil : { back() })
             ScrollView { reviewContent }
                 .scrollBounceBehavior(.basedOnSize)
-            ChimpButton("Tap \(model.card.name) to change it", action: model.openTapSheet)
+            ChimpButton("Continue", action: model.continueFromReview)
                 .padding(.horizontal, ChimpSpacing.xxl)
                 .padding(.vertical, ChimpSpacing.l)
         }

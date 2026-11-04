@@ -217,14 +217,14 @@ struct SwapFlowTests {
         #expect(service.submitCount == 1)
     }
 
-    @Test("Anti-double envoi : « Looks good » deux fois ne prépare qu'une fois ; signature verrouillée pendant la préparation")
+    @Test("Anti-double envoi : « Looks good » deux fois ne prépare qu'une fois ; le PIN s'ouvre pendant la préparation")
     func noDoubleSend() async {
         let (model, service) = await reviewReady()
         model.confirmReview()
-        #expect(model.stage == .preparing)
-        #expect(model.isSigningLocked)
+        #expect(model.stage == .enteringPin)
         model.confirmReview()
-        await waitUntil { model.stage == .enteringPin }
+        await waitUntil { service.prepareCount > 0 }
+        try? await Task.sleep(for: .milliseconds(50))
         #expect(service.prepareCount == 1)
         #expect(!model.isSigningLocked, "La feuille du PIN se ferme encore (« Cancel »)")
     }

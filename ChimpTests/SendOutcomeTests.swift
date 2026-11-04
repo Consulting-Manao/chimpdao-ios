@@ -96,6 +96,7 @@ struct SendOutcomeTests {
         #expect(model.signingStage == .idle)
         model.confirmReview()
         await waitUntil { model.signingStage == .enteringPin }
+        await waitUntil { service.prepareCount == 2 }
         #expect(service.prepareCount == 2, "Nouvel envoi seulement une fois certain que rien n'est parti")
     }
 
@@ -212,6 +213,8 @@ struct SendOutcomeTests {
         await waitUntil { model.signingStage == .waitingForTap(.tapToSign) }
         #expect(model.signingStage == .waitingForTap(.tapToSign))
         #expect(model.tapProblem == nil)
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(model.signingStage == .waitingForTap(.tapToSign), "Pas de relance toute seule après une annulation")
     }
 
     @Test("Carte retirée trop tôt : message de Chimpy de l'onboarding")

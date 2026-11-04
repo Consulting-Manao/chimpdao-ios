@@ -257,6 +257,34 @@ struct SetupRehearsalTests {
         #expect(signer.calls.count == 1)
     }
 
+    @Test("Création : confirmation, PIN, puis le tap démarre tout seul après la confirmation du PIN (une seule signature)")
+    func pinStartsTheTap() async throws {
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
+        let signer = RecordingSigner()
+        let onboarding = OnboardingModel(
+            session: session, reader: MockChipReader(scenario: .infineon, delay: .zero),
+            service: MockOnboardingService(scenario: .fresh, delay: .zero), signer: RecordingSigner(),
+            makeSetup: { try self.makeSetup($0, service: MockAccountSetupService(delay: .zero), signer: signer) }
+        )
+        onboarding.path = [.reading]
+        await onboarding.scan()
+        guard case .choice(let fresh) = onboarding.path.last else { Issue.record("expected A3"); return }
+        onboarding.startNewAccount(with: fresh)
+        let setup = try #require(onboarding.setup)
+        setup.firstName = "Léo"
+        onboarding.continueFromName()
+        setup.cardName = "Jungle"
+        onboarding.continueFromCard()
+        onboarding.confirmCreate(.rehearsal)
+        #expect(onboarding.path.last == .pickPIN)
+        await setup.pinEnter("1234", "1234")
+        for _ in 0..<200 where onboarding.path.last != .unlockCode {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(onboarding.path.last == .unlockCode)
+        #expect(signer.calls.count == 1, "Un seul tap, lancé tout seul")
+    }
+
     @Test("Toute la répétition, de A3 à A7 : rien n'est enregistré sur le téléphone, retour à A1")
     func wholeRehearsalSavesNothing() async throws {
         let store = InMemoryLocalWalletStore()
@@ -276,11 +304,11 @@ struct SetupRehearsalTests {
         onboarding.continueFromName()
         setup.cardName = "Jungle"
         onboarding.continueFromCard()
+        #expect(onboarding.path.last == .confirmCreate, "La confirmation vient avant le PIN")
+        onboarding.confirmCreate(.rehearsal)
         #expect(onboarding.path.last == .pickPIN)
         await setup.pinEnter("1234", "1234")
-        onboarding.continueFromPIN()
-        #expect(onboarding.path.last == .confirmCreate)
-        setup.openTapSheet(.rehearsal)
+        #expect(setup.isShowingTapSheet, "PIN confirmé : la feuille du tap s'ouvre tout de suite")
         await onboarding.scanForSetup()
         #expect(onboarding.path.last == .unlockCode)
         #expect(setup.unlockCode == nil)

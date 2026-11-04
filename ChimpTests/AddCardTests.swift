@@ -62,7 +62,7 @@ struct AddCardTests {
 
     // MARK: G1 → G3 (Wallet)
 
-    @Test("Wallet : lire la nouvelle carte, nom, nouveau PIN, un tap (SET PIN + set_owner), code, une carte du compte (add_card), G3")
+    @Test("Wallet : lire la nouvelle carte, nom, confirmation, nouveau PIN puis tap tout seul (SET PIN + set_owner), code, une carte du compte (add_card), G3")
     func walletHappyPath() async throws {
         let (session, store) = walletSession()
         let service = MockAddCardService(delay: .zero)
@@ -79,14 +79,15 @@ struct AddCardTests {
         model.cardName = "Leaf"
         model.cardColor = .leaf
         model.continueFromCard()
-        #expect(model.screen == .pin)
-        model.pinCompleted("1234")
-        model.pinCompleted("1234")
-        model.continueFromPIN()
-        #expect(model.screen == .confirm)
-
+        #expect(model.screen == .confirm, "La confirmation vient avant le PIN")
+        #expect(model.confirmLeadsToPIN)
         model.openTapSheet()
-        #expect(model.isShowingTapSheet)
+        #expect(model.screen == .pin)
+        #expect(!model.isShowingTapSheet)
+        model.pinCompleted("1234")
+        model.pinCompleted("1234")
+        #expect(model.isShowingTapSheet, "PIN confirmé : la feuille du tap s'ouvre, sans écran ni bouton de plus")
+        #expect(model.screen == .pin)
         await model.scanNewCardToSign()
         #expect(signer.newPINs == ["1234"])
         #expect(signer.calls.last?.expectedKey == k1)
@@ -133,8 +134,8 @@ struct AddCardTests {
         #expect(model.progress(at: .tapNew)! == (1, 5), "Avant la lecture : on compte l'étape du PIN")
         await model.scanNewCard()
         #expect(model.progress(at: .nameCard)! == (2, 5))
-        #expect(model.progress(at: .pin)! == (3, 5))
-        #expect(model.progress(at: .confirm)! == (4, 5))
+        #expect(model.progress(at: .confirm)! == (3, 5))
+        #expect(model.progress(at: .pin)! == (4, 5), "Le PIN vient après la confirmation, juste avant le tap")
         #expect(model.progress(at: .unlockCode)! == (4, 5))
         #expect(model.progress(at: .member)! == (5, 5))
         #expect(model.progress(at: .adding) == nil)
@@ -150,7 +151,9 @@ struct AddCardTests {
                                 signer: RecordingSigner(), service: MockAddCardService(delay: .zero),
                                 newCard: ChipKeyInfo(kind: .infineon2Go, publicKey: k1, pinActive: false), tokenID: 913)
         #expect(join.progress(at: .firstName)! == (1, 6))
-        #expect(join.progress(at: .findAccount)! == (4, 6))
+        #expect(join.progress(at: .findAccount)! == (3, 6))
+        #expect(join.progress(at: .confirm)! == (4, 6))
+        #expect(join.progress(at: .pin)! == (5, 6))
         #expect(join.progress(at: .member)! == (6, 6))
     }
 
@@ -171,9 +174,8 @@ struct AddCardTests {
         await model.scanNewCard()
         model.cardName = "Leaf"
         model.continueFromCard()
-        model.pinCompleted("1234")
-        model.continueFromPIN()
         model.openTapSheet()
+        model.pinCompleted("1234")
         await model.scanNewCardToSign()
         #expect(model.screen == .member)
 
@@ -317,10 +319,7 @@ struct AddCardTests {
         model.continueFromName()
         model.cardName = "Leaf"
         model.continueFromCard()
-        model.pinCompleted("1234")
-        model.pinCompleted("1234")
-        model.continueFromPIN()
-        #expect(model.screen == .findAccount)
+        #expect(model.screen == .findAccount, "Rejoindre : trouver le compte d'abord")
 
         await model.scanForAccount()
         #expect(model.account == MockOnboardingService.memberAccount)
@@ -328,6 +327,9 @@ struct AddCardTests {
         #expect(model.screen == .confirm)
 
         model.openTapSheet()
+        #expect(model.screen == .pin)
+        model.pinCompleted("1234")
+        model.pinCompleted("1234")
         await model.scanNewCardToSign()
         model.acknowledgeUnlockCode()
         #expect(model.screen == .member)
@@ -403,9 +405,8 @@ struct AddCardTests {
         await model.scanNewCard()
         model.cardName = "Leaf"
         model.continueFromCard()
-        model.pinCompleted("1234")
-        model.continueFromPIN()
         model.openTapSheet()
+        model.pinCompleted("1234")
         await model.scanNewCardToSign()
         return model
     }

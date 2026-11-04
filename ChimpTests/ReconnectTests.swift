@@ -47,6 +47,20 @@ struct ReconnectTests {
 
     // MARK: Parcours
 
+    @Test("Infineon avec PIN : le 4ᵉ chiffre lance le tap tout seul (VERIFY PIN), sans « Scan my card »")
+    func pinStartsTheTap() async throws {
+        let session = AppSession(store: InMemoryLocalWalletStore(), config: .testnet)
+        let signer = RecordingSigner()
+        let model = await scannedMember(reader: .infineonWithPIN, session: session, signer: signer)
+        let reconnect = try #require(model.reconnection)
+        reconnect.pinCompleted("1234")
+        for _ in 0..<200 where model.path.last != .welcomeBack {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(signer.verifiedPINs == ["1234"])
+        #expect(model.path == [.reading, .welcomeBack])
+    }
+
     @Test("Infineon avec PIN : PIN, second tap (VERIFY PIN), puis « Welcome back! » ; le compte n'est ouvert qu'à la fin")
     func infineonWithPIN() async throws {
         let store = InMemoryLocalWalletStore()

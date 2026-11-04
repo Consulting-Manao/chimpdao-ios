@@ -66,9 +66,15 @@ struct OnboardingFlow: View {
         case .nameYourCard:
             if let setup = model.setup { NameYourCardView(model: setup, onBack: model.back, onContinue: model.continueFromCard) }
         case .pickPIN:
-            if let setup = model.setup { PickPINView(model: setup, onBack: model.back, onContinue: model.continueFromPIN) }
+            if let setup = model.setup {
+                PickPINView(model: setup, onBack: model.back, onContinue: model.continueFromPIN)
+                    .modifier(SetupTapSheet(model: setup, onScan: { Task { await model.scanForSetup() } }))
+            }
         case .confirmCreate:
-            if let setup = model.setup { CreateAccountConfirmView(model: setup, onBack: model.back, onScan: { Task { await model.scanForSetup() } }) }
+            if let setup = model.setup {
+                CreateAccountConfirmView(model: setup, onBack: model.back, onCreate: model.confirmCreate)
+                    .modifier(SetupTapSheet(model: setup, onScan: { Task { await model.scanForSetup() } }))
+            }
         case .unlockCode:
             if let setup = model.setup {
                 UnlockCodeView(code: setup.unlockCode, isRehearsal: setup.isRehearsal, isLost: setup.unlockCodeLost,

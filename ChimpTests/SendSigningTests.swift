@@ -45,9 +45,8 @@ struct SendSigningTests {
         #expect(model.signingStage == .enteringPin)
 
         model.pinEntered("1234")
-        #expect(model.signingStage == .waitingForTap(.tapToSign))
+        #expect(model.signingStage == .scanning(.tapToSign), "Le scan démarre tout seul, sans « Scan my card »")
 
-        model.scanCard()
         await waitUntil { isSent(model) }
         #expect(isSent(model))
         #expect(service.readCount == 0)
@@ -64,18 +63,14 @@ struct SendSigningTests {
         #expect(model.signingSteps == [.tapToRead, .pin, .tapToSign])
 
         model.confirmReview()
-        await waitUntil { model.signingStage == .waitingForTap(.tapToRead) }
-        #expect(model.signingStage == .waitingForTap(.tapToRead))
-
-        model.scanCard()
+        // Pas de PIN avant le premier tap : il démarre tout seul, une fois la préparation finie.
         await waitUntil { model.signingStage == .enteringPin }
         #expect(model.signingStage == .enteringPin)
         #expect(model.cardCheck?.cardName == "Jungle")
         #expect(service.signCount == 0, "Le premier tap ne signe rien")
 
         model.pinEntered("4321")
-        #expect(model.signingStage == .waitingForTap(.tapToSign))
-        model.scanCard()
+        #expect(model.signingStage == .scanning(.tapToSign))
         await waitUntil { isSent(model) }
         #expect(service.readCount == 1)
         #expect(service.signCount == 1)
@@ -86,12 +81,9 @@ struct SendSigningTests {
     func tapThenPinFromMain() async {
         let (model, service) = await reviewReady(drawerID: "main", order: .tapThenPin, cards: .mixed)
         model.confirmReview()
-        await waitUntil { model.signingStage == .waitingForTap(.tapToRead) }
-        model.scanCard()
         await waitUntil { model.signingStage == .enteringPin }
         #expect(model.cardCheck == CardCheck(cardName: "Jungle", cardColor: .jungle, usesPin: true))
         model.pinEntered("1111")
-        model.scanCard()
         await waitUntil { isSent(model) }
         #expect(service.lastPin == "1111")
     }
@@ -104,10 +96,10 @@ struct SendSigningTests {
         #expect(model.signingSteps == [.tapToSign])
 
         model.confirmReview()
-        await waitUntil { model.signingStage == .waitingForTap(.tapToSign) }
-        #expect(model.signingStage == .waitingForTap(.tapToSign))
-        model.scanCard()
+        #expect(model.isSigningLocked, "Préparation")
+        // Pas de PIN : « Looks good » ouvre directement la fenêtre NFC, sans « Scan my card ».
         await waitUntil { isSent(model) }
+        #expect(isSent(model))
         #expect(service.readCount == 0)
         #expect(service.signCount == 1)
         #expect(service.lastPin == nil)
@@ -127,6 +119,8 @@ struct SendSigningTests {
         model.confirmReview()
         model.confirmReview()
         await waitUntil { model.signingStage == .enteringPin }
+        await waitUntil { service.prepareCount > 0 }
+        try? await Task.sleep(for: .milliseconds(50))
         #expect(service.prepareCount == 1)
 
         model.pinEntered("1234")
@@ -139,17 +133,14 @@ struct SendSigningTests {
         #expect(service.prepareCount == 1, "Rien ne repart une fois signé")
     }
 
-    @Test("Verrous : préparation, scan et après signature ; pas pendant le PIN ou l'attente du tap")
+    @Test("Verrous : scan et après signature ; pas pendant le PIN, ouvert dès « Looks good »")
     func locks() async {
         let (model, _) = await reviewReady(drawerID: "0421", order: .pinThenTap, nfcDelay: .milliseconds(300))
         #expect(!model.isSigningLocked)
         model.confirmReview()
-        #expect(model.isSigningLocked, "Préparation")
-        await waitUntil { model.signingStage == .enteringPin }
+        #expect(model.signingStage == .enteringPin, "Le PIN s'ouvre tout de suite, la préparation se fait pendant la saisie")
         #expect(!model.isSigningLocked)
         model.pinEntered("1234")
-        #expect(!model.isSigningLocked)
-        model.scanCard()
         #expect(model.isSigningLocked, "Scan")
         await waitUntil { isSent(model) }
         #expect(model.isSigningLocked, "Signé puis envoyé")
@@ -168,6 +159,7 @@ struct SendSigningTests {
 
         model.confirmReview()
         await waitUntil { model.signingStage == .enteringPin }
+        await waitUntil { service.prepareCount == 2 }
         #expect(service.prepareCount == 2)
         model.pinEntered("1234")
         model.scanCard()
@@ -175,6 +167,55 @@ struct SendSigningTests {
         #expect(model.signingStage == .scanning(.tapToSign), "Un scan en cours ne s'annule pas")
         await waitUntil { isSent(model) }
         #expect(isSent(model))
+    }
+
+    @Test("PIN tapé avant la fin de la préparation : le scan l'attend, puis signe une seule fois")
+    func pinFasterThanNetwork() async {
+        let service = MockSendService(cardSetup: .allWithPin, delay: .zero, nfcDelay: .zero)
+        let model = SendFlowModel(service: service, signingOrder: .pinThenTap)
+        await model.load()
+        model.choose(SendContact(id: "maya", name: "Maya", color: .pink, address: MockSendService.mayaAddress))
+        model.select(drawerID: "0421")
+        model.setAmount(10)
+        model.continueToReview()
+        service.delay = .milliseconds(400)
+        model.confirmReview()
+        model.pinEntered("1234")
+        #expect(model.signingStage == .scanning(.tapToSign))
+        #expect(service.signCount == 0, "Rien n'est signé avant la fin de la préparation")
+        await waitUntil { isSent(model) }
+        #expect(service.prepareCount == 1)
+        #expect(service.signCount == 1)
+    }
+
+    @Test("Préparation ratée pendant la saisie du PIN : retour à la vérification avec le message, PIN effacé, rien de signé")
+    func preparationFailsDuringPin() async {
+        let (model, service) = await reviewReady(drawerID: "0421", order: .pinThenTap)
+        service.delay = .milliseconds(200)
+        service.nextPrepareError = StellarError.rpc("down")
+        model.confirmReview()
+        model.pin = "12"
+        await waitUntil { model.signingStage == .idle }
+        #expect(model.signingStage == .idle)
+        #expect(model.signingErrorMessage != nil)
+        #expect(model.pin.isEmpty)
+        #expect(service.signCount == 0)
+    }
+
+    @Test("Fenêtre NFC fermée : retour à la feuille du tap, sans relance ; « Scan my card » relance")
+    func nfcClosedNoRelaunch() async {
+        let (model, service) = await reviewReady(drawerID: "0421", order: .pinThenTap)
+        service.nextSignError = ChipError.cancelled
+        model.confirmReview()
+        model.pinEntered("1234")
+        await waitUntil { model.signingStage == .waitingForTap(.tapToSign) }
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(model.signingStage == .waitingForTap(.tapToSign), "Pas de nouvelle fenêtre NFC toute seule")
+        #expect(model.pin == "1234")
+        model.scanCard()
+        await waitUntil { isSent(model) }
+        #expect(service.signCount == 2)
+        #expect(service.lastPin == "1234")
     }
 
     @Test("PIN incomplet ignoré")

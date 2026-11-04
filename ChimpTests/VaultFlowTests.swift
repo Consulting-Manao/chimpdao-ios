@@ -109,10 +109,11 @@ struct VaultFlowTests {
         #expect(model.draft?.amount == 50)
         model.confirmReview()
         model.confirmReview()
-        await waitUntil { model.stage == .enteringPin }
+        await waitUntil { service.prepareCount > 0 }
+        try? await Task.sleep(for: .milliseconds(50))
         #expect(service.prepareCount == 1, "Impossible de préparer deux fois")
         model.pinEntered("1234")
-        model.scanCard()
+        #expect(model.stage == .scanning(.tapToSign), "Le scan démarre tout seul")
         await waitUntil { isSent(model) }
         guard case .finished(.sent(let receipt)) = model.stage else { Issue.record("pas envoyé"); return }
         #expect(receipt.summary.action == .deposit)
@@ -122,18 +123,22 @@ struct VaultFlowTests {
         #expect(service.pendingSend == nil)
     }
 
-    @Test("Verrou : pendant la préparation, le scan et l'envoi, rien ne peut interrompre")
-    func locks() async {
+    @Test("Annuler pendant le PIN, préparation en cours : elle est abandonnée, rien ne se rouvre")
+    func cancelDuringPreparation() async {
         let service = MockVaultService(delay: .milliseconds(200))
         let model = VaultFlowModel(service: service, action: .deposit, quoteDebounce: .zero)
         await model.loadIfNeeded()
         await quoted(model, 10)
         model.continueToReview()
         model.confirmReview()
-        #expect(model.stage == .preparing)
-        #expect(model.isSigningLocked)
+        #expect(model.stage == .enteringPin, "Le PIN s'ouvre pendant la préparation")
+        #expect(!model.isSigningLocked)
         model.cancelSigning()
-        #expect(model.stage == .preparing, "Annuler ne fait rien pendant la préparation")
+        #expect(model.stage == .idle)
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(model.stage == .idle, "La préparation abandonnée ne rouvre rien")
+        #expect(model.preparationIssue == nil)
+        #expect(service.signCount == 0)
     }
 
     // MARK: Retirer

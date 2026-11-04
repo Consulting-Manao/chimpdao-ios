@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// Confirmation juste avant le vrai tap (demandée le 2026-09-29) : « This will create your account and set your PIN
-/// for good. » Ce qui va se passer, puis « Create my account » ouvre la feuille du tap. En Debug et Testing, la
-/// répétition à blanc est proposée à côté.
+/// Confirmation avant le PIN et le vrai tap (demandée le 2026-09-29, placée avant le PIN le 2026-11-04) : « This will
+/// create your account and set your PIN for good. » Ce qui va se passer, puis « Create my account » mène au PIN (dont la
+/// fin lance le tap tout seul), ou directement au tap pour une carte sans PIN. En Debug et Testing, la répétition à blanc
+/// est proposée à côté.
 struct CreateAccountConfirmView: View {
     @Bindable var model: AccountSetupModel
     let onBack: () -> Void
-    let onScan: () -> Void
+    let onCreate: (AccountSetupModel.RunMode) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,12 +36,12 @@ struct CreateAccountConfirmView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             VStack(spacing: ChimpSpacing.xs) {
-                ChimpButton("Create my account", isLoading: model.isBusy && !model.isRehearsal) { model.openTapSheet(.real) }
-                    .disabled(!model.canFinish)
+                ChimpButton("Create my account", isLoading: model.isBusy && !model.isRehearsal) { onCreate(.real) }
+                    .disabled(model.isBusy)
                 #if CHIMP_ADMIN
                 if model.canRehearse, !model.pinWasSet {
-                    ChimpButton(untranslated("Practice run instead (nothing sent)"), kind: .secondary) { model.openTapSheet(.rehearsal) }
-                        .disabled(!model.canFinish)
+                    ChimpButton(untranslated("Practice run instead (nothing sent)"), kind: .secondary) { onCreate(.rehearsal) }
+                        .disabled(model.isBusy)
                 }
                 #endif
             }
@@ -49,9 +50,6 @@ struct CreateAccountConfirmView: View {
         }
         .background(Color(.chimpBackground))
         .blocksSwipeBack(model.isBusy)
-        .chimpSheet(isPresented: $model.isShowingTapSheet, height: ChimpSize.cardTapSheetHeight, isDismissDisabled: model.isBusy) {
-            tapSheet
-        }
     }
 
     private var headline: LocalizedStringKey {
@@ -74,6 +72,20 @@ struct CreateAccountConfirmView: View {
         case .none: steps.append(Text("This card has no PIN: a tap is all it takes."))
         }
         return steps
+    }
+}
+
+/// Feuille du tap de la création (deux signatures, et SET PIN si la carte n'a pas de PIN), sur A6 et sur la confirmation
+/// (carte sans PIN). Elle s'ouvre avec la fenêtre NFC d'iOS (`AutoScan`) ; « Scan my card » sert à retaper après une
+/// annulation ou un échec.
+struct SetupTapSheet: ViewModifier {
+    @Bindable var model: AccountSetupModel
+    let onScan: () -> Void
+
+    func body(content: Content) -> some View {
+        content.chimpSheet(isPresented: $model.isShowingTapSheet, height: ChimpSize.cardTapSheetHeight, isDismissDisabled: model.isBusy) {
+            tapSheet
+        }
     }
 
     private var tapSheet: some View {

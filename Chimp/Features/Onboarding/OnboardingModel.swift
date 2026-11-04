@@ -290,6 +290,7 @@ final class OnboardingModel {
             // Carte déjà dans un compte : PIN d'une Infineon, puis « Welcome back! » si besoin, puis le Wallet.
             readingState = .idle
             let reconnect = ReconnectModel(account: account, inspection: inspection, session: session, signer: signer)
+            reconnect.startScan = { [weak self] in await self?.scanForReconnection() }
             reconnection = reconnect
             if reconnect.needsPIN {
                 path.append(.reconnectPIN)
@@ -315,6 +316,7 @@ final class OnboardingModel {
             }
             readingState = .idle
             let reconnect = ReconnectModel(account: account, inspection: inspection, session: session, signer: signer)
+            reconnect.startScan = { [weak self] in await self?.scanForReconnection() }
             reconnection = reconnect
             if reconnect.needsPIN {
                 path.append(.reconnectPIN)
@@ -409,6 +411,7 @@ final class OnboardingModel {
     /// « Start a new account » : une nouvelle cérémonie pour la carte lue en A2.
     func startNewAccount(with choice: CardChoice) {
         guard let model = try? makeSetup(choice) else { return }
+        model.startScan = { [weak self] in await self?.scanForSetup() }
         setup = model
         path.append(.yourName)
     }
@@ -418,18 +421,34 @@ final class OnboardingModel {
         path.append(.nameYourCard)
     }
 
+    /// Après le nom de la carte : la confirmation (« Create your account? »), **avant** le PIN, pour que la fin du PIN
+    /// puisse ouvrir la fenêtre NFC d'iOS sans écran de plus (demande de Barth du 2026-11-04).
     func continueFromCard() {
         guard setup?.canContinueFromCard == true else { return }
-        path.append(.pickPIN)
-    }
-
-    /// A6 « Hold your … card to finish » : d'abord l'écran de confirmation (création et PIN pour toujours).
-    func continueFromPIN() {
-        guard setup?.canFinish == true else { return }
         path.append(.confirmCreate)
     }
 
-    /// « Scan my card » (feuille de l'écran de confirmation).
+    /// « Create my account » (ou la répétition, en Debug et Testing) : le PIN, dont la fin lance le tap tout seul. Carte
+    /// sans PIN, ou PIN déjà prêt : le tap, tout de suite.
+    func confirmCreate(_ mode: AccountSetupModel.RunMode) {
+        guard let setup, !setup.isBusy else { return }
+        setup.choose(mode)
+        if setup.canFinish {
+            setup.openTapSheet(mode)
+        } else {
+            // Une saisie laissée en route (retour depuis le PIN) repart du début.
+            setup.restartPIN()
+            path.append(.pickPIN)
+        }
+    }
+
+    /// A6 « Hold your … card to finish » (PIN prêt, après un tap annulé ou raté) : nouveau tap.
+    func continueFromPIN() {
+        guard let setup, setup.canFinish else { return }
+        setup.openTapSheet(setup.runMode)
+    }
+
+    /// Le tap (automatique, ou « Scan my card » de la feuille, sur A6 ou la confirmation).
     func scanForSetup() async {
         guard let setup else { return }
         do {
@@ -482,11 +501,13 @@ final class OnboardingModel {
         path.append(.welcome)
     }
 
-    /// Échec qui demande un nouveau tap : retour à A6 si le PIN doit être ressaisi, sinon à la confirmation.
+    /// Échec qui demande un nouveau tap : retour à A6 (PIN redemandé s'il a été effacé), ou à la confirmation pour une carte
+    /// sans PIN.
     func newTapAfterFailure() {
         guard let setup else { return }
         setup.prepareNewTap()
-        popTo(setup.pinStep == .done ? .confirmCreate : .pickPIN)
+        // La feuille du tap est sur A6, ou sur la confirmation pour une carte sans PIN.
+        popTo(setup.pinMode == .none ? .confirmCreate : .pickPIN)
     }
 
     /// Tout reprendre depuis A1 (un nouveau tap relira la carte ; les étapes déjà faites sur la chaîne seront sautées).

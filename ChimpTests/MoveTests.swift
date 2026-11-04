@@ -96,8 +96,7 @@ struct MoveTests {
         model.continueToReview()
         #expect(model.signingSteps == [.tapToSign])
         model.confirmReview()
-        await waitUntil { model.signingStage == .waitingForTap(.tapToSign) }
-        model.scanCard()
+        // Pas de PIN : la fenêtre NFC s'ouvre dès « Looks good ».
         await waitUntil { if case .finished(.sent) = model.signingStage { true } else { false } }
         #expect(service.lastPin == nil)
         #expect(model.draft?.recipient.address == MockReceiveDataSource.mainAddress)

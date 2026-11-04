@@ -81,21 +81,24 @@ struct ChangePINTests {
     private var card: PINCard { PINCard(key: key, name: "Banana", color: .banana, number: "0007") }
 
     private func typed(_ model: ChangePINModel, current: String = "1234", new: String = "5678", confirm: String? = nil) {
+        model.continueFromReview()
         model.pinCompleted(current)
         model.pinCompleted(new)
         model.pinCompleted(confirm ?? new)
     }
 
-    @Test("PIN actuel, nouveau PIN deux fois, revue, un tap, nouveau code, fin ; les PIN vont à la carte, rien n'est gardé")
+    @Test("Revue, PIN actuel, nouveau PIN deux fois, tap tout seul, nouveau code, fin ; les PIN vont à la carte, rien n'est gardé")
     func happyPath() async {
         let signer = PINSigner(result: .success(Self.puk))
         let model = ChangePINModel(card: card, signer: signer)
-        #expect(model.screen == .current)
-        typed(model)
         #expect(model.screen == .review)
-        model.openTapSheet()
-        await model.scan()
-        #expect(signer.changes.count == 1)
+        #expect(!model.back(), "Retour depuis la revue : on quitte")
+        typed(model)
+        #expect(model.isShowingTapSheet, "Nouveau PIN confirmé : la feuille du tap s'ouvre, sans écran de plus")
+        for _ in 0..<200 where model.screen != .unlockCode {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(signer.changes.count == 1, "Le scan a démarré tout seul, une seule fois")
         #expect(signer.changes.first?.current == "1234")
         #expect(signer.changes.first?.new == "5678")
         #expect(model.screen == .unlockCode)
@@ -128,15 +131,17 @@ struct ChangePINTests {
         #expect(locked.pinState == .blocked)
     }
 
-    @Test("Autre carte tapée : message dans la feuille, la revue reste")
+    @Test("Autre carte tapée : message dans la feuille, qui reste ouverte, sans nouveau scan tout seul")
     func otherCard() async {
-        let model = ChangePINModel(card: card, signer: PINSigner(result: .failure(ChipError.wrongCard)))
+        let signer = PINSigner(result: .failure(ChipError.wrongCard))
+        let model = ChangePINModel(card: card, signer: signer)
         typed(model)
-        model.openTapSheet()
         await model.scan()
         #expect(model.problem?.kind == .otherCard)
-        #expect(model.screen == .review)
+        #expect(model.screen == .confirmNew)
         #expect(model.isShowingTapSheet)
+        try? await Task.sleep(for: .milliseconds(500))
+        #expect(signer.changes.count == 1, "« Scan my card » a été tapé avant la pause : pas de second scan")
     }
 
     @Test("Réponse perdue : « Did it work? » ; le nouveau PIN marche → fait, code perdu ; il ne marche pas → l'ancien est le bon")

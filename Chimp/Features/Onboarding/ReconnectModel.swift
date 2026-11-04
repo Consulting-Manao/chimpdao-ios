@@ -30,6 +30,10 @@ final class ReconnectModel {
     /// PIN complet, gardé en mémoire le temps du tap seulement.
     private var pin: String?
     var isShowingTapSheet = false
+    /// Ce que lance le tap automatique (`OnboardingModel.scanForReconnection` : VERIFY PIN, puis la navigation).
+    var startScan: (() async -> Void)?
+    /// Scans lancés : le scan automatique n'a lieu que si aucun n'a démarré pendant sa courte pause.
+    private(set) var scanAttempts = 0
     private(set) var isScanning = false
     /// Tap raté (NFC, autre carte) : message dans la feuille du tap, le PIN reste en mémoire pour retaper.
     private(set) var tapProblem: OnboardingProblem?
@@ -79,12 +83,17 @@ final class ReconnectModel {
 
     // MARK: PIN puis tap
 
-    /// Le pavé a reçu 4 chiffres : la feuille du tap s'ouvre (le PIN part à la carte pendant ce tap).
+    /// Le pavé a reçu 4 chiffres : la feuille du tap s'ouvre et le scan démarre tout seul (`AutoScan`) ; le PIN part à la
+    /// carte pendant ce tap.
     func pinCompleted(_ value: String) {
         guard needsPIN, !isPINVerified, value.count == Self.pinLength, value.allSatisfy(\.isNumber) else { return }
         pin = value
         tapProblem = nil
         isShowingTapSheet = true
+        let attempts = scanAttempts
+        AutoScan.start(when: { [weak self] in self?.isShowingTapSheet == true && self?.scanAttempts == attempts }) { [weak self] in
+            await self?.startScan?()
+        }
     }
 
     /// Feuille fermée : le PIN est effacé, on le retape.
@@ -97,6 +106,7 @@ final class ReconnectModel {
     /// « Scan my card » : VERIFY PIN sur la carte lue en A2 (même clé). Renvoie vrai si le PIN est accepté.
     func scan() async -> Bool {
         guard let pin, !isScanning, !isPINVerified else { return false }
+        scanAttempts += 1
         isScanning = true
         tapProblem = nil
         defer { isScanning = false }

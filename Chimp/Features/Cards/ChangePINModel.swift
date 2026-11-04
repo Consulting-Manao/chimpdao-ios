@@ -29,21 +29,21 @@ struct ChangePINProblem: Equatable {
 }
 
 /// ViewModel du changement de PIN (réglages et page d'une carte). ⚠️ CHANGE PIN n'est pas dans `reference/` (manuel
-/// Infineon) : à faire valider par Pamphile. PIN actuel, nouveau PIN (deux fois), écran de revue, **un tap** (lecture de
-/// la clé, puis CHANGE PIN), nouveau code de déblocage affiché une seule fois. Aucun PIN n'est gardé après l'écran.
+/// Infineon) : à faire valider par Pamphile. Écran de revue, PIN actuel, nouveau PIN (deux fois), puis **un tap** qui
+/// démarre tout seul (lecture de la clé, puis CHANGE PIN), nouveau code de déblocage affiché une seule fois. Aucun PIN n'est gardé après l'écran.
 ///
 /// Réponse perdue (carte retirée pendant CHANGE PIN) : on ne sait pas quel PIN est actif. Proposition (à valider) :
 /// vérifier avec le **nouveau** PIN (VERIFY PIN, un tap ; un essai perdu s'il est faux) pour savoir lequel marche.
 @Observable
 final class ChangePINModel {
     enum Screen: Equatable {
+        /// Ce qui va se passer (avant toute saisie, règle 8).
+        case review
         /// PIN actuel.
         case current
-        /// Nouveau PIN, puis confirmation.
+        /// Nouveau PIN, puis confirmation, suivie du tap.
         case new
         case confirmNew
-        /// Ce qui va se passer, puis le tap.
-        case review
         /// Nouveau code de déblocage (une seule fois).
         case unlockCode
         /// La réponse de la carte s'est perdue : on ne sait pas quel PIN est actif.
@@ -61,11 +61,13 @@ final class ChangePINModel {
     static let pinLength = 4
 
     let card: PINCard
-    private(set) var screen = Screen.current
+    private(set) var screen = Screen.review
     var pinEntry = ""
     var pinState = ChimpPinState.entering
     var isShowingTapSheet = false
     private(set) var isBusy = false
+    /// Scans lancés : le scan automatique n'a lieu que si aucun n'a démarré pendant sa courte pause.
+    private(set) var scanAttempts = 0
     private(set) var problem: ChangePINProblem?
     /// Nouveau PUK, en mémoire le temps de l'écran du code seulement.
     private(set) var unlockCode: Data?
@@ -100,7 +102,7 @@ final class ChangePINModel {
             pinEntry = ""
             if pin == newPIN {
                 pinState = .entering
-                screen = .review
+                autoScan()
             } else {
                 // Comme A6 (`NewCardPin.tsx`) : les deux saisies diffèrent, on recommence le nouveau PIN.
                 newPIN = nil
@@ -118,24 +120,39 @@ final class ChangePINModel {
         pinEntry = ""
         pinState = .entering
         switch screen {
-        case .current: return false
+        case .review: return false
+        case .current:
+            currentPIN = nil
+            screen = .review
         case .new, .confirmNew:
             newPIN = nil
             currentPIN = nil
             screen = .current
-        case .review:
-            newPIN = nil
-            screen = .new
         case .unlockCode, .unknownOutcome, .done: return false
         }
         return true
     }
 
+    /// Revue lue : la saisie du PIN actuel.
+    func continueFromReview() {
+        guard screen == .review else { return }
+        problem = nil
+        pinEntry = ""
+        pinState = .entering
+        screen = .current
+    }
+
     // MARK: Tap
 
-    func openTapSheet() {
+    /// Nouveau PIN confirmé : la feuille du tap, et la fenêtre NFC d'iOS juste après, sans « Scan my card » (`AutoScan`).
+    /// Feuille fermée : retaper la confirmation la rouvre.
+    private func autoScan() {
         problem = nil
         isShowingTapSheet = true
+        let attempts = scanAttempts
+        AutoScan.start(when: { [weak self] in self?.isShowingTapSheet == true && self?.scanAttempts == attempts }) { [weak self] in
+            await self?.scan()
+        }
     }
 
     func cancelTapSheet() {
@@ -146,6 +163,7 @@ final class ChangePINModel {
     /// Un tap : la carte vérifie sa clé (bonne carte ? PIN actif ?), puis CHANGE PIN. Une autre carte ne reçoit aucun PIN.
     func scan() async {
         guard let currentPIN, let newPIN, !isBusy else { return }
+        scanAttempts += 1
         isBusy = true
         problem = nil
         defer { isBusy = false }

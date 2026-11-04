@@ -98,6 +98,8 @@ final class SwapFlowModel {
     var pinState: ChimpPinState = .entering
     private(set) var cardCheck: CardCheck?
     private var prepared: PreparedSwap?
+    /// Préparation lancée par « Looks good », encore en cours (le PIN se tape pendant ce temps).
+    private var preparation: Task<PreparedSwap, Error>?
     private(set) var signed: SignedSwap?
     private(set) var preparationIssue: PreparationIssue?
     /// E4p, affiché par-dessus la vérification.
@@ -451,13 +453,26 @@ final class SwapFlowModel {
         guard stage == .idle, let draft, !blockedByPendingPayment else { return }
         preparationIssue = nil
         technicalDetails = nil
-        stage = .preparing
+        // Si le PIN vient d'abord, son pavé s'ouvre tout de suite : la préparation se fait pendant la saisie.
+        let task = Task { try await service.prepare(draft) }
+        preparation = task
+        if signingSteps.first == .pin {
+            beginSigning()
+        } else {
+            stage = .preparing
+        }
         Task {
             do {
-                prepared = try await service.prepare(draft)
-                beginSigning()
+                let ready = try await task.value
+                guard preparation == task else { return }
+                prepared = ready
+                preparation = nil
+                if stage == .preparing { beginSigning() }
             } catch {
-                stage = .idle
+                // Annulée par « Cancel » : `cancelSigning` a déjà tout remis à zéro.
+                guard preparation == task else { return }
+                preparation = nil
+                resetSigning()
                 technicalDetails = SendFlowModel.details(error)
                 let issue = Self.preparationIssue(for: error)
                 if issue == .priceMoved {
@@ -528,8 +543,8 @@ final class SwapFlowModel {
         tapProblem = nil
         switch signingSteps.first {
         case .pin: stage = .enteringPin
-        case .tapToRead: stage = .waitingForTap(.tapToRead)
-        case .tapToSign, nil: stage = .waitingForTap(.tapToSign)
+        case .tapToRead: autoScan(.tapToRead)
+        case .tapToSign, nil: autoScan(.tapToSign)
         }
     }
 
@@ -537,15 +552,29 @@ final class SwapFlowModel {
         guard stage == .enteringPin, value.count == pinLength else { return }
         pin = value
         tapProblem = nil
-        stage = .waitingForTap(.tapToSign)
+        autoScan(.tapToSign)
+    }
+
+    /// La fenêtre NFC d'iOS s'ouvre sans « Scan my card » (après le PIN, « Looks good » ou « Try again »). La feuille du
+    /// tap reste derrière : elle sert à retaper après une annulation ou un échec.
+    private func autoScan(_ step: SigningStep) {
+        stage = .waitingForTap(step)
+        startScan(after: AutoScan.pause)
     }
 
     /// « Scan my card » : ouvre la session NFC. L'autorisation est refaite avant si elle arrive à expiration.
     func scanCard() {
-        guard case .waitingForTap(let step) = stage, let current = prepared else { return }
+        startScan(after: .zero)
+    }
+
+    private func startScan(after pause: Duration) {
+        guard case .waitingForTap(let step) = stage, prepared != nil || preparation != nil else { return }
         stage = .scanning(step)
         tapProblem = nil
         Task {
+            if pause > .zero { try? await Task.sleep(for: pause) }
+            // PIN tapé plus vite que le réseau : on attend la préparation. Ratée, `confirmReview` revient à la vérification.
+            guard let current = await readyPrepared() else { return }
             do {
                 let fresh = try await service.refreshedIfNeeded(current)
                 prepared = fresh
@@ -624,7 +653,7 @@ final class SwapFlowModel {
 
     func retryAfterWrongCard() {
         guard case .wrongCard(_, let retry) = stage else { return }
-        stage = .waitingForTap(retry)
+        autoScan(retry)
     }
 
     private var pinForSigning: String? {
@@ -642,7 +671,15 @@ final class SwapFlowModel {
         }
     }
 
+    /// La signature préparée, ou la préparation encore en cours ; `nil` si elle a échoué ou a été annulée.
+    private func readyPrepared() async -> PreparedSwap? {
+        if let prepared { return prepared }
+        return try? await preparation?.value
+    }
+
     private func resetSigning() {
+        preparation?.cancel()
+        preparation = nil
         pin = ""
         pinState = .entering
         cardCheck = nil

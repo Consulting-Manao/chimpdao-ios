@@ -12,9 +12,9 @@ enum CardTapPinStatus {
 
 /// Contenu de la feuille « approchez la carte » (« Chimp Sign » dans la maquette), affichée **avant** le scan.
 ///
-/// Elle prépare le moment où iOS affichera sa propre fenêtre NFC (non personnalisable, sauf son texte) :
-/// ce qu'on signe, avec quelle carte, où la poser, et où en est le PIN. Le scan ne démarre
-/// que quand l'utilisateur touche « Scan my card ». Aucun code NFC ici.
+/// Elle accompagne la fenêtre NFC d'iOS (non personnalisable, sauf son texte) : ce qu'on signe, avec quelle carte, où
+/// la poser, et où en est le PIN. Les ViewModels ouvrent le scan tout seuls avec elle (`AutoScan`) ; « Scan my card »
+/// sert à retaper après une annulation ou un échec. Aucun code NFC ici.
 ///
 /// À présenter avec `.chimpSheet(isPresented:height: ChimpSize.cardTapSheetHeight, ...)`.
 struct CardTapSheet: View {

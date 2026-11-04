@@ -86,6 +86,8 @@ final class SendFlowModel {
     /// Carte lue au premier tap (ordre « tap puis PIN »).
     private(set) var cardCheck: CardCheck?
     private var prepared: PreparedSend?
+    /// Préparation lancée par « Looks good », encore en cours (le PIN se tape pendant ce temps).
+    private var preparation: Task<PreparedSend, Error>?
     private(set) var signed: SignedSend?
     /// Message si la préparation a échoué (rien n'a été envoyé), sous « Looks good ».
     private(set) var signingErrorMessage: String?
@@ -477,18 +479,35 @@ final class SendFlowModel {
         }
     }
 
-    /// « Looks good » : prépare l'envoi (réseau, avant toute session NFC), puis ouvre la première feuille.
+    /// « Looks good » : prépare l'envoi (réseau, avant toute session NFC). Si le PIN vient d'abord, son pavé s'ouvre tout
+    /// de suite et la préparation se fait pendant la saisie ; sinon le scan démarre dès qu'elle est prête.
     /// Ignoré si une signature est déjà en cours : impossible d'envoyer deux fois.
     func confirmReview() {
         guard signingStage == .idle, let draft else { return }
         signingErrorMessage = nil
         technicalDetails = nil
-        signingStage = .preparing
+        let task = Task { try await service.prepare(draft) }
+        preparation = task
+        if signingSteps.first == .pin {
+            beginSigning()
+        } else {
+            signingStage = .preparing
+        }
         Task {
             do {
-                prepared = try await service.prepare(draft)
-                beginSigning()
+                let ready = try await task.value
+                guard preparation == task else { return }
+                prepared = ready
+                preparation = nil
+                if signingStage == .preparing { beginSigning() }
             } catch {
+                // Annulée par « Cancel » : `cancelSigning` a déjà tout remis à zéro.
+                guard preparation == task else { return }
+                preparation = nil
+                pin = ""
+                pinState = .entering
+                cardCheck = nil
+                tapProblem = nil
                 signingStage = .idle
                 signingErrorMessage = Self.preparationMessage(for: error, drawer: draft.drawer)
                 technicalDetails = Self.details(error)
@@ -503,26 +522,40 @@ final class SendFlowModel {
         tapProblem = nil
         switch signingSteps.first {
         case .pin: signingStage = .enteringPin
-        case .tapToRead: signingStage = .waitingForTap(.tapToRead)
-        case .tapToSign, nil: signingStage = .waitingForTap(.tapToSign)
+        case .tapToRead: autoScan(.tapToRead)
+        case .tapToSign, nil: autoScan(.tapToSign)
         }
     }
 
-    /// PIN complet : on passe au tap qui signe. Le PIN n'est envoyé à la carte que pendant ce tap.
+    /// PIN complet : le tap qui signe démarre tout seul. Le PIN n'est envoyé à la carte que pendant ce tap.
     func pinEntered(_ value: String) {
         guard signingStage == .enteringPin, value.count == pinLength else { return }
         pin = value
         tapProblem = nil
-        signingStage = .waitingForTap(.tapToSign)
+        autoScan(.tapToSign)
+    }
+
+    /// La fenêtre NFC d'iOS s'ouvre sans « Scan my card » (après le PIN, « Looks good » ou « Try again »). La feuille du
+    /// tap reste derrière : elle sert à retaper après une annulation ou un échec.
+    private func autoScan(_ step: SigningStep) {
+        signingStage = .waitingForTap(step)
+        startScan(after: AutoScan.pause)
     }
 
     /// « Scan my card » : ouvre la session NFC. Avant le tap qui signe, l'autorisation est refaite si elle arrive à
     /// expiration (réseau, avant la session NFC).
     func scanCard() {
-        guard case .waitingForTap(let step) = signingStage, let current = prepared else { return }
+        startScan(after: .zero)
+    }
+
+    private func startScan(after pause: Duration) {
+        guard case .waitingForTap(let step) = signingStage, prepared != nil || preparation != nil else { return }
         signingStage = .scanning(step)
         tapProblem = nil
         Task {
+            if pause > .zero { try? await Task.sleep(for: pause) }
+            // PIN tapé plus vite que le réseau : on attend la préparation. Ratée, `confirmReview` revient à la vérification.
+            guard let current = await readyPrepared() else { return }
             do {
                 // Autorisation refaite si elle arrive à expiration (réseau, avant la session NFC).
                 let fresh = try await service.refreshedIfNeeded(current)
@@ -597,10 +630,10 @@ final class SendFlowModel {
         }
     }
 
-    /// « Try again with your … card » (C7) : retour à la feuille du tap, avec le PIN déjà saisi s'il y en a un.
+    /// « Try again with your … card » (C7) : nouveau scan, avec le PIN déjà saisi s'il y en a un.
     func retryAfterWrongCard() {
         guard case .wrongCard(_, let retry) = signingStage else { return }
-        signingStage = .waitingForTap(retry)
+        autoScan(retry)
     }
 
     /// PIN à envoyer : seulement si la carte en a un.
@@ -609,10 +642,18 @@ final class SendFlowModel {
         return cardUsesPin && !pin.isEmpty ? pin : nil
     }
 
+    /// L'envoi préparé, ou la préparation encore en cours ; `nil` si elle a échoué ou a été annulée.
+    private func readyPrepared() async -> PreparedSend? {
+        if let prepared { return prepared }
+        return try? await preparation?.value
+    }
+
     /// « Cancel » ou feuille fermée : retour à la vérification, rien n'a été signé. Impossible pendant un scan.
     func cancelSigning() {
         switch signingStage {
         case .enteringPin, .waitingForTap, .wrongCard:
+            preparation?.cancel()
+            preparation = nil
             pin = ""
             pinState = .entering
             cardCheck = nil

@@ -322,6 +322,8 @@ final class MockSendService: SendService {
     var pendingSend: PendingSend?
     /// Erreur de la prochaine signature (tests : PIN faux, carte refusée…), consommée une fois.
     var nextSignError: Error?
+    /// Erreur de la prochaine préparation (tests : réseau en panne pendant la saisie du PIN), consommée une fois.
+    var nextPrepareError: Error?
     /// Délai simulé du réseau.
     var delay: Duration
     /// Délai simulé d'une session NFC (le temps de poser la carte et de la lire).
@@ -367,6 +369,10 @@ final class MockSendService: SendService {
     func prepare(_ draft: SendDraft) async throws -> PreparedSend {
         prepareCount += 1
         try await Task.sleep(for: delay)
+        if let error = nextPrepareError {
+            nextPrepareError = nil
+            throw error
+        }
         return PreparedSend(draft: draft)
     }
 

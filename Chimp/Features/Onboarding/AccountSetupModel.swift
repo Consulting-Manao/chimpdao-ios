@@ -133,6 +133,10 @@ final class AccountSetupModel {
     private var chosenPIN: String?
 
     var isShowingTapSheet = false
+    /// Ce que lance le tap automatique (`OnboardingModel.scanForSetup` : les signatures, puis la navigation).
+    var startScan: (() async -> Void)?
+    /// Scans lancés : le scan automatique n'a lieu que si aucun n'a démarré pendant sa courte pause.
+    private(set) var scanAttempts = 0
     private(set) var phase: Phase = .editing
     /// Problème survenu avant ou pendant le tap (affiché sur l'écran de confirmation).
     private(set) var tapProblem: OnboardingProblem?
@@ -262,6 +266,8 @@ final class AccountSetupModel {
         default:
             break
         }
+        // PIN prêt : le tap démarre tout seul (la confirmation a été vue avant le PIN).
+        if pinStep == .done { openTapSheet(runMode) }
     }
 
     /// « Change the PIN » : on repart de la première saisie, rien n'est gardé.
@@ -288,12 +294,24 @@ final class AccountSetupModel {
 
     // MARK: Confirmation et tap
 
-    /// Écran de confirmation : « Create my account » (ou la répétition, en Debug et Testing) ouvre la feuille du tap.
+    /// Écran de confirmation : « Create my account » (ou la répétition, en Debug et Testing) choisit le mode ; le PIN
+    /// vient ensuite (`OnboardingModel.confirmCreate`).
+    func choose(_ mode: RunMode) {
+        guard !isBusy else { return }
+        runMode = mode
+    }
+
+    /// PIN prêt (ou carte sans PIN) : la feuille du tap, et la fenêtre NFC d'iOS juste après, sans « Scan my card »
+    /// (`AutoScan`). La feuille reste pour retaper après une annulation ou un échec.
     func openTapSheet(_ mode: RunMode) {
         guard canFinish else { return }
         runMode = mode
         tapProblem = nil
         isShowingTapSheet = true
+        let attempts = scanAttempts
+        AutoScan.start(when: { [weak self] in self?.isShowingTapSheet == true && self?.scanAttempts == attempts }) { [weak self] in
+            await self?.startScan?()
+        }
     }
 
     func cancelTapSheet() {
@@ -308,6 +326,7 @@ final class AccountSetupModel {
     /// Après une vraie signature, la création doit démarrer aussitôt (la signature `set_owner` ne vaut que ~10 min).
     func scan() async -> TapOutcome {
         guard canFinish else { return .failed }
+        scanAttempts += 1
         tapProblem = nil
         guard let pocket = choice.pocket else {
             failTap(OnboardingProblem(kind: .readFailed, technicalDetails: "This card has no wallet (Pocket) on chain."))

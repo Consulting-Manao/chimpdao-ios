@@ -133,6 +133,8 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     private(set) var isBusy = false
     private(set) var problem: AddCardProblem?
     var isShowingTapSheet = false
+    /// Scans lancés : le scan automatique n'a lieu que si aucun n'a démarré pendant sa courte pause.
+    private(set) var scanAttempts = 0
     /// Carte du compte lue en A8 (rejoindre) : seule elle signera `add_card` (son PIN est saisi pour elle).
     private(set) var member: ChipKeyInfo?
     var memberPIN = ""
@@ -267,16 +269,15 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         screen = .nameCard
     }
 
-    /// Après le nom : le PIN, sauf s'il n'y a rien à signer ni à définir (DUOX, ou carte déjà liée au compte).
+    /// Après le nom : la confirmation (rejoindre : d'abord trouver le compte, A8). Le PIN vient après la confirmation,
+    /// juste avant le tap ; rien à saisir s'il n'y a rien à signer ni à définir (DUOX, ou carte déjà liée au compte).
     func continueFromCard() {
         guard canContinueFromCard else { return }
         if pinMode == .none || addable?.needsLink == false {
             chosenPIN = nil
             pinStep = .done
-            screen = isJoining && account == nil ? .findAccount : .confirm
-        } else {
-            screen = .pin
         }
+        screen = isJoining && account == nil ? .findAccount : .confirm
     }
 
     // MARK: A6 · PIN de la nouvelle carte
@@ -313,6 +314,8 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         default:
             break
         }
+        // PIN prêt : le tap de la nouvelle carte démarre tout seul.
+        if pinStep == .done, screen == .pin { autoScanNewCard() }
     }
 
     func restartPIN() {
@@ -330,10 +333,11 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         return OnboardingProblem(kind: kind, technicalDetails: problem.technicalDetails)
     }
 
-    /// A6 : PIN prêt. Rejoindre : il faut d'abord trouver le compte (A8) ; sinon, la confirmation.
+    /// A6 « Hold your … card to finish » (PIN déjà prêt, après un tap raté) : nouveau tap de la nouvelle carte.
     func continueFromPIN() {
         guard canFinish else { return }
-        screen = isJoining && account == nil ? .findAccount : .confirm
+        problem = nil
+        autoScanNewCard()
     }
 
     // MARK: A8 · Trouver le compte (rejoindre)
@@ -371,7 +375,10 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             member = card
             addable = checked
             tokenID = tokenID ?? checked.state.tokenID
-            if !checked.needsLink { chosenPIN = nil }
+            if !checked.needsLink {
+                chosenPIN = nil
+                pinStep = .done
+            }
             screen = .confirm
         } catch {
             problem = Self.problem(for: error)
@@ -384,14 +391,37 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     /// le compte.)
     var newCardMustSign: Bool { addable?.needsLink ?? true }
 
+    /// Bouton de la confirmation : le PIN s'il reste à saisir, sinon le tap de la nouvelle carte, tout de suite.
     func openTapSheet() {
         guard !isBusy else { return }
         problem = nil
-        if newCardMustSign {
-            isShowingTapSheet = true
-        } else {
+        if !newCardMustSign {
             screen = .member
             skipMemberIfAlreadyIn()
+        } else if pinStep != .done {
+            screen = .pin
+        } else {
+            autoScanNewCard()
+        }
+    }
+
+    /// La confirmation demande-t-elle encore le PIN avant le tap ?
+    var confirmLeadsToPIN: Bool { newCardMustSign && pinStep != .done }
+
+    /// La feuille du tap de la nouvelle carte, et la fenêtre NFC d'iOS juste après, sans « Scan my card » (`AutoScan`).
+    private func autoScanNewCard() {
+        isShowingTapSheet = true
+        let attempts = scanAttempts
+        AutoScan.start(when: { [weak self] in self?.isShowingTapSheet == true && self?.scanAttempts == attempts }) { [weak self] in
+            await self?.scanNewCardToSign()
+        }
+    }
+
+    private func autoScanMember() {
+        isShowingMemberTapSheet = true
+        let attempts = scanAttempts
+        AutoScan.start(when: { [weak self] in self?.isShowingMemberTapSheet == true && self?.scanAttempts == attempts }) { [weak self] in
+            await self?.scanMember()
         }
     }
 
@@ -405,6 +435,7 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     /// Le lien part aussitôt, pendant l'écran du code ou de la carte du compte (« les pointeurs d'abord »).
     func scanNewCardToSign() async {
         guard let account, let newCard, let addable, !isBusy else { return }
+        scanAttempts += 1
         isBusy = true
         problem = nil
         defer { isBusy = false }
@@ -568,16 +599,15 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     /// (Infineon) ; une DUOX, sans PIN, en a une de moins.
     var progressScreens: [Screen] {
         let needsPIN = newCard == nil || (pinMode != .none && addable?.needsLink != false)
-        let start: [Screen] = isJoining ? [.firstName, .nameCard] : [.tapNew, .nameCard]
-        let middle: [Screen] = needsPIN ? [.pin] : []
-        let end: [Screen] = isJoining ? [.findAccount, .confirm, .member] : [.confirm, .member]
-        return start + middle + end
+        let start: [Screen] = isJoining ? [.firstName, .nameCard, .findAccount, .confirm] : [.tapNew, .nameCard, .confirm]
+        let pin: [Screen] = needsPIN ? [.pin] : []
+        return start + pin + [.member]
     }
 
-    /// (étape, nombre d'étapes) d'un écran ; le code de déblocage fait partie du tap de la nouvelle carte.
+    /// (étape, nombre d'étapes) d'un écran ; le code de déblocage fait partie du tap de la nouvelle carte (après le PIN).
     func progress(at screen: Screen) -> (step: Int, of: Int)? {
         let screens = progressScreens
-        let target = screen == .unlockCode ? .confirm : screen
+        let target = screen == .unlockCode ? (screens.contains(.pin) ? .pin : .confirm) : screen
         guard let index = screens.firstIndex(of: target) else { return nil }
         return (index + 1, screens.count)
     }
@@ -590,15 +620,16 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             memberPIN = ""
             isShowingMemberPINSheet = true
         } else {
-            isShowingMemberTapSheet = true
+            autoScanMember()
         }
     }
 
+    /// PIN complet : le tap de la carte du compte démarre tout seul.
     func memberPINEntered(_ value: String) {
         guard value.count == Self.pinLength else { return }
         memberPIN = value
         isShowingMemberPINSheet = false
-        isShowingMemberTapSheet = true
+        autoScanMember()
     }
 
     func cancelMemberStep() {
@@ -613,6 +644,7 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     /// compte : sa clé est comparée **avant** tout PIN ; la nouvelle carte, ou une carte hors du compte, ne reçoit rien.
     func scanMember() async {
         guard let account, let newCard, !isBusy else { return }
+        scanAttempts += 1
         isBusy = true
         problem = nil
         defer { isBusy = false }
@@ -806,11 +838,17 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             if case .wallet = entry { screen = .tapNew; return true }
             screen = .firstName
             return true
-        case .pin: screen = .nameCard
-        case .findAccount: screen = pinMode == .none ? .nameCard : .pin
+        case .pin:
+            if linkSignature != nil || pinWasSet { return true }
+            // Retour à la confirmation : le PIN sera ressaisi en entier.
+            clearPIN()
+            pinState = .entering
+            if pinMode != .none { pinStep = .first }
+            screen = .confirm
+        case .findAccount: screen = .nameCard
         case .confirm:
             if linkSignature != nil || pinWasSet { return true }
-            if isJoining { screen = .findAccount } else { screen = pinMode == .none || addable?.needsLink == false ? .nameCard : .pin }
+            screen = isJoining ? .findAccount : .nameCard
         case .unlockCode, .member, .adding, .done: return true
         }
         return true
@@ -820,7 +858,7 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     var isLocked: Bool {
         switch screen {
         case .unlockCode, .member, .adding, .done: true
-        case .confirm: isBusy || linkSignature != nil || pinWasSet
+        case .confirm, .pin: isBusy || linkSignature != nil || pinWasSet
         default: isBusy || isReading
         }
     }

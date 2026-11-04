@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Parcours « ajouter une carte » : G1 → G1b → PIN → confirmation et tap → code de déblocage → G2 → envois → G3 (Wallet),
-/// ou A4 → A5 → A6 → A8 → confirmation et tap → code → A8 (carte du compte) → envois → A9 (rejoindre, onboarding).
+/// Parcours « ajouter une carte » : G1 → G1b → confirmation → PIN et tap → code de déblocage → G2 → envois → G3 (Wallet),
+/// ou A4 → A5 → A8 → confirmation → A6 et tap → code → A8 (carte du compte) → envois → A9 (rejoindre, onboarding).
+/// Le tap démarre tout seul dès le PIN prêt (`AutoScan`).
 /// Un seul écran à la fois (`AddCardModel.screen`) ; retour par le bouton de chaque écran, jamais par glissement.
 struct AddCardFlowView: View {
     @Bindable var model: AddCardModel
@@ -22,7 +23,8 @@ struct AddCardFlowView: View {
                 )
             case .pin:
                 PickPINView(model: model, step: step(.pin), steps: steps, subtitle: "For \(model.displayCardName), the new card",
-                            continueTitle: "Next", onBack: back, onContinue: model.continueFromPIN)
+                            onBack: back, onContinue: model.continueFromPIN)
+                    .modifier(NewCardTapSheet(model: model))
             case .findAccount:
                 AddCardTapScreen(model: model, target: .accountCard, onScan: { Task { await model.scanForAccount() } }, onCancel: back)
             case .confirm:
@@ -54,7 +56,8 @@ struct AddCardFlowView: View {
     /// Le son d'un passage d'écran : après un tap réussi (lecture ou signature) et la carte ajoutée.
     static func sound(from old: AddCardModel.Screen, to new: AddCardModel.Screen) -> ChimpSound? {
         switch (old, new) {
-        case (_, .done), (.tapNew, .nameCard), (.findAccount, .confirm), (.confirm, .unlockCode), (.confirm, .member), (.member, .adding):
+        case (_, .done), (.tapNew, .nameCard), (.findAccount, .confirm), (.confirm, .unlockCode), (.confirm, .member),
+             (.pin, .unlockCode), (.pin, .member), (.member, .adding):
             .confirmation
         default: nil
         }
@@ -244,32 +247,17 @@ struct AddCardConfirmView: View {
                 .padding(.bottom, ChimpSpacing.l)
             }
             .scrollBounceBehavior(.basedOnSize)
-            ChimpButton(model.newCardMustSign ? "Tap \(model.displayCardName)" : "Continue", isLoading: model.isBusy, action: model.openTapSheet)
+            ChimpButton(confirmTitle, isLoading: model.isBusy, action: model.openTapSheet)
                 .padding(.horizontal, ChimpSpacing.xxl)
                 .padding(.vertical, ChimpSpacing.l)
         }
         .background(Color(.chimpBackground))
-        .chimpSheet(isPresented: $model.isShowingTapSheet, height: ChimpSize.cardTapSheetHeight, isDismissDisabled: model.isBusy) {
-            CardTapSheet(
-                cardName: model.displayCardName,
-                cardColor: model.cardColor,
-                cardBadge: "New",
-                stepLabel: AddCardFlowView.stepLabel(model, at: .confirm),
-                title: "Hold \(model.displayCardName), the new card, to your phone",
-                what: "\(model.displayCardName) signs its link to your account.",
-                who: model.pinMode == .choose ? "\(model.displayCardName) receives the PIN you just picked, then signs." : nil,
-                pinStatus: model.pinMode == .none ? .notNeeded : .ready,
-                isScanning: model.isBusy,
-                problem: sheetProblem,
-                problemDetails: model.problem?.technicalDetails,
-                onScan: { Task { await model.scanNewCardToSign() } },
-                onCancel: model.isBusy ? nil : { model.cancelTapSheet() }
-            )
-        }
+        .modifier(NewCardTapSheet(model: model))
     }
 
-    private var sheetProblem: LocalizedStringKey? {
-        model.problem.map { AddCardFlowView.message(for: $0.kind) }
+    /// « Continue » si le PIN vient ensuite (il ouvrira le tap tout seul), « Tap {carte} » s'il est déjà prêt.
+    private var confirmTitle: LocalizedStringKey {
+        model.newCardMustSign && !model.confirmLeadsToPIN ? "Tap \(model.displayCardName)" : "Continue"
     }
 
     private var steps: [Text] {
@@ -286,6 +274,32 @@ struct AddCardConfirmView: View {
         steps.append(Text("Then one of your cards says yes. A card can't invite itself."))
         steps.append(Text("Network fees paid by ChimpDAO"))
         return steps
+    }
+}
+
+/// Feuille du tap de la nouvelle carte (`set_owner`), sur la confirmation (rien à saisir) et sur l'écran du PIN.
+/// Elle s'ouvre avec la fenêtre NFC d'iOS (`AutoScan`) ; « Scan my card » sert à retaper après une annulation ou un échec.
+private struct NewCardTapSheet: ViewModifier {
+    @Bindable var model: AddCardModel
+
+    func body(content: Content) -> some View {
+        content.chimpSheet(isPresented: $model.isShowingTapSheet, height: ChimpSize.cardTapSheetHeight, isDismissDisabled: model.isBusy) {
+            CardTapSheet(
+                cardName: model.displayCardName,
+                cardColor: model.cardColor,
+                cardBadge: "New",
+                stepLabel: AddCardFlowView.stepLabel(model, at: model.screen == .pin ? .pin : .confirm),
+                title: "Hold \(model.displayCardName), the new card, to your phone",
+                what: "\(model.displayCardName) signs its link to your account.",
+                who: model.pinMode == .choose ? "\(model.displayCardName) receives the PIN you just picked, then signs." : nil,
+                pinStatus: model.pinMode == .none ? .notNeeded : .ready,
+                isScanning: model.isBusy,
+                problem: model.problem.map { AddCardFlowView.message(for: $0.kind) },
+                problemDetails: model.problem?.technicalDetails,
+                onScan: { Task { await model.scanNewCardToSign() } },
+                onCancel: model.isBusy ? nil : { model.cancelTapSheet() }
+            )
+        }
     }
 }
 

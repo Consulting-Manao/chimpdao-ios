@@ -103,6 +103,8 @@ final class RemoveCardModel {
     var isShowingPINSheet = false
     var isShowingTapSheet = false
     private(set) var isBusy = false
+    /// Scans lancés : le scan automatique n'a lieu que si aucun n'a démarré pendant sa courte pause.
+    private(set) var scanAttempts = 0
     private(set) var problem: RemoveCardProblem?
     /// Nom local de la carte qui a signé (G7).
     private(set) var signerName: String?
@@ -165,15 +167,25 @@ final class RemoveCardModel {
             pin = ""
             isShowingPINSheet = true
         } else {
-            isShowingTapSheet = true
+            autoScan()
         }
     }
 
+    /// PIN complet : le tap démarre tout seul.
     func pinEntered(_ value: String) {
         guard value.count == Self.pinLength else { return }
         pin = value
         isShowingPINSheet = false
+        autoScan()
+    }
+
+    /// La feuille du tap, et la fenêtre NFC d'iOS juste après, sans « Scan my card » (`AutoScan`).
+    private func autoScan() {
         isShowingTapSheet = true
+        let attempts = scanAttempts
+        AutoScan.start(when: { [weak self] in self?.isShowingTapSheet == true && self?.scanAttempts == attempts }) { [weak self] in
+            await self?.scan()
+        }
     }
 
     func cancelSigning() {
@@ -190,6 +202,7 @@ final class RemoveCardModel {
     /// carte est comparée **avant** tout PIN ; une carte qui n'a pas le droit de signer ne reçoit rien d'autre.
     func scan() async {
         guard !isBusy else { return }
+        scanAttempts += 1
         isBusy = true
         problem = nil
         defer { isBusy = false }
