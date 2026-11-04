@@ -50,7 +50,14 @@ struct MainTabView: View {
         )))
     }
 
+    /// L'œil du Wallet (et de Grow) vaut pour tous les onglets ; les parcours qui font signer le remettent à `false`.
     var body: some View {
+        tabs
+            .environment(\.chimpHidesAmounts, session.preferences.hidesBalances)
+    }
+
+    @ViewBuilder
+    private var tabs: some View {
         switch selection {
         case .wallet:
             NavigationStack(path: $walletPath) {
@@ -215,7 +222,7 @@ struct MainTabView: View {
             .environment(activityModel)
         case .grow:
             NavigationStack(path: $growPath) {
-                GrowView(model: growModel) { growPath.append($0) }
+                GrowView(model: growModel, onToggleAmounts: { session.preferences.hidesBalances.toggle() }) { growPath.append($0) }
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
                     .navigationDestination(for: GrowRoute.self) { route in
@@ -342,16 +349,20 @@ struct MainTabView: View {
     /// (qui, devant un envoi en attente, montre son propre « Check it first »).
     @ViewBuilder
     private func pendingFirst(onExit: @escaping () -> Void, @ViewBuilder content: () -> some View) -> some View {
-        if hasPendingVault {
-            VaultFlowRoot(
-                service: ChainVaultService(session: session), action: .deposit,
-                onSeePosition: showPositionInGrow, onExit: onExit
-            )
-        } else if hasPendingSwap {
-            SwapFlowRoot(service: ChainSwapService(session: session), onExit: onExit)
-        } else {
-            content()
+        Group {
+            if hasPendingVault {
+                VaultFlowRoot(
+                    service: ChainVaultService(session: session), action: .deposit,
+                    onSeePosition: showPositionInGrow, onExit: onExit
+                )
+            } else if hasPendingSwap {
+                SwapFlowRoot(service: ChainSwapService(session: session), onExit: onExit)
+            } else {
+                content()
+            }
         }
+        // Règle 8 : dans un parcours qui fait signer, les montants restent visibles même si l'œil est fermé.
+        .chimpShowsAmounts()
     }
 
     private func openWalletAction(_ action: WalletAction) {
@@ -501,6 +512,7 @@ private struct CrossChainQuoteDestination: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .chimpShowsAmounts()
     }
 }
 
@@ -538,6 +550,7 @@ private struct RozoTransferDestination: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .chimpShowsAmounts()
     }
 }
 
@@ -595,6 +608,8 @@ private struct RemoveCardDestination: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        // Règle 8 : ce que le retrait fait de l'argent de la carte reste lisible, même si l'œil est fermé.
+        .chimpShowsAmounts()
     }
 }
 

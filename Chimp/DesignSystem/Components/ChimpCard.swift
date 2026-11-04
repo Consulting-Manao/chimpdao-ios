@@ -13,6 +13,7 @@ struct ChimpCard: View {
     let number: String
     /// Montant déjà formaté (« $62.50 »).
     var amount: String?
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
     /// Texte à côté du montant (« pocket »).
     var subtitle: LocalizedStringKey?
     /// `true` : `number` est un libellé affiché tel quel, sans « N° » (visite guidée : « CHIMP CARD »).
@@ -57,7 +58,7 @@ struct ChimpCard: View {
             if amount != nil || subtitle != nil {
                 HStack(alignment: .firstTextBaseline, spacing: ChimpSpacing.xs) {
                     if let amount {
-                        Text(verbatim: amount)
+                        Text(verbatim: ChimpPrivacy.amount(amount, hidden: hidesAmounts))
                             .chimpFont(.amountS)
                     }
                     if let subtitle {

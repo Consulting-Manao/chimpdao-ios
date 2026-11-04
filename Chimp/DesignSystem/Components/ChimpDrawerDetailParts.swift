@@ -12,6 +12,7 @@ struct ChimpAssetTile: View {
     /// Détail (« 620 USDC ») ; masqué si `nil`.
     var detail: String?
     var detailColor: Color = Color(.chimpTextSecondary)
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 20)
@@ -31,13 +32,13 @@ struct ChimpAssetTile: View {
                     Rectangle().fill(Color(.chimpOutline)).frame(height: ChimpBorder.regular)
                 }
             VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
-                Text(verbatim: value)
+                Text(verbatim: ChimpPrivacy.amount(value, hidden: hidesAmounts))
                     .chimpFont(.amountM)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .foregroundStyle(.chimpTextPrimary)
                 if let detail {
-                    Text(verbatim: detail)
+                    Text(verbatim: ChimpPrivacy.amount(detail, hidden: hidesAmounts))
                         .chimpFont(.captionStrong)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -65,6 +66,7 @@ struct ChimpRecentRow: View {
     let meta: String
     let amount: String?
     var isIncoming = false
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     var body: some View {
         HStack(spacing: ChimpSpacing.sm) {
@@ -79,7 +81,7 @@ struct ChimpRecentRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let amount {
-                Text(verbatim: amount)
+                Text(verbatim: ChimpPrivacy.amount(amount, hidden: hidesAmounts))
                     .chimpFont(.ticketAmount)
                     .foregroundStyle(isIncoming ? Color(.chimpPositive) : Color(.chimpTextPrimary))
             }

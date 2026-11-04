@@ -796,6 +796,10 @@ struct ActivityReceipt: Identifiable, Equatable {
         let label: LocalizedStringKey
         let value: Value
 
+        /// Lignes qui disent un montant (« Gave », « Got », « Amount », « Circle fee »…) : « **** » quand l'œil est fermé.
+        static let amountIDs: Set<String> = ["gave", "got", "minimum", "putIn", "shares", "gaveBack", "amount", "bridgeFee"]
+        var isAmount: Bool { Self.amountIDs.contains(id) }
+
         static func == (lhs: Line, rhs: Line) -> Bool { lhs.id == rhs.id && lhs.value == rhs.value }
     }
 

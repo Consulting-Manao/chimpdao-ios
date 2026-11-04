@@ -21,6 +21,7 @@ struct DrawerDetailView: View {
     var grow: GrowModel?
 
     @Environment(\.locale) private var locale
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     @State private var renameModel: SettingsModel?
     /// G5 : le compte n'a qu'une carte (dernière lecture) ; retirer ou déclarer perdue est refusé avant tout tap.
@@ -234,7 +235,7 @@ struct DrawerDetailView: View {
     }
 
     private func total(_ content: DrawerDetailContent) -> some View {
-        Text(verbatim: content.total)
+        Text(verbatim: ChimpPrivacy.amount(content.total, hidden: hidesAmounts))
             .chimpFont(.amountL)
             .foregroundStyle(.chimpTextPrimary)
             .lineLimit(1)

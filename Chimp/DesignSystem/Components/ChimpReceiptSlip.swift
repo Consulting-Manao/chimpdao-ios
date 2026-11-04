@@ -14,6 +14,7 @@ struct ChimpReceiptSlip<Lines: View>: View {
     /// Quantités affichées à côté du tampon, à la place du total (swap, maquette I1s.1 : « −400 XLM » puis
     /// « +99.71 USDC », la dernière en grand).
     var stampAmounts: [(text: String, color: Color)] = []
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
     var onExplorer: (() -> Void)?
     @ViewBuilder let lines: Lines
 
@@ -69,7 +70,7 @@ struct ChimpReceiptSlip<Lines: View>: View {
                 HStack(alignment: .lastTextBaseline) {
                     Text("Total").textCase(.uppercase).chimpFont(.label)
                     Spacer(minLength: ChimpSpacing.s)
-                    Text(total)
+                    Text(ChimpPrivacy.amount(total, hidden: hidesAmounts))
                         .chimpFont(.receiptTotal)
                         .foregroundStyle(totalColor)
                         .multilineTextAlignment(.trailing)
@@ -88,7 +89,7 @@ struct ChimpReceiptSlip<Lines: View>: View {
                     Spacer(minLength: ChimpSpacing.xs)
                     VStack(alignment: .trailing, spacing: 0) {
                         ForEach(Array(stampAmounts.enumerated()), id: \.offset) { index, amount in
-                            Text(amount.text)
+                            Text(ChimpPrivacy.amount(amount.text, hidden: hidesAmounts))
                                 .chimpFont(index == stampAmounts.count - 1 ? .amountM : .displayS)
                                 .foregroundStyle(amount.color)
                                 .lineLimit(1)

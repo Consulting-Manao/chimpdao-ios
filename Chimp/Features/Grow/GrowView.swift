@@ -20,9 +20,12 @@ enum GrowRoute: Hashable {
 /// pour les protocoles pas encore plantés dans ce tiroir. Seule la croissance réelle est montrée, jamais un taux.
 struct GrowView: View {
     let model: GrowModel
+    /// L'œil (le même que celui du Wallet) : affiché dans l'en-tête seulement si une action est fournie.
+    var onToggleAmounts: (() -> Void)? = nil
     let onOpen: (GrowRoute) -> Void
 
     @Environment(\.locale) private var locale
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
     @Environment(\.chimpScreenInsets) private var screenInsets
     /// Le tiroir choisi ; `nil` = « All drawers ».
     @State private var selectedDrawerID: String?
@@ -39,7 +42,7 @@ struct GrowView: View {
         GeometryReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    GrowHeader(total: total)
+                    GrowHeader(total: total, onToggleAmounts: onToggleAmounts)
                     pills
                     content
                         .padding(.horizontal, ChimpSpacing.xxl)
@@ -158,13 +161,17 @@ struct GrowView: View {
     private func drawerLabel(_ drawer: SendDrawer, pots: [GrowPot]) -> String {
         let name = Self.pillTitle(drawer)
         guard let total = GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD) else { return name }
-        return "\(name) · \(Self.dollars(total, locale: locale))"
+        return "\(name) · \(ChimpPrivacy.amount(Self.dollars(total, locale: locale), hidden: hidesAmounts))"
     }
 
     private func card(_ pot: GrowPot, compact: Bool) -> some View {
         ChimpPotCard(mark: pot.mark, subtitle: Self.subtitle(pot), compact: compact) {
             if let value = pot.value {
-                ChimpPotAmount(amount: Self.amount(value, pot: pot, locale: locale), chip: Self.chip(pot, locale: locale), isNegative: Self.isNegative(pot))
+                // Le CETES montre l'évolution de son prix en pourcentage : pas un montant, toujours visible.
+                ChimpPotAmount(
+                    amount: Self.amount(value, pot: pot, locale: locale), chip: Self.chip(pot, locale: locale), isNegative: Self.isNegative(pot),
+                    chipIsAmount: pot.mark != .etherfuse
+                )
             }
         }
     }
@@ -297,8 +304,10 @@ struct GrowView: View {
 /// jardine (il se balance doucement, sauf si « Réduire les animations » est activé).
 struct GrowHeader: View {
     let total: Decimal?
+    var onToggleAmounts: (() -> Void)? = nil
 
     @Environment(\.locale) private var locale
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
     @Environment(\.chimpScreenInsets) private var screenInsets
 
     var body: some View {
@@ -310,7 +319,7 @@ struct GrowHeader: View {
                     .shadow(color: Color(.chimpGrowShade), radius: 0, x: 0, y: 3)
                     .accessibilityAddTraits(.isHeader)
                 if let total {
-                    Text(verbatim: GrowView.dollars(total, locale: locale))
+                    Text(verbatim: ChimpPrivacy.amount(GrowView.dollars(total, locale: locale), hidden: hidesAmounts))
                         .chimpFont(.growTotal)
                         .foregroundStyle(total < 0 ? Color(.chimpNegative) : Color(.chimpTicketPaper))
                         .shadow(color: Color(.chimpGrowShade), radius: 0, x: 0, y: 4)
@@ -345,5 +354,13 @@ struct GrowHeader: View {
         }
         .clipped()
         .accessibilityElement(children: .combine)
+        // Hors du bloc lu d'un coup par VoiceOver : le bouton reste atteignable.
+        .overlay(alignment: .topTrailing) {
+            if let onToggleAmounts, total != nil {
+                ChimpAmountsEyeButton(isHiding: hidesAmounts, color: Color(.chimpTicketPaper), action: onToggleAmounts)
+                    .padding(.top, screenInsets.top + 12)
+                    .padding(.trailing, 20)
+            }
+        }
     }
 }

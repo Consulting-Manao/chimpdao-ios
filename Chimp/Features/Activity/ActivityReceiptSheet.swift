@@ -25,6 +25,7 @@ struct ActivityReceiptContent: View {
     let onAgain: (ReceiptAgain) -> Void
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     var body: some View {
         VStack(spacing: ChimpSpacing.ml) {
@@ -63,7 +64,7 @@ struct ActivityReceiptContent: View {
                         }
                     }
                 } else {
-                    ChimpReceiptLine(label: line.label) { value(line.value) }
+                    ChimpReceiptLine(label: line.label) { value(line.isAmount ? masked(line.value) : line.value) }
                 }
             }
             ChimpReceiptLine(label: "Tx") {
@@ -74,6 +75,15 @@ struct ActivityReceiptContent: View {
                     model.copyHash(receipt.hash)
                 }
             }
+        }
+    }
+
+    /// Un montant du reçu, « **** » si l'œil est fermé.
+    private func masked(_ value: ActivityReceipt.Line.Value) -> ActivityReceipt.Line.Value {
+        switch value {
+        case .text(let text): .text(ChimpPrivacy.amount(text, hidden: hidesAmounts))
+        case .positive(let text): .positive(ChimpPrivacy.amount(text, hidden: hidesAmounts))
+        case .drawer: value
         }
     }
 

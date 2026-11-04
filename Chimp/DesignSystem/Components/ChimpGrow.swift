@@ -92,11 +92,14 @@ struct ChimpPotAmount: View {
     let amount: String
     var chip: String?
     var isNegative = false
+    /// La pastille dit un montant (« +0.12 XLM ») : masquée aussi par l'œil. Un pourcentage reste visible.
+    var chipIsAmount = true
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            Text(verbatim: amount).chimpFont(.potAmount).foregroundStyle(.chimpTextPrimary).lineLimit(1).fixedSize()
-            if let chip { ChimpGrowthChip(text: chip, isNegative: isNegative).fixedSize() }
+            Text(verbatim: ChimpPrivacy.amount(amount, hidden: hidesAmounts)).chimpFont(.potAmount).foregroundStyle(.chimpTextPrimary).lineLimit(1).fixedSize()
+            if let chip { ChimpGrowthChip(text: chipIsAmount ? ChimpPrivacy.amount(chip, hidden: hidesAmounts) : chip, isNegative: isNegative).fixedSize() }
         }
         // Le montant garde sa taille : c'est le nom du protocole qui cède la place.
         .layoutPriority(1)
@@ -251,6 +254,9 @@ struct ChimpReceiptRow: View {
     let label: LocalizedStringKey
     let value: String
     var tone: Tone = .plain
+    /// Un montant : « **** » quand l'œil est fermé.
+    var isAmount = false
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     enum Tone { case plain, positive, negative }
 
@@ -258,7 +264,7 @@ struct ChimpReceiptRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(label).textCase(.uppercase).foregroundStyle(Color(.chimpTicketMuted))
             Spacer(minLength: 0)
-            Text(verbatim: value)
+            Text(verbatim: isAmount ? ChimpPrivacy.amount(value, hidden: hidesAmounts) : value)
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(tone == .positive ? Color(.chimpPositive) : tone == .negative ? Color(.chimpNegative) : Color(.chimpTicketInk))
         }

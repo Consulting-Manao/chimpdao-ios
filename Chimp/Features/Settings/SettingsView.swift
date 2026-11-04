@@ -503,6 +503,7 @@ struct SettingsView: View {
 /// bulle de Chimpy et « Disconnect ». Passer à un autre compte ne demande aucune carte.
 struct AccountsSheet: View {
     @Bindable var model: SettingsModel
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -563,7 +564,7 @@ struct AccountsSheet: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: row.name)
                         .chimpFont(.optionTitle)
-                    Text(verbatim: Self.detail(row))
+                    Text(verbatim: Self.detail(row, hidesAmounts: hidesAmounts))
                         .chimpFont(.captionS)
                         .foregroundStyle(row.isCurrent ? Color(.chimpOnAccent) : Color(.chimpTextSecondary))
                 }
@@ -583,11 +584,12 @@ struct AccountsSheet: View {
         .accessibilityAddTraits(row.isCurrent ? [.isButton, .isSelected] : .isButton)
     }
 
-    /// « 3 cards · $1,485.00 », ou le nombre de cartes seul tant que le total n'est pas lu.
-    static func detail(_ row: SettingsModel.AccountRow) -> String {
+    /// « 3 cards · $1,485.00 » (« 3 cards · **** » si l'œil est fermé), ou le nombre de cartes seul tant que le total n'est
+    /// pas lu.
+    static func detail(_ row: SettingsModel.AccountRow, hidesAmounts: Bool = false) -> String {
         let cards = row.cardCount == 1 ? String(localized: "1 card") : String(localized: "\(row.cardCount) cards")
         guard let total = row.total else { return cards }
-        return "\(cards) · \(total)"
+        return "\(cards) · \(ChimpPrivacy.amount(total, hidden: hidesAmounts))"
     }
 }
 

@@ -114,7 +114,7 @@ final class WalletViewModel {
         return hidesBalances ? Self.masked(content) : content
     }
 
-    static let hiddenAmount = "****"
+    static let hiddenAmount = ChimpPrivacy.hiddenAmount
 
     /// Tous les montants remplacés par « **** », variation de la semaine comprise (« **** this week » : l'en-tête garde sa
     /// hauteur).

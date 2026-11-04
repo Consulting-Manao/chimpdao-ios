@@ -76,15 +76,8 @@ struct ChimpBalanceHeader: View {
             // Hors du bloc lu d'un coup par VoiceOver : le bouton reste atteignable.
             .overlay(alignment: .topTrailing) {
                 if let onToggleAmounts {
-                    Button(action: onToggleAmounts) {
-                        Image(systemName: isHidingAmounts ? "eye.slash.fill" : "eye.fill")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.chimpOnHeaderSecondary)
-                            .expandedTouchTarget(visualSize: 24)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, ChimpSpacing.lg)
-                    .accessibilityLabel(isHidingAmounts ? "Show amounts" : "Hide amounts")
+                    ChimpAmountsEyeButton(isHiding: isHidingAmounts, action: onToggleAmounts)
+                        .padding(.top, ChimpSpacing.lg)
                 }
             }
         }

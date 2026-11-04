@@ -176,6 +176,7 @@ struct ChimpTicketRow: View {
     var secondaryAmountColor: Color = Color(.chimpStampReceived)
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     var body: some View {
         Group {
@@ -217,10 +218,10 @@ struct ChimpTicketRow: View {
     private var amountText: some View {
         if let amount {
             VStack(alignment: .trailing, spacing: 1) {
-                Text(amount)
+                Text(ChimpPrivacy.amount(amount, hidden: hidesAmounts))
                     .foregroundStyle(amountColor)
                 if let secondaryAmount {
-                    Text(secondaryAmount)
+                    Text(ChimpPrivacy.amount(secondaryAmount, hidden: hidesAmounts))
                         .foregroundStyle(secondaryAmountColor)
                 }
             }

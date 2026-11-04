@@ -7,6 +7,7 @@ struct ChimpDrawerCard: View {
     let label: LocalizedStringKey
     /// Montant déjà formaté (« $1,320.00 »).
     let amount: String
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
     /// Part disponible, déjà formatée (« $820 »). Masquée si `nil`.
     var ready: String?
     /// Part en épargne (Grow), déjà formatée (« $500 »). Masquée si `nil`.
@@ -29,9 +30,9 @@ struct ChimpDrawerCard: View {
                         .chimpFont(.label)
                         .textCase(.uppercase)
                         .foregroundStyle(.chimpTextSecondary)
-                    Text(verbatim: amount)
+                    Text(verbatim: ChimpPrivacy.amount(amount, hidden: hidesAmounts))
                         .chimpFont(.amountM)
-                        .chimpRollingNumber(amount)
+                        .chimpRollingNumber(ChimpPrivacy.amount(amount, hidden: hidesAmounts))
                         .foregroundStyle(.chimpTextPrimary)
                     detail
                 }
@@ -62,8 +63,8 @@ struct ChimpDrawerCard: View {
     }
 
     private var detailText: Text? {
-        let readyText = ready.map { Text("\($0) ready").foregroundStyle(.chimpTextSecondary) }
-        let growingText = growing.map { Text("\($0) growing").foregroundStyle(.chimpPositive) }
+        let readyText = ready.map { Text("\(ChimpPrivacy.amount($0, hidden: hidesAmounts)) ready").foregroundStyle(.chimpTextSecondary) }
+        let growingText = growing.map { Text("\(ChimpPrivacy.amount($0, hidden: hidesAmounts)) growing").foregroundStyle(.chimpPositive) }
         switch (readyText, growingText) {
         case let (ready?, growing?):
             return ready + Text(verbatim: " · ").foregroundStyle(.chimpTextSecondary) + growing

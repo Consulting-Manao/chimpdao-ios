@@ -1,5 +1,6 @@
 import Foundation
 import stellarsdk
+import SwiftUI
 import Testing
 @testable import ChimpDAO
 
@@ -354,6 +355,20 @@ struct WalletTests {
         #expect(AppPreferences(store: store).hidesBalances, "Retrouvé au prochain lancement")
         preferences.reset()
         #expect(!AppPreferences(store: store).hidesBalances)
+    }
+
+    @Test("L'œil partout : un montant devient « **** » ; dans un reçu, seules les lignes de montant sont cachées")
+    @MainActor func maskedEverywhere() {
+        #expect(ChimpPrivacy.amount("$25.00", hidden: true) == "****")
+        #expect(ChimpPrivacy.amount("$25.00", hidden: false) == "$25.00")
+        #expect(WalletViewModel.hiddenAmount == ChimpPrivacy.hiddenAmount)
+        let line = { (id: String) in ActivityReceipt.Line(id: id, label: "x", value: .text("y")) }
+        for id in ["gave", "got", "minimum", "putIn", "shares", "gaveBack", "amount", "bridgeFee"] {
+            #expect(line(id).isAmount, "\(id) est un montant")
+        }
+        for id in ["fee", "status", "to", "from", "route", "protocol", "via", "card"] {
+            #expect(!line(id).isAmount, "\(id) n'est pas un montant (« Paid by ChimpDAO », « Confirmed », une adresse…)")
+        }
     }
 
     @Test("Fichier des soldes : relu tel quel, effacé avec le reste")

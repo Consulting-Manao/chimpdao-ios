@@ -219,6 +219,7 @@ struct AccountSwitchTests {
         #expect(model.accountRows.map(\.isCurrent) == [true, false])
         #expect(model.accountRows[1] == SettingsModel.AccountRow(id: shop, name: "Shop's account", cardCount: 2, total: "$312.40", isCurrent: false))
         #expect(AccountsSheet.detail(model.accountRows[1]) == "2 cards · $312.40")
+        #expect(AccountsSheet.detail(model.accountRows[1], hidesAmounts: true) == "2 cards · ****", "L'œil fermé cache aussi les totaux des comptes")
         #expect(AccountsSheet.detail(SettingsModel.AccountRow(id: "x", name: "", cardCount: 1, total: nil, isCurrent: false)) == "1 card")
     }
 

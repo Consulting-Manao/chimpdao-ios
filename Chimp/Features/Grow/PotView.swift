@@ -17,6 +17,7 @@ struct PotView: View {
 
     @Environment(\.locale) private var locale
     @Environment(\.chimpScreenInsets) private var screenInsets
+    @Environment(\.chimpHidesAmounts) private var hidesAmounts
     @State private var isShowingInfo = false
 
     private var pot: GrowPot? { model.pot(mark, drawerAddress: drawerAddress) }
@@ -129,7 +130,7 @@ struct PotView: View {
                 Text("You have").textCase(.uppercase).chimpFont(.label).foregroundStyle(Color(.chimpTicketMuted))
                 if let value = pot.value {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(verbatim: GrowView.twoDecimals(value, locale: locale))
+                        Text(verbatim: ChimpPrivacy.amount(GrowView.twoDecimals(value, locale: locale), hidden: hidesAmounts))
                             .chimpFont(.receiptBig)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
@@ -137,7 +138,7 @@ struct PotView: View {
                     }
                     .padding(.top, 4)
                     if let line = PotText.sinceLine(pot, locale: locale) {
-                        Text(verbatim: line)
+                        Text(verbatim: ChimpPrivacy.amount(line, hidden: hidesAmounts))
                             .chimpFont(.rowTitle)
                             .foregroundStyle(GrowView.isNegative(pot) ? Color(.chimpNegative) : Color(.chimpPositive))
                             .padding(.top, 6)
@@ -169,7 +170,7 @@ struct PotView: View {
         if mark == .etherfuse {
             let price = model.savingsPrice
             if let price, let value = pot.value {
-                ChimpReceiptRow(label: "Worth about", value: SendAsset.usdc.displayedWithCode(price.value(of: value), locale: locale))
+                ChimpReceiptRow(label: "Worth about", value: SendAsset.usdc.displayedWithCode(price.value(of: value), locale: locale), isAmount: true)
             }
             if let price {
                 ChimpReceiptRow(label: "1 \(pot.asset.code)", value: PotText.unitPrice(price.usd, locale: locale))
@@ -177,12 +178,12 @@ struct PotView: View {
             ChimpReceiptRow(label: "Price", value: PotText.priceSource(price))
         } else {
             if let putIn = pot.putIn {
-                ChimpReceiptRow(label: "Put in", value: PotText.putIn(putIn, since: pot.since, asset: pot.asset, locale: locale))
+                ChimpReceiptRow(label: "Put in", value: PotText.putIn(putIn, since: pot.since, asset: pot.asset, locale: locale), isAmount: true)
             }
             if let week = PotHistory.thisWeek(of: pot, readings: model.readings(of: pot)) {
                 ChimpReceiptRow(
                     label: "This week", value: GrowView.changeText(week, asset: pot.asset, locale: locale),
-                    tone: week < 0 ? .negative : (week > 0 ? .positive : .plain)
+                    tone: week < 0 ? .negative : (week > 0 ? .positive : .plain), isAmount: true
                 )
             }
             if let days = PotHistory.days(since: pot.since) {
