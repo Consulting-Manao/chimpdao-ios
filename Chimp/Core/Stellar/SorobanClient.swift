@@ -71,14 +71,17 @@ struct SorobanClient {
     /// Durée de validité d'une transaction construite (`TX_TIMEOUT_S` = 60 s dans `chain/env.ts`).
     static let transactionTimeout: UInt64 = 60
 
+    /// Une seule session pour toute l'app (comme `WorkerFeeSigner`) : les connexions au RPC sont réutilisées d'un appel à
+    /// l'autre au lieu d'être rouvertes (TLS) à chaque client créé.
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = callTimeout
+        return URLSession(configuration: configuration)
+    }()
+
     init(config: ChimpNetworkConfig) {
         self.config = config
-        let session = URLSession(configuration: {
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.timeoutIntervalForRequest = Self.callTimeout
-            return configuration
-        }())
-        server = SorobanServer(endpoint: config.endpoints.rpc.absoluteString, urlSession: session)
+        server = SorobanServer(endpoint: config.endpoints.rpc.absoluteString, urlSession: Self.session)
     }
 
     var network: Network { .custom(passphrase: config.passphrase) }
@@ -292,7 +295,11 @@ struct SorobanClient {
             let polledAt = clock.now
             switch await server.getTransaction(transactionHash: hash) {
             case .success(let response):
-                if response.status == GetTransactionResponse.STATUS_SUCCESS { return hash }
+                if response.status == GetTransactionResponse.STATUS_SUCCESS {
+                    // De l'argent a bougé : toute lecture gardée est l'état d'avant (`invalidateReads` du terminal).
+                    ReadCache.shared.invalidate()
+                    return hash
+                }
                 if response.status == GetTransactionResponse.STATUS_FAILED {
                     // Le diagnostic est la seule chose qui dise *pourquoi* (et qui révèle une empreinte trop petite).
                     let events = (response.events?.diagnosticEventsXdr ?? []).compactMap { try? DiagnosticEventXDR(xdr: $0) }

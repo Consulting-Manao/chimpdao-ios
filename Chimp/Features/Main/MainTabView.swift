@@ -34,7 +34,7 @@ struct MainTabView: View {
         self.session = session
         self.config = config
         let wallet = WalletViewModel(dataSource: ChainWalletDataSource(
-            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle(),
+            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle.shared,
             stablebondPrices: StablebondWalletPrices(config: config)
         ))
         _walletModel = State(initialValue: wallet)
@@ -42,7 +42,7 @@ struct MainTabView: View {
             service: ChainVaultService(session: session),
             savingsService: config.features.grow && config.etherfuse != nil ? ChainSavingsService(session: session) : nil,
             lendingService: config.features.grow && config.integrations != nil ? ChainLendingService(session: session) : nil,
-            priceOracle: ReflectorPriceOracle(), history: DefaultsPotHistoryStore()
+            priceOracle: ReflectorPriceOracle.shared, history: DefaultsPotHistoryStore()
         ))
         // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
@@ -654,7 +654,7 @@ private struct SettingsDestination: View {
         onDeveloper: (() -> Void)?, onExit: @escaping () -> Void
     ) {
         let summaries = ChainAccountSummaryReader(wallet: ChainWalletDataSource(
-            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle(),
+            session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle.shared,
             stablebondPrices: StablebondWalletPrices(config: config)
         ))
         _model = State(initialValue: SettingsModel(

@@ -47,6 +47,10 @@ struct ChainWalletDataSource: WalletDataSource {
         var errorDescription: String? { "No account is open on this phone." }
     }
 
+    func discardCachedReads() {
+        ReadCache.shared.clear()
+    }
+
     func fetchWallet() async throws -> WalletSnapshot {
         guard let account = session.wallet.account else { throw ReadError.noAccount }
         return try await fetchWallet(for: account)
@@ -58,13 +62,22 @@ struct ChainWalletDataSource: WalletDataSource {
         // Lectures indépendantes, lancées ensemble (le terminal fait de même).
         async let membersRead = chain.cards(of: account.address)
         async let mainRead = chain.balances(of: account.address)
+        // Les wallets des cartes déjà connues du téléphone sont lus sans attendre `cards()`. Seule la liste du compte
+        // compte pour l'affichage : une lecture d'une carte qui n'y est plus est jetée.
+        var early: [String: Task<[AssetAmount], Error>] = [:]
+        for saved in account.cards {
+            guard let pocket = saved.pocket else { continue }
+            early[pocket] = Task { [chain] in try await chain.balances(of: pocket) }
+        }
+        defer { early.values.forEach { $0.cancel() } }
         let members = try await membersRead
         let mainAssets = try await mainRead
 
         let cards = try await withThrowingTaskGroup(of: (Int, CardBalance).self) { group in
             for (index, member) in members.enumerated() {
                 let saved = account.cards.first { $0.publicKey == member.publicKey.hex }
-                group.addTask { (index, try await self.card(member, saved: saved)) }
+                let prefetched = saved?.pocket.flatMap { early[$0] }
+                group.addTask { (index, try await self.card(member, saved: saved, prefetched: prefetched)) }
             }
             var result: [(Int, CardBalance)] = []
             for try await entry in group { result.append(entry) }
@@ -86,13 +99,17 @@ struct ChainWalletDataSource: WalletDataSource {
         // celui de la devise d'affichage (`usdRates([...holdings, denom])` de `useNetWorth`).
         let held = Set(snapshot.allAssets.filter { $0.amount != 0 }.map(\.code))
         var priced = snapshot
-        priced.usdPrices = held.isEmpty ? [:] : await oracle.usdPrices(for: DisplayMoney.priceCodes(held: held, currency: snapshot.currency))
-        if let stablebondPrices { priced.usdPrices.merge(await stablebondPrices.usdPrices(for: held)) { _, etherfuse in etherfuse } }
+        // Reflector et Etherfuse sont indépendants : lus ensemble.
+        async let reflector = held.isEmpty ? [:] : oracle.usdPrices(for: DisplayMoney.priceCodes(held: held, currency: snapshot.currency))
+        async let etherfuse = stablebondPrices?.usdPrices(for: held)
+        priced.usdPrices = await reflector
+        if let bonds = await etherfuse { priced.usdPrices.merge(bonds) { _, etherfuse in etherfuse } }
         return priced
     }
 
     /// Une carte : sa Pocket (mémorisée à l'onboarding, sinon demandée à la factory), ses soldes, son numéro.
-    private func card(_ member: AccountCard, saved: SavedCard?) async throws -> CardBalance {
+    /// `prefetched` : la lecture des soldes de la Pocket mémorisée, déjà lancée.
+    private func card(_ member: AccountCard, saved: SavedCard?, prefetched: Task<[AssetAmount], Error>?) async throws -> CardBalance {
         let key = member.publicKey
         var pocket: String?
         if let known = saved?.pocket {
@@ -102,11 +119,18 @@ struct ChainWalletDataSource: WalletDataSource {
         }
         // Revue de sécurité F2 : gardée ou lue, la Pocket doit être celle que la factory déploie pour cette clé.
         if let found = pocket { pocket = try config.checkedPocket(found, of: key) }
+        // Le numéro n'est que de l'affichage : une lecture ratée donne « ···· », pas une erreur. Lu en même temps que les soldes.
+        async let tokenRead: UInt32? = saved?.tokenID == nil ? try? await chain.tokenID(of: key) : saved?.tokenID
         var assets: [AssetAmount] = []
-        if let pocket { assets = try await chain.balances(of: pocket) }
-        // Le numéro n'est que de l'affichage : une lecture ratée donne « ···· », pas une erreur.
-        var tokenID = saved?.tokenID
-        if tokenID == nil { tokenID = try? await chain.tokenID(of: key) }
+        if let pocket {
+            // La lecture anticipée ne vaut que pour la Pocket vérifiée (F2) ; sinon, une lecture neuve.
+            if let prefetched, pocket == saved?.pocket {
+                assets = try await prefetched.value
+            } else {
+                assets = try await chain.balances(of: pocket)
+            }
+        }
+        let tokenID = await tokenRead
         return CardBalance(
             id: key.hex,
             number: tokenID.map { String(format: "%04u", $0) } ?? "····",
@@ -120,56 +144,86 @@ struct ChainWalletDataSource: WalletDataSource {
     }
 }
 
-/// `WalletChain` sur le réseau de l'app (testnet), avec le payeur de frais comme source des simulations.
+/// `WalletChain` sur le réseau de l'app (testnet), avec le payeur de frais comme source des simulations. Les lectures
+/// passent par `ReadCache` (60 s, vidée après chaque envoi) : Envoyer, Swap et Grow reprennent celles du Wallet.
 final class ChainWalletReader: WalletChain {
     let config: ChimpNetworkConfig
-    /// Compte source des simulations, lu une fois : une simulation ne consomme pas la séquence (`simBuilderFor` du
-    /// terminal le garde aussi en mémoire).
-    private var cachedSource: Account?
+    private let cache: ReadCache
 
-    init(config: ChimpNetworkConfig) {
+    init(config: ChimpNetworkConfig, cache: ReadCache = .shared) {
         self.config = config
+        self.cache = cache
     }
 
     private var client: SorobanClient { SorobanClient(config: config) }
 
-    /// XLM puis USDC (`assetsOf(network, "stellar")` du terminal).
+    /// XLM, USDC puis les stablebonds (`assetsOf(network, "stellar")` du terminal).
     private func assets() throws -> [(code: String, contract: String)] {
         try SACClient.stellarAssets(config: config)
     }
 
-    private func source() async throws -> Account {
-        if let cachedSource { return cachedSource }
-        let account = try await client.account(config.feePayer)
-        cachedSource = account
-        return account
+    /// Compte source des simulations : le payeur de frais, sans lire sa séquence (une simulation ne la consomme ni ne la
+    /// vérifie ; même choix que Swap, Grow et l'oracle). Un aller-retour réseau de moins avant chaque Wallet.
+    private func source() throws -> Account {
+        try Account(accountId: config.feePayer, sequenceNumber: 0)
     }
 
+    /// Gardées comme les soldes (le terminal ne garde que soldes, Pocket et positions) : une carte ajoutée ou retirée
+    /// depuis ce téléphone vide la mémoire, depuis un autre elle se voit en une minute au plus.
     func cards(of account: String) async throws -> [AccountCard] {
-        try await ChimpAccountClient(client: client, config: config).cards(account: account, source: try await source())
-            .map { AccountCard(publicKey: $0.publicKey, curve: $0.curve) }
-    }
-
-    func balances(of address: String) async throws -> [AssetAmount] {
-        let source = try await source()
-        let sac = SACClient(client: client)
-        var result: [AssetAmount] = []
-        for asset in try assets() {
-            guard let units = try await sac.balance(token: asset.contract, holder: address, source: source) else {
-                throw StellarError.noReturnValue("balance")
-            }
-            result.append(AssetAmount(code: asset.code, amount: SACClient.amount(fromUnits: units)))
+        let source = try source()
+        return try await cache.read("cards:\(config.passphrase):\(account)") { [client, config] in
+            try await ChimpAccountClient(client: client, config: config).cards(account: account, source: source)
+                .map { AccountCard(publicKey: $0.publicKey, curve: $0.curve) }
         }
-        return result
     }
 
-    func pocket(of card: ChipPublicKey) async throws -> String? {
-        try await PocketFactoryClient(client: client, contract: config.contracts.factory).pocket(of: card, source: try await source())
+    /// Un actif par simulation, toutes lancées ensemble ; le résultat garde l'ordre des actifs.
+    func balances(of address: String) async throws -> [AssetAmount] {
+        let source = try source()
+        let sac = SACClient(client: client)
+        let assets = try assets()
+        return try await withThrowingTaskGroup(of: (Int, AssetAmount).self) { group in
+            for (index, asset) in assets.enumerated() {
+                group.addTask { [cache, config] in
+                    // Clé du terminal : `bal:{passphrase}:{adresse}:{actif}`.
+                    let read = try await cache.read("bal:\(config.passphrase):\(address):\(asset.contract)") {
+                        try await sac.balance(token: asset.contract, holder: address, source: source)
+                    }
+                    guard let units = read else {
+                        throw StellarError.noReturnValue("balance")
+                    }
+                    return (index, AssetAmount(code: asset.code, amount: SACClient.amount(fromUnits: units)))
+                }
+            }
+            var result: [(Int, AssetAmount)] = []
+            for try await entry in group { result.append(entry) }
+            return result.sorted { $0.0 < $1.0 }.map(\.1)
+        }
     }
+
+    /// Une Pocket trouvée est gardée sans limite de durée (une clé n'a qu'une Pocket possible) ; « pas de Pocket » ne
+    /// l'est jamais, pour voir celle qu'on vient de déployer (`lookupPocket` du terminal).
+    func pocket(of card: ChipPublicKey) async throws -> String? {
+        let source = try source()
+        do {
+            return try await cache.read("pocket:\(config.passphrase):\(card.hex)", ttl: nil) { [client, config] in
+                guard let found = try await PocketFactoryClient(client: client, contract: config.contracts.factory).pocket(of: card, source: source) else {
+                    throw PocketNotDeployed()
+                }
+                return found
+            }
+        } catch is PocketNotDeployed {
+            return nil
+        }
+    }
+
+    /// « Pas encore de Pocket », passé par le chemin des erreurs de `ReadCache` pour n'être jamais gardé.
+    private struct PocketNotDeployed: Error {}
 
     func tokenID(of card: ChipPublicKey) async throws -> UInt32 {
         let nft = NfcNftClient(client: client, defaultContract: config.contracts.nfcNft, collection: config.contracts.collection)
-        return try await nft.token(of: card, source: try await source()).tokenID
+        return try await nft.token(of: card, source: try source()).tokenID
     }
 }
 

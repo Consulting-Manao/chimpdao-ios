@@ -57,22 +57,38 @@ final class ChainVaultService: VaultService {
 
     func fetchContext() async throws -> VaultContext {
         let (adapter, venue, asset) = try vault()
-        let context = try await drawers.fetchContext()
+        // Les tiroirs et l'état du vault sont indépendants : lus ensemble.
+        async let contextRead = drawers.fetchContext()
+        async let stateRead = adapter.state(of: venue)
+        let context = try await contextRead
         let state: DeFindexAdapter.VaultState
         do {
-            state = try await adapter.state(of: venue)
+            state = try await stateRead
         } catch {
             throw Self.unavailable(error)
         }
         let records = session.wallet.account.map { session.activity.activity(of: $0.address).records } ?? []
-        var holdings: [VaultHolding] = []
-        for drawer in context.drawers {
-            let positions: [YieldPosition]
-            do {
-                positions = try await adapter.discover(holder: drawer.address)
-            } catch {
-                throw Self.unavailable(error)
+        // Les positions de tous les tiroirs, lues ensemble ; l'ordre des tiroirs est gardé.
+        let found: [[YieldPosition]]
+        do {
+            found = try await withThrowingTaskGroup(of: (Int, [YieldPosition]).self) { group in
+                for (index, drawer) in context.drawers.enumerated() {
+                    // Clé du terminal : `defi:{réseau}:{adresse}` (`ReadCache`, vidée après chaque envoi).
+                    group.addTask { [config] in
+                        (index, try await ReadCache.shared.read("defi:defindex:\(config.passphrase):\(drawer.address)") {
+                            try await adapter.discover(holder: drawer.address)
+                        })
+                    }
+                }
+                var result: [(Int, [YieldPosition])] = []
+                for try await entry in group { result.append(entry) }
+                return result.sorted { $0.0 < $1.0 }.map(\.1)
             }
+        } catch {
+            throw Self.unavailable(error)
+        }
+        var holdings: [VaultHolding] = []
+        for (drawer, positions) in zip(context.drawers, found) {
             for position in positions where position.venueID == venue.id {
                 holdings.append(VaultHolding(
                     drawerID: drawer.id, drawerAddress: drawer.address, shares: SwapUnits.amount(fromUnits: position.shares),

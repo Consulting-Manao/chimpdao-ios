@@ -132,7 +132,7 @@ extension OnboardingModel {
         #endif
         return OnboardingModel(
             session: session, reader: NFCChipReader(), service: ChainOnboardingService(config: session.config),
-            signer: NFCChipSigner(), joinService: ChainAddCardService(config: session.config), oracle: ReflectorPriceOracle(), mode: mode,
+            signer: NFCChipSigner(), joinService: ChainAddCardService(config: session.config), oracle: ReflectorPriceOracle.shared, mode: mode,
             makeSetup: { choice in try Self.liveSetup(choice: choice, session: session) }
         )
     }

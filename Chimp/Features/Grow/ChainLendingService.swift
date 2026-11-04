@@ -59,22 +59,38 @@ final class ChainLendingService: VaultService {
 
     func fetchContext() async throws -> VaultContext {
         let (adapter, asset) = try lending()
-        let context = try await drawers.fetchContext()
+        // Les tiroirs et l'état du marché sont indépendants : lus ensemble.
+        async let contextRead = drawers.fetchContext()
+        async let stateRead = adapter.state()
+        let context = try await contextRead
         let state: XoxnoMarketState
         do {
-            state = try await adapter.state()
+            state = try await stateRead
         } catch {
             throw Self.unavailable(error)
         }
         let records = session.wallet.account.map { session.activity.activity(of: $0.address).records } ?? []
-        var holdings: [VaultHolding] = []
-        for drawer in context.drawers {
-            let positions: [XoxnoPosition]
-            do {
-                positions = try await adapter.positions(holder: drawer.address)
-            } catch {
-                throw Self.unavailable(error)
+        // Les positions de tous les tiroirs, lues ensemble ; l'ordre des tiroirs est gardé.
+        let found: [[XoxnoPosition]]
+        do {
+            found = try await withThrowingTaskGroup(of: (Int, [XoxnoPosition]).self) { group in
+                for (index, drawer) in context.drawers.enumerated() {
+                    // Comme les positions du vault (`ReadCache`, vidée après chaque envoi).
+                    group.addTask { [config] in
+                        (index, try await ReadCache.shared.read("defi:xoxno:\(config.passphrase):\(drawer.address)") {
+                            try await adapter.positions(holder: drawer.address)
+                        })
+                    }
+                }
+                var result: [(Int, [XoxnoPosition])] = []
+                for try await entry in group { result.append(entry) }
+                return result.sorted { $0.0 < $1.0 }.map(\.1)
             }
+        } catch {
+            throw Self.unavailable(error)
+        }
+        var holdings: [VaultHolding] = []
+        for (drawer, positions) in zip(context.drawers, found) {
             holdings += Self.holdings(positions, drawer: drawer, records: records, pool: adapter.market.pool)
         }
         return VaultContext(network: context.network, drawers: context.drawers, vault: Self.info(adapter: adapter, asset: asset, state: state), holdings: holdings)

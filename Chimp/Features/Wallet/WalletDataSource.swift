@@ -63,6 +63,12 @@ protocol WalletDataSource {
     /// Prénom saisi à l'onboarding (A4), lu sur le téléphone : l'en-tête l'affiche même si les soldes n'arrivent pas.
     var firstName: String? { get }
     func fetchWallet() async throws -> WalletSnapshot
+    /// « Tirer pour rafraîchir » : oublier les lectures gardées en mémoire, pour tout relire sur la chaîne.
+    func discardCachedReads()
+}
+
+extension WalletDataSource {
+    func discardCachedReads() {}
 }
 
 /// Données factices (noms et montants de la maquette), avec des scénarios pour tester chaque état.

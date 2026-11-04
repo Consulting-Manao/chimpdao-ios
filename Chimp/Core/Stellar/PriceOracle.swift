@@ -13,6 +13,9 @@ protocol PriceOracle: Sendable {
 /// source construit localement (séquence 0), jamais lu ni utilisé pour envoyer quoi que ce soit.
 /// Prix gardés en mémoire 5 minutes (l'échantillonnage des flux) ; un échec n'est jamais gardé.
 final class ReflectorPriceOracle: PriceOracle {
+    /// Un seul lecteur pour toute l'app : son cache de prix sert à tous les écrans au lieu d'être perdu à chaque écran.
+    static let shared = ReflectorPriceOracle()
+
     private let config: PriceOracleConfig
     private let server: SorobanServer
     private let now: () -> ContinuousClock.Instant
@@ -21,12 +24,8 @@ final class ReflectorPriceOracle: PriceOracle {
     init(config: PriceOracleConfig = .reflector, now: @escaping () -> ContinuousClock.Instant = { .now }) {
         self.config = config
         self.now = now
-        let session = URLSession(configuration: {
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.timeoutIntervalForRequest = SorobanClient.callTimeout
-            return configuration
-        }())
-        server = SorobanServer(endpoint: config.rpc.absoluteString, urlSession: session)
+        // Session partagée de l'app : connexions réutilisées.
+        server = SorobanServer(endpoint: config.rpc.absoluteString, urlSession: SorobanClient.session)
     }
 
     func usdPrices(for codes: Set<String>) async -> [String: Decimal] {

@@ -93,7 +93,13 @@ final class WalletViewModel {
         await refresh()
     }
 
-    /// Relit les soldes (tirer pour rafraîchir, bouton « Try again » ou « Retry »).
+    /// « Tirer pour rafraîchir » : tout est relu sur la chaîne, rien n'est repris de la mémoire courte (`ReadCache`).
+    func pullToRefresh() async {
+        dataSource.discardCachedReads()
+        await refresh()
+    }
+
+    /// Relit les soldes (bouton « Try again » ou « Retry », retour d'un envoi).
     func refresh() async {
         if content == nil { phase = .loading }
         do {

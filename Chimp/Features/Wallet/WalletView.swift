@@ -61,7 +61,7 @@ struct WalletView: View {
         .refreshable {
             // Tirer pour rafraîchir : on secoue la branche.
             ChimpSoundPlayer.shared.play(.branch)
-            await model.refresh()
+            await model.pullToRefresh()
         }
         // Tiré vers le bas, le haut de l'écran garde la couleur et le motif de l'en-tête (retour de Barth, 2026-10-02).
         .background(alignment: .top) {
