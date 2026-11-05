@@ -221,6 +221,32 @@ final class ChainSwapService: SwapService {
         }
     }
 
+    /// Un swap qui part dans un lot du router avec d'autres appels (dépôt Solv payé en USDC, 2026-11-05) : devis redemandé,
+    /// appel construit **au minimum déjà montré**, bornes relues et comparées à l'écran, comme `prepare`. Rien n'est signé.
+    /// `SwapError.slippageExceeded` si le prix est passé sous ce minimum.
+    func batchLeg(for quote: VaultSwap, minimumOut: TokenAmount, authorizer: String) async throws -> (call: ContractCall, shape: any AuthShape) {
+        let minimumOutUnits = minimumOut.units
+        guard let adapter = registry.swapAdapter(id: quote.protocolID) else { throw SwapServiceError.protocolUnavailable([quote.protocolName]) }
+        let request = try request(given: quote.given, received: quote.received, amount: quote.amountIn)
+        guard let fresh = try await adapter.quote(request) else { throw SwapError.noRoute }
+        guard fresh.amountOut >= minimumOutUnits else { throw SwapError.slippageExceeded }
+        let now = UInt64(Date().timeIntervalSince1970)
+        let call = try adapter.swapCall(for: fresh, minimumOut: minimumOutUnits, authorizer: authorizer, now: now)
+        let shown = SignedTerms(
+            action: .swap, contract: call.contract, authorizer: authorizer,
+            assetIn: request.assetIn.contract, amountIn: request.amountIn,
+            assetOut: request.assetOut.contract, minimumOut: minimumOutUnits,
+            route: quote.routeContracts, deadline: adapter.deadlineSeconds.map { now + $0 }
+        )
+        try BoundsCheck.verify(shown: shown, signed: try adapter.terms(of: call), quotedOut: quote.expectedOut.units, now: now)
+        return (call, adapter.authShape(for: fresh))
+    }
+
+    /// Le refus d'un contrat de swap, nommé par son protocole (prix qui a bougé, échéance…) ; `nil` sinon.
+    func swapError(for error: Error, protocolID: String) -> SwapError? {
+        registry.swapAdapter(id: protocolID)?.swapError(for: error)
+    }
+
     /// Les cartes du Main account (relues sur la chaîne) ; aucune pour le wallet d'une carte.
     private func mainAccountCards(of drawer: SendDrawer, source: Account) async throws -> [ChipPublicKey] {
         guard case .main = drawer.kind else { return [] }

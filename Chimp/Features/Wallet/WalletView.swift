@@ -22,7 +22,7 @@ struct WalletView: View {
     var onAddMoney: (() -> Void)?
 
     /// De combien l'en-tête est tiré vers le bas (« tirer pour rafraîchir »).
-    @State private var pull = WalletPull()
+    @State private var pull = ChimpPull()
 
     var body: some View {
         // Le défilement passe sous la barre d'état : l'en-tête comble lui-même la zone sûre du haut,
@@ -65,7 +65,7 @@ struct WalletView: View {
         }
         // Tiré vers le bas, le haut de l'écran garde la couleur et le motif de l'en-tête (retour de Barth, 2026-10-02).
         .background(alignment: .top) {
-            WalletPullBackground(pull: pull)
+            ChimpPullBackground(pull: pull, color: Color(.chimpHeader))
         }
         .ignoresSafeArea(edges: .top)
     }
@@ -249,30 +249,4 @@ extension WalletAction {
         WalletView(model: WalletViewModel(dataSource: MockWalletDataSource(scenario: .networkError)))
     }
     .preferredColorScheme(.dark)
-}
-
-/// Distance tirée, dans un objet à part : seul le fond la lit, le Wallet n'est pas recalculé pendant le geste.
-@Observable
-private final class WalletPull {
-    var distance: CGFloat = 0
-}
-
-/// Fond révélé au-dessus de l'en-tête quand on tire pour rafraîchir : la couleur de l'en-tête et son motif, décalé
-/// de la distance tirée pour continuer exactement celui de l'en-tête (pas de raccord visible). Derrière le défilement,
-/// donc sous la roue de chargement.
-private struct WalletPullBackground: View {
-    let pull: WalletPull
-    private let height: CGFloat = 320
-
-    var body: some View {
-        let tile = ChimpPattern.tileHeight
-        Color(.chimpHeader)
-            .overlay(alignment: .top) {
-                ChimpPattern()
-                    .frame(height: height + tile)
-                    .offset(y: pull.distance.truncatingRemainder(dividingBy: tile) - tile)
-            }
-            .frame(height: height)
-            .clipped()
-    }
 }

@@ -79,6 +79,8 @@ final class VaultFlowModel {
     private(set) var amount = AmountEntry()
     /// Retirer : « All » (toutes les parts).
     private(set) var withdrawAll = false
+    /// Mettre : l'actif choisi parmi `payingOptions` ; `nil` = le premier proposé.
+    private(set) var chosenPaying: SendAsset?
     private(set) var rejectedKeyCount = 0
     private(set) var quoteState: QuoteState = .idle
 
@@ -240,7 +242,26 @@ final class VaultFlowModel {
 
     var selectedDrawer: SendDrawer? { drawers.first { $0.id == selectedDrawerID } ?? drawers.first }
     var holding: VaultHolding? { selectedDrawer.flatMap { context?.holding(drawerID: $0.id) } }
-    var asset: SendAsset { context?.vault.asset ?? .xlm }
+    var asset: SendAsset { chosenVault?.asset ?? .xlm }
+
+    /// Mettre : les actifs qu'on peut donner (Solv : USDC ou SolvBTC) ; vide quand seul l'actif du vault entre.
+    var payingOptions: [SendAsset] { action == .deposit ? context?.vault.depositAssets ?? [] : [] }
+
+    /// Le lieu tel qu'il sera signé : payé dans l'actif choisi.
+    var chosenVault: VaultInfo? {
+        guard let vault = context?.vault else { return nil }
+        guard let paying = chosenPaying ?? payingOptions.first, payingOptions.contains(paying) else { return vault }
+        return vault.paying(paying)
+    }
+
+    /// Mettre : l'actif donné change (USDC ↔ SolvBTC) ; le montant garde ce que le nouvel actif accepte.
+    func choosePaying(_ paying: SendAsset) {
+        guard payingOptions.contains(paying), paying != asset else { return }
+        chosenPaying = paying
+        amount = amount.clamped(toFractionDigits: paying.maxFractionDigits)
+        withdrawAll = false
+        amountChanged()
+    }
     var canChooseDrawer: Bool { drawers.count > 1 }
 
     /// Mettre : le solde de l'actif dans le tiroir. Retirer : la valeur de la position.
@@ -345,7 +366,7 @@ final class VaultFlowModel {
     }
 
     func refreshQuote() async {
-        let (value, all, drawerID) = (amount.value, withdrawAll, selectedDrawerID)
+        let (value, all, drawerID, paying) = (amount.value, withdrawAll, selectedDrawerID, asset)
         guard let drawer = selectedDrawer, value > 0 || all else {
             quoteState = .idle
             return
@@ -353,13 +374,13 @@ final class VaultFlowModel {
         quoteState = .loading
         do {
             let quote = action == .deposit
-                ? try await service.depositQuote(drawer: drawer, amount: value)
+                ? try await service.depositQuote(drawer: drawer, amount: value, paying: paying)
                 : try await service.withdrawQuote(drawer: drawer, amount: value, all: all)
-            guard value == amount.value, all == withdrawAll, drawerID == selectedDrawerID else { return }
+            guard value == amount.value, all == withdrawAll, drawerID == selectedDrawerID, paying == asset else { return }
             quoteState = .quoted(quote)
         } catch is CancellationError {
         } catch {
-            guard value == amount.value, all == withdrawAll, drawerID == selectedDrawerID else { return }
+            guard value == amount.value, all == withdrawAll, drawerID == selectedDrawerID, paying == asset else { return }
             technicalDetails = SendFlowModel.details(error)
             quoteState = .failed(Self.quoteIssue(for: error))
         }
@@ -375,8 +396,8 @@ final class VaultFlowModel {
     }
 
     func continueToReview() {
-        guard canReview, let drawer = selectedDrawer, let quote = currentQuote, let context else { return }
-        draft = VaultDraft(drawer: drawer, vault: context.vault, quote: quote, network: context.network)
+        guard canReview, let drawer = selectedDrawer, let quote = currentQuote, let context, let vault = chosenVault else { return }
+        draft = VaultDraft(drawer: drawer, vault: vault, quote: quote, network: context.network)
         preparationIssue = nil
         isReviewPresented = true
     }
@@ -493,7 +514,7 @@ final class VaultFlowModel {
         defer { isRefreshingQuote = false }
         do {
             let quote = draft.action == .deposit
-                ? try await service.depositQuote(drawer: draft.drawer, amount: draft.amount)
+                ? try await service.depositQuote(drawer: draft.drawer, amount: draft.amount, paying: draft.vault.asset)
                 : try await service.withdrawQuote(drawer: draft.drawer, amount: draft.quote.all ? 0 : draft.amount, all: draft.quote.all)
             moved.newDraft = VaultDraft(drawer: draft.drawer, vault: draft.vault, quote: quote, network: draft.network)
         } catch {

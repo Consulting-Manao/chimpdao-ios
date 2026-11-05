@@ -14,8 +14,8 @@ struct VaultInfo: Equatable {
     let name: String
     /// « DeFindex », « Blend » : nommés partout avec l'avertissement (principe 6).
     let protocols: [String]
-    /// L'actif du vault (XLM).
-    let asset: SendAsset
+    /// L'actif du vault (XLM). Un brouillon payé dans un autre actif (`depositAssets`) porte cet actif-là (`paying`).
+    var asset: SendAsset
     /// Montant que le vault prête en ce moment, dans l'actif (sur testnet le 2026-10-15 : 0, tout attend).
     let invested: Decimal
     let totalManaged: Decimal
@@ -33,6 +33,16 @@ struct VaultInfo: Equatable {
     /// Prêt : le marché refuse les dépôts (gel ou pause), ou les retraits (pause).
     var depositsBlocked = false
     var withdrawalsBlocked = false
+    /// Les actifs qu'on peut mettre, le premier par défaut ; vide = seulement `asset`. Solv : USDC (échangé en SolvBTC
+    /// dans la même transaction) ou SolvBTC (retour de Barth, 2026-11-05).
+    var depositAssets: [SendAsset] = []
+
+    /// Le même lieu, payé en `asset` (un des `depositAssets`).
+    func paying(_ asset: SendAsset) -> VaultInfo {
+        var copy = self
+        copy.asset = asset
+        return copy
+    }
 
     /// Ce que le vault peut rendre tout de suite : ce qui n'est pas prêté (le reste revient quand les emprunteurs
     /// remboursent). Prêt : ce que le marché laisse retirer.
@@ -100,10 +110,37 @@ struct VaultQuote: Equatable {
     let all: Bool
     /// Décimales on-chain des unités ci-dessus : 7, ou 8 chez Solv (SolvBTC et xSolvBTC).
     var decimals = SACClient.decimals
+    /// Dépôt payé dans un autre actif que celui du vault : le devis de l'échange fait dans la même transaction. Le
+    /// minimum de cet échange (`minimumOut`, dans l'actif du vault) est exactement ce qui est déposé.
+    var swap: VaultSwap?
 
     var sharesAmount: Decimal { SACClient.amount(fromUnits: Decimal(string: String(shares.units)) ?? 0, chainDecimals: decimals) }
     var expected: Decimal? { expectedOut.map { SACClient.amount(fromUnits: Decimal(string: String($0.units)) ?? 0, chainDecimals: decimals) } }
     var minimum: Decimal? { minimumOut.map { SACClient.amount(fromUnits: Decimal(string: String($0.units)) ?? 0, chainDecimals: decimals) } }
+}
+
+/// L'échange d'un dépôt payé dans un autre actif (Solv : USDC → SolvBTC), tiré du devis de l'écran Swap. Montants en
+/// `TokenAmount`, jamais en `Int128` nu (règle des appels async, `AsyncAmountRuleTests`).
+struct VaultSwap: Equatable {
+    let protocolID: String
+    /// « Soroswap ».
+    let protocolName: String
+    let given: SendAsset
+    let received: SendAsset
+    let amountIn: Decimal
+    /// Quantité attendue (exacte, unités on-chain) : la base du minimum déposé.
+    let expectedOut: TokenAmount
+    let routeContracts: [String]
+
+    init(_ quote: SwapQuoteSummary) {
+        protocolID = quote.protocolID
+        protocolName = quote.protocolName
+        given = quote.given
+        received = quote.received
+        amountIn = quote.amountIn
+        expectedOut = TokenAmount(quote.expectedOutUnits)
+        routeContracts = quote.routeContracts
+    }
 }
 
 /// Ce qui sera signé, figé au passage à la vérification (F4, F7r). Affiché tel quel.
@@ -263,6 +300,8 @@ protocol VaultService {
     func fetchContext() async throws -> VaultContext
     /// Devis d'un dépôt de `amount` depuis `drawer` : parts attendues (lecture seule).
     func depositQuote(drawer: SendDrawer, amount: Decimal) async throws -> VaultQuote
+    /// Le même, payé en `paying` (un des `VaultInfo.depositAssets`).
+    func depositQuote(drawer: SendDrawer, amount: Decimal, paying: SendAsset) async throws -> VaultQuote
     /// Devis d'un retrait de `amount` (ou de tout) de la position de `drawer` : parts, valeur attendue, minimum.
     func withdrawQuote(drawer: SendDrawer, amount: Decimal, all: Bool) async throws -> VaultQuote
     /// Avant la session NFC : solde ou parts relus, appel construit **avec les bornes du brouillon**, bornes vérifiées,
@@ -281,4 +320,11 @@ protocol VaultService {
     var pendingSend: PendingSend? { get }
     func setPendingSend(_ pending: PendingSend?) throws
     func explorerURL(transactionHash: String) -> URL?
+}
+
+extension VaultService {
+    /// Un seul actif accepté : celui du vault.
+    func depositQuote(drawer: SendDrawer, amount: Decimal, paying: SendAsset) async throws -> VaultQuote {
+        try await depositQuote(drawer: drawer, amount: amount)
+    }
 }

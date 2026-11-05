@@ -35,6 +35,8 @@ struct GrowView: View {
     /// Le tiroir choisi ; `nil` = « All drawers ».
     @State private var selectedDrawerID: String?
     @State private var plantChoice: PlantChoice?
+    /// De combien l'en-tête est tiré vers le bas : le vert et son motif remontent, comme sur le Wallet (Barth, 2026-11-05).
+    @State private var pull = ChimpPull()
 
     /// Les protocoles à proposer dans un tiroir (feuille « Plant something else »).
     struct PlantChoice: Identifiable {
@@ -48,6 +50,7 @@ struct GrowView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     GrowHeader(total: total, onToggleAmounts: onToggleAmounts)
+                        .onGeometryChange(for: CGFloat.self) { max(0, $0.frame(in: .global).minY) } action: { pull.distance = $0 }
                     pills
                     content
                         .padding(.horizontal, ChimpSpacing.xxl)
@@ -61,11 +64,14 @@ struct GrowView: View {
                 .frame(minHeight: proxy.size.height + proxy.safeAreaInsets.top)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .ignoresSafeArea(edges: .top)
             .refreshable {
                 ChimpSoundPlayer.shared.play(.branch)
                 await model.refresh()
             }
+            .background(alignment: .top) {
+                ChimpPullBackground(pull: pull, color: Color(.chimpCardLeaf), patternOpacity: GrowHeader.patternOpacity)
+            }
+            .ignoresSafeArea(edges: .top)
         }
         .background(Color(.chimpBackground))
         .task { await model.refresh() }
@@ -118,6 +124,9 @@ struct GrowView: View {
                         drawerSection(drawer, compact: true, alwaysShow: false)
                     }
                 }
+                // Les protocoles où rien ne pousse encore, quel que soit le tiroir (Barth, 2026-11-05).
+                let missing = model.plantable.filter { mark in !pots.contains { $0.mark == mark } }
+                if !missing.isEmpty { plantSomethingElse(drawer: nil, marks: missing) }
             }
         }
     }
@@ -319,6 +328,7 @@ struct GrowView: View {
 /// G1 · l'en-tête vert : « Grow », ce qui a poussé en tout (en dollars, seulement s'il est connu en entier), Chimpy qui
 /// jardine (il se balance doucement, sauf si « Réduire les animations » est activé).
 struct GrowHeader: View {
+    static let patternOpacity = 0.14
     let total: Decimal?
     var onToggleAmounts: (() -> Void)? = nil
 
@@ -366,7 +376,7 @@ struct GrowHeader: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 22)
         .background {
-            Color(.chimpCardLeaf).overlay { ChimpPattern(opacity: 0.14) }
+            Color(.chimpCardLeaf).overlay { ChimpPattern(opacity: Self.patternOpacity) }
         }
         .clipped()
         .accessibilityElement(children: .combine)

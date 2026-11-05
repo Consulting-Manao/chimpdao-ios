@@ -310,6 +310,11 @@ final class SwapFlowModel {
         guard asset != current else { return }
         if asset == other { return flipAssets() }
         if side == .given { given = asset } else { received = asset }
+        // Sans route entre les deux, l'autre côté passe sur un partenaire qui en a une : l'USDC, sinon le seul possible
+        // (xSolvBTC ↔ SolvBTC). Retour de Barth, 2026-11-05.
+        if let code = SwapPairs.partner(for: asset.code, replacing: other.code, on: service.network), let partner = SendAsset(code: code) {
+            if side == .given { received = partner } else { given = partner }
+        }
         amount = amount.clamped(toFractionDigits: given.maxFractionDigits)
         amountChanged()
     }

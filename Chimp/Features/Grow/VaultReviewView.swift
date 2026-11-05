@@ -109,7 +109,15 @@ struct VaultReviewView: View {
                                 label: "\(drawerName) after",
                                 value: asset.displayedWithCode(max(0, draft.drawer.balance(of: asset) - draft.amount), locale: locale)
                             )
-                            ChimpReceiptRow(label: "Grows", value: String(localized: "\(asset.code), in \(mark.name)"))
+                            if let swap = draft.quote.swap, let planted = draft.quote.minimum {
+                                // Règle 8 : l'échange fait partie de ce qui est signé.
+                                ChimpReceiptRow(label: "Swapped on", value: swap.protocolName)
+                                ChimpReceiptRow(
+                                    label: "Planted, at least",
+                                    value: SwapReviewView.exact(planted, locale: locale) + " " + swap.received.code
+                                )
+                            }
+                            ChimpReceiptRow(label: "Grows", value: String(localized: "\(draft.quote.swap?.received.code ?? asset.code), in \(mark.name)"))
                         } else {
                             ChimpReceiptRow(label: "Lands in", value: drawerName)
                             if let minimum = draft.quote.minimum {
@@ -123,7 +131,14 @@ struct VaultReviewView: View {
                         }
                         ChimpReceiptRow(label: "Fees", value: asset.formattedWithCode(0, locale: locale), tone: .positive)
                     }
-                    if draft.vault.mark == .sentora {
+                    if isDeposit, let swap = draft.quote.swap {
+                        Text(Self.swapNote(swap, drawer: drawerName))
+                            .chimpFont(.caption)
+                            .foregroundStyle(Color(.chimpTicketMuted))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 6)
+                    } else if draft.vault.mark == .sentora {
                         // Règle 8 : la condition des récompenses, dite avant de signer.
                         Text(isDeposit ? Self.sentoraDepositNote : Self.sentoraWithdrawNote)
                             .chimpFont(.caption)
@@ -157,6 +172,11 @@ struct VaultReviewView: View {
                 .padding(.top, ChimpSpacing.m)
             }
         }
+    }
+
+    /// Dépôt payé dans un autre actif : l'échange et son minimum, dits avant de signer (règle 8).
+    static func swapNote(_ swap: VaultSwap, drawer: String) -> LocalizedStringKey {
+        "Your \(swap.given.code) is swapped to \(swap.received.code) on \(swap.protocolName), then planted, in the same transaction. If the price slips more than 0.5%, nothing happens. Any extra \(swap.received.code) stays in \(drawer)."
     }
 
     /// Le trajet : le tiroir → le protocole (mettre), le protocole → le tiroir (retirer), une graine verte au milieu.

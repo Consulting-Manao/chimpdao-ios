@@ -120,4 +120,55 @@ struct SolvTests {
         #expect(MainTabView.addRoute(.solv, drawerID: "main") == .solvDeposit(drawerID: "main"))
         #expect(GrowView.plantRoute(.solv, drawer: nil, fallbackAddress: nil) == .solvDeposit(drawerID: nil))
     }
+
+    @Test("Payé en USDC : on dépose le minimum de l'échange (− 0,5 %, vers zéro), relevé sur testnet : 1 173 → 1 167 unités")
+    func depositedFromUSDC() {
+        let swap = SwapQuoteSummary(
+            protocolID: "soroswap", protocolName: "Soroswap", given: .usdc, received: .solvbtc, amountIn: 1, expectedOutUnits: 1_173,
+            route: [.usdc, .solvbtc], routeContracts: [], priceImpactBasisPoints: nil
+        )
+        #expect(ChainSolvService.depositedUnits(of: VaultSwap(swap)) == 1_167)
+    }
+
+    @Test("Payé en USDC : l'historique garde le SolvBTC déposé, pour que la base de la position reste en SolvBTC")
+    func activityFromUSDC() {
+        let drawer = SendDrawer(id: "main", kind: .main, address: Self.main, balances: [:], usesPin: true)
+        let solv = ChimpNetworkConfig.testnet.integrations!.solv
+        var quote = VaultQuote(action: .deposit, amount: 1, shares: TokenAmount(1_160), expectedOut: nil, minimumOut: TokenAmount(1_167), all: false)
+        quote.decimals = 8
+        let draft = VaultDraft(drawer: drawer, vault: ChainSolvService.info(solv).paying(.usdc), quote: quote, network: .testnet)
+        let receipt = VaultReceipt(summary: VaultSummary(draft), transactionHash: "ab", sentAt: .now, explorerURL: nil, shares: quote.sharesAmount, received: nil)
+        let record = ChainSolvService.activityRecord(receipt, vault: solv.vault, label: solv.label)
+        #expect(record.assetCode == "SolvBTC" && record.amount == Decimal(string: "0.00001167"))
+        #expect(receipt.summary.asset == .usdc && receipt.summary.amount == 1, "L'écran dit ce qui est parti : 1 USDC")
+
+        let direct = VaultDraft(drawer: drawer, vault: ChainSolvService.info(solv), quote: quote, network: .testnet)
+        let plain = ChainSolvService.activityRecord(
+            VaultReceipt(summary: VaultSummary(direct), transactionHash: "cd", sentAt: .now, explorerURL: nil, shares: nil, received: nil),
+            vault: solv.vault, label: solv.label
+        )
+        #expect(plain.assetCode == "SolvBTC" && plain.amount == 1)
+    }
+
+    @Test("Écran du dépôt : USDC par défaut, SolvBTC au choix ; le brouillon est payé dans l'actif choisi")
+    func payingChoice() async {
+        let service = MockLendingService(delay: .zero, mark: .solv)
+        service.depositAssets = [.usdc, .solvbtc]
+        let model = VaultFlowModel(service: service, action: .deposit, quoteDebounce: .zero)
+        await model.loadIfNeeded()
+        #expect(model.payingOptions == [.usdc, .solvbtc] && model.asset == .usdc)
+        model.setAmount(Decimal(string: "12.5")!)
+        await model.refreshQuote()
+        model.continueToReview()
+        #expect(model.draft?.vault.asset == .usdc, "Le brouillon est payé en USDC")
+        #expect(model.draft?.vault.id == service.market.id)
+        model.choosePaying(.solvbtc)
+        #expect(model.asset == .solvbtc && model.amount.value == Decimal(string: "12.5"))
+        #expect(model.amountIssue != nil, "Le Main factice n'a pas de SolvBTC : le solde se lit dans l'actif choisi")
+        #expect(ChainSolvService.info(ChimpNetworkConfig.testnet.integrations!.solv).depositAssets == [.usdc, .solvbtc])
+
+        let withdraw = VaultFlowModel(service: service, action: .withdraw, quoteDebounce: .zero)
+        await withdraw.loadIfNeeded()
+        #expect(withdraw.payingOptions.isEmpty, "Retirer : rien à choisir")
+    }
 }

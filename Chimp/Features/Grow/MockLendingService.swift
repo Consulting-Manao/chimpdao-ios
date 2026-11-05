@@ -30,6 +30,8 @@ final class MockLendingService: VaultService {
     var scenario: Scenario
     /// `.xoxno` (le prêt), ou `.sentora` (son vault : même parcours, le dépôt revient tel quel).
     var mark: ChimpPotProtocol = .xoxno
+    /// Les actifs qu'on peut mettre (`VaultInfo.depositAssets`) : tests du choix « Pay with ».
+    var depositAssets: [SendAsset] = []
     var delay: Duration
     var pendingSend: PendingSend?
     private(set) var prepareCount = 0
@@ -59,7 +61,8 @@ final class MockLendingService: VaultService {
             id: Self.pool, name: "\(mark.name) USDC", protocols: [mark.name], asset: .usdc,
             invested: Decimal(string: "846.2")!, totalManaged: Decimal(string: "2477.89")!, kind: .lending, mark: mark,
             withdrawableNow: scenario == .lentOut ? Self.availableWhenLentOut : Decimal(string: "1578.69")!,
-            depositsBlocked: scenario == .paused || scenario == .frozen, withdrawalsBlocked: scenario == .paused
+            depositsBlocked: scenario == .paused || scenario == .frozen, withdrawalsBlocked: scenario == .paused,
+            depositAssets: depositAssets
         )
     }
 

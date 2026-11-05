@@ -42,6 +42,11 @@ struct VaultAmountView: View {
                 drawerBar
                     .padding(.horizontal, 22)
                     .padding(.top, 16)
+                if model.payingOptions.count > 1 {
+                    payingBar
+                        .padding(.horizontal, 22)
+                        .padding(.top, 10)
+                }
                 ScrollView {
                     VStack(spacing: 0) {
                         amountBlock
@@ -109,6 +114,28 @@ struct VaultAmountView: View {
         .accessibilityLabel(Text(isDeposit ? "From \(drawerName)" : "To \(drawerName)"))
     }
 
+    /// « PAY WITH USDC · SolvBTC » (Solv) : l'USDC est échangé en SolvBTC dans la même transaction.
+    private var payingBar: some View {
+        HStack(spacing: 8) {
+            Text("Pay with")
+                .textCase(.uppercase)
+                .chimpFont(.label)
+                .foregroundStyle(.chimpTextSecondary)
+            Spacer(minLength: 0)
+            ForEach(model.payingOptions) { option in
+                ChimpQuickPick(title: option.code, isSelected: option == asset) { model.choosePaying(option) }
+                    .fixedSize()
+            }
+        }
+        .disabled(model.loadPhase != .loaded)
+    }
+
+    /// L'actif du vault, quand on paie avec un autre (« USDC → SolvBTC into Solv »).
+    private var vaultAsset: SendAsset? {
+        guard let vault = model.context?.vault, vault.asset != asset else { return nil }
+        return vault.asset
+    }
+
     /// Mettre : le solde moins le montant. Retirer : le solde plus ce qui est attendu.
     private func balanceAfter(_ drawer: SendDrawer) -> Decimal? {
         let before = drawer.balance(of: asset)
@@ -156,7 +183,15 @@ struct VaultAmountView: View {
             .padding(.horizontal, 22)
             HStack(spacing: 8) {
                 ChimpProtocolLogo(mark: mark, size: 24, border: ChimpBorder.regular)
-                Text(isDeposit ? "\(asset.code) into \(mark.name)" : "\(asset.code) out of \(mark.name)")
+                Group {
+                    if !isDeposit {
+                        Text("\(asset.code) out of \(mark.name)")
+                    } else if let vaultAsset {
+                        Text("\(asset.code) → \(vaultAsset.code) into \(mark.name)")
+                    } else {
+                        Text("\(asset.code) into \(mark.name)")
+                    }
+                }
                     .chimpFont(.pill)
                     .foregroundStyle(.chimpTextPrimary)
             }
@@ -230,6 +265,8 @@ struct VaultAmountView: View {
         } else if model.isLending, !isDeposit, let now = model.withdrawableNow, now < model.available {
             // G5 : une note dans l'écran, pas un écran d'erreur.
             ChimpGrowNote(text: "\(mark.name) can give back \(asset.displayedWithCode(now, locale: locale)) right now. The rest comes back as borrowers repay.")
+        } else if isDeposit, let vaultAsset, model.loadPhase == .loaded, !isQuoteFailed {
+            ChimpGrowNote(text: "Your \(asset.code) is swapped to \(vaultAsset.code) first, then planted in \(mark.name). Same transaction, one tap of your card.")
         } else if model.loadPhase == .unavailable {
             problem(title: "The vault is unavailable right now", line: "Nothing moved. Try again in a minute.")
         } else if case .failed(let issue) = model.quoteState {
@@ -242,6 +279,11 @@ struct VaultAmountView: View {
                 problem(title: "That's too little for the vault", line: "Try a bigger amount.")
             }
         }
+    }
+
+    private var isQuoteFailed: Bool {
+        if case .failed = model.quoteState { return true }
+        return false
     }
 
     private func problem(title: LocalizedStringKey, line: LocalizedStringKey) -> some View {
