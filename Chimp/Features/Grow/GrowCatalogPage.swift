@@ -66,6 +66,7 @@ struct GrowDemoRoot: View {
     @State private var path: [GrowRoute]
 
     let lendingService: MockLendingService
+    let sentoraService = MockLendingService(scenario: .noPosition, cardSetup: SendMockSettings.cardSetup, mark: .sentora)
 
     init(
         service: MockVaultService, savings: MockSavingsService.Scenario = .normal, lending: MockLendingService.Scenario = .noPosition,
@@ -77,7 +78,7 @@ struct GrowDemoRoot: View {
         self.lendingService = lendingService
         _model = State(initialValue: GrowModel(
             service: service, savingsService: MockSavingsService(scenario: savings), lendingService: lendingService,
-            priceOracle: MockPriceOracle(), history: MemoryPotHistoryStore()
+            sentoraService: sentoraService, priceOracle: MockPriceOracle(), history: MemoryPotHistoryStore()
         ))
         _path = State(initialValue: start)
     }
@@ -101,8 +102,8 @@ struct GrowDemoRoot: View {
         case .pot(let mark, let address):
             PotView(
                 model: model, mark: mark, drawerAddress: address, onBack: pop,
-                onAdd: { path.append(mark == .xoxno ? .lendingDeposit(drawerID: $0) : .deposit(drawerID: $0)) },
-                onTakeOut: { path.append(mark == .xoxno ? .lendingWithdraw(drawerID: $0) : .withdraw(drawerID: $0)) },
+                onAdd: { path.append(MainTabView.addRoute(mark, drawerID: $0)) },
+                onTakeOut: { path.append(MainTabView.takeOutRoute(mark, drawerID: $0)) },
                 onSwap: { path.append(.swap($0)) }
             )
         case .deposit(let drawerID):
@@ -115,6 +116,10 @@ struct GrowDemoRoot: View {
             VaultFlowRoot(service: lendingService, action: .deposit, drawerID: drawerID, onSeePosition: { path = [.pot(.xoxno, drawerAddress: $0)] }, onExit: pop)
         case .lendingWithdraw(let drawerID):
             VaultFlowRoot(service: lendingService, action: .withdraw, drawerID: drawerID, onSeePosition: { path = [.pot(.xoxno, drawerAddress: $0)] }, onExit: pop)
+        case .sentoraDeposit(let drawerID):
+            VaultFlowRoot(service: sentoraService, action: .deposit, drawerID: drawerID, onSeePosition: { path = [.pot(.sentora, drawerAddress: $0)] }, onExit: pop)
+        case .sentoraWithdraw(let drawerID):
+            VaultFlowRoot(service: sentoraService, action: .withdraw, drawerID: drawerID, onSeePosition: { path = [.pot(.sentora, drawerAddress: $0)] }, onExit: pop)
         }
     }
 

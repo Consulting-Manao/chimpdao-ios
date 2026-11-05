@@ -42,6 +42,7 @@ struct MainTabView: View {
             service: ChainVaultService(session: session),
             savingsService: config.features.grow && !config.issuedAssets.isEmpty ? ChainSavingsService(session: session) : nil,
             lendingService: config.features.grow && config.integrations != nil ? ChainLendingService(session: session) : nil,
+            sentoraService: config.features.grow && config.integrations?.sentora != nil ? ChainSentoraService(session: session) : nil,
             priceOracle: ReflectorPriceOracle.shared, history: DefaultsPotHistoryStore()
         ))
         // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
@@ -244,8 +245,8 @@ struct MainTabView: View {
             // G2 : la page d'un pot.
             PotView(
                 model: growModel, mark: mark, drawerAddress: address, onBack: popGrow,
-                onAdd: { growPath.append(mark == .xoxno ? .lendingDeposit(drawerID: $0) : .deposit(drawerID: $0)) },
-                onTakeOut: { growPath.append(mark == .xoxno ? .lendingWithdraw(drawerID: $0) : .withdraw(drawerID: $0)) },
+                onAdd: { growPath.append(Self.addRoute(mark, drawerID: $0)) },
+                onTakeOut: { growPath.append(Self.takeOutRoute(mark, drawerID: $0)) },
                 onSwap: { growPath.append(.swap($0)) }
             )
         case .deposit(let drawerID):
@@ -281,7 +282,47 @@ struct MainTabView: View {
                     onSeePosition: showLendingInGrow, onExit: closeGrowFlow
                 )
             }
+        case .sentoraDeposit(let drawerID):
+            pendingFirst(onExit: closeGrowFlow) {
+                VaultFlowRoot(
+                    service: ChainSentoraService(session: session), action: .deposit, drawerID: drawerID,
+                    onSeePosition: { showPotInGrow(.sentora, address: $0) }, onExit: closeGrowFlow
+                )
+            }
+        case .sentoraWithdraw(let drawerID):
+            pendingFirst(onExit: closeGrowFlow) {
+                VaultFlowRoot(
+                    service: ChainSentoraService(session: session), action: .withdraw, drawerID: drawerID,
+                    onSeePosition: { showPotInGrow(.sentora, address: $0) }, onExit: closeGrowFlow
+                )
+            }
         }
+    }
+
+    /// « Add » sur la page d'un pot : le dépôt de son protocole.
+    static func addRoute(_ mark: ChimpPotProtocol, drawerID: String) -> GrowRoute {
+        switch mark {
+        case .xoxno: .lendingDeposit(drawerID: drawerID)
+        case .sentora: .sentoraDeposit(drawerID: drawerID)
+        default: .deposit(drawerID: drawerID)
+        }
+    }
+
+    /// « Take out » sur la page d'un pot : le retrait de son protocole.
+    static func takeOutRoute(_ mark: ChimpPotProtocol, drawerID: String) -> GrowRoute {
+        switch mark {
+        case .xoxno: .lendingWithdraw(drawerID: drawerID)
+        case .sentora: .sentoraWithdraw(drawerID: drawerID)
+        default: .withdraw(drawerID: drawerID)
+        }
+    }
+
+    /// « See my position » : la page du pot de ce protocole dans l'onglet Grow, positions relues.
+    private func showPotInGrow(_ mark: ChimpPotProtocol, address: String) {
+        refreshAll()
+        guard config.features.grow else { return }
+        growPath = [.pot(mark, drawerAddress: address)]
+        selection = .grow
     }
 
     /// G2 ouvert depuis la page d'un tiroir (Wallet) : ses parcours restent dans la pile du Wallet.

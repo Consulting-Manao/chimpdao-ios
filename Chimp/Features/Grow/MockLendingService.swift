@@ -28,6 +28,8 @@ final class MockLendingService: VaultService {
 
     let send: MockSendService
     var scenario: Scenario
+    /// `.xoxno` (le prêt), ou `.sentora` (son vault : même parcours, le dépôt revient tel quel).
+    var mark: ChimpPotProtocol = .xoxno
     var delay: Duration
     var pendingSend: PendingSend?
     private(set) var prepareCount = 0
@@ -43,17 +45,19 @@ final class MockLendingService: VaultService {
         scenario: Scenario = .normal,
         cardSetup: MockSendService.CardSetup = .allWithPin,
         resultScenario: MockSendService.ResultScenario = .sent,
-        delay: Duration = .milliseconds(600)
+        delay: Duration = .milliseconds(600),
+        mark: ChimpPotProtocol = .xoxno
     ) {
         send = MockSendService(dataScenario: .standard, cardSetup: cardSetup, resultScenario: resultScenario, delay: delay, nfcDelay: delay)
         self.scenario = scenario
         self.delay = delay
+        self.mark = mark
     }
 
     var market: VaultInfo {
         VaultInfo(
-            id: Self.pool, name: "XOXNO USDC", protocols: ["XOXNO"], asset: .usdc,
-            invested: Decimal(string: "846.2")!, totalManaged: Decimal(string: "2477.89")!, kind: .lending,
+            id: Self.pool, name: "\(mark.name) USDC", protocols: [mark.name], asset: .usdc,
+            invested: Decimal(string: "846.2")!, totalManaged: Decimal(string: "2477.89")!, kind: .lending, mark: mark,
             withdrawableNow: scenario == .lentOut ? Self.availableWhenLentOut : Decimal(string: "1578.69")!,
             depositsBlocked: scenario == .paused || scenario == .frozen, withdrawalsBlocked: scenario == .paused
         )
@@ -70,7 +74,8 @@ final class MockLendingService: VaultService {
             case .hasDebt: .hasDebt
             default: .movable
             }
-            let value = condition == .needsRenewal ? 0 : Self.positionValue
+            // Sentora rend le dépôt tel quel : rien ne pousse dans le vault.
+            let value = condition == .needsRenewal ? 0 : (mark == .sentora ? 20 : Self.positionValue)
             holdings.append(VaultHolding(
                 drawerID: main.id, drawerAddress: main.address, shares: value, value: value,
                 basis: VaultBasis(putIn: 20, since: Self.depositDate), readAt: .now, condition: condition

@@ -65,6 +65,19 @@ struct IntegrationConfig: Equatable, Sendable {
         let usdy: Stablebond
     }
 
+    /// Sentora (décision de Barth du 2026-11-05) : un vault qui garde le montant déposé et paie, en fin de période, un taux
+    /// publié par Sentora (récompenses réclamées avec une preuve de son serveur ; retirer avant la fin les fait perdre).
+    /// Mainnet : vaults USDC `CAHEWHOP…`, XLM `CA54LVHM…`, PYUSD `CAQRAXBU…`, escrow `CCZSNGVM…`. Pas de testnet officiel :
+    /// copie de test (`tools/grow-testnet`), **le même wasm** copié depuis le mainnet (`ca6b85a1…`, escrow `f22e4a52…`).
+    /// L'app propose le vault USDC (un pot par protocole) ; le vault XLM de test existe aussi.
+    struct Sentora: Equatable, Sendable {
+        let vault: String
+        /// Code de l'actif du vault, parmi ceux de l'app.
+        let assetCode: String
+        let name: String
+        let escrow: String
+    }
+
     /// RedStone (SEP-40, **mainnet**, lecture seule) : prix indicatif des actifs que ni Reflector ni leur émetteur ne
     /// donnent (USDY). `lastprice(Asset::Stellar(contrat))`, 8 décimales, relevé le 2026-11-05 (1 USDY ≈ 1,152 $). Contrat
     /// listé par la documentation de Stellar (« Oracle providers », RedStone). Affichage seulement, jamais pour signer.
@@ -165,6 +178,7 @@ struct IntegrationConfig: Equatable, Sendable {
     let xoxno: Xoxno
     let ondo: Ondo
     let redstone: RedStone
+    let sentora: Sentora
 
     static let testnet = IntegrationConfig(
         soroswap: Soroswap(
@@ -226,6 +240,11 @@ struct IntegrationConfig: Equatable, Sendable {
             decimals: 8,
             mainnetAssets: ["USDY": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP"],
             maximumAge: 36 * 3600
+        ),
+        // Copie de test du 2026-11-05 (`tools/grow-testnet`), même wasm que le mainnet ; dépôt et retrait vérifiés.
+        sentora: Sentora(
+            vault: "CDGXALH6TAXVN3G26TQYMH7ORXESODQQHXL2BNGMZEC4BP5NMHMIAL2V", assetCode: "USDC", name: "Sentora USDC",
+            escrow: "CD4P36A22VCGWUWV4Z6WU3SAFCJTO7HEQWF5Y6R7DWLTFKQ6TI7QHWE5"
         )
     )
 
@@ -272,6 +291,9 @@ struct IntegrationConfig: Equatable, Sendable {
         if usdy.flatMap({ try? SACClient.contractID(for: $0, network: .custom(passphrase: passphrase)) }) != ondo.usdy.contract {
             problems.append("ondo.\(ondo.usdy.code) is not the SAC of \(ondo.usdy.code):\(ondo.issuer)")
         }
+        address("sentora.vault", sentora.vault)
+        address("sentora.escrow", sentora.escrow)
+        if !knownAssetCodes.contains(sentora.assetCode) { problems.append("sentora names unknown asset \"\(sentora.assetCode)\"") }
         if redstone.rpc.scheme != "https" { problems.append("redstone.rpc is not https") }
         if !redstone.oracle.hasPrefix("C") || (try? SCAddressXDR(contractId: redstone.oracle)) == nil { problems.append("redstone.oracle is not a C-address") }
         for (code, contract) in redstone.mainnetAssets where !contract.hasPrefix("C") || (try? SCAddressXDR(contractId: contract)) == nil {

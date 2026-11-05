@@ -252,7 +252,7 @@ struct VaultStatusView: View {
     /// Mettre : depuis, ce qui part. Retirer : vers, ce qui est attendu, le minimum signé.
     private func details(_ summary: VaultSummary) -> [ChimpDetailItem] {
         var items = summary.kind == .lending
-            ? [ChimpDetailItem(id: "vault", label: "Market", value: summary.vaultName)]
+            ? [ChimpDetailItem(id: "vault", label: summary.vaultName.hasPrefix("XOXNO") ? "Market" : "Vault", value: summary.vaultName)]
             : [ChimpDetailItem(id: "vault", label: "Vault", value: "\(summary.vaultName) vault")]
         if summary.action == .deposit {
             items.append(ChimpDetailItem(id: "from", label: "From", value: summary.drawerTitle))
@@ -329,7 +329,7 @@ struct VaultSentView: View {
     /// « 50 XLM is growing in DeFindex. I'll show you what it really does. » / « 30 XLM is back in Main, ready to use. »
     /// Retrait sans montant lu : « Your XLM is back in Main, ready to use. »
     static func lead(_ summary: VaultSummary, received: Decimal?, locale: Locale) -> String {
-        let place = summary.kind == .lending ? "XOXNO" : "DeFindex"
+        let place = summary.protocolName
         if summary.action == .deposit {
             return String(localized: "\(summary.asset.formattedWithCode(summary.amount, locale: locale)) is growing in \(place). I'll show you what it really does.")
         }

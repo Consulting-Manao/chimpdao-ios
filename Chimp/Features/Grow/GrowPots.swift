@@ -76,16 +76,16 @@ struct GrowPot: Identifiable, Equatable {
 /// Les pots d'un compte, construits à partir des trois services (vault, prêt, CETES).
 enum GrowPots {
     /// Les tiroirs dans l'ordre de l'app (Main, puis les cartes), tels qu'au moins un service les a lus.
-    static func drawers(vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext]) -> [SendDrawer] {
-        for context in [vault?.drawers, lending?.drawers] + savings.map(\.drawers) {
+    static func drawers(vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext], sentora: VaultContext? = nil) -> [SendDrawer] {
+        for context in [vault?.drawers, lending?.drawers, sentora?.drawers] + savings.map(\.drawers) {
             if let drawers = context, !drawers.isEmpty { return drawers }
         }
         return []
     }
 
-    static func build(vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext]) -> [GrowPot] {
+    static func build(vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext], sentora: VaultContext? = nil) -> [GrowPot] {
         var pots: [GrowPot] = []
-        for drawer in drawers(vault: vault, lending: lending, savings: savings) {
+        for drawer in drawers(vault: vault, lending: lending, savings: savings, sentora: sentora) {
             if let vault, let holding = vault.holdings.first(where: { $0.drawerID == drawer.id }) {
                 pots.append(GrowPot(
                     mark: .defindex, drawerID: drawer.id, drawerAddress: drawer.address, asset: vault.vault.asset, state: .growing,
@@ -106,6 +106,14 @@ enum GrowPots {
                         withdrawableNow: largest.map { min($0, lending.vault.availableNow) }, positions: mine.count
                     ))
                 }
+            }
+            if let sentora, let holding = sentora.holdings.first(where: { $0.drawerID == drawer.id }) {
+                // Le dépôt, rendu tel quel : rien ne « pousse » dans le vault (les récompenses se réclament à part).
+                pots.append(GrowPot(
+                    mark: .sentora, drawerID: drawer.id, drawerAddress: drawer.address, asset: sentora.vault.asset, state: .growing,
+                    value: holding.value, putIn: holding.basis?.putIn, since: holding.basis?.since, basisPriceUSD: nil, priceUSD: nil,
+                    withdrawableNow: holding.value
+                ))
             }
             for bond in savings {
                 guard let holding = bond.holding(drawerAddress: drawer.address) else { continue }

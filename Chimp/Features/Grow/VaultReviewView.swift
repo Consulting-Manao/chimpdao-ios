@@ -34,7 +34,7 @@ struct VaultReviewView: View {
         .chimpSound(.error, trigger: model.preparationIssue) { _, new in new != nil }
     }
 
-    private var mark: ChimpPotProtocol { model.isLending ? .xoxno : .defindex }
+    private var mark: ChimpPotProtocol { model.mark }
 
     private var review: some View {
         VStack(spacing: 0) {
@@ -123,7 +123,15 @@ struct VaultReviewView: View {
                         }
                         ChimpReceiptRow(label: "Fees", value: asset.formattedWithCode(0, locale: locale), tone: .positive)
                     }
-                    if !isDeposit, draft.quote.minimum != nil {
+                    if draft.vault.mark == .sentora {
+                        // Règle 8 : la condition des récompenses, dite avant de signer.
+                        Text(isDeposit ? Self.sentoraDepositNote : Self.sentoraWithdrawNote)
+                            .chimpFont(.caption)
+                            .foregroundStyle(Color(.chimpTicketMuted))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 6)
+                    } else if !isDeposit, draft.quote.minimum != nil {
                         Text(Self.minimumNote(lending: draft.vault.kind == .lending))
                             .chimpFont(.caption)
                             .foregroundStyle(Color(.chimpTicketMuted))
@@ -241,6 +249,10 @@ struct VaultReviewView: View {
         lending ? "Expected back" : "At least"
     }
 
+    /// Sentora : ses récompenses se réclament en fin de période ; retirer avant les fait perdre (texte du 2026-11-05).
+    static let sentoraDepositNote: LocalizedStringKey = "Sentora pays its rewards at the end of each term. Taking money out before the end gives up that term's rewards."
+    static let sentoraWithdrawNote: LocalizedStringKey = "Sentora gives back exactly this amount, or nothing moves. Taking it out before the end of the term gives up that term's rewards."
+
     static func minimumNote(lending: Bool) -> LocalizedStringKey {
         lending ? "The contract doesn't guarantee a minimum. If XOXNO can't pay it right now, nothing moves." : "This is what your card signs. If the vault would pay less, nothing moves."
     }
@@ -251,13 +263,13 @@ struct VaultReviewView: View {
         case .insufficientBalance: return "Not enough \(asset.code) in \(draft.drawer.title). Nothing was signed."
         case .notEnoughShares: return "The position doesn't hold that much anymore. Nothing was signed."
         case .notEnoughLiquidity where draft.vault.kind == .lending:
-            return "XOXNO can't pay that much back right now: it's lent out. Nothing was signed."
+            return "\(draft.vault.mark.name) can't pay that much back right now. Nothing was signed."
         case .notEnoughLiquidity:
             return "The vault can give back \(asset.displayedWithCode(draft.vault.availableNow, locale: locale)) right now. The rest comes back as borrowers repay."
         case .vaultUnavailable where draft.vault.kind == .lending:
-            return "XOXNO is paused or unavailable right now. Nothing moved. Try again later."
+            return "\(draft.vault.mark.name) is paused or unavailable right now. Nothing moved. Try again later."
         case .vaultUnavailable: return "The vault is unavailable right now. Nothing moved. Try again in a minute."
-        case .capReached: return "XOXNO isn't taking more deposits in this market right now. Nothing was signed."
+        case .capReached: return "\(draft.vault.mark.name) isn't taking more deposits right now. Nothing was signed."
         case .implausible: return "The vault's numbers don't look right, so I won't sign. Nothing was signed."
         case .priceMoved: return "The vault moved. Nothing was signed."
         case .other: return "Couldn't get ready. Nothing was signed. Check your connection and try again."

@@ -16,7 +16,7 @@ struct VaultAmountView: View {
 
     private var isDeposit: Bool { model.action == .deposit }
     private var asset: SendAsset { model.asset }
-    private var mark: ChimpPotProtocol { model.isLending ? .xoxno : .defindex }
+    private var mark: ChimpPotProtocol { model.mark }
     private var drawerName: String { model.selectedDrawer.map { GrowView.shortTitle($0) } ?? String(localized: "Main") }
 
     var body: some View {
@@ -222,14 +222,14 @@ struct VaultAmountView: View {
             ChimpNoticeBanner(text: "A payment is still being checked. Check it first.", marker: .error)
         } else if model.isBlockedByMarket {
             ChimpNoticeBanner(
-                text: isDeposit ? "XOXNO isn't taking deposits right now." : "XOXNO has paused withdrawals right now. Your money is still there.",
+                text: isDeposit ? "\(mark.name) isn't taking deposits right now." : "\(mark.name) has paused withdrawals right now. Your money is still there.",
                 marker: .error
             )
         } else if model.isLending, !isDeposit, model.movablePositionCount > 1 {
             ChimpGrowNote(text: "\(drawerName) has \(model.movablePositionCount) positions. This takes money out of the biggest one (\(asset.displayedWithCode(model.available, locale: locale))); then you can take out the next.")
         } else if model.isLending, !isDeposit, let now = model.withdrawableNow, now < model.available {
             // G5 : une note dans l'écran, pas un écran d'erreur.
-            ChimpGrowNote(text: "XOXNO can give back \(asset.displayedWithCode(now, locale: locale)) right now. The rest comes back as borrowers repay.")
+            ChimpGrowNote(text: "\(mark.name) can give back \(asset.displayedWithCode(now, locale: locale)) right now. The rest comes back as borrowers repay.")
         } else if model.loadPhase == .unavailable {
             problem(title: "The vault is unavailable right now", line: "Nothing moved. Try again in a minute.")
         } else if case .failed(let issue) = model.quoteState {

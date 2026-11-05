@@ -100,7 +100,7 @@ final class ChainLendingService: VaultService {
         VaultInfo(
             id: adapter.market.pool, name: adapter.market.name, protocols: ["XOXNO"], asset: asset,
             invested: SwapUnits.amount(fromUnits: state.borrowed), totalManaged: SwapUnits.amount(fromUnits: state.supplied),
-            kind: .lending, withdrawableNow: SwapUnits.amount(fromUnits: state.marketWithdrawable),
+            kind: .lending, mark: .xoxno, withdrawableNow: SwapUnits.amount(fromUnits: state.marketWithdrawable),
             depositsBlocked: state.paused || state.frozen || state.remainingCap <= 0, withdrawalsBlocked: state.paused
         )
     }

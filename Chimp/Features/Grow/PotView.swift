@@ -30,6 +30,7 @@ struct PotView: View {
         switch mark {
         case .defindex: model.phase
         case .xoxno: model.lending?.phase ?? .unavailable
+        case .sentora: model.sentora?.phase ?? .unavailable
         case .etherfuse, .ondo: model.savingsPhase
         }
     }
@@ -38,6 +39,7 @@ struct PotView: View {
         switch mark {
         case .defindex: model.vault
         case .xoxno: model.lending?.vault
+        case .sentora: model.sentora?.vault
         case .etherfuse, .ondo: nil
         }
     }
@@ -254,7 +256,7 @@ enum PotText {
     static func assetCode(_ mark: ChimpPotProtocol) -> String {
         switch mark {
         case .defindex: "XLM"
-        case .xoxno: "USDC"
+        case .xoxno, .sentora: "USDC"
         case .etherfuse: "CETES"
         case .ondo: "USDY"
         }
@@ -339,6 +341,9 @@ enum PotText {
         if pot.mark == .ondo {
             return String(localized: "USDY's price goes up as US Treasuries pay. I show the price RedStone gives me.")
         }
+        if pot.mark == .sentora {
+            return String(localized: "Sentora keeps exactly what you put in. Its rewards come at the end of the term.")
+        }
         guard let growth = pot.growth else {
             return String(localized: "I don't know what you put in from this phone, so I only show what you have now.")
         }
@@ -361,6 +366,7 @@ enum PotText {
         case .defindex: String(localized: "DeFindex puts your XLM to work and gives you back what it earns. You can add more or take it out whenever you want.")
         case .xoxno: String(localized: "XOXNO lends your USDC to borrowers, who pay it back with a little extra. You can add more or take it out whenever you want.")
         case .etherfuse: String(localized: "CETES are tokens for short-term Mexican government bonds, issued by Etherfuse. You get them with a swap, and swap them back the same way.")
+        case .sentora: String(localized: "Sentora keeps your USDC in its vault and gives it back exactly. At the end of each term, it pays a reward rate it publishes. Taking money out before the end gives up that term's rewards.")
         case .ondo: String(localized: "USDY is a dollar token backed by short-term US Treasuries, issued by Ondo. Its price goes up a little every day. You get it with a swap, and swap it back the same way. Not for US persons.")
         }
     }

@@ -26,6 +26,8 @@ final class GrowModel {
     let savingsService: SavingsService?
     /// Prêt XOXNO (phase 7) : le même modèle, sur le service de prêt ; lu à part, une panne de l'un ne cache pas l'autre.
     let lending: GrowModel?
+    /// Vault Sentora (2026-11-05) : le même modèle, sur son service ; lu à part lui aussi.
+    let sentora: GrowModel?
     /// Prix du XLM en dollars (oracle Reflector, lecture seule) : seulement pour le total « grown in total » (G1).
     private let priceOracle: PriceOracle?
     private(set) var xlmUSD: Decimal?
@@ -35,11 +37,12 @@ final class GrowModel {
 
     init(
         service: VaultService, savingsService: SavingsService? = nil, lendingService: VaultService? = nil,
-        priceOracle: PriceOracle? = nil, history: PotHistoryStore? = nil
+        sentoraService: VaultService? = nil, priceOracle: PriceOracle? = nil, history: PotHistoryStore? = nil
     ) {
         self.service = service
         self.savingsService = savingsService
         lending = lendingService.map { GrowModel(service: $0) }
+        sentora = sentoraService.map { GrowModel(service: $0) }
         self.priceOracle = priceOracle
         self.history = history
     }
@@ -47,7 +50,7 @@ final class GrowModel {
     // MARK: Pots (maquette « Chimp Grow Final »)
 
     /// Un pot par protocole et par tiroir.
-    var pots: [GrowPot] { GrowPots.build(vault: context, lending: lending?.context, savings: savings) }
+    var pots: [GrowPot] { GrowPots.build(vault: context, lending: lending?.context, savings: savings, sentora: sentora?.context) }
 
     /// Le contexte d'un pot d'actif d'émetteur (`.etherfuse`, `.ondo`).
     func savings(_ mark: ChimpPotProtocol) -> SavingsContext? {
@@ -55,7 +58,7 @@ final class GrowModel {
     }
 
     /// Les tiroirs, Main d'abord.
-    var potDrawers: [SendDrawer] { GrowPots.drawers(vault: context, lending: lending?.context, savings: savings) }
+    var potDrawers: [SendDrawer] { GrowPots.drawers(vault: context, lending: lending?.context, savings: savings, sentora: sentora?.context) }
 
     func pot(_ mark: ChimpPotProtocol, drawerAddress: String) -> GrowPot? {
         pots.first { $0.mark == mark && $0.drawerAddress == drawerAddress }
@@ -74,6 +77,7 @@ final class GrowModel {
         var marks: [ChimpPotProtocol] = []
         if context != nil { marks.append(.defindex) }
         if lending?.context != nil, lending?.vault?.depositsBlocked != true { marks.append(.xoxno) }
+        if sentora?.context != nil, sentora?.vault?.depositsBlocked != true { marks.append(.sentora) }
         marks += savings.map(\.mark)
         return marks
     }
@@ -140,8 +144,9 @@ final class GrowModel {
             async let vault: Void = loadVault()
             async let bonds: Void = loadSavings()
             async let lent: Void = lending?.refresh() ?? ()
+            async let escrowed: Void = sentora?.refresh() ?? ()
             async let price: Void = loadPrice()
-            _ = await (vault, bonds, lent, price)
+            _ = await (vault, bonds, lent, escrowed, price)
             recordHistory()
         }
         loadTask = task

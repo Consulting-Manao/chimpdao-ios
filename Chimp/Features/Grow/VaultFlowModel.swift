@@ -214,8 +214,11 @@ final class VaultFlowModel {
         return action == .deposit ? context.drawers : context.drawers.filter { context.holding(drawerID: $0.id)?.condition == .movable }
     }
 
-    /// Un marché de prêt (XOXNO) plutôt qu'un vault.
+    /// Un lieu à montant exact (prêt XOXNO, vault Sentora) plutôt qu'un vault à parts.
     var isLending: Bool { context?.vault.kind == .lending }
+
+    /// Le pot de ce lieu (logo et nom).
+    var mark: ChimpPotProtocol { context?.vault.mark ?? .defindex }
 
     /// Prêt, retrait : ce que la position peut retirer maintenant (calculé avant de proposer quoi que ce soit).
     var withdrawableNow: Decimal? {

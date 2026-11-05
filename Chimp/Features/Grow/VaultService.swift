@@ -23,8 +23,11 @@ struct VaultInfo: Equatable {
     /// « DeFindex → Blend ».
     var protocolChain: String { protocols.joined(separator: " → ") }
 
-    /// Un vault DeFindex, ou un marché de prêt XOXNO (phase 7 : dépôt seulement, sans parts, montant exact).
+    /// Un vault DeFindex, ou un marché de prêt XOXNO (phase 7 : dépôt seulement, sans parts, montant exact), ou un vault
+    /// Sentora (montant exact aussi : le même parcours que le prêt).
     var kind: VaultKind = .vault
+    /// Le pot de ce lieu (logo, nom).
+    var mark: ChimpPotProtocol = .defindex
     /// Prêt : ce que le marché laisse retirer maintenant (limite d'utilisation comprise), `nil` pour un vault.
     var withdrawableNow: Decimal? = nil
     /// Prêt : le marché refuse les dépôts (gel ou pause), ou les retraits (pause).
@@ -162,8 +165,13 @@ struct VaultSummary: Equatable {
     /// Un vault, ou un marché de prêt (XOXNO).
     let kind: VaultKind
 
-    /// « the vault », ou « XOXNO » pour un marché de prêt.
-    var placeName: String { kind == .lending ? "XOXNO" : String(localized: "the vault") }
+    /// « the vault », ou le protocole (« XOXNO », « Sentora ») pour un lieu à montant exact.
+    var placeName: String { kind == .lending ? protocolName : String(localized: "the vault") }
+
+    /// « XOXNO », « Sentora » (premier mot du nom du lieu), ou « DeFindex ».
+    var protocolName: String {
+        kind == .lending ? String(vaultName.split(separator: " ").first ?? "XOXNO") : "DeFindex"
+    }
 
     init(_ draft: VaultDraft) {
         action = draft.action
@@ -192,8 +200,8 @@ struct VaultSummary: Equatable {
         shares = vault.shares
         minimumOut = vault.minimumReceived
         self.network = network
-        // L'opération gardée sur le téléphone ne porte pas le type de lieu : un nom de marché XOXNO le dit.
-        kind = vault.vaultName.hasPrefix("XOXNO") ? .lending : .vault
+        // L'opération gardée sur le téléphone ne porte pas le type de lieu : un nom XOXNO ou Sentora le dit.
+        kind = vault.vaultName.hasPrefix("XOXNO") || vault.vaultName.hasPrefix("Sentora") ? .lending : .vault
     }
 }
 

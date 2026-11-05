@@ -13,6 +13,9 @@ enum GrowRoute: Hashable {
     /// Prêt XOXNO (phase 7) : mettre, retirer.
     case lendingDeposit(drawerID: String?)
     case lendingWithdraw(drawerID: String)
+    /// Vault Sentora (2026-11-05) : mettre, retirer.
+    case sentoraDeposit(drawerID: String?)
+    case sentoraWithdraw(drawerID: String)
 }
 
 /// G1 · Grow (maquette « Chimp Grow Final », Claude Design, 2026-10-18) : en-tête vert « Grow », ce qui a poussé en tout
@@ -118,7 +121,8 @@ struct GrowView: View {
     }
 
     private var isLoadingFirst: Bool {
-        pots.isEmpty && (model.phase == .loading || model.savingsPhase == .loading || model.lending?.phase == .loading) && drawers.isEmpty
+        pots.isEmpty && (model.phase == .loading || model.savingsPhase == .loading || model.lending?.phase == .loading || model.sentora?.phase == .loading)
+            && drawers.isEmpty
     }
 
     /// Un protocole qui ne répond pas : une ligne, avec « Retry ».
@@ -127,6 +131,7 @@ struct GrowView: View {
         let silent: [String] = [
             model.phase == .unavailable ? "DeFindex" : nil,
             model.lending?.phase == .unavailable ? "XOXNO" : nil,
+            model.sentora?.phase == .unavailable ? "Sentora" : nil,
             model.savingsService != nil && model.savingsPhase == .unavailable
                 ? model.savingsService?.marks.map(\.name).joined(separator: ", ") : nil,
         ].compactMap { $0 }
@@ -214,6 +219,7 @@ struct GrowView: View {
         switch mark {
         case .defindex: .deposit(drawerID: drawer?.id)
         case .xoxno: .lendingDeposit(drawerID: drawer?.id)
+        case .sentora: .sentoraDeposit(drawerID: drawer?.id)
         case .etherfuse: .swap(SwapPrefill(drawerAddress: drawer?.address ?? fallbackAddress ?? "", given: .usdc, received: .cetes, amount: nil))
         case .ondo: .swap(SwapPrefill(drawerAddress: drawer?.address ?? fallbackAddress ?? "", given: .usdc, received: .usdy, amount: nil))
         }
@@ -226,6 +232,7 @@ struct GrowView: View {
         switch mark {
         case .defindex: String(localized: "Grows XLM")
         case .xoxno: String(localized: "Grows USDC")
+        case .sentora: String(localized: "USDC · rewards each term")
         case .etherfuse: String(localized: "CETES · Mexican bonds")
         case .ondo: String(localized: "USDY · US Treasuries")
         }
