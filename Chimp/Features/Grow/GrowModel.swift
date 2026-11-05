@@ -16,9 +16,10 @@ final class GrowModel {
     private(set) var context: VaultContext?
     private(set) var technicalDetails: String?
 
-    /// Économies (CETES, F9 et F10) : lues à part, une panne du vault ne les cache pas (et inversement).
+    /// Économies (CETES et USDY, F9 et F10) : lues à part, une panne du vault ne les cache pas (et inversement).
     private(set) var savingsPhase: Phase = .loading
-    private(set) var savings: SavingsContext?
+    /// Un contexte par actif dont le prix pousse, dans l'ordre du service (CETES, USDY).
+    private(set) var savings: [SavingsContext] = []
     private(set) var savingsDetails: String?
 
     let service: VaultService
@@ -48,6 +49,11 @@ final class GrowModel {
     /// Un pot par protocole et par tiroir.
     var pots: [GrowPot] { GrowPots.build(vault: context, lending: lending?.context, savings: savings) }
 
+    /// Le contexte d'un pot d'actif d'émetteur (`.etherfuse`, `.ondo`).
+    func savings(_ mark: ChimpPotProtocol) -> SavingsContext? {
+        savings.first { $0.mark == mark }
+    }
+
     /// Les tiroirs, Main d'abord.
     var potDrawers: [SendDrawer] { GrowPots.drawers(vault: context, lending: lending?.context, savings: savings) }
 
@@ -68,7 +74,7 @@ final class GrowModel {
         var marks: [ChimpPotProtocol] = []
         if context != nil { marks.append(.defindex) }
         if lending?.context != nil, lending?.vault?.depositsBlocked != true { marks.append(.xoxno) }
-        if savings != nil { marks.append(.etherfuse) }
+        marks += savings.map(\.mark)
         return marks
     }
 
@@ -86,13 +92,15 @@ final class GrowModel {
         if let price = await priceOracle.usdPrices(for: ["XLM"])["XLM"] { xlmUSD = price }
     }
 
-    /// Les CETES d'un tiroir (adresse), s'il en détient (ou s'ils sont gelés).
-    func savingsHolding(drawerAddress: String) -> SavingsHolding? {
-        savings?.holding(drawerAddress: drawerAddress)
+    /// Les jetons d'un actif d'émetteur (code) d'un tiroir (adresse), s'il en détient (ou s'ils sont gelés).
+    func savingsHolding(drawerAddress: String, code: String) -> SavingsHolding? {
+        savings.first { $0.asset.code == code }?.holding(drawerAddress: drawerAddress)
     }
 
-    /// Le prix indicatif du moment, s'il est disponible.
-    var savingsPrice: StablebondPrice? { savings?.price.price }
+    /// Le prix indicatif du moment de cet actif, s'il est disponible.
+    func savingsPrice(_ code: String) -> StablebondPrice? {
+        savings.first { $0.asset.code == code }?.price.price
+    }
 
     var vault: VaultInfo? { context?.vault }
     var holdings: [VaultHolding] { context?.holdings ?? [] }
@@ -156,7 +164,7 @@ final class GrowModel {
 
     private func loadSavings() async {
         guard let savingsService else { return }
-        if savings == nil { savingsPhase = .loading }
+        if savings.isEmpty { savingsPhase = .loading }
         do {
             savings = try await savingsService.fetchSavings()
             savingsDetails = nil

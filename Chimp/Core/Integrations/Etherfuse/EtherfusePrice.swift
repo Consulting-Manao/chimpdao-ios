@@ -13,8 +13,8 @@ struct StablebondPrice: Equatable, Sendable {
     let fiat: Decimal
     /// Heure de la **plus ancienne** source retenue : l'âge honnête du prix affiché.
     let asOf: Date
-    /// Toujours « Etherfuse » : l'écran dit d'où vient le prix.
-    var source: String { "Etherfuse" }
+    /// D'où vient le prix (« Etherfuse », « RedStone ») : l'écran le dit toujours.
+    var source = "Etherfuse"
 
     /// Valeur indicative d'une quantité, en dollars.
     func value(of amount: Decimal) -> Decimal { amount * usd }

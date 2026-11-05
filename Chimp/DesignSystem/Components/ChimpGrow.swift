@@ -8,14 +8,21 @@ enum ChimpPotProtocol: String, CaseIterable, Identifiable, Hashable, Sendable {
     case defindex
     case xoxno
     case etherfuse
+    /// USDY d'Ondo (2026-11-05).
+    case ondo
 
     var id: String { rawValue }
+
+    /// Un pot qui détient un actif dont le **prix** monte (CETES, USDY) : obtenu et rendu par swap, son évolution est celle
+    /// du prix, et son émetteur peut le geler.
+    var tracksPrice: Bool { self == .etherfuse || self == .ondo }
 
     var name: String {
         switch self {
         case .defindex: "DeFindex"
         case .xoxno: "XOXNO"
         case .etherfuse: "Etherfuse"
+        case .ondo: "Ondo"
         }
     }
 
@@ -24,6 +31,7 @@ enum ChimpPotProtocol: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .defindex: .protocolDefindex
         case .xoxno: .protocolXoxno
         case .etherfuse: .protocolEtherfuse
+        case .ondo: .protocolOndo
         }
     }
 }

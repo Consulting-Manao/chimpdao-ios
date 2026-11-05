@@ -11,12 +11,12 @@ struct CetesAssetTests {
     /// SAC d'un autre « CETES » de testnet (émetteur `GAAV6W…SXUC`), sans rapport avec Etherfuse.
     static let otherCetes = "CD4RNB7OSWXXR6KNIUVWT2YKBMNTR6R4DD4FHZYRMN7ICEI3YOMG2C3H"
 
-    @Test("Liste blanche de l'app : XLM, USDC, puis CETES à son adresse exacte, qui est bien le SAC de CETES:GC3CW7…UPS4")
+    @Test("Liste blanche de l'app : XLM, USDC, CETES à son adresse exacte (le SAC de CETES:GC3CW7…UPS4), puis l'USDY d'Ondo")
     func whitelist() throws {
         let config = ChimpNetworkConfig.testnet
         let assets = try SACClient.stellarAssets(config: config)
-        #expect(assets.map(\.code) == ["XLM", "USDC", "CETES"])
-        #expect(assets.last?.contract == Self.cetes)
+        #expect(assets.map(\.code) == ["XLM", "USDC", "CETES", "USDY"])
+        #expect(assets.first { $0.code == "CETES" }?.contract == Self.cetes)
         let issuer = try #require(config.integrations?.etherfuse.issuer)
         #expect(issuer == "GC3CW7EDYRTWQ635VDIGY6S4ZUF5L6TQ7AA4MWS7LEQDBLUSZXV7UPS4")
         let asset = try #require(Asset(canonicalForm: "CETES:\(issuer)"))
@@ -43,7 +43,8 @@ struct CetesAssetTests {
     func notSendable() {
         #expect(SendAsset.sendable == [.usdc, .xlm])
         #expect(!SendAsset.cetes.isSendable)
-        #expect(SendAsset.swappable == [.xlm, .usdc, .cetes])
+        #expect(SendAsset.swappable == [.xlm, .usdc, .cetes, .usdy])
+        #expect(!SendAsset.usdy.isSendable, "L'USDY d'Ondo non plus : swap seulement")
         let received = ActivityRecord(
             id: "r", event: .transfer, hash: "r", from: ActivityHistoryTests.admin, to: ActivityHistoryTests.account,
             assetCode: "CETES", amount: 10, at: .now, isLocal: false

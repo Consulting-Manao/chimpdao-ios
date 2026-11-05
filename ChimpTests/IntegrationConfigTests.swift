@@ -60,6 +60,11 @@ struct IntegrationConfigTests {
             xoxno: .init(
                 controller: base.cctp.tokenMessengerMinter, pool: "not-an-address", positionNFT: base.xoxno.positionNFT,
                 assetCode: "EURC", hubID: 1, spokeID: 1, name: "XOXNO EURC"
+            ),
+            ondo: .init(issuer: base.ondo.issuer, usdy: .init(code: "USDY", contract: base.etherfuse.stablebonds[0].contract)),
+            redstone: .init(
+                rpc: URL(string: "http://rpc.lightsail.network")!, passphrase: base.redstone.passphrase, oracle: "not-an-address",
+                decimals: 8, mainnetAssets: ["USDY": "G-not-a-contract"], maximumAge: 1
             )
         )
         let problems = broken.problems(passphrase: config.passphrase, knownAssetCodes: knownAssetCodes, reserved: reserved)
@@ -71,6 +76,10 @@ struct IntegrationConfigTests {
         #expect(problems.contains("etherfuse.CETES repeats an address used elsewhere"))
         #expect(problems.contains { $0.hasPrefix("etherfuse.CETES is not the SAC of CETES:") })
         #expect(problems.contains("etherfuse.priceAPI is not https"))
+        #expect(problems.contains { $0.hasPrefix("ondo.USDY is not the SAC of USDY:") })
+        #expect(problems.contains("redstone.rpc is not https"))
+        #expect(problems.contains("redstone.oracle is not a C-address"))
+        #expect(problems.contains("redstone.mainnetAssets[USDY] is not a C-address"))
         #expect(problems.contains { $0.hasPrefix("cctp.forwarder is not a C-address") })
         #expect(problems.contains("cctp.messageTransmitter repeats an address used elsewhere"))
         #expect(problems.contains("cctp.sourceChains names Stellar's own domain"))

@@ -27,10 +27,11 @@ struct SACClient {
         let network = Network.custom(passphrase: config.passphrase)
         let usdc = Asset(type: AssetType.ASSET_TYPE_CREDIT_ALPHANUM4, code: "USDC", issuer: try KeyPair(accountId: config.usdcIssuer))!
         let stablebonds = config.etherfuse?.stablebonds.map { ($0.code, $0.contract) } ?? []
+        let usdy = config.ondo.map { [($0.usdy.code, $0.usdy.contract)] } ?? []
         return [
             ("XLM", try contractID(for: Asset(type: AssetType.ASSET_TYPE_NATIVE)!, network: network)),
             ("USDC", try contractID(for: usdc, network: network)),
-        ] + stablebonds
+        ] + stablebonds + usdy
     }
 
     /// `balance(holder)` en unités on-chain (entier, 7 décimales). `nil` si la simulation n'a rendu aucune valeur :

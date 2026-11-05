@@ -4,7 +4,7 @@ import Testing
 
 /// Grow, étape 2 : les pots (un par protocole et par tiroir), le total en dollars, l'historique de la courbe.
 struct GrowPotsTests {
-    private func contexts() async throws -> (VaultContext, VaultContext, SavingsContext) {
+    private func contexts() async throws -> (VaultContext, VaultContext, [SavingsContext]) {
         let vault = try await MockVaultService(delay: .zero).fetchContext()
         let lending = try await MockLendingService(delay: .zero).fetchContext()
         let savings = try await MockSavingsService(delay: .zero).fetchSavings()
@@ -38,14 +38,38 @@ struct GrowPotsTests {
         #expect(GrowPots.totalUSD(pots, xlmUSD: nil) == nil, "Jamais de total partiel")
     }
 
+    @Test("USDY (Ondo) : un pot à lui, à côté des CETES, qui suit son prix comme eux (pas de « mis », pas de croissance en actif)")
+    func ondoPot() async throws {
+        let cetes = try #require(try await MockSavingsService(delay: .zero).fetchSavings().first)
+        let price = StablebondPrice(code: "USDY", usd: Decimal(string: "1.1520412")!, currency: "USD", fiat: Decimal(string: "1.1520412")!, asOf: .now, source: "RedStone")
+        let main = try #require(cetes.drawers.first)
+        let usdy = SavingsContext(
+            network: .testnet, mark: .ondo, asset: .usdy, drawers: cetes.drawers,
+            holdings: [SavingsHolding(drawerID: main.id, drawerAddress: main.address, amount: 100, frozen: false,
+                                      basis: SavingsBasis(unitPriceUSD: Decimal(string: "1.15")!, since: .now))],
+            price: .price(price), issuerPowers: IssuerPowers(canFreeze: true, canClawBack: true)
+        )
+        let pots = GrowPots.build(vault: nil, lending: nil, savings: [cetes, usdy])
+        #expect(pots.map(\.mark) == [.etherfuse, .ondo])
+        let ondo = pots[1]
+        #expect(ondo.asset == .usdy && ondo.growth == nil)
+        #expect(ondo.worthUSD == 100 * Decimal(string: "1.1520412")!)
+        #expect(ondo.growthUSD(xlmUSD: nil) == 100 * (Decimal(string: "1.1520412")! - Decimal(string: "1.15")!))
+        #expect(ChimpPotProtocol.ondo.tracksPrice && ChimpPotProtocol.etherfuse.tracksPrice && !ChimpPotProtocol.defindex.tracksPrice)
+        #expect(ChimpPotProtocol.savings(code: "USDY") == .ondo && ChimpPotProtocol.savings(code: "CETES") == .etherfuse)
+        #expect(ChimpPotProtocol.savings(code: "XLM") == nil)
+        #expect(GrowView.plantRoute(.ondo, drawer: main, fallbackAddress: nil)
+            == .swap(SwapPrefill(drawerAddress: main.address, given: .usdc, received: .usdy, amount: nil)))
+    }
+
     @Test("XOXNO à renouveler : valeur inconnue (jamais zéro), hors du total ; avec dette : montré sans action")
     func lendingStates() async throws {
         let renew = try await MockLendingService(scenario: .needsRenewal, delay: .zero).fetchContext()
-        let pot = try #require(GrowPots.build(vault: nil, lending: renew, savings: nil).first)
+        let pot = try #require(GrowPots.build(vault: nil, lending: renew, savings: []).first)
         #expect(pot.state == .needsRenewal && pot.value == nil && !pot.canMove)
         #expect(GrowPots.totalUSD([pot], xlmUSD: 1) == 0)
         let debt = try await MockLendingService(scenario: .hasDebt, delay: .zero).fetchContext()
-        #expect(GrowPots.build(vault: nil, lending: debt, savings: nil).first?.state == .hasDebt)
+        #expect(GrowPots.build(vault: nil, lending: debt, savings: []).first?.state == .hasDebt)
     }
 
     @Test("Courbe : départ à zéro au jour du dépôt, puis les relevés ; « THIS WEEK » seulement avec un relevé d'il y a 7 jours")

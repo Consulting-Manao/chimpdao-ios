@@ -150,7 +150,7 @@ struct DrawerDetailView: View {
                             .accessibilityHint(Text("Opens your position"))
                     }
                     ForEach(content.savings) { bond in
-                        Button { if let address = content.address { actions.onSavings(address) } } label: { savingsTile(bond, address: content.address) }
+                        Button { if let address = content.address { actions.onSavings(address, bond.code) } } label: { savingsTile(bond, address: content.address) }
                             .buttonStyle(ChimpPressableStyle())
                             .accessibilityHint(Text("Opens your savings bonds"))
                     }
@@ -194,8 +194,8 @@ struct DrawerDetailView: View {
     /// sinon rien ; gelés : « Frozen by Etherfuse » en rouge.
     private func savingsTile(_ bond: DrawerDetailContent.Asset, address: String?) -> some View {
         let asset = SendAsset(code: bond.code) ?? .cetes
-        let holding = address.flatMap { grow?.savingsHolding(drawerAddress: $0) }
-        let price = grow?.savingsPrice
+        let holding = address.flatMap { grow?.savingsHolding(drawerAddress: $0, code: bond.code) }
+        let price = grow?.savingsPrice(bond.code)
         let issuer = asset.issuerName ?? String(localized: "The issuer")
         let detail: String?
         var color = Color(.chimpTextSecondary)
@@ -399,5 +399,6 @@ struct DrawerDetailActions {
     /// La tuile « GROWING », « See my position » d'un reçu : F6 pour ce tiroir (adresse).
     var onPosition: (String) -> Void = { _ in }
     /// La tuile d'un stablebond (CETES) : F10 pour ce tiroir (adresse).
-    var onSavings: (String) -> Void = { _ in }
+    /// La tuile d'un actif d'émetteur (adresse du tiroir, code de l'actif) : son pot.
+    var onSavings: (String, String) -> Void = { _, _ in }
 }

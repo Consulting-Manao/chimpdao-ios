@@ -84,6 +84,25 @@ struct ChimpNetworkConfig: Equatable, Sendable {
 
     /// Etherfuse (CETES), seulement si la fonction est allumée sur ce réseau : le seul accès à sa configuration.
     var etherfuse: IntegrationConfig.Etherfuse? { features.cetes ? integrations?.etherfuse : nil }
+
+    /// Ondo (USDY), quand Grow est allumé sur ce réseau.
+    var ondo: IntegrationConfig.Ondo? { features.grow ? integrations?.ondo : nil }
+
+    /// Les actifs qu'un émetteur peut geler ou reprendre (CETES d'Etherfuse, USDY d'Ondo) : leur gel est relu avant tout
+    /// swap, et leur pot montre l'évolution de leur prix.
+    var issuedAssets: [IssuedAsset] {
+        let bonds = etherfuse.map { etherfuse in etherfuse.stablebonds.map { IssuedAsset(code: $0.code, contract: $0.contract, issuer: etherfuse.issuer) } } ?? []
+        let usdy = ondo.map { [IssuedAsset(code: $0.usdy.code, contract: $0.usdy.contract, issuer: $0.issuer)] } ?? []
+        return bonds + usdy
+    }
+}
+
+/// Un actif dont l'émetteur garde des pouvoirs (gel, clawback) : le stablebond d'Etherfuse, l'USDY d'Ondo.
+struct IssuedAsset: Equatable, Sendable {
+    let code: String
+    /// Son SAC.
+    let contract: String
+    let issuer: String
 }
 
 /// Les fonctions de l'app qu'on peut allumer ou éteindre pour chaque réseau, séparément.
@@ -246,8 +265,9 @@ struct PriceOracleConfig: Equatable, Sendable {
     /// Stablecoins comptés à exactement 1 $ (`STABLE_USD`, décision produit : USDC = 1 $).
     let stableUSD: Set<String>
     /// Codes jamais demandés à Reflector : les stablebonds d'Etherfuse n'ont de prix que par l'API d'Etherfuse, pour
-    /// l'affichage (décision de Barth du 2026-10-14). Un autre « CETES » coté ailleurs ne serait pas le nôtre.
-    var neverPriced: Set<String> = ["CETES"]
+    /// l'affichage (décision de Barth du 2026-10-14), et l'USDY d'Ondo que par RedStone (2026-11-05). Un autre « CETES »
+    /// ou « USDY » coté ailleurs ne serait pas le nôtre.
+    var neverPriced: Set<String> = ["CETES", "USDY"]
 
     static let reflector = PriceOracleConfig(
         rpc: URL(string: "https://rpc.lightsail.network")!,

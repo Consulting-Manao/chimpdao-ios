@@ -20,14 +20,16 @@ struct SavingsHolding: Equatable, Identifiable {
     }
 }
 
-/// Tout ce que montrent F9 et F10 pour un stablebond.
+/// Tout ce que montrent F9 et F10 pour un actif dont le prix pousse (CETES d'Etherfuse, USDY d'Ondo).
 struct SavingsContext: Equatable {
     let network: StellarNetwork
+    /// Le pot de cet actif (`.etherfuse`, `.ondo`).
+    var mark: ChimpPotProtocol = .etherfuse
     let asset: SendAsset
     let drawers: [SendDrawer]
     /// Les tiroirs qui détiennent des CETES, ou dont les CETES sont gelés.
     let holdings: [SavingsHolding]
-    /// Prix indicatif d'Etherfuse ; indisponible → la quantité seule.
+    /// Prix indicatif (Etherfuse pour les CETES, RedStone pour l'USDY) ; indisponible → la quantité seule.
     let price: StablebondPriceResult
     /// Pouvoirs de l'émetteur, lus sur la chaîne (`nil` si la lecture a échoué).
     let issuerPowers: IssuerPowers?
@@ -42,48 +44,83 @@ struct SavingsContext: Equatable {
 }
 
 protocol SavingsService: AnyObject {
-    func fetchSavings() async throws -> SavingsContext
+    /// Les pots que ce service sait lire, dans l'ordre (CETES, USDY).
+    var marks: [ChimpPotProtocol] { get }
+    func fetchSavings() async throws -> [SavingsContext]
+}
+
+extension ChimpPotProtocol {
+    /// Le pot d'un actif d'émetteur, d'après son code (CETES → Etherfuse, USDY → Ondo).
+    static func savings(code: String) -> ChimpPotProtocol? {
+        switch code {
+        case SendAsset.cetes.code: .etherfuse
+        case SendAsset.usdy.code: .ondo
+        default: nil
+        }
+    }
 }
 
 /// Le vrai service, sur le réseau de l'app (testnet) : soldes des tiroirs (comme Envoyer), gel de chaque tiroir et pouvoirs
-/// de l'émetteur (sur la chaîne), prix indicatif (Etherfuse), base tirée de l'historique du téléphone.
+/// de l'émetteur (sur la chaîne), prix indicatif (Etherfuse pour les CETES, RedStone pour l'USDY), base tirée de
+/// l'historique du téléphone. Un actif par pot, chacun lu en parallèle.
 final class ChainSavingsService: SavingsService {
     private let session: AppSession
     private let config: ChimpNetworkConfig
     private let drawers: ChainSendService
-    private let pricing: StablebondPricing?
+    private let prices: StablebondWalletPrices?
 
+    /// `pricing` : la source du prix des CETES (Etherfuse par défaut) ; l'USDY passe toujours par RedStone.
     init(session: AppSession, pricing: StablebondPricing? = nil) {
         self.session = session
         config = session.config
         drawers = ChainSendService(session: session)
-        self.pricing = pricing ?? EtherfusePriceClient.shared(for: config)
+        let config = session.config
+        var entries = StablebondWalletPrices(config: config)?.entries ?? []
+        if let pricing {
+            let bonds = config.etherfuse?.stablebonds ?? []
+            entries = entries.map { entry in bonds.contains(entry.bond) ? (entry.bond, pricing) : entry }
+        }
+        prices = StablebondWalletPrices(entries: entries)
     }
 
-    func fetchSavings() async throws -> SavingsContext {
-        guard let etherfuse = config.etherfuse, let bond = etherfuse.stablebonds.first,
-              let asset = SendAsset(code: bond.code) else { throw SwapServiceError.unknownDrawer("stablebond") }
+    var marks: [ChimpPotProtocol] { config.issuedAssets.compactMap { ChimpPotProtocol.savings(code: $0.code) } }
+
+    func fetchSavings() async throws -> [SavingsContext] {
+        let assets = config.issuedAssets
+        guard !assets.isEmpty else { throw SwapServiceError.unknownDrawer("stablebond") }
         let context = try await drawers.fetchContext()
+        return try await withThrowingTaskGroup(of: (Int, SavingsContext?).self) { group in
+            for (index, issued) in assets.enumerated() {
+                group.addTask { (index, try await self.savings(of: issued, drawers: context.drawers, network: context.network)) }
+            }
+            var found: [(Int, SavingsContext)] = []
+            for try await (index, savings) in group { if let savings { found.append((index, savings)) } }
+            return found.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+    }
+
+    private func savings(of issued: IssuedAsset, drawers: [SendDrawer], network: StellarNetwork) async throws -> SavingsContext? {
+        guard let asset = SendAsset(code: issued.code), let mark = ChimpPotProtocol.savings(code: issued.code) else { return nil }
         let client = SorobanClient(config: config)
         let control = StablebondControl(client: client)
         let source = try Account(accountId: config.feePayer, sequenceNumber: 0)
         let records = session.wallet.account.map { session.activity.activity(of: $0.address).records } ?? []
 
         // Réseau en parallèle : le prix, les pouvoirs de l'émetteur, le gel de chaque tiroir.
-        async let price = pricing?.price(of: bond) ?? .unavailable("no price source")
-        async let powers = try? control.issuerPowers(etherfuse.issuer)
+        async let price = prices?.price(of: issued.code) ?? .unavailable("no price source")
+        async let powers = try? control.issuerPowers(issued.issuer)
         let frozen: Set<String> = await withTaskGroup(of: String?.self) { group in
-            for drawer in context.drawers {
+            for drawer in drawers {
                 group.addTask {
                     // Une lecture ratée n'invente pas un gel : seul `authorized == false` en est un.
-                    (try? await control.isFrozen(token: bond.contract, holder: drawer.address, source: source)) == true ? drawer.id : nil
+                    (try? await control.isFrozen(token: issued.contract, holder: drawer.address, source: source)) == true ? drawer.id : nil
                 }
             }
             var result: Set<String> = []
             for await id in group { if let id { result.insert(id) } }
             return result
         }
-        let holdings = context.drawers.compactMap { drawer -> SavingsHolding? in
+        let holdings = drawers.compactMap { drawer -> SavingsHolding? in
             let amount = drawer.balance(of: asset)
             guard amount > 0 || frozen.contains(drawer.id) else { return nil }
             return SavingsHolding(
@@ -92,7 +129,7 @@ final class ChainSavingsService: SavingsService {
             )
         }
         return SavingsContext(
-            network: context.network, asset: asset, drawers: context.drawers, holdings: holdings,
+            network: network, mark: mark, asset: asset, drawers: drawers, holdings: holdings,
             price: await price, issuerPowers: await powers
         )
     }
@@ -131,7 +168,9 @@ final class MockSavingsService: SavingsService {
         self.delay = delay
     }
 
-    func fetchSavings() async throws -> SavingsContext {
+    var marks: [ChimpPotProtocol] { [.etherfuse] }
+
+    func fetchSavings() async throws -> [SavingsContext] {
         try await Task.sleep(for: delay)
         let context = try await send.fetchContext()
         var holdings: [SavingsHolding] = []
@@ -144,10 +183,10 @@ final class MockSavingsService: SavingsService {
         if scenario == .twoDrawers, let card = context.drawers.first(where: { $0.kind != .main }) {
             holdings.append(SavingsHolding(drawerID: card.id, drawerAddress: card.address, amount: 500, frozen: false, basis: nil))
         }
-        return SavingsContext(
+        return [SavingsContext(
             network: context.network, asset: .cetes, drawers: context.drawers, holdings: holdings,
             price: scenario == .priceUnavailable ? .unavailable("mock") : .price(Self.price),
             issuerPowers: IssuerPowers(canFreeze: true, canClawBack: true)
-        )
+        )]
     }
 }

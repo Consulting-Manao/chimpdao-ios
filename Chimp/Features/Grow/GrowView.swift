@@ -127,7 +127,8 @@ struct GrowView: View {
         let silent: [String] = [
             model.phase == .unavailable ? "DeFindex" : nil,
             model.lending?.phase == .unavailable ? "XOXNO" : nil,
-            model.savingsService != nil && model.savingsPhase == .unavailable ? "Etherfuse" : nil,
+            model.savingsService != nil && model.savingsPhase == .unavailable
+                ? model.savingsService?.marks.map(\.name).joined(separator: ", ") : nil,
         ].compactMap { $0 }
         if !silent.isEmpty {
             ChimpNoticeBanner(text: "\(silent.joined(separator: ", ")) isn't answering right now. Showing what I know.", marker: .error) {
@@ -170,7 +171,7 @@ struct GrowView: View {
                 // Le CETES montre l'évolution de son prix en pourcentage : pas un montant, toujours visible.
                 ChimpPotAmount(
                     amount: Self.amount(value, pot: pot, locale: locale), chip: Self.chip(pot, locale: locale), isNegative: Self.isNegative(pot),
-                    chipIsAmount: pot.mark != .etherfuse
+                    chipIsAmount: !pot.mark.tracksPrice
                 )
             }
         }
@@ -208,12 +209,13 @@ struct GrowView: View {
         .padding(.horizontal, ChimpSpacing.xxl)
     }
 
-    /// Où mène « planter » un protocole : le dépôt du vault ou du prêt, ou le swap USDC → CETES.
+    /// Où mène « planter » un protocole : le dépôt du vault ou du prêt, ou le swap USDC → CETES (ou USDY).
     static func plantRoute(_ mark: ChimpPotProtocol, drawer: SendDrawer?, fallbackAddress: String?) -> GrowRoute {
         switch mark {
         case .defindex: .deposit(drawerID: drawer?.id)
         case .xoxno: .lendingDeposit(drawerID: drawer?.id)
         case .etherfuse: .swap(SwapPrefill(drawerAddress: drawer?.address ?? fallbackAddress ?? "", given: .usdc, received: .cetes, amount: nil))
+        case .ondo: .swap(SwapPrefill(drawerAddress: drawer?.address ?? fallbackAddress ?? "", given: .usdc, received: .usdy, amount: nil))
         }
     }
 
@@ -225,6 +227,7 @@ struct GrowView: View {
         case .defindex: String(localized: "Grows XLM")
         case .xoxno: String(localized: "Grows USDC")
         case .etherfuse: String(localized: "CETES · Mexican bonds")
+        case .ondo: String(localized: "USDY · US Treasuries")
         }
     }
 
@@ -232,7 +235,7 @@ struct GrowView: View {
         switch pot.state {
         case .needsRenewal: return String(localized: "Needs renewal · your money is still there")
         case .hasDebt: return String(localized: "Has a loan · can't be moved here")
-        case .frozen: return String(localized: "Frozen by Etherfuse")
+        case .frozen: return String(localized: "Frozen by \(pot.asset.issuerName ?? pot.mark.name)")
         case .growing:
             return pot.positions > 1 ? "\(grows(pot.mark)) · " + String(localized: "\(pot.positions) positions") : grows(pot.mark)
         }
@@ -262,14 +265,14 @@ struct GrowView: View {
 
     /// « +0.12 XLM », « −0.03 USDC », « Price +0.62% » ; `nil` sans base.
     static func chip(_ pot: GrowPot, locale: Locale) -> String? {
-        if pot.mark == .etherfuse {
+        if pot.mark.tracksPrice {
             return pot.priceChange.map { String(localized: "Price \(percent($0, locale: locale))") }
         }
         return pot.growth.map { changeText($0, asset: pot.asset, locale: locale) }
     }
 
     static func isNegative(_ pot: GrowPot) -> Bool {
-        (pot.mark == .etherfuse ? pot.priceChange : pot.growth).map { $0 < 0 } ?? false
+        (pot.mark.tracksPrice ? pot.priceChange : pot.growth).map { $0 < 0 } ?? false
     }
 
     /// « +0.62% », « −0.10% ».

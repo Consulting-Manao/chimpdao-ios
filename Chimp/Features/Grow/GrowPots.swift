@@ -37,19 +37,19 @@ struct GrowPot: Identifiable, Equatable {
 
     /// La croissance réelle, dans l'actif du pot (DeFindex, XOXNO) ; `nil` sans base ou sans valeur.
     var growth: Decimal? {
-        guard mark != .etherfuse, let value, let putIn else { return nil }
+        guard !mark.tracksPrice, let value, let putIn else { return nil }
         return value - putIn
     }
 
-    /// CETES : l'évolution du prix depuis l'obtention (fraction, 0.0062 = +0,62 %).
+    /// CETES, USDY : l'évolution du prix depuis l'obtention (fraction, 0.0062 = +0,62 %).
     var priceChange: Decimal? {
-        guard mark == .etherfuse, let basis = basisPriceUSD, basis > 0, let price = priceUSD else { return nil }
+        guard mark.tracksPrice, let basis = basisPriceUSD, basis > 0, let price = priceUSD else { return nil }
         return (price - basis) / basis
     }
 
-    /// CETES : ce que valent les jetons, au prix d'Etherfuse.
+    /// CETES, USDY : ce que valent les jetons, au prix de leur source.
     var worthUSD: Decimal? {
-        guard mark == .etherfuse, let value, let price = priceUSD else { return nil }
+        guard mark.tracksPrice, let value, let price = priceUSD else { return nil }
         return value * price
     }
 
@@ -57,7 +57,7 @@ struct GrowPot: Identifiable, Equatable {
     /// `nil` si un prix ou une base manque (l'en-tête n'affiche alors pas de total partiel).
     func growthUSD(xlmUSD: Decimal?) -> Decimal? {
         switch mark {
-        case .etherfuse:
+        case .etherfuse, .ondo:
             guard let value, let basis = basisPriceUSD, let price = priceUSD else { return nil }
             return value * (price - basis)
         default:
@@ -70,20 +70,20 @@ struct GrowPot: Identifiable, Equatable {
         }
     }
 
-    var canMove: Bool { state == .growing || (mark == .etherfuse && state != .frozen) }
+    var canMove: Bool { state == .growing || (mark.tracksPrice && state != .frozen) }
 }
 
 /// Les pots d'un compte, construits à partir des trois services (vault, prêt, CETES).
 enum GrowPots {
     /// Les tiroirs dans l'ordre de l'app (Main, puis les cartes), tels qu'au moins un service les a lus.
-    static func drawers(vault: VaultContext?, lending: VaultContext?, savings: SavingsContext?) -> [SendDrawer] {
-        for context in [vault?.drawers, lending?.drawers, savings?.drawers] {
+    static func drawers(vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext]) -> [SendDrawer] {
+        for context in [vault?.drawers, lending?.drawers] + savings.map(\.drawers) {
             if let drawers = context, !drawers.isEmpty { return drawers }
         }
         return []
     }
 
-    static func build(vault: VaultContext?, lending: VaultContext?, savings: SavingsContext?) -> [GrowPot] {
+    static func build(vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext]) -> [GrowPot] {
         var pots: [GrowPot] = []
         for drawer in drawers(vault: vault, lending: lending, savings: savings) {
             if let vault, let holding = vault.holdings.first(where: { $0.drawerID == drawer.id }) {
@@ -107,11 +107,12 @@ enum GrowPots {
                     ))
                 }
             }
-            if let savings, let holding = savings.holding(drawerAddress: drawer.address) {
+            for bond in savings {
+                guard let holding = bond.holding(drawerAddress: drawer.address) else { continue }
                 pots.append(GrowPot(
-                    mark: .etherfuse, drawerID: drawer.id, drawerAddress: drawer.address, asset: savings.asset,
+                    mark: bond.mark, drawerID: drawer.id, drawerAddress: drawer.address, asset: bond.asset,
                     state: holding.frozen ? .frozen : .growing, value: holding.amount, putIn: nil, since: holding.basis?.since,
-                    basisPriceUSD: holding.basis?.unitPriceUSD, priceUSD: savings.price.price?.usd, withdrawableNow: nil
+                    basisPriceUSD: holding.basis?.unitPriceUSD, priceUSD: bond.price.price?.usd, withdrawableNow: nil
                 ))
             }
         }
@@ -152,7 +153,7 @@ enum PotHistory {
     /// Ce qu'un pot relève aujourd'hui, `nil` s'il n'y a rien d'honnête à garder.
     static func reading(of pot: GrowPot, day: Date) -> PotReading? {
         switch pot.mark {
-        case .etherfuse: pot.priceUSD.map { PotReading(day: day, value: $0) }
+        case .etherfuse, .ondo: pot.priceUSD.map { PotReading(day: day, value: $0) }
         default: pot.growth.map { PotReading(day: day, value: $0) }
         }
     }
@@ -160,7 +161,7 @@ enum PotHistory {
     /// La série de la courbe : le point de départ (rien n'a encore poussé, ou le prix d'obtention), puis les relevés
     /// depuis ce jour-là, dans l'ordre. Une seule valeur → ligne plate.
     static func series(of pot: GrowPot, readings: [PotReading]) -> [Double] {
-        let start: Decimal? = pot.mark == .etherfuse ? pot.basisPriceUSD : (pot.putIn == nil ? nil : 0)
+        let start: Decimal? = pot.mark.tracksPrice ? pot.basisPriceUSD : (pot.putIn == nil ? nil : 0)
         let kept = readings.filter { reading in pot.since.map { reading.day >= Calendar.current.startOfDay(for: $0) } ?? true }
             .sorted { $0.day < $1.day }
         let values = (start.map { [$0] } ?? []) + kept.map(\.value)
@@ -170,7 +171,7 @@ enum PotHistory {
     /// « THIS WEEK » : ce qui a poussé depuis 7 jours. Planté cette semaine : toute la croissance. Sinon, il faut un relevé
     /// d'il y a au moins 7 jours ; sans lui, `nil` (la ligne est masquée).
     static func thisWeek(of pot: GrowPot, readings: [PotReading], now: Date = .now) -> Decimal? {
-        guard pot.mark != .etherfuse, let growth = pot.growth else { return nil }
+        guard !pot.mark.tracksPrice, let growth = pot.growth else { return nil }
         let weekAgo = now.addingTimeInterval(-7 * 86_400)
         if let since = pot.since, since >= weekAgo { return growth }
         guard let old = readings.filter({ $0.day <= weekAgo }).max(by: { $0.day < $1.day }) else { return nil }

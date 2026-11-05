@@ -30,7 +30,7 @@ struct PotView: View {
         switch mark {
         case .defindex: model.phase
         case .xoxno: model.lending?.phase ?? .unavailable
-        case .etherfuse: model.savingsPhase
+        case .etherfuse, .ondo: model.savingsPhase
         }
     }
 
@@ -38,7 +38,7 @@ struct PotView: View {
         switch mark {
         case .defindex: model.vault
         case .xoxno: model.lending?.vault
-        case .etherfuse: nil
+        case .etherfuse, .ondo: nil
         }
     }
 
@@ -49,7 +49,7 @@ struct PotView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     if let pot {
                         receipt(pot)
-                        if pot.state == .frozen, let savings = model.savings {
+                        if pot.state == .frozen, let savings = model.savings(mark) {
                             SavingsFrozenBanner(asset: savings.asset, drawerName: drawerName).padding(.top, 14)
                         }
                         ChimpySays(text: "\(PotText.chimpyLine(pot, locale: locale))", pose: .plant)
@@ -157,7 +157,7 @@ struct PotView: View {
                         .chimpFont(.potFooter)
                         .foregroundStyle(Color(.chimpTicketMuted))
                     Spacer(minLength: 8)
-                    let stamp = PotText.stamp(pot, network: model.savings?.network)
+                    let stamp = PotText.stamp(pot, network: model.savings(mark)?.network)
                     ChimpPotStamp(text: "\(stamp.text)", color: stamp.positive ? Color(.chimpPositive) : Color(.chimpNegative))
                 }
             }
@@ -167,8 +167,8 @@ struct PotView: View {
 
     @ViewBuilder
     private func rows(_ pot: GrowPot) -> some View {
-        if mark == .etherfuse {
-            let price = model.savingsPrice
+        if mark.tracksPrice {
+            let price = model.savings(mark)?.price.price
             if let price, let value = pot.value {
                 ChimpReceiptRow(label: "Worth about", value: SendAsset.usdc.displayedWithCode(price.value(of: value), locale: locale), isAmount: true)
             }
@@ -200,13 +200,14 @@ struct PotView: View {
     private var buttons: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                if mark == .etherfuse {
+                if mark.tracksPrice {
+                    let asset = pot?.asset ?? model.savings(mark)?.asset ?? .cetes
                     ChimpButton(pot?.value ?? 0 > 0 ? "Get more" : "Get some") {
-                        onSwap(SwapPrefill(drawerAddress: drawerAddress, given: .usdc, received: pot?.asset ?? .cetes, amount: nil))
+                        onSwap(SwapPrefill(drawerAddress: drawerAddress, given: .usdc, received: asset, amount: nil))
                     }
-                    .disabled(model.savings == nil || pot?.state == .frozen)
+                    .disabled(model.savings(mark) == nil || pot?.state == .frozen)
                     ChimpButton("Swap back", kind: .secondary, raised: true) {
-                        onSwap(SwapPrefill(drawerAddress: drawerAddress, given: pot?.asset ?? .cetes, received: .usdc, amount: nil))
+                        onSwap(SwapPrefill(drawerAddress: drawerAddress, given: asset, received: .usdc, amount: nil))
                     }
                     .disabled((pot?.value ?? 0) <= 0 || pot?.state == .frozen)
                 } else {
@@ -255,6 +256,7 @@ enum PotText {
         case .defindex: "XLM"
         case .xoxno: "USDC"
         case .etherfuse: "CETES"
+        case .ondo: "USDY"
         }
     }
 
@@ -287,7 +289,7 @@ enum PotText {
 
     /// « +0.12 XLM since you planted », « Price +0.62% since you got them » ; `nil` sans base.
     static func sinceLine(_ pot: GrowPot, locale: Locale) -> String? {
-        if pot.mark == .etherfuse {
+        if pot.mark.tracksPrice {
             return pot.priceChange.map { String(localized: "Price \(GrowView.percent($0, locale: locale)) since you got them") }
         }
         return pot.growth.map { String(localized: "\(GrowView.changeText($0, asset: pot.asset, locale: locale)) since you planted") }
@@ -312,7 +314,7 @@ enum PotText {
         case .hasDebt: return (String(localized: "Loan"), false)
         case .frozen: return (String(localized: "Frozen"), false)
         case .growing:
-            if pot.mark == .etherfuse {
+            if pot.mark.tracksPrice {
                 return network == .testnet ? (String(localized: "Testnet prices"), false) : (String(localized: "Indicative"), true)
             }
             return (String(localized: "Growing"), true)
@@ -325,11 +327,17 @@ enum PotText {
         switch pot.state {
         case .needsRenewal: return String(localized: "Your money is still there. It needs a renewal before I can show or move it.")
         case .hasDebt: return String(localized: "This one has a loan on it. I never borrow, so I can't move it from here.")
-        case .frozen: return String(localized: "Etherfuse froze these CETES. Nothing moved, but they can't be swapped for now.")
+        case .frozen:
+            return pot.mark == .ondo
+                ? String(localized: "Ondo froze this USDY. Nothing moved, but it can't be swapped for now.")
+                : String(localized: "Etherfuse froze these CETES. Nothing moved, but they can't be swapped for now.")
         case .growing: break
         }
         if pot.mark == .etherfuse {
             return String(localized: "CETES follow the Mexican peso. I show the price Etherfuse gives me.")
+        }
+        if pot.mark == .ondo {
+            return String(localized: "USDY's price goes up as US Treasuries pay. I show the price RedStone gives me.")
         }
         guard let growth = pot.growth else {
             return String(localized: "I don't know what you put in from this phone, so I only show what you have now.")
@@ -353,12 +361,14 @@ enum PotText {
         case .defindex: String(localized: "DeFindex puts your XLM to work and gives you back what it earns. You can add more or take it out whenever you want.")
         case .xoxno: String(localized: "XOXNO lends your USDC to borrowers, who pay it back with a little extra. You can add more or take it out whenever you want.")
         case .etherfuse: String(localized: "CETES are tokens for short-term Mexican government bonds, issued by Etherfuse. You get them with a swap, and swap them back the same way.")
+        case .ondo: String(localized: "USDY is a dollar token backed by short-term US Treasuries, issued by Ondo. Its price goes up a little every day. You get it with a swap, and swap it back the same way. Not for US persons.")
         }
     }
 
     static func infoHonesty(_ mark: ChimpPotProtocol) -> String {
         switch mark {
         case .etherfuse: String(localized: "I show the price Etherfuse gives me, never a promised rate.")
+        case .ondo: String(localized: "I show the price RedStone gives me, never a promised rate.")
         default: String(localized: "I only show what really grew, never a promised rate.")
         }
     }

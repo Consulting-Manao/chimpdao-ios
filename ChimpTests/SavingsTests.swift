@@ -139,17 +139,17 @@ struct SavingsTests {
             return model
         }
         let normal = await load(.normal)
-        let holding = try #require(normal.savings?.holdings.first)
+        let holding = try #require(normal.savings(.etherfuse)?.holdings.first)
         #expect(holding.amount == Decimal(string: "1820.4"))
-        let change = try #require(holding.priceChange(normal.savingsPrice))
+        let change = try #require(holding.priceChange(normal.savingsPrice("CETES")))
         #expect((change * 10_000).truncated(to: 0) == 62)
-        #expect(normal.savingsHolding(drawerAddress: holding.drawerAddress) == holding)
-        #expect((await load(.twoDrawers)).savings?.holdings.count == 2)
-        #expect((await load(.frozen)).savings?.holdings.first?.frozen == true)
+        #expect(normal.savingsHolding(drawerAddress: holding.drawerAddress, code: "CETES") == holding)
+        #expect((await load(.twoDrawers)).savings(.etherfuse)?.holdings.count == 2)
+        #expect((await load(.frozen)).savings(.etherfuse)?.holdings.first?.frozen == true)
         let unavailable = await load(.priceUnavailable)
-        #expect(unavailable.savingsPrice == nil)
-        #expect(unavailable.savings?.holdings.first?.priceChange(unavailable.savingsPrice) == nil)
-        #expect((await load(.unknownBasis)).savings?.holdings.first?.priceChange(MockSavingsService.price) == nil)
-        #expect((await load(.none)).savings?.holdings.isEmpty == true)
+        #expect(unavailable.savingsPrice("CETES") == nil)
+        #expect(unavailable.savings(.etherfuse)?.holdings.first?.priceChange(unavailable.savingsPrice("CETES")) == nil)
+        #expect((await load(.unknownBasis)).savings(.etherfuse)?.holdings.first?.priceChange(MockSavingsService.price) == nil)
+        #expect((await load(.none)).savings(.etherfuse)?.holdings.isEmpty == true)
     }
 }

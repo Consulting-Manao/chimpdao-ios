@@ -40,7 +40,7 @@ struct MainTabView: View {
         _walletModel = State(initialValue: wallet)
         _growModel = State(initialValue: GrowModel(
             service: ChainVaultService(session: session),
-            savingsService: config.features.grow && config.etherfuse != nil ? ChainSavingsService(session: session) : nil,
+            savingsService: config.features.grow && !config.issuedAssets.isEmpty ? ChainSavingsService(session: session) : nil,
             lendingService: config.features.grow && config.integrations != nil ? ChainLendingService(session: session) : nil,
             priceOracle: ReflectorPriceOracle.shared, history: DefaultsPotHistoryStore()
         ))
@@ -129,9 +129,9 @@ struct MainTabView: View {
                                     onSeePosition: showPositionFromWallet, onExit: closeFlow
                                 )
                             }
-                        case .savings(let address):
-                            // G2 (Etherfuse) depuis la tuile CETES d'un tiroir.
-                            walletPot(.etherfuse, address: address)
+                        case .savings(let address, let mark):
+                            // G2 (Etherfuse, Ondo) depuis la tuile CETES ou USDY d'un tiroir.
+                            walletPot(mark, address: address)
                         case .vaultPosition(let address):
                             // G2 depuis la tuile « GROWING » d'un tiroir.
                             walletPot(.defindex, address: address)
@@ -416,7 +416,7 @@ struct MainTabView: View {
             onAddCard: { walletPath = [.addCard] },
             onGrow: { walletPath.append(.vault(.deposit, drawerID: $0)) },
             onPosition: { walletPath.append(.vaultPosition($0)) },
-            onSavings: { walletPath.append(.savings($0)) }
+            onSavings: { address, code in walletPath.append(.savings(address, ChimpPotProtocol.savings(code: code) ?? .etherfuse)) }
         )
     }
 
@@ -462,7 +462,7 @@ enum WalletRoute: Hashable {
     /// F6 : la position de ce tiroir (adresse).
     case vaultPosition(String)
     /// F10 : les CETES de ce tiroir (adresse).
-    case savings(String)
+    case savings(String, ChimpPotProtocol)
     /// « Add money » (D4).
     case addMoney
     /// N1 : devis NEAR Intents (« From another chain »).

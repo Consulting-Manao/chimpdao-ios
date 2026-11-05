@@ -1,0 +1,18 @@
+{
+  "images": [
+    {
+      "filename": "asset-solvbtc@2x.png",
+      "idiom": "universal",
+      "scale": "2x"
+    },
+    {
+      "filename": "asset-solvbtc@3x.png",
+      "idiom": "universal",
+      "scale": "3x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

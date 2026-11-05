@@ -235,27 +235,42 @@ final class ChainWalletReader: WalletChain {
     }
 }
 
-/// Prix indicatifs des stablebonds détenus, pour le total du Wallet et des tiroirs : seulement par Etherfuse (jamais
-/// Reflector, jamais un pool), affichage seulement.
+/// Prix indicatifs des actifs d'un émetteur (stablebonds d'Etherfuse, USDY d'Ondo) détenus, pour le total du Wallet et des
+/// tiroirs : chacun par **sa** source (Etherfuse pour les CETES, l'oracle RedStone pour l'USDY), jamais Reflector, jamais un
+/// pool ; affichage seulement.
 struct StablebondWalletPrices {
-    let bonds: [IntegrationConfig.Stablebond]
-    let pricing: StablebondPricing?
+    let entries: [(bond: IntegrationConfig.Stablebond, pricing: StablebondPricing?)]
+
+    init(entries: [(bond: IntegrationConfig.Stablebond, pricing: StablebondPricing?)]) {
+        self.entries = entries
+    }
 
     init(bonds: [IntegrationConfig.Stablebond], pricing: StablebondPricing?) {
-        self.bonds = bonds
-        self.pricing = pricing
+        self.init(entries: bonds.map { ($0, pricing) })
     }
 
     init?(config: ChimpNetworkConfig) {
-        guard let etherfuse = config.etherfuse else { return nil }
-        self.init(bonds: etherfuse.stablebonds, pricing: EtherfusePriceClient.shared(for: config))
+        let bonds = config.etherfuse.map { etherfuse in
+            etherfuse.stablebonds.map { (bond: $0, pricing: EtherfusePriceClient.shared(for: config) as StablebondPricing?) }
+        } ?? []
+        let usdy = config.ondo.map { [(bond: $0.usdy, pricing: RedStonePriceClient.shared(for: config) as StablebondPricing?)] } ?? []
+        guard !(bonds + usdy).isEmpty else { return nil }
+        self.init(entries: bonds + usdy)
     }
 
-    /// Le prix en dollars de chaque stablebond détenu ; un prix indisponible est absent (jamais inventé).
+    /// Le prix de cet actif par sa source, ou pourquoi il n'y en a pas.
+    func price(of code: String) async -> StablebondPriceResult {
+        guard let entry = entries.first(where: { $0.bond.code == code }), let pricing = entry.pricing else {
+            return .unavailable("no price source for \(code)")
+        }
+        return await pricing.price(of: entry.bond)
+    }
+
+    /// Le prix en dollars de chaque actif détenu ; un prix indisponible est absent (jamais inventé).
     func usdPrices(for held: Set<String>) async -> [String: Decimal] {
         var prices: [String: Decimal] = [:]
-        for bond in bonds where held.contains(bond.code) {
-            if let price = await pricing?.price(of: bond).price { prices[bond.code] = price.usd }
+        for entry in entries where held.contains(entry.bond.code) {
+            if let price = await entry.pricing?.price(of: entry.bond).price { prices[entry.bond.code] = price.usd }
         }
         return prices
     }

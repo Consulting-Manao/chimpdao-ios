@@ -13,6 +13,8 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     case usdc
     case xlm
     case cetes
+    /// USDY d'Ondo (bons du Trésor américain), décision de Barth du 2026-11-05.
+    case usdy
 
     /// Ce qu'Envoyer, Move et les préremplissages d'un envoi proposent.
     static let sendable: [SendAsset] = [.usdc, .xlm]
@@ -20,7 +22,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     var isSendable: Bool { Self.sendable.contains(self) }
 
     /// Ce que propose le swap (maquette E3p), dans cet ordre.
-    static let swappable: [SendAsset] = [.xlm, .usdc, .cetes]
+    static let swappable: [SendAsset] = [.xlm, .usdc, .cetes, .usdy]
 
     var id: String { rawValue }
 
@@ -30,6 +32,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         case .usdc: "USDC"
         case .xlm: "XLM"
         case .cetes: "CETES"
+        case .usdy: "USDY"
         }
     }
 
@@ -39,22 +42,34 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         case .usdc: "Digital dollar, by Circle"
         case .xlm: "Stellar Lumens"
         case .cetes: "Mexican government bonds, by Etherfuse"
+        case .usdy: "US Treasuries, by Ondo"
         }
     }
 
     /// La ligne de description sous l'actif, seulement quand elle aide (maquette E3p, décision de Barth du 2026-10-15).
     var descriptionLine: String? {
-        self == .cetes ? String(localized: "Mexican government bonds, by Etherfuse") : nil
+        switch self {
+        case .cetes: String(localized: "Mexican government bonds, by Etherfuse")
+        case .usdy: String(localized: "US Treasuries, by Ondo")
+        case .usdc, .xlm: nil
+        }
     }
 
     /// Qui émet l'actif et peut le geler, quand ce n'est pas un actif « de base » (XLM, USDC de Circle).
-    var issuerName: String? { self == .cetes ? "Etherfuse" : nil }
+    var issuerName: String? {
+        switch self {
+        case .cetes: "Etherfuse"
+        case .usdy: "Ondo"
+        case .usdc, .xlm: nil
+        }
+    }
 
     var glyph: ChimpAssetGlyph {
         switch self {
         case .usdc: .usdc
         case .xlm: .xlm
         case .cetes: .cetes
+        case .usdy: .usdy
         }
     }
 
@@ -62,7 +77,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     var maxFractionDigits: Int {
         switch self {
         case .usdc: 2
-        case .xlm, .cetes: 7
+        case .xlm, .cetes, .usdy: 7
         }
     }
 
@@ -76,6 +91,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         case .usdc: [10, 25, 50]
         case .xlm: [50, 100, 250]
         case .cetes: [100, 500, 1000]
+        case .usdy: [10, 25, 50]
         }
     }
 
@@ -88,7 +104,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
             let cents = amount.truncated(to: 2)
             fractionLength = cents.isWhole ? 0...0 : 2...2
             return cents.formatted(.number.locale(locale).precision(.fractionLength(fractionLength)))
-        case .xlm, .cetes:
+        case .xlm, .cetes, .usdy:
             fractionLength = 0...maxFractionDigits
             return amount.truncated(to: maxFractionDigits)
                 .formatted(.number.locale(locale).precision(.fractionLength(fractionLength)))

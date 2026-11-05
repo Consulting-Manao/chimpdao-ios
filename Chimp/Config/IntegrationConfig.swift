@@ -53,6 +53,32 @@ struct IntegrationConfig: Equatable, Sendable {
         let priceAPI: URL
     }
 
+    /// Ondo USDY (décision de Barth du 2026-11-05) : un dollar qui rapporte (bons du Trésor américain). Son **prix monte**,
+    /// il ne verse rien : comme les CETES, il s'obtient et se rend par swap, sans émission ni rachat (KYC d'Ondo), et l'app
+    /// montre l'évolution de son prix. Réservé aux personnes non américaines (conditions d'Ondo).
+    ///
+    /// Mainnet : `USDY:GAJMPX5N…TADAZ6` (home domain `ondo.finance`), révocable et clawback, SAC `CB3YA656…`. Pas de
+    /// testnet officiel : copie de test (`tools/grow-testnet`), d'un émetteur aux **mêmes pouvoirs**, avec une paire
+    /// Soroswap USDC/USDY au prix RedStone du jour de sa création.
+    struct Ondo: Equatable, Sendable {
+        let issuer: String
+        let usdy: Stablebond
+    }
+
+    /// RedStone (SEP-40, **mainnet**, lecture seule) : prix indicatif des actifs que ni Reflector ni leur émetteur ne
+    /// donnent (USDY). `lastprice(Asset::Stellar(contrat))`, 8 décimales, relevé le 2026-11-05 (1 USDY ≈ 1,152 $). Contrat
+    /// listé par la documentation de Stellar (« Oracle providers », RedStone). Affichage seulement, jamais pour signer.
+    struct RedStone: Equatable, Sendable {
+        let rpc: URL
+        let passphrase: String
+        let oracle: String
+        let decimals: Int
+        /// Le contrat **du vrai actif sur le mainnet**, par code : une copie de test n'a pas de prix à elle.
+        let mainnetAssets: [String: String]
+        /// Au-delà, le prix est trop vieux pour être affiché (RedStone publie au moins toutes les 12 à 24 h).
+        let maximumAge: TimeInterval
+    }
+
     /// Circle CCTP V2 (D4) : arrivées d'USDC depuis une autre blockchain. Le transfert se lance et se finalise sur le site
     /// (`/fund`, décision de Barth du 2026-10-15) ; l'app ne signe jamais rien d'Ethereum, elle reconnaît l'arrivée.
     /// Adresses vérifiées sur testnet le 2026-10-15 (interfaces lues sur la chaîne, forwarder relié à ces deux contrats).
@@ -137,6 +163,8 @@ struct IntegrationConfig: Equatable, Sendable {
     let nearIntents: NearIntents
     let rozo: Rozo
     let xoxno: Xoxno
+    let ondo: Ondo
+    let redstone: RedStone
 
     static let testnet = IntegrationConfig(
         soroswap: Soroswap(
@@ -185,6 +213,19 @@ struct IntegrationConfig: Equatable, Sendable {
             pool: "CBSGF6QOQAMPFBEVSYPEQHSZRIHJ6RCGUPCRDMUX36DEKRWFAO2PZB5A",
             positionNFT: "CDVN5JU675MEDPVRPCYC45AHFC275UH57WEU5OTFE4WFGZBNN7HTLPSY",
             assetCode: "USDC", hubID: 1, spokeID: 1, name: "XOXNO USDC"
+        ),
+        // Copie de test du 2026-11-05 (`tools/grow-testnet`) : émetteur révocable + clawback, comme celui d'Ondo.
+        ondo: Ondo(
+            issuer: "GCSNYZ25ZBQJVHLOAPONBUKDXFLD5WCMETW75QNV3LO2NQMBTSUWP2DQ",
+            usdy: Stablebond(code: "USDY", contract: "CBHI53SV3OMRU3TJPCUHEORL6O2OD4W4CKYUNUV2YPLLA7UYTGYEUZWI")
+        ),
+        redstone: RedStone(
+            rpc: URL(string: "https://rpc.lightsail.network")!,
+            passphrase: "Public Global Stellar Network ; September 2015",
+            oracle: "CBMGLKUQZVSAIL5CPDDAWSUY7MAKXISHMOZEVLMBUWBMFGHRJSR4WYRF",
+            decimals: 8,
+            mainnetAssets: ["USDY": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP"],
+            maximumAge: 36 * 3600
         )
     )
 
@@ -225,6 +266,17 @@ struct IntegrationConfig: Equatable, Sendable {
             if expected != bond.contract { problems.append("etherfuse.\(bond.code) is not the SAC of \(bond.code):\(etherfuse.issuer)") }
         }
         if etherfuse.priceAPI.scheme != "https" { problems.append("etherfuse.priceAPI is not https") }
+        if (try? KeyPair(accountId: ondo.issuer)) == nil { problems.append("ondo.issuer is not a G-address") }
+        address("ondo.\(ondo.usdy.code)", ondo.usdy.contract)
+        let usdy = Asset(canonicalForm: "\(ondo.usdy.code):\(ondo.issuer)")
+        if usdy.flatMap({ try? SACClient.contractID(for: $0, network: .custom(passphrase: passphrase)) }) != ondo.usdy.contract {
+            problems.append("ondo.\(ondo.usdy.code) is not the SAC of \(ondo.usdy.code):\(ondo.issuer)")
+        }
+        if redstone.rpc.scheme != "https" { problems.append("redstone.rpc is not https") }
+        if !redstone.oracle.hasPrefix("C") || (try? SCAddressXDR(contractId: redstone.oracle)) == nil { problems.append("redstone.oracle is not a C-address") }
+        for (code, contract) in redstone.mainnetAssets where !contract.hasPrefix("C") || (try? SCAddressXDR(contractId: contract)) == nil {
+            problems.append("redstone.mainnetAssets[\(code)] is not a C-address")
+        }
         address("cctp.forwarder", cctp.forwarder)
         address("cctp.tokenMessengerMinter", cctp.tokenMessengerMinter)
         address("cctp.messageTransmitter", cctp.messageTransmitter)
