@@ -88,6 +88,9 @@ struct ChimpNetworkConfig: Equatable, Sendable {
     /// Ondo (USDY), quand Grow est allumé sur ce réseau.
     var ondo: IntegrationConfig.Ondo? { features.grow ? integrations?.ondo : nil }
 
+    /// Solv (SolvBTC, xSolvBTC), quand Grow est allumé sur ce réseau.
+    var solv: IntegrationConfig.Solv? { features.grow ? integrations?.solv : nil }
+
     /// Les actifs qu'un émetteur peut geler ou reprendre (CETES d'Etherfuse, USDY d'Ondo) : leur gel est relu avant tout
     /// swap, et leur pot montre l'évolution de leur prix.
     var issuedAssets: [IssuedAsset] {
@@ -267,7 +270,7 @@ struct PriceOracleConfig: Equatable, Sendable {
     /// Codes jamais demandés à Reflector : les stablebonds d'Etherfuse n'ont de prix que par l'API d'Etherfuse, pour
     /// l'affichage (décision de Barth du 2026-10-14), et l'USDY d'Ondo que par RedStone (2026-11-05). Un autre « CETES »
     /// ou « USDY » coté ailleurs ne serait pas le nôtre.
-    var neverPriced: Set<String> = ["CETES", "USDY"]
+    var neverPriced: Set<String> = ["CETES", "USDY", "SOLVBTC", "XSOLVBTC"]
 
     static let reflector = PriceOracleConfig(
         rpc: URL(string: "https://rpc.lightsail.network")!,

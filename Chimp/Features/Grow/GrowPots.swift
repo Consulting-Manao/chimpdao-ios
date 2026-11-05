@@ -53,9 +53,9 @@ struct GrowPot: Identifiable, Equatable {
         return value * price
     }
 
-    /// La croissance en dollars, pour l'en-tête : XLM au prix de l'oracle, USDC à 1 $, CETES au prix d'Etherfuse ;
-    /// `nil` si un prix ou une base manque (l'en-tête n'affiche alors pas de total partiel).
-    func growthUSD(xlmUSD: Decimal?) -> Decimal? {
+    /// La croissance en dollars, pour l'en-tête : XLM au prix de l'oracle, USDC à 1 $, CETES au prix d'Etherfuse, SolvBTC
+    /// au prix de RedStone ; `nil` si un prix ou une base manque (l'en-tête n'affiche alors pas de total partiel).
+    func growthUSD(xlmUSD: Decimal?, btcUSD: Decimal? = nil) -> Decimal? {
         switch mark {
         case .etherfuse, .ondo:
             guard let value, let basis = basisPriceUSD, let price = priceUSD else { return nil }
@@ -65,6 +65,7 @@ struct GrowPot: Identifiable, Equatable {
             switch asset {
             case .usdc: return growth
             case .xlm: return xlmUSD.map { growth * $0 }
+            case .solvbtc: return btcUSD.map { growth * $0 }
             default: return nil
             }
         }
@@ -76,16 +77,20 @@ struct GrowPot: Identifiable, Equatable {
 /// Les pots d'un compte, construits à partir des trois services (vault, prêt, CETES).
 enum GrowPots {
     /// Les tiroirs dans l'ordre de l'app (Main, puis les cartes), tels qu'au moins un service les a lus.
-    static func drawers(vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext], sentora: VaultContext? = nil) -> [SendDrawer] {
-        for context in [vault?.drawers, lending?.drawers, sentora?.drawers] + savings.map(\.drawers) {
+    static func drawers(
+        vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext], sentora: VaultContext? = nil, solv: VaultContext? = nil
+    ) -> [SendDrawer] {
+        for context in [vault?.drawers, lending?.drawers, sentora?.drawers, solv?.drawers] + savings.map(\.drawers) {
             if let drawers = context, !drawers.isEmpty { return drawers }
         }
         return []
     }
 
-    static func build(vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext], sentora: VaultContext? = nil) -> [GrowPot] {
+    static func build(
+        vault: VaultContext?, lending: VaultContext?, savings: [SavingsContext], sentora: VaultContext? = nil, solv: VaultContext? = nil
+    ) -> [GrowPot] {
         var pots: [GrowPot] = []
-        for drawer in drawers(vault: vault, lending: lending, savings: savings, sentora: sentora) {
+        for drawer in drawers(vault: vault, lending: lending, savings: savings, sentora: sentora, solv: solv) {
             if let vault, let holding = vault.holdings.first(where: { $0.drawerID == drawer.id }) {
                 pots.append(GrowPot(
                     mark: .defindex, drawerID: drawer.id, drawerAddress: drawer.address, asset: vault.vault.asset, state: .growing,
@@ -115,6 +120,14 @@ enum GrowPots {
                     withdrawableNow: holding.value
                 ))
             }
+            if let solv, let holding = solv.holdings.first(where: { $0.drawerID == drawer.id }) {
+                // La valeur des xSolvBTC en SolvBTC, à la NAV de Solv : ce qui pousse, c'est la NAV (pas le prix du bitcoin).
+                pots.append(GrowPot(
+                    mark: .solv, drawerID: drawer.id, drawerAddress: drawer.address, asset: solv.vault.asset, state: .growing,
+                    value: holding.value, putIn: holding.basis?.putIn, since: holding.basis?.since, basisPriceUSD: nil, priceUSD: nil,
+                    withdrawableNow: nil
+                ))
+            }
             for bond in savings {
                 guard let holding = bond.holding(drawerAddress: drawer.address) else { continue }
                 pots.append(GrowPot(
@@ -128,10 +141,10 @@ enum GrowPots {
     }
 
     /// La somme en dollars de `pots`, ou `nil` si l'une manque (jamais de total partiel).
-    static func totalUSD(_ pots: [GrowPot], xlmUSD: Decimal?) -> Decimal? {
+    static func totalUSD(_ pots: [GrowPot], xlmUSD: Decimal?, btcUSD: Decimal? = nil) -> Decimal? {
         var total: Decimal = 0
         for pot in pots where pot.state != .needsRenewal {
-            guard let growth = pot.growthUSD(xlmUSD: xlmUSD) else { return nil }
+            guard let growth = pot.growthUSD(xlmUSD: xlmUSD, btcUSD: btcUSD) else { return nil }
             total += growth
         }
         return total

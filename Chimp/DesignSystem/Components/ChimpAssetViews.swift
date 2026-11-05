@@ -7,6 +7,8 @@ enum ChimpAssetGlyph: Equatable {
     case xlm
     case cetes
     case usdy
+    case solvbtc
+    case xsolvbtc
 }
 
 /// Dessin de l'icône d'un actif dans un carré de la taille demandée, contour compris.
@@ -46,6 +48,10 @@ struct ChimpAssetIcon: View {
                     }
             case .usdy:
                 logo(.assetUsdy)
+            case .solvbtc:
+                logo(.assetSolvbtc)
+            case .xsolvbtc:
+                logo(.assetXsolvbtc)
             }
         }
         .frame(width: size, height: size)

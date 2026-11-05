@@ -28,6 +28,11 @@ final class GrowModel {
     let lending: GrowModel?
     /// Vault Sentora (2026-11-05) : le même modèle, sur son service ; lu à part lui aussi.
     let sentora: GrowModel?
+    /// Vault xSolvBTC de Solv (2026-11-05) : le même modèle, sur son service.
+    let solv: GrowModel?
+    /// Prix du SolvBTC en dollars (RedStone) : seulement pour le total de l'en-tête, quand un pot Solv existe.
+    private let solvPricing: StablebondWalletPrices?
+    private(set) var btcUSD: Decimal?
     /// Prix du XLM en dollars (oracle Reflector, lecture seule) : seulement pour le total « grown in total » (G1).
     private let priceOracle: PriceOracle?
     private(set) var xlmUSD: Decimal?
@@ -37,12 +42,15 @@ final class GrowModel {
 
     init(
         service: VaultService, savingsService: SavingsService? = nil, lendingService: VaultService? = nil,
-        sentoraService: VaultService? = nil, priceOracle: PriceOracle? = nil, history: PotHistoryStore? = nil
+        sentoraService: VaultService? = nil, solvService: VaultService? = nil, solvPricing: StablebondWalletPrices? = nil,
+        priceOracle: PriceOracle? = nil, history: PotHistoryStore? = nil
     ) {
         self.service = service
         self.savingsService = savingsService
         lending = lendingService.map { GrowModel(service: $0) }
         sentora = sentoraService.map { GrowModel(service: $0) }
+        solv = solvService.map { GrowModel(service: $0) }
+        self.solvPricing = solvPricing
         self.priceOracle = priceOracle
         self.history = history
     }
@@ -50,7 +58,9 @@ final class GrowModel {
     // MARK: Pots (maquette « Chimp Grow Final »)
 
     /// Un pot par protocole et par tiroir.
-    var pots: [GrowPot] { GrowPots.build(vault: context, lending: lending?.context, savings: savings, sentora: sentora?.context) }
+    var pots: [GrowPot] {
+        GrowPots.build(vault: context, lending: lending?.context, savings: savings, sentora: sentora?.context, solv: solv?.context)
+    }
 
     /// Le contexte d'un pot d'actif d'émetteur (`.etherfuse`, `.ondo`).
     func savings(_ mark: ChimpPotProtocol) -> SavingsContext? {
@@ -58,7 +68,9 @@ final class GrowModel {
     }
 
     /// Les tiroirs, Main d'abord.
-    var potDrawers: [SendDrawer] { GrowPots.drawers(vault: context, lending: lending?.context, savings: savings, sentora: sentora?.context) }
+    var potDrawers: [SendDrawer] {
+        GrowPots.drawers(vault: context, lending: lending?.context, savings: savings, sentora: sentora?.context, solv: solv?.context)
+    }
 
     func pot(_ mark: ChimpPotProtocol, drawerAddress: String) -> GrowPot? {
         pots.first { $0.mark == mark && $0.drawerAddress == drawerAddress }
@@ -78,6 +90,7 @@ final class GrowModel {
         if context != nil { marks.append(.defindex) }
         if lending?.context != nil, lending?.vault?.depositsBlocked != true { marks.append(.xoxno) }
         if sentora?.context != nil, sentora?.vault?.depositsBlocked != true { marks.append(.sentora) }
+        if solv?.context != nil { marks.append(.solv) }
         marks += savings.map(\.mark)
         return marks
     }
@@ -94,6 +107,7 @@ final class GrowModel {
     private func loadPrice() async {
         guard let priceOracle else { return }
         if let price = await priceOracle.usdPrices(for: ["XLM"])["XLM"] { xlmUSD = price }
+        if let solvPricing, let price = await solvPricing.price(of: SendAsset.solvbtc.code).price { btcUSD = price.usd }
     }
 
     /// Les jetons d'un actif d'émetteur (code) d'un tiroir (adresse), s'il en détient (ou s'ils sont gelés).
@@ -145,8 +159,9 @@ final class GrowModel {
             async let bonds: Void = loadSavings()
             async let lent: Void = lending?.refresh() ?? ()
             async let escrowed: Void = sentora?.refresh() ?? ()
+            async let bitcoin: Void = solv?.refresh() ?? ()
             async let price: Void = loadPrice()
-            _ = await (vault, bonds, lent, escrowed, price)
+            _ = await (vault, bonds, lent, escrowed, bitcoin, price)
             recordHistory()
         }
         loadTask = task

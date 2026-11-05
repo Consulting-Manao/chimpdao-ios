@@ -286,7 +286,7 @@ final class ChainSwapService: SwapService {
         let hash = try await integrations.submit(integration, signed: card, trace: trace, feeSigner: feeSigner, onProgress: onProgress)
         let receipt = SwapReceipt(
             summary: SwapSummary(prepared.draft), transactionHash: hash, sentAt: .now,
-            explorerURL: explorerURL(transactionHash: hash), receivedAmount: await receivedAmount(hash, protocolID: prepared.draft.quote.protocolID)
+            explorerURL: explorerURL(transactionHash: hash), receivedAmount: await receivedAmount(hash, protocolID: prepared.draft.quote.protocolID, asset: prepared.draft.received)
         )
         // La ligne d'historique du swap (I1s) : celle du reçu de E5, avec le minimum signé et le protocole ; vers un
         // stablebond, le prix d'Etherfuse du moment (base de l'évolution, F9 et F10).
@@ -299,10 +299,10 @@ final class ChainSwapService: SwapService {
     }
 
     /// La quantité reçue, lue par le protocole dans la valeur rendue par l'appel. `nil` si illisible (affichage seulement).
-    private func receivedAmount(_ hash: String, protocolID: String?) async -> Decimal? {
+    private func receivedAmount(_ hash: String, protocolID: String?, asset: SendAsset?) async -> Decimal? {
         guard let adapter = protocolID.flatMap({ registry.swapAdapter(id: $0) }),
               let value = try? await client.transactionReturnValue(hash), let units = adapter.receivedUnits(value) else { return nil }
-        return SwapUnits.amount(fromUnits: units)
+        return asset.map { SwapUnits.amount(fromUnits: units, asset: $0) } ?? SwapUnits.amount(fromUnits: units)
     }
 
     /// Comme Envoyer (`ChainSendService.check`, qui écrit la ligne d'un **envoi** en attente finalement parti, jamais
@@ -315,7 +315,9 @@ final class ChainSwapService: SwapService {
             session.recordActivity(.swap(
                 hash: hash, drawer: trace.from, venue: trace.destination, givenCode: SendAsset(rawValue: pending.asset)?.code ?? pending.asset,
                 given: pending.amount, receivedCode: SendAsset(rawValue: swap.receivedAsset)?.code ?? swap.receivedAsset,
-                received: await receivedAmount(hash, protocolID: registry.swapAdapters.first { $0.name == swap.protocolName }?.id),
+                received: await receivedAmount(
+                    hash, protocolID: registry.swapAdapters.first { $0.name == swap.protocolName }?.id, asset: SendAsset(rawValue: swap.receivedAsset)
+                ),
                 minimum: swap.minimumReceived, protocolName: swap.protocolName, at: pending.signedAt,
                 // Le prix « du moment du swap » n'est plus connu si la vérification arrive trop tard.
                 receivedPriceUSD: Date().timeIntervalSince(pending.signedAt) < Self.priceWindow

@@ -16,6 +16,8 @@ enum GrowRoute: Hashable {
     /// Vault Sentora (2026-11-05) : mettre, retirer.
     case sentoraDeposit(drawerID: String?)
     case sentoraWithdraw(drawerID: String)
+    /// Vault xSolvBTC de Solv (2026-11-05) : mettre (on sort par un swap).
+    case solvDeposit(drawerID: String?)
 }
 
 /// G1 · Grow (maquette « Chimp Grow Final », Claude Design, 2026-10-18) : en-tête vert « Grow », ce qui a poussé en tout
@@ -77,7 +79,7 @@ struct GrowView: View {
 
     private var pots: [GrowPot] { model.pots }
     private var drawers: [SendDrawer] { model.potDrawers }
-    private var total: Decimal? { pots.isEmpty ? nil : GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD) }
+    private var total: Decimal? { pots.isEmpty ? nil : GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD, btcUSD: model.btcUSD) }
 
     // MARK: Pastilles
 
@@ -121,7 +123,8 @@ struct GrowView: View {
     }
 
     private var isLoadingFirst: Bool {
-        pots.isEmpty && (model.phase == .loading || model.savingsPhase == .loading || model.lending?.phase == .loading || model.sentora?.phase == .loading)
+        pots.isEmpty && (model.phase == .loading || model.savingsPhase == .loading || model.lending?.phase == .loading || model.sentora?.phase == .loading
+            || model.solv?.phase == .loading)
             && drawers.isEmpty
     }
 
@@ -132,6 +135,7 @@ struct GrowView: View {
             model.phase == .unavailable ? "DeFindex" : nil,
             model.lending?.phase == .unavailable ? "XOXNO" : nil,
             model.sentora?.phase == .unavailable ? "Sentora" : nil,
+            model.solv?.phase == .unavailable ? "Solv" : nil,
             model.savingsService != nil && model.savingsPhase == .unavailable
                 ? model.savingsService?.marks.map(\.name).joined(separator: ", ") : nil,
         ].compactMap { $0 }
@@ -166,7 +170,7 @@ struct GrowView: View {
     /// « MAIN · +$1.48 » (le total du tiroir seulement s'il est connu en entier).
     private func drawerLabel(_ drawer: SendDrawer, pots: [GrowPot]) -> String {
         let name = Self.pillTitle(drawer)
-        guard let total = GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD) else { return name }
+        guard let total = GrowPots.totalUSD(pots, xlmUSD: model.xlmUSD, btcUSD: model.btcUSD) else { return name }
         return "\(name) · \(ChimpPrivacy.amount(Self.dollars(total, locale: locale), hidden: hidesAmounts))"
     }
 
@@ -220,6 +224,7 @@ struct GrowView: View {
         case .defindex: .deposit(drawerID: drawer?.id)
         case .xoxno: .lendingDeposit(drawerID: drawer?.id)
         case .sentora: .sentoraDeposit(drawerID: drawer?.id)
+        case .solv: .solvDeposit(drawerID: drawer?.id)
         case .etherfuse: .swap(SwapPrefill(drawerAddress: drawer?.address ?? fallbackAddress ?? "", given: .usdc, received: .cetes, amount: nil))
         case .ondo: .swap(SwapPrefill(drawerAddress: drawer?.address ?? fallbackAddress ?? "", given: .usdc, received: .usdy, amount: nil))
         }
@@ -233,6 +238,7 @@ struct GrowView: View {
         case .defindex: String(localized: "Grows XLM")
         case .xoxno: String(localized: "Grows USDC")
         case .sentora: String(localized: "USDC · rewards each term")
+        case .solv: String(localized: "SolvBTC · Bitcoin yield")
         case .etherfuse: String(localized: "CETES · Mexican bonds")
         case .ondo: String(localized: "USDY · US Treasuries")
         }

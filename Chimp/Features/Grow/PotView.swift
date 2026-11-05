@@ -31,6 +31,7 @@ struct PotView: View {
         case .defindex: model.phase
         case .xoxno: model.lending?.phase ?? .unavailable
         case .sentora: model.sentora?.phase ?? .unavailable
+        case .solv: model.solv?.phase ?? .unavailable
         case .etherfuse, .ondo: model.savingsPhase
         }
     }
@@ -40,6 +41,7 @@ struct PotView: View {
         case .defindex: model.vault
         case .xoxno: model.lending?.vault
         case .sentora: model.sentora?.vault
+        case .solv: model.solv?.vault
         case .etherfuse, .ondo: nil
         }
     }
@@ -212,6 +214,14 @@ struct PotView: View {
                         onSwap(SwapPrefill(drawerAddress: drawerAddress, given: asset, received: .usdc, amount: nil))
                     }
                     .disabled((pot?.value ?? 0) <= 0 || pot?.state == .frozen)
+                } else if mark == .solv {
+                    // Un retrait du vault exige une signature du serveur de Solv : on sort par un swap xSolvBTC → SolvBTC.
+                    ChimpButton("Add") { if let drawer { onAdd(drawer.id) } }
+                        .disabled(place == nil || drawer == nil)
+                    ChimpButton("Swap out", kind: .secondary, raised: true) {
+                        onSwap(SwapPrefill(drawerAddress: drawerAddress, given: .xsolvbtc, received: .solvbtc, amount: nil))
+                    }
+                    .disabled((pot?.value ?? 0) <= 0)
                 } else {
                     ChimpButton("Add") { if let drawer { onAdd(drawer.id) } }
                         .disabled(place == nil || drawer == nil || place?.depositsBlocked == true)
@@ -257,6 +267,7 @@ enum PotText {
         switch mark {
         case .defindex: "XLM"
         case .xoxno, .sentora: "USDC"
+        case .solv: "SolvBTC"
         case .etherfuse: "CETES"
         case .ondo: "USDY"
         }
@@ -366,6 +377,7 @@ enum PotText {
         case .defindex: String(localized: "DeFindex puts your XLM to work and gives you back what it earns. You can add more or take it out whenever you want.")
         case .xoxno: String(localized: "XOXNO lends your USDC to borrowers, who pay it back with a little extra. You can add more or take it out whenever you want.")
         case .etherfuse: String(localized: "CETES are tokens for short-term Mexican government bonds, issued by Etherfuse. You get them with a swap, and swap them back the same way.")
+        case .solv: String(localized: "Solv puts your SolvBTC (bitcoin on Stellar) to work and gives you xSolvBTC. Their value in SolvBTC follows Solv's NAV. You add with your card; to take out, you swap xSolvBTC back to SolvBTC.")
         case .sentora: String(localized: "Sentora keeps your USDC in its vault and gives it back exactly. At the end of each term, it pays a reward rate it publishes. Taking money out before the end gives up that term's rewards.")
         case .ondo: String(localized: "USDY is a dollar token backed by short-term US Treasuries, issued by Ondo. Its price goes up a little every day. You get it with a swap, and swap it back the same way. Not for US persons.")
         }

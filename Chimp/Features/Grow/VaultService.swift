@@ -98,10 +98,12 @@ struct VaultQuote: Equatable {
     let minimumOut: TokenAmount?
     /// Retrait de toutes les parts.
     let all: Bool
+    /// Décimales on-chain des unités ci-dessus : 7, ou 8 chez Solv (SolvBTC et xSolvBTC).
+    var decimals = SACClient.decimals
 
-    var sharesAmount: Decimal { SwapUnits.amount(fromUnits: shares.units) }
-    var expected: Decimal? { expectedOut.map { SwapUnits.amount(fromUnits: $0.units) } }
-    var minimum: Decimal? { minimumOut.map { SwapUnits.amount(fromUnits: $0.units) } }
+    var sharesAmount: Decimal { SACClient.amount(fromUnits: Decimal(string: String(shares.units)) ?? 0, chainDecimals: decimals) }
+    var expected: Decimal? { expectedOut.map { SACClient.amount(fromUnits: Decimal(string: String($0.units)) ?? 0, chainDecimals: decimals) } }
+    var minimum: Decimal? { minimumOut.map { SACClient.amount(fromUnits: Decimal(string: String($0.units)) ?? 0, chainDecimals: decimals) } }
 }
 
 /// Ce qui sera signé, figé au passage à la vérification (F4, F7r). Affiché tel quel.

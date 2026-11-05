@@ -66,7 +66,8 @@ struct IntegrationConfigTests {
                 rpc: URL(string: "http://rpc.lightsail.network")!, passphrase: base.redstone.passphrase, oracle: "not-an-address",
                 decimals: 8, mainnetAssets: ["USDY": "G-not-a-contract"], maximumAge: 1
             ),
-            sentora: .init(vault: base.defindexVaults[0].vault, assetCode: "EURC", name: "Sentora EURC", escrow: "not-an-address")
+            sentora: .init(vault: base.defindexVaults[0].vault, assetCode: "EURC", name: "Sentora EURC", escrow: "not-an-address"),
+            solv: .init(solvBTC: base.solv.solvBTC, xSolvBTC: base.solv.xSolvBTC, vault: "not-an-address", oracle: base.solv.vault, name: base.solv.name)
         )
         let problems = broken.problems(passphrase: config.passphrase, knownAssetCodes: knownAssetCodes, reserved: reserved)
         #expect(problems.contains { $0.hasPrefix("soroswap.router is not a C-address") })
@@ -84,6 +85,7 @@ struct IntegrationConfigTests {
         #expect(problems.contains("sentora.vault repeats an address used elsewhere"))
         #expect(problems.contains { $0.hasPrefix("sentora.escrow is not a C-address") })
         #expect(problems.contains("sentora names unknown asset \"EURC\""))
+        #expect(problems.contains { $0.hasPrefix("solv.vault is not a C-address") })
         #expect(problems.contains { $0.hasPrefix("cctp.forwarder is not a C-address") })
         #expect(problems.contains("cctp.messageTransmitter repeats an address used elsewhere"))
         #expect(problems.contains("cctp.sourceChains names Stellar's own domain"))

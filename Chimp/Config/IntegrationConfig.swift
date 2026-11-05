@@ -78,6 +78,20 @@ struct IntegrationConfig: Equatable, Sendable {
         let escrow: String
     }
 
+    /// Solv (décision de Barth du 2026-11-05) : SolvBTC (du bitcoin sur Stellar, adossé 1:1) et xSolvBTC (SolvBTC qui
+    /// rapporte : sa valeur en SolvBTC suit la NAV de l'oracle de Solv). Jetons SEP-41 à **8 décimales**. Mainnet : SolvBTC
+    /// `CBIJBDNZ…`, xSolvBTC `CAUP7NFA…`, vault `CATBHFGH…`, oracle `CD2KTWZ3…`. Pas de testnet officiel : copie de test
+    /// (`tools/grow-testnet`), **les mêmes wasm** copiés depuis le mainnet, NAV du mainnet, paires Soroswap USDC/SolvBTC et
+    /// SolvBTC/xSolvBTC. On entre par le vault (une signature, par le router) ; on sort par un swap (un retrait du vault
+    /// exige une signature du serveur de Solv).
+    struct Solv: Equatable, Sendable {
+        let solvBTC: Stablebond
+        let xSolvBTC: Stablebond
+        let vault: String
+        let oracle: String
+        let name: String
+    }
+
     /// RedStone (SEP-40, **mainnet**, lecture seule) : prix indicatif des actifs que ni Reflector ni leur émetteur ne
     /// donnent (USDY). `lastprice(Asset::Stellar(contrat))`, 8 décimales, relevé le 2026-11-05 (1 USDY ≈ 1,152 $). Contrat
     /// listé par la documentation de Stellar (« Oracle providers », RedStone). Affichage seulement, jamais pour signer.
@@ -179,6 +193,7 @@ struct IntegrationConfig: Equatable, Sendable {
     let ondo: Ondo
     let redstone: RedStone
     let sentora: Sentora
+    let solv: Solv
 
     static let testnet = IntegrationConfig(
         soroswap: Soroswap(
@@ -238,13 +253,25 @@ struct IntegrationConfig: Equatable, Sendable {
             passphrase: "Public Global Stellar Network ; September 2015",
             oracle: "CBMGLKUQZVSAIL5CPDDAWSUY7MAKXISHMOZEVLMBUWBMFGHRJSR4WYRF",
             decimals: 8,
-            mainnetAssets: ["USDY": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP"],
+            mainnetAssets: [
+                "USDY": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP",
+                "SolvBTC": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+                "xSolvBTC": "CAUP7NFABXE5TJRL3FKTPMWRLC7IAXYDCTHQRFSCLR5TMGKHOOQO772J",
+            ],
             maximumAge: 36 * 3600
         ),
         // Copie de test du 2026-11-05 (`tools/grow-testnet`), même wasm que le mainnet ; dépôt et retrait vérifiés.
         sentora: Sentora(
             vault: "CDGXALH6TAXVN3G26TQYMH7ORXESODQQHXL2BNGMZEC4BP5NMHMIAL2V", assetCode: "USDC", name: "Sentora USDC",
             escrow: "CD4P36A22VCGWUWV4Z6WU3SAFCJTO7HEQWF5Y6R7DWLTFKQ6TI7QHWE5"
+        ),
+        // Copie de test du 2026-11-05 (`tools/grow-testnet`), mêmes wasm que le mainnet ; dépôt vérifié par le router.
+        solv: Solv(
+            solvBTC: Stablebond(code: "SolvBTC", contract: "CBEBG4NVDGZ2UZXXEYZATVF77SFCLG2U2ISOLKJI7RF2TZWBQCAWJ7MU"),
+            xSolvBTC: Stablebond(code: "xSolvBTC", contract: "CBO6MQP2L2GITZXPU7H7HZJU7JRH7VBBGXOQRU6NVAKXIL35AOWVOCEC"),
+            vault: "CAFSPVWXSAVR3DKCJXFHMD4RPYUDL6UW6X5HC6FJV5PU4BPOFC757CXW",
+            oracle: "CDMEOCFFNLSYYZ4OMQ56XPWJHOHUZXPFP65FLUA23JV2YKHAN2RUKWUO",
+            name: "Solv xSolvBTC"
         )
     )
 
@@ -291,6 +318,10 @@ struct IntegrationConfig: Equatable, Sendable {
         if usdy.flatMap({ try? SACClient.contractID(for: $0, network: .custom(passphrase: passphrase)) }) != ondo.usdy.contract {
             problems.append("ondo.\(ondo.usdy.code) is not the SAC of \(ondo.usdy.code):\(ondo.issuer)")
         }
+        address("solv.\(solv.solvBTC.code)", solv.solvBTC.contract)
+        address("solv.\(solv.xSolvBTC.code)", solv.xSolvBTC.contract)
+        address("solv.vault", solv.vault)
+        address("solv.oracle", solv.oracle)
         address("sentora.vault", sentora.vault)
         address("sentora.escrow", sentora.escrow)
         if !knownAssetCodes.contains(sentora.assetCode) { problems.append("sentora names unknown asset \"\(sentora.assetCode)\"") }

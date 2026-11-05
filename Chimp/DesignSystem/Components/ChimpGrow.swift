@@ -12,6 +12,8 @@ enum ChimpPotProtocol: String, CaseIterable, Identifiable, Hashable, Sendable {
     case ondo
     /// Vault USDC de Sentora (2026-11-05).
     case sentora
+    /// Vault xSolvBTC de Solv (2026-11-05).
+    case solv
 
     var id: String { rawValue }
 
@@ -26,6 +28,7 @@ enum ChimpPotProtocol: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .etherfuse: "Etherfuse"
         case .ondo: "Ondo"
         case .sentora: "Sentora"
+        case .solv: "Solv"
         }
     }
 
@@ -36,6 +39,7 @@ enum ChimpPotProtocol: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .etherfuse: .protocolEtherfuse
         case .ondo: .protocolOndo
         case .sentora: .protocolSentora
+        case .solv: .protocolSolv
         }
     }
 }

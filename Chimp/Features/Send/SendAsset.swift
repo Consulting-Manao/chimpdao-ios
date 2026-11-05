@@ -15,6 +15,10 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     case cetes
     /// USDY d'Ondo (bons du Trésor américain), décision de Barth du 2026-11-05.
     case usdy
+    /// SolvBTC (du bitcoin sur Stellar, adossé 1:1) et xSolvBTC (SolvBTC qui rapporte), de Solv, 2026-11-05. Jetons SEP-41
+    /// à **8 décimales** (pas des SAC).
+    case solvbtc
+    case xsolvbtc
 
     /// Ce qu'Envoyer, Move et les préremplissages d'un envoi proposent.
     static let sendable: [SendAsset] = [.usdc, .xlm]
@@ -22,7 +26,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     var isSendable: Bool { Self.sendable.contains(self) }
 
     /// Ce que propose le swap (maquette E3p), dans cet ordre.
-    static let swappable: [SendAsset] = [.xlm, .usdc, .cetes, .usdy]
+    static let swappable: [SendAsset] = [.xlm, .usdc, .cetes, .usdy, .solvbtc, .xsolvbtc]
 
     var id: String { rawValue }
 
@@ -33,6 +37,8 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         case .xlm: "XLM"
         case .cetes: "CETES"
         case .usdy: "USDY"
+        case .solvbtc: "SolvBTC"
+        case .xsolvbtc: "xSolvBTC"
         }
     }
 
@@ -43,6 +49,8 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         case .xlm: "Stellar Lumens"
         case .cetes: "Mexican government bonds, by Etherfuse"
         case .usdy: "US Treasuries, by Ondo"
+        case .solvbtc: "Bitcoin on Stellar, by Solv"
+        case .xsolvbtc: "SolvBTC that earns, by Solv"
         }
     }
 
@@ -51,6 +59,8 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .cetes: String(localized: "Mexican government bonds, by Etherfuse")
         case .usdy: String(localized: "US Treasuries, by Ondo")
+        case .solvbtc: String(localized: "Bitcoin on Stellar, by Solv")
+        case .xsolvbtc: String(localized: "SolvBTC that earns, by Solv")
         case .usdc, .xlm: nil
         }
     }
@@ -60,6 +70,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .cetes: "Etherfuse"
         case .usdy: "Ondo"
+        case .solvbtc, .xsolvbtc: "Solv"
         case .usdc, .xlm: nil
         }
     }
@@ -70,6 +81,8 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         case .xlm: .xlm
         case .cetes: .cetes
         case .usdy: .usdy
+        case .solvbtc: .solvbtc
+        case .xsolvbtc: .xsolvbtc
         }
     }
 
@@ -78,7 +91,21 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .usdc: 2
         case .xlm, .cetes, .usdy: 7
+        case .solvbtc, .xsolvbtc: 8
         }
+    }
+
+    /// Décimales on-chain : 7 pour un SAC (XLM, USDC, CETES, USDY), 8 pour les jetons de Solv.
+    var decimals: Int {
+        switch self {
+        case .solvbtc, .xsolvbtc: 8
+        case .usdc, .xlm, .cetes, .usdy: SACClient.decimals
+        }
+    }
+
+    /// Les décimales on-chain d'un actif de l'app désigné par son code (7 si l'app ne le connaît pas).
+    static func decimals(code: String) -> Int {
+        SendAsset(code: code)?.decimals ?? SACClient.decimals
     }
 
     /// Prix variable en dollars : on affiche alors l'équivalent « ≈ $ » (décision du 2026-09-28).
@@ -92,6 +119,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
         case .xlm: [50, 100, 250]
         case .cetes: [100, 500, 1000]
         case .usdy: [10, 25, 50]
+        case .solvbtc, .xsolvbtc: [Decimal(string: "0.0001")!, Decimal(string: "0.0005")!, Decimal(string: "0.001")!]
         }
     }
 
@@ -104,7 +132,7 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
             let cents = amount.truncated(to: 2)
             fractionLength = cents.isWhole ? 0...0 : 2...2
             return cents.formatted(.number.locale(locale).precision(.fractionLength(fractionLength)))
-        case .xlm, .cetes, .usdy:
+        case .xlm, .cetes, .usdy, .solvbtc, .xsolvbtc:
             fractionLength = 0...maxFractionDigits
             return amount.truncated(to: maxFractionDigits)
                 .formatted(.number.locale(locale).precision(.fractionLength(fractionLength)))
@@ -134,15 +162,23 @@ enum SendAsset: String, CaseIterable, Identifiable, Hashable {
     /// Plus petit montant affiché : 0.01.
     static let smallestDisplayed = Decimal(sign: .plus, exponent: -2, significand: 1)
 
+    /// Décimales affichées d'un solde : 2, sauf les jetons de bitcoin (6 : un centième de bitcoin vaut des centaines de
+    /// dollars, 2026-11-05).
+    static func displayedDigits(code: String) -> Int {
+        code == SendAsset.solvbtc.code || code == SendAsset.xsolvbtc.code ? 6 : 2
+    }
+
     /// Même règle pour un actif désigné par son code (actifs hors `SendAsset` : 0 à 2 décimales).
     static func displayed(_ amount: Decimal, code: String, locale: Locale = .autoupdatingCurrent) -> String {
+        let digits = displayedDigits(code: code)
+        let smallest = Decimal(sign: .plus, exponent: -digits, significand: 1)
         let magnitude = abs(amount)
-        if magnitude > 0, magnitude < smallestDisplayed {
-            let floor = smallestDisplayed.formatted(.number.locale(locale).precision(.fractionLength(2)))
+        if magnitude > 0, magnitude < smallest {
+            let floor = smallest.formatted(.number.locale(locale).precision(.fractionLength(digits)))
             return "< \(floor)"
         }
-        let cents = amount.truncated(to: 2)
-        let fraction: ClosedRange<Int> = code == SendAsset.usdc.code ? (cents.isWhole ? 0...0 : 2...2) : 0...2
+        let cents = amount.truncated(to: digits)
+        let fraction: ClosedRange<Int> = code == SendAsset.usdc.code ? (cents.isWhole ? 0...0 : 2...2) : 0...digits
         return cents.formatted(.number.locale(locale).precision(.fractionLength(fraction)))
     }
 }

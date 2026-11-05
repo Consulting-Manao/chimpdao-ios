@@ -12,14 +12,20 @@ struct SwapContext: Equatable {
 
 /// Conversions entre les montants affichés (`Decimal`, unité de l'actif) et les unités on-chain (7 décimales, `i128`).
 enum SwapUnits {
-    /// Montant tapé → unités. Refuse un montant nul, négatif ou trop précis (jamais tronqué : règle 8).
+    /// Montant tapé → unités de l'actif (ses décimales on-chain : 7, ou 8 pour SolvBTC). Refuse un montant nul, négatif
+    /// ou trop précis (jamais tronqué : règle 8).
     static func units(of amount: Decimal, asset: SendAsset) throws -> Int128 {
-        Int128(try SACClient.units(of: amount, keypadDecimals: asset.maxFractionDigits))
+        Int128(try SACClient.units(of: amount, keypadDecimals: asset.maxFractionDigits, chainDecimals: asset.decimals))
     }
 
-    /// Unités → montant exact (7 décimales).
+    /// Unités → montant exact (7 décimales : XLM, USDC, CETES, USDY, et les parts des vaults).
     static func amount(fromUnits units: Int128) -> Decimal {
         SACClient.amount(fromUnits: Decimal(string: String(units)) ?? 0)
+    }
+
+    /// Unités de cet actif → montant exact, selon ses décimales on-chain.
+    static func amount(fromUnits units: Int128, asset: SendAsset) -> Decimal {
+        SACClient.amount(fromUnits: Decimal(string: String(units)) ?? 0, chainDecimals: asset.decimals)
     }
 }
 
@@ -47,7 +53,7 @@ struct SwapQuoteSummary: Equatable {
     /// Debug seulement : le protocole a été forcé dans le catalogue (`SwapProtocolOverride`), E3 le dit.
     var isForcedForDebug = false
 
-    var expectedOut: Decimal { SwapUnits.amount(fromUnits: expectedOutUnits) }
+    var expectedOut: Decimal { SwapUnits.amount(fromUnits: expectedOutUnits, asset: received) }
 
     /// Ce que la ligne discrète sous le taux dit de la comparaison des protocoles.
     enum Comparison: Equatable {
@@ -89,7 +95,7 @@ struct SwapDraft: Equatable {
         Slippage.minimum(of: quote.expectedOutUnits, basisPoints: slippageBasisPoints)
     }
 
-    var minimumOut: Decimal { SwapUnits.amount(fromUnits: minimumOutUnits) }
+    var minimumOut: Decimal { SwapUnits.amount(fromUnits: minimumOutUnits, asset: received) }
 }
 
 /// Swap préparé **avant** la session NFC (règle 9) : devis redemandé, bornes vérifiées, autorisation à signer.

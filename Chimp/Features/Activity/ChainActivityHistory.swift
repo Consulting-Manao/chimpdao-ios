@@ -248,7 +248,8 @@ struct ChainActivityHistory {
                       case .i128(let parts)? = decode(event.value) else { return nil }
                 return ActivityRecord(
                     id: id, event: .transfer, hash: event.transactionHash, from: from, to: to, assetCode: code,
-                    amount: SACClient.amount(fromUnits: SACClient.decimal(parts)), at: at, isLocal: false, ledger: event.ledger
+                    amount: SACClient.amount(fromUnits: SACClient.decimal(parts), chainDecimals: SendAsset.decimals(code: code)), at: at, isLocal: false,
+                    ledger: event.ledger
                 )
             case ("clawback", 3):
                 // Seulement un actif de la liste blanche (par l'adresse de son contrat), repris dans l'un des tiroirs.
@@ -256,7 +257,8 @@ struct ChainActivityHistory {
                       case .i128(let parts)? = decode(event.value) else { return nil }
                 return ActivityRecord(
                     id: id, event: .clawback, hash: event.transactionHash, from: from, to: "", assetCode: code,
-                    amount: SACClient.amount(fromUnits: SACClient.decimal(parts)), at: at, isLocal: false, ledger: event.ledger
+                    amount: SACClient.amount(fromUnits: SACClient.decimal(parts), chainDecimals: SendAsset.decimals(code: code)), at: at, isLocal: false,
+                    ledger: event.ledger
                 )
             case ("card_added", 1), ("add_card", 1):
                 guard event.contractID == account, let key = cardKey(decode(event.value)) else { return nil }

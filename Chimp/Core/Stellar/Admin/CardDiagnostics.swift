@@ -62,7 +62,7 @@ struct ChainCardDiagnostics: CardDiagnosing {
             for (code, asset) in assets {
                 let token = try SACClient.contractID(for: asset, network: client.network)
                 let units = try await sac.balance(token: token, holder: pocket, source: source)
-                balances.append(.init(code: code, amount: units.map(SACClient.amount(fromUnits:))))
+                balances.append(.init(code: code, amount: units.map { SACClient.amount(fromUnits: $0) }))
             }
         }
 

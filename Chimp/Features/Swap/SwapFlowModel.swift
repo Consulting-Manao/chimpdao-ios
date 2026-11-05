@@ -252,7 +252,7 @@ final class SwapFlowModel {
 
     /// Minimum reçu au slippage choisi, pour le devis affiché.
     var currentMinimum: Decimal? {
-        currentQuote.map { SwapUnits.amount(fromUnits: Slippage.minimum(of: $0.expectedOutUnits, basisPoints: slippageBasisPoints)) }
+        currentQuote.map { SwapUnits.amount(fromUnits: Slippage.minimum(of: $0.expectedOutUnits, basisPoints: slippageBasisPoints), asset: $0.received) }
     }
 
     var canReview: Bool {
@@ -320,7 +320,7 @@ final class SwapFlowModel {
 
     /// Minimum reçu pour une tolérance donnée, au devis affiché (E3s : « You get at least 98.68 USDC »).
     func minimum(atSlippage basisPoints: Int) -> Decimal? {
-        currentQuote.map { SwapUnits.amount(fromUnits: Slippage.minimum(of: $0.expectedOutUnits, basisPoints: basisPoints)) }
+        currentQuote.map { SwapUnits.amount(fromUnits: Slippage.minimum(of: $0.expectedOutUnits, basisPoints: basisPoints), asset: $0.received) }
     }
 
     /// Taux du devis affiché, en quantités : « 1 XLM ≈ 0.2492 USDC » (4 décimales, tronqué). Jamais de dollars.

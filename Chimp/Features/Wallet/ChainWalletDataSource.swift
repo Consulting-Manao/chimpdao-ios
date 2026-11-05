@@ -201,7 +201,7 @@ final class ChainWalletReader: WalletChain {
                     guard let units = read else {
                         throw StellarError.noReturnValue("balance")
                     }
-                    return (index, AssetAmount(code: asset.code, amount: SACClient.amount(fromUnits: units)))
+                    return (index, AssetAmount(code: asset.code, amount: SACClient.amount(fromUnits: units, chainDecimals: SendAsset.decimals(code: asset.code))))
                 }
             }
             var result: [(Int, AssetAmount)] = []
@@ -253,9 +253,11 @@ struct StablebondWalletPrices {
         let bonds = config.etherfuse.map { etherfuse in
             etherfuse.stablebonds.map { (bond: $0, pricing: EtherfusePriceClient.shared(for: config) as StablebondPricing?) }
         } ?? []
-        let usdy = config.ondo.map { [(bond: $0.usdy, pricing: RedStonePriceClient.shared(for: config) as StablebondPricing?)] } ?? []
-        guard !(bonds + usdy).isEmpty else { return nil }
-        self.init(entries: bonds + usdy)
+        let redstone = RedStonePriceClient.shared(for: config) as StablebondPricing?
+        let usdy = config.ondo.map { [(bond: $0.usdy, pricing: redstone)] } ?? []
+        let solv = config.solv.map { [(bond: $0.solvBTC, pricing: redstone), (bond: $0.xSolvBTC, pricing: redstone)] } ?? []
+        guard !(bonds + usdy + solv).isEmpty else { return nil }
+        self.init(entries: bonds + usdy + solv)
     }
 
     /// Le prix de cet actif par sa source, ou pourquoi il n'y en a pas.
@@ -270,7 +272,8 @@ struct StablebondWalletPrices {
     func usdPrices(for held: Set<String>) async -> [String: Decimal] {
         var prices: [String: Decimal] = [:]
         for entry in entries where held.contains(entry.bond.code) {
-            if let price = await entry.pricing?.price(of: entry.bond).price { prices[entry.bond.code] = price.usd }
+            // Clé en majuscules, comme Reflector et `NetWorth` (« SOLVBTC »).
+            if let price = await entry.pricing?.price(of: entry.bond).price { prices[entry.bond.code.uppercased()] = price.usd }
         }
         return prices
     }

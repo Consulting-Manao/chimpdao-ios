@@ -24,6 +24,13 @@ extension IntegrationConfig.Sentora {
     }
 }
 
+extension IntegrationConfig.Solv {
+    /// « Solv xSolvBTC », via « Solv ».
+    var label: ActivityRecord.VaultLabel {
+        ActivityRecord.VaultLabel(name: name, protocols: "Solv")
+    }
+}
+
 extension ChimpNetworkConfig {
     /// Les vaults de ce réseau, par adresse : pour reconnaître un dépôt ou un retrait relu sur la chaîne.
     var vaultLabels: [String: ActivityRecord.VaultLabel] {

@@ -43,6 +43,8 @@ struct MainTabView: View {
             savingsService: config.features.grow && !config.issuedAssets.isEmpty ? ChainSavingsService(session: session) : nil,
             lendingService: config.features.grow && config.integrations != nil ? ChainLendingService(session: session) : nil,
             sentoraService: config.features.grow && config.integrations?.sentora != nil ? ChainSentoraService(session: session) : nil,
+            solvService: config.solv != nil ? ChainSolvService(session: session) : nil,
+            solvPricing: config.solv != nil ? StablebondWalletPrices(config: config) : nil,
             priceOracle: ReflectorPriceOracle.shared, history: DefaultsPotHistoryStore()
         ))
         // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
@@ -296,6 +298,13 @@ struct MainTabView: View {
                     onSeePosition: { showPotInGrow(.sentora, address: $0) }, onExit: closeGrowFlow
                 )
             }
+        case .solvDeposit(let drawerID):
+            pendingFirst(onExit: closeGrowFlow) {
+                VaultFlowRoot(
+                    service: ChainSolvService(session: session), action: .deposit, drawerID: drawerID,
+                    onSeePosition: { showPotInGrow(.solv, address: $0) }, onExit: closeGrowFlow
+                )
+            }
         }
     }
 
@@ -304,6 +313,7 @@ struct MainTabView: View {
         switch mark {
         case .xoxno: .lendingDeposit(drawerID: drawerID)
         case .sentora: .sentoraDeposit(drawerID: drawerID)
+        case .solv: .solvDeposit(drawerID: drawerID)
         default: .deposit(drawerID: drawerID)
         }
     }

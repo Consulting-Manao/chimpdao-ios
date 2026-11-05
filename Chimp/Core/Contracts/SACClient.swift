@@ -28,10 +28,12 @@ struct SACClient {
         let usdc = Asset(type: AssetType.ASSET_TYPE_CREDIT_ALPHANUM4, code: "USDC", issuer: try KeyPair(accountId: config.usdcIssuer))!
         let stablebonds = config.etherfuse?.stablebonds.map { ($0.code, $0.contract) } ?? []
         let usdy = config.ondo.map { [($0.usdy.code, $0.usdy.contract)] } ?? []
+        // Jetons SEP-41 de Solv (pas des SAC, 8 décimales) : même `balance` et mêmes événements `transfer`.
+        let solv = config.solv.map { [($0.solvBTC.code, $0.solvBTC.contract), ($0.xSolvBTC.code, $0.xSolvBTC.contract)] } ?? []
         return [
             ("XLM", try contractID(for: Asset(type: AssetType.ASSET_TYPE_NATIVE)!, network: network)),
             ("USDC", try contractID(for: usdc, network: network)),
-        ] + stablebonds + usdy
+        ] + stablebonds + usdy + solv
     }
 
     /// `balance(holder)` en unités on-chain (entier, 7 décimales). `nil` si la simulation n'a rendu aucune valeur :
@@ -115,11 +117,12 @@ struct SACClient {
     /// Montant de l'actif → unités on-chain (`toUnits(amount, keypadDecimals, chainDecimals)` de `lib/amount.ts`).
     /// Calcul exact en base 10 (`Decimal`), jamais par un `Double`, indépendant de la langue du téléphone.
     /// Écart volontaire : `toUnits` tronque les décimales en trop ; ici elles sont refusées.
-    static func units(of amount: Decimal, keypadDecimals: Int) throws(AmountError) -> UInt64 {
+    /// `chainDecimals` : 7 pour un SAC ; un jeton SEP-41 peut en avoir d'autres (8 pour SolvBTC et xSolvBTC, 2026-11-05).
+    static func units(of amount: Decimal, keypadDecimals: Int, chainDecimals: Int = decimals) throws(AmountError) -> UInt64 {
         guard amount > 0 else { throw .notPositive }
         let keypadScaled = amount * pow(Decimal(10), keypadDecimals)
         guard isWhole(keypadScaled) else { throw .tooManyDecimals(allowed: keypadDecimals) }
-        let scaled = amount * pow(Decimal(10), decimals)
+        let scaled = amount * pow(Decimal(10), chainDecimals)
         guard isWhole(scaled), scaled <= Decimal(UInt64.max) else { throw .tooLarge }
         // `Decimal` → texte (toujours avec « . » et sans séparateur) → entier : aucune perte possible.
         guard let units = UInt64(NSDecimalNumber(decimal: scaled).stringValue) else { throw .tooLarge }
@@ -138,8 +141,9 @@ struct SACClient {
         Decimal(parts.hi) * Decimal(string: "18446744073709551616")! + Decimal(parts.lo)
     }
 
-    /// Unités on-chain → montant de l'actif (division exacte par 10⁷).
-    static func amount(fromUnits units: Decimal) -> Decimal {
-        units / pow(Decimal(10), decimals)
+    /// Unités on-chain → montant de l'actif (division exacte par 10⁷, ou par 10^`chainDecimals` pour un jeton qui en a
+    /// d'autres).
+    static func amount(fromUnits units: Decimal, chainDecimals: Int = decimals) -> Decimal {
+        units / pow(Decimal(10), chainDecimals)
     }
 }

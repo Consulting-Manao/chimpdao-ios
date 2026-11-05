@@ -120,6 +120,9 @@ struct GrowDemoRoot: View {
             VaultFlowRoot(service: sentoraService, action: .deposit, drawerID: drawerID, onSeePosition: { path = [.pot(.sentora, drawerAddress: $0)] }, onExit: pop)
         case .sentoraWithdraw(let drawerID):
             VaultFlowRoot(service: sentoraService, action: .withdraw, drawerID: drawerID, onSeePosition: { path = [.pot(.sentora, drawerAddress: $0)] }, onExit: pop)
+        case .solvDeposit:
+            // La démo n'a pas de Solv factice : son pot n'y apparaît pas.
+            EmptyView()
         }
     }
 
