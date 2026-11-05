@@ -59,6 +59,7 @@ struct RemoveCardFlowView: View {
                         : "Any other card of your account can do it.",
                     pinStatus: model.usesPIN ? .ready : .notNeeded,
                     isScanning: model.isBusy,
+                    isGettingReady: model.isGettingReady,
                     problem: model.problem.map { Self.message(for: $0.kind, card: model.target.name) },
                     problemDetails: model.problem?.technicalDetails,
                     onScan: { Task { await model.scan() } },

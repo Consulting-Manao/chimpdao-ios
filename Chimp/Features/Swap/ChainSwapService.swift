@@ -33,18 +33,30 @@ final class ChainSwapService: SwapService {
         self.drawers = drawers ?? ChainSendService(session: session, signer: signer)
         client = SorobanClient(config: config)
         integrations = IntegrationCallClient(client: client, config: config)
+        registry = Self.registry(for: config, client: client)
+        self.signer = signer
+        self.feeSigner = feeSigner ?? WorkerFeeSigner(url: config.feeSignerURL)
+    }
+
+    /// Un registre par réseau, gardé tant que l'app tourne (2026-11-05, vitesse) : les adaptateurs y gardent ce qui ne
+    /// change jamais pour un déploiement (paire Soroswap et son `token_0`, pools Aquarius et leur type), qui n'est plus
+    /// relu à chaque ouverture de Swap. Les montants (devis, réserves) sont toujours relus.
+    private static var registries: [String: IntegrationRegistry] = [:]
+
+    private static func registry(for config: ChimpNetworkConfig, client: SorobanClient) -> IntegrationRegistry {
+        if let known = registries[config.passphrase] { return known }
         let reader = SimulationReader(client: client, source: config.feePayer)
         // Actif pivot d'Aquarius : l'USDC de Circle (un saut au plus, décision du 2026-10-14).
         let usdc = (try? SACClient.stellarAssets(config: config))?.first { $0.code == SendAsset.usdc.code }?.contract
-        registry = IntegrationRegistry(
+        let registry = IntegrationRegistry(
             swapAdapters: config.integrations.map { [
                 SoroswapAdapter(contracts: $0.soroswap, reader: reader),
                 AquariusAdapter(contracts: $0.aquarius, hub: usdc, reader: reader),
             ] } ?? [],
             yieldAdapters: []
         )
-        self.signer = signer
-        self.feeSigner = feeSigner ?? WorkerFeeSigner(url: config.feeSignerURL)
+        registries[config.passphrase] = registry
+        return registry
     }
 
     // MARK: Contexte et devis
@@ -162,14 +174,18 @@ final class ChainSwapService: SwapService {
         let request = try request(given: draft.given, received: draft.received, amount: draft.amount)
         let source = try Account(accountId: config.feePayer, sequenceNumber: 0)
 
-        try await checkNotFrozen(draft, request: request, source: source)
-
+        // Les lectures indépendantes partent ensemble (2026-11-05, vitesse) ; elles sont attendues dans l'ordre d'avant,
+        // donc la même erreur remonte en premier (gel, puis solde, puis prix).
+        async let frozenCheck: Void = checkNotFrozen(draft, request: request, source: source)
         // Solde relu : on ne signe jamais sur un solde inconnu ou insuffisant.
-        let held = try await SACClient(client: client).balance(token: request.assetIn.contract, holder: draft.drawer.address, source: source)
-        try PaymentClient.checkBalance(held, units: UInt64(request.amountIn))
-
+        async let heldRead = SACClient(client: client).balance(token: request.assetIn.contract, holder: draft.drawer.address, source: source)
         // Devis redemandé juste avant de signer (`runSwap` : « Price moved »).
-        guard let fresh = try await adapter.quote(request) else { throw SwapError.noRoute }
+        async let freshQuote = adapter.quote(request)
+        async let accountCards = mainAccountCards(of: draft.drawer, source: source)
+
+        try await frozenCheck
+        try PaymentClient.checkBalance(try await heldRead, units: UInt64(request.amountIn))
+        guard let fresh = try await freshQuote else { throw SwapError.noRoute }
         guard fresh.amountOut >= draft.minimumOutUnits else { throw SwapError.slippageExceeded }
 
         // L'appel, au minimum que l'écran a montré ; ses bornes relues et comparées à l'écran.
@@ -188,8 +204,7 @@ final class ChainSwapService: SwapService {
         switch draft.drawer.kind {
         case .main:
             authorizer = .account(draft.drawer.address)
-            acceptedKeys = try await ChimpAccountClient(client: client, config: config)
-                .cards(account: draft.drawer.address, source: source).map(\.publicKey)
+            acceptedKeys = try await accountCards
         case .card:
             guard let key = drawers.cardKey(drawerID: draft.drawer.id) else { throw SwapServiceError.unknownDrawer(draft.drawer.id) }
             authorizer = .pocket(draft.drawer.address)
@@ -204,6 +219,12 @@ final class ChainSwapService: SwapService {
             // La simulation du Main account exécute le swap : un refus du router a un nom (prix qui a bougé, échéance…).
             throw adapter.swapError(for: error) ?? error
         }
+    }
+
+    /// Les cartes du Main account (relues sur la chaîne) ; aucune pour le wallet d'une carte.
+    private func mainAccountCards(of drawer: SendDrawer, source: Account) async throws -> [ChipPublicKey] {
+        guard case .main = drawer.kind else { return [] }
+        return try await ChimpAccountClient(client: client, config: config).cards(account: drawer.address, source: source).map(\.publicKey)
     }
 
     func refreshedIfNeeded(_ prepared: PreparedSwap) async throws -> PreparedSwap {

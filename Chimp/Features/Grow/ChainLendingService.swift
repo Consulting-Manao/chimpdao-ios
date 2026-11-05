@@ -159,11 +159,12 @@ final class ChainLendingService: VaultService {
     /// La plus grosse position déplaçable du tiroir (un tiroir peut en avoir plusieurs : chaque dépôt en ouvre une), sa
     /// valeur et le marché, relus. Un retrait vise une position à la fois, la plus grosse d'abord.
     private func freshPosition(of drawer: SendDrawer, adapter: XoxnoAdapter) async throws -> (XoxnoPosition, Int128, XoxnoMarketState) {
+        async let stateRead = adapter.state()
         let positions = try await adapter.positions(holder: drawer.address)
         guard let position = positions.filter(\.canMove).max(by: { ($0.value ?? 0) < ($1.value ?? 0) }), let value = position.value, value > 0 else {
             throw positions.contains { $0.status == .needsRenewal } ? YieldError.vaultUnavailable : YieldError.notEnoughShares
         }
-        return (position, value, try await adapter.state())
+        return (position, value, try await stateRead)
     }
 
     // MARK: Avant le tap
@@ -171,6 +172,8 @@ final class ChainLendingService: VaultService {
     func prepare(_ draft: VaultDraft) async throws -> PreparedVault {
         let (adapter, asset) = try lending()
         let source = try Account(accountId: config.feePayer, sequenceNumber: 0)
+        // Lu pendant les autres lectures (2026-11-05, vitesse).
+        async let accountCards = mainAccountCards(of: draft.drawer, source: source)
         let call: ContractCall
         let shown: SignedTerms
         var allValue: TokenAmount?
@@ -178,9 +181,10 @@ final class ChainLendingService: VaultService {
         case .deposit:
             let units = try SwapUnits.units(of: draft.amount, asset: asset)
             // Solde relu : on ne signe jamais sur un solde inconnu ou insuffisant.
-            let held = try await SACClient(client: client).balance(token: adapter.asset.contract, holder: draft.drawer.address, source: source)
-            try PaymentClient.checkBalance(held, units: UInt64(units))
-            let state = try await adapter.state()
+            async let heldRead = SACClient(client: client).balance(token: adapter.asset.contract, holder: draft.drawer.address, source: source)
+            async let stateRead = adapter.state()
+            try PaymentClient.checkBalance(try await heldRead, units: UInt64(units))
+            let state = try await stateRead
             guard !state.paused, !state.frozen else { throw YieldError.vaultUnavailable }
             guard Int128(units) <= state.remainingCap else { throw YieldError.capReached }
             // Revue de sécurité F4 : chaque dépôt ouvre une nouvelle position, jamais un numéro lu sur le réseau.
@@ -212,8 +216,7 @@ final class ChainLendingService: VaultService {
         switch draft.drawer.kind {
         case .main:
             authorizer = .account(draft.drawer.address)
-            acceptedKeys = try await ChimpAccountClient(client: client, config: config)
-                .cards(account: draft.drawer.address, source: source).map(\.publicKey)
+            acceptedKeys = try await accountCards
         case .card:
             guard let key = drawers.cardKey(drawerID: draft.drawer.id) else { throw VaultServiceError.unknownDrawer(draft.drawer.id) }
             authorizer = .pocket(draft.drawer.address)
@@ -226,6 +229,12 @@ final class ChainLendingService: VaultService {
             // La simulation du Main account exécute l'appel : un refus de XOXNO a un nom (liquidité, pause, plafond).
             throw XoxnoAdapter.yieldError(for: error) ?? error
         }
+    }
+
+    /// Les cartes du Main account (relues sur la chaîne) ; aucune pour le wallet d'une carte.
+    private func mainAccountCards(of drawer: SendDrawer, source: Account) async throws -> [ChipPublicKey] {
+        guard case .main = drawer.kind else { return [] }
+        return try await ChimpAccountClient(client: client, config: config).cards(account: drawer.address, source: source).map(\.publicKey)
     }
 
     func refreshedIfNeeded(_ prepared: PreparedVault) async throws -> PreparedVault {

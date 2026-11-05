@@ -22,7 +22,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		276DCDF92EEB0063009A1DA5 /* ChimpDAO.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChimpDAO.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		276DCDF92EEB0063009A1DA5 /* ChimpDAO.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = ChimpDAO.app; path = "Chimp Dev.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		276DCE0D2EEB0593009A1DA5 /* CoreNFC.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreNFC.framework; path = System/Library/Frameworks/CoreNFC.framework; sourceTree = SDKROOT; };
 		276DCE0F2EEB0600009A1DA5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2C7E5A002F20000000000000 /* ChimpTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ChimpTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };

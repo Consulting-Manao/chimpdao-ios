@@ -102,6 +102,7 @@ struct SetupTapSheet: ViewModifier {
             who: who,
             pinStatus: model.pinMode == .none ? .notNeeded : .ready,
             isScanning: model.isBusy,
+            isGettingReady: model.phase == .preparing,
             onScan: onScan,
             onCancel: cancel
         )

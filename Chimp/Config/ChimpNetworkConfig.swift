@@ -58,7 +58,9 @@ struct ChimpNetworkConfig: Equatable, Sendable {
         network: .testnet,
         passphrase: "Test SDF Network ; September 2015",
         endpoints: Endpoints(
-            rpc: URL(string: "https://soroban-testnet.stellar.org")!,
+            // Gateway.fm plutôt que le RPC public de la SDF (celui du terminal) : même testnet, mêmes réponses, mais ~0,1 s
+            // par appel au lieu de 1 à 4 s (mesuré le 2026-11-05, décision de Barth ; DESIGN_NOTES §13).
+            rpc: URL(string: "https://soroban-rpc.testnet.stellar.gateway.fm")!,
             horizon: URL(string: "https://horizon-testnet.stellar.org")!,
             explorer: URL(string: "https://stellar.expert/explorer/testnet")!,
             friendbot: URL(string: "https://friendbot.stellar.org")!

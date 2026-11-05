@@ -82,12 +82,13 @@ struct CardEnrolment: CardEnrolmentService {
     }
 
     static let testnetPassphrase = "Test SDF Network ; September 2015"
-    static let testnetRPCHost = "soroban-testnet.stellar.org"
+    /// Les serveurs RPC testnet connus : celui de la SDF (terminal) et Gateway.fm (celui de l'app depuis le 2026-11-05).
+    static let testnetRPCHosts: Set<String> = ["soroban-testnet.stellar.org", "soroban-rpc.testnet.stellar.gateway.fm"]
 
     static func requireTestnet(_ config: ChimpNetworkConfig) throws {
         guard config.network == .testnet,
               config.passphrase == testnetPassphrase,
-              config.endpoints.rpc.host() == testnetRPCHost
+              config.endpoints.rpc.host().map(testnetRPCHosts.contains) == true
         else { throw CardEnrolmentError.notTestnet }
     }
 

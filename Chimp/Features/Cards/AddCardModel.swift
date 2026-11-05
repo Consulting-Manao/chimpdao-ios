@@ -131,6 +131,9 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     /// Lecture en cours (G1, A8) ou vérification en ligne.
     private(set) var isReading = false
     private(set) var isBusy = false
+    /// La signature se prépare encore (réseau, avant la session NFC) : la feuille dit « Getting ready… » au lieu de
+    /// « Hold your card » (demande de Barth du 2026-11-05).
+    private(set) var isGettingReady = false
     private(set) var problem: AddCardProblem?
     var isShowingTapSheet = false
     /// Scans lancés : le scan automatique n'a lieu que si aucun n'a démarré pendant sa courte pause.
@@ -438,7 +441,11 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         scanAttempts += 1
         isBusy = true
         problem = nil
-        defer { isBusy = false }
+        isGettingReady = true
+        defer {
+            isBusy = false
+            isGettingReady = false
+        }
         let declared: DeclaredAuthorization
         do {
             declared = try await service.declareLink(pocket: addable.pocket, account: account)
@@ -446,6 +453,7 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             problem = AddCardProblem(kind: .network, technicalDetails: OnboardingModel.details(error))
             return
         }
+        isGettingReady = false
         do {
             let signature: ChipSignedDigest
             if pinMode == .choose, let chosenPIN {
@@ -647,7 +655,11 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
         scanAttempts += 1
         isBusy = true
         problem = nil
-        defer { isBusy = false }
+        isGettingReady = true
+        defer {
+            isBusy = false
+            isGettingReady = false
+        }
         do {
             if let current = prepared, try await !service.needsRefresh(current) {
                 // Encore valable.
@@ -659,6 +671,7 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
             return
         }
         guard let prepared else { return }
+        isGettingReady = false
         let accepted: [ChipPublicKey] = if let member {
             prepared.acceptedKeys.filter { $0 == member.publicKey }
         } else if let chosenMember {

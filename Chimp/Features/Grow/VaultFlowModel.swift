@@ -102,6 +102,9 @@ final class VaultFlowModel {
     /// Écran « le montant a bougé », par-dessus la vérification.
     private(set) var amountMoved: AmountMoved?
     private(set) var tapProblem: TapProblem?
+    /// Après le PIN (ou « Scan my card ») : la signature se prépare encore (réseau), la fenêtre NFC d'iOS n'est pas
+    /// encore ouverte. La feuille dit « Getting ready… » au lieu de « Hold your card » (demande de Barth du 2026-11-05).
+    private(set) var isGettingReady = false
     private(set) var technicalDetails: String?
 
     private(set) var pending: PendingSend?
@@ -545,14 +548,20 @@ final class VaultFlowModel {
     private func startScan(after pause: Duration) {
         guard case .waitingForTap(let step) = stage, prepared != nil || preparation != nil else { return }
         stage = .scanning(step)
+        isGettingReady = true
         tapProblem = nil
         Task {
             if pause > .zero { try? await Task.sleep(for: pause) }
             // PIN tapé plus vite que le réseau : on attend la préparation. Ratée, `confirmReview` revient à la vérification.
-            guard let current = await readyPrepared() else { return }
+            guard let current = await readyPrepared() else {
+                isGettingReady = false
+                return
+            }
             do {
                 let fresh = try await service.refreshedIfNeeded(current)
                 prepared = fresh
+                // La session NFC s'ouvre maintenant.
+                isGettingReady = false
                 switch step {
                 case .tapToRead:
                     let read = try await service.readCard(for: fresh)
@@ -571,6 +580,7 @@ final class VaultFlowModel {
                     await send(signed)
                 }
             } catch {
+                isGettingReady = false
                 handleTapError(error, step: step)
             }
         }

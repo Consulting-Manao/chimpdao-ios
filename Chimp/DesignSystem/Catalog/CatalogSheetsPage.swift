@@ -9,6 +9,7 @@ struct CatalogSheetsPage: View {
     @State private var isTapSheetPresented = false
     @State private var isPinSheetPresented = false
     @State private var isScanning = false
+    @State private var isGettingReady = false
     @State private var blocksDismiss = false
     @State private var pin = ""
     @State private var pinState = ChimpPinState.entering
@@ -30,6 +31,14 @@ struct CatalogSheetsPage: View {
                 ChimpButton("Infineon · PIN already typed", kind: .secondary) { presentTapSheet(.ready) }
                 ChimpButton("Infineon · PIN after the tap", kind: .secondary) { presentTapSheet(.afterTap) }
                 ChimpButton("DUOX · no PIN", kind: .secondary) { presentTapSheet(.notNeeded) }
+                ChimpButton("Getting ready (4 s), then the tap", kind: .secondary) {
+                    presentTapSheet(.ready)
+                    isGettingReady = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(4))
+                        isGettingReady = false
+                    }
+                }
             }
 
             VStack(alignment: .leading, spacing: ChimpSpacing.m) {
@@ -48,7 +57,7 @@ struct CatalogSheetsPage: View {
         .chimpSheet(
             isPresented: $isTapSheetPresented,
             height: ChimpSize.cardTapSheetHeight,
-            isDismissDisabled: blocksDismiss || isScanning
+            isDismissDisabled: blocksDismiss || isScanning || isGettingReady
         ) {
             CardTapSheet(
                 cardName: "Jungle",
@@ -58,6 +67,7 @@ struct CatalogSheetsPage: View {
                 who: "It's from Jungle's wallet, so only that card works.",
                 pinStatus: tapStatus,
                 isScanning: isScanning,
+                isGettingReady: isGettingReady,
                 onScan: simulateScan,
                 onCancel: { isTapSheetPresented = false }
             )

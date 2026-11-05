@@ -103,6 +103,9 @@ final class RemoveCardModel {
     var isShowingPINSheet = false
     var isShowingTapSheet = false
     private(set) var isBusy = false
+    /// La signature se prépare encore (réseau, avant la session NFC) : la feuille dit « Getting ready… » au lieu de
+    /// « Hold your card » (demande de Barth du 2026-11-05).
+    private(set) var isGettingReady = false
     /// Scans lancés : le scan automatique n'a lieu que si aucun n'a démarré pendant sa courte pause.
     private(set) var scanAttempts = 0
     private(set) var problem: RemoveCardProblem?
@@ -205,7 +208,11 @@ final class RemoveCardModel {
         scanAttempts += 1
         isBusy = true
         problem = nil
-        defer { isBusy = false }
+        isGettingReady = true
+        defer {
+            isBusy = false
+            isGettingReady = false
+        }
         do {
             if let current = prepared, try await !service.needsRefresh(current) {
                 // Encore valable.
@@ -227,6 +234,7 @@ final class RemoveCardModel {
             return
         }
         guard let prepared else { return }
+        isGettingReady = false
         do {
             let signed = try await signer.sign(digests: [prepared.digest], acceptedKeys: prepared.acceptedKeys, pin: pin.isEmpty ? nil : pin)
             signature = signed

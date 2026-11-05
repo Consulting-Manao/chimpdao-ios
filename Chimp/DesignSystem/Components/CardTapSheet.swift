@@ -35,6 +35,9 @@ struct CardTapSheet: View {
     let pinStatus: CardTapPinStatus
     /// Session NFC en cours d'ouverture : le bouton affiche une roue et ne réagit plus.
     var isScanning = false
+    /// L'app prépare encore ce que la carte va signer (réseau, avant la session NFC) : la fenêtre d'iOS n'est pas encore
+    /// là, donc la feuille ne dit pas encore de poser la carte (demande de Barth du 2026-11-05).
+    var isGettingReady = false
     /// Tap précédent raté, avant toute signature (carte refusée, carte retirée…) : message au-dessus du bouton.
     var problem: LocalizedStringKey?
     /// Texte technique de ce problème, repliable (« Technical details »).
@@ -51,19 +54,42 @@ struct CardTapSheet: View {
                     .textCase(.uppercase)
                     .foregroundStyle(.chimpTextSecondary)
             }
-            Text(title ?? "Hold your \(cardName) card to your phone")
-                .chimpFont(.sheetTitle)
-                .padding(.top, ChimpSpacing.s)
-                .accessibilityAddTraits(.isHeader)
-            // Même consigne que le texte de la fenêtre NFC d'iOS (alertMessage), à reprendre dans Core/NFC.
-            Text("Place it flat against the top of the back of your iPhone and keep it still.")
-                .chimpFont(.bodyS)
-                .foregroundStyle(.chimpTextSecondary)
-                .padding(.top, ChimpSpacing.xs)
+            Group {
+                if isGettingReady {
+                    Text("Getting ready…")
+                } else {
+                    Text(title ?? "Hold your \(cardName) card to your phone")
+                }
+            }
+            .chimpFont(.sheetTitle)
+            .padding(.top, ChimpSpacing.s)
+            .accessibilityAddTraits(.isHeader)
+            Group {
+                if isGettingReady {
+                    Text("Checking with Stellar. Your phone will ask for your card in a moment.")
+                } else {
+                    // Même consigne que le texte de la fenêtre NFC d'iOS (alertMessage), à reprendre dans Core/NFC.
+                    Text("Place it flat against the top of the back of your iPhone and keep it still.")
+                }
+            }
+            .chimpFont(.bodyS)
+            .foregroundStyle(.chimpTextSecondary)
+            .padding(.top, ChimpSpacing.xs)
 
             Spacer(minLength: ChimpSpacing.s)
-            ChimpNFCRings {
-                ChimpCardThumbnail(color: cardColor, badge: cardBadge)
+            Group {
+                if isGettingReady {
+                    VStack(spacing: ChimpSpacing.m) {
+                        ChimpCardThumbnail(color: cardColor, badge: cardBadge)
+                            .opacity(0.5)
+                        ProgressView()
+                            .controlSize(.large)
+                    }
+                } else {
+                    ChimpNFCRings {
+                        ChimpCardThumbnail(color: cardColor, badge: cardBadge)
+                    }
+                }
             }
             .accessibilityHidden(true)
             Spacer(minLength: ChimpSpacing.s)
@@ -95,7 +121,7 @@ struct CardTapSheet: View {
                 .padding(.top, ChimpSpacing.s)
             }
 
-            ChimpButton("Scan my card", isLoading: isScanning, action: onScan)
+            ChimpButton("Scan my card", isLoading: isScanning || isGettingReady, action: onScan)
                 .padding(.top, ChimpSpacing.ml)
 
             if let onCancel {
@@ -141,6 +167,7 @@ struct CardTapSheet: View {
 private struct CardTapSheetPreview: View {
     @State private var isPresented = true
     var pinStatus: CardTapPinStatus
+    var isGettingReady = false
 
     var body: some View {
         Color(.chimpBackground)
@@ -153,6 +180,7 @@ private struct CardTapSheetPreview: View {
                     what: "Paying Maya $25.00",
                     who: "It's from Jungle's wallet, so only that card works.",
                     pinStatus: pinStatus,
+                    isGettingReady: isGettingReady,
                     onScan: {},
                     onCancel: { isPresented = false }
                 )
@@ -162,6 +190,10 @@ private struct CardTapSheetPreview: View {
 
 #Preview("Infineon · PIN saisi") {
     CardTapSheetPreview(pinStatus: .ready)
+}
+
+#Preview("Préparation en cours") {
+    CardTapSheetPreview(pinStatus: .ready, isGettingReady: true)
 }
 
 #Preview("DUOX · sombre") {

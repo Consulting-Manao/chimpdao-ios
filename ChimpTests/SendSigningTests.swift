@@ -188,6 +188,34 @@ struct SendSigningTests {
         #expect(service.signCount == 1)
     }
 
+    @Test("PIN tapé avant la fin de la préparation : « Getting ready » jusqu'à l'ouverture de la fenêtre NFC, plus après")
+    func gettingReadyUntilNFC() async {
+        let (model, service) = await reviewReady(drawerID: "0421", order: .pinThenTap)
+        service.delay = .milliseconds(400)
+        #expect(!model.isGettingReady)
+        model.confirmReview()
+        model.pinEntered("1234")
+        await waitUntil { model.isGettingReady }
+        #expect(model.isGettingReady, "La feuille ne dit pas encore de poser la carte")
+        #expect(service.signCount == 0)
+        await waitUntil { isSent(model) }
+        #expect(!model.isGettingReady)
+        #expect(service.signCount == 1)
+    }
+
+    @Test("Préparation ratée après le PIN : « Getting ready » s'arrête, retour à la vérification, rien de signé")
+    func gettingReadyStopsOnFailure() async {
+        let (model, service) = await reviewReady(drawerID: "0421", order: .pinThenTap)
+        service.delay = .milliseconds(200)
+        service.nextPrepareError = StellarError.rpc("down")
+        model.confirmReview()
+        model.pinEntered("1234")
+        await waitUntil { model.signingStage == .idle }
+        #expect(model.signingStage == .idle)
+        #expect(!model.isGettingReady)
+        #expect(service.signCount == 0)
+    }
+
     @Test("Préparation ratée pendant la saisie du PIN : retour à la vérification avec le message, PIN effacé, rien de signé")
     func preparationFailsDuringPin() async {
         let (model, service) = await reviewReady(drawerID: "0421", order: .pinThenTap)

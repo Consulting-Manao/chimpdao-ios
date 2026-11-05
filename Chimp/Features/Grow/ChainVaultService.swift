@@ -138,15 +138,18 @@ final class ChainVaultService: VaultService {
     func prepare(_ draft: VaultDraft) async throws -> PreparedVault {
         let (adapter, venue, asset) = try vault()
         let source = try Account(accountId: config.feePayer, sequenceNumber: 0)
+        // Lu pendant les autres lectures (2026-11-05, vitesse).
+        async let accountCards = mainAccountCards(of: draft.drawer, source: source)
         let call: ContractCall
         let shown: SignedTerms
         switch draft.action {
         case .deposit:
             let units = try SwapUnits.units(of: draft.amount, asset: asset)
             // Solde relu : on ne signe jamais sur un solde inconnu ou insuffisant.
-            let held = try await SACClient(client: client).balance(token: venue.asset.contract, holder: draft.drawer.address, source: source)
-            try PaymentClient.checkBalance(held, units: UInt64(units))
-            call = try await adapter.depositCall(venue: venue, amount: TokenAmount(units), authorizer: draft.drawer.address)
+            async let heldRead = SACClient(client: client).balance(token: venue.asset.contract, holder: draft.drawer.address, source: source)
+            async let depositCall = adapter.depositCall(venue: venue, amount: TokenAmount(units), authorizer: draft.drawer.address)
+            try PaymentClient.checkBalance(try await heldRead, units: UInt64(units))
+            call = try await depositCall
             shown = SignedTerms(
                 action: .deposit, contract: venue.id, authorizer: draft.drawer.address, assetIn: venue.asset.contract, amountIn: units,
                 assetOut: venue.id, minimumOut: nil, route: [], deadline: nil
@@ -156,10 +159,10 @@ final class ChainVaultService: VaultService {
             // Les parts et le minimum **du brouillon** (ceux de l'écran) ; le vault est relu pour vérifier qu'il rend au
             // moins ce minimum maintenant, sinon rien n'est signé.
             let position = YieldPosition(protocolID: adapter.id, venueID: venue.id, holder: draft.drawer.address, shares: 0, value: 0)
-            let fresh = try await adapter.withdrawQuote(position: position, amount: TokenAmount(draft.quote.shares.units), all: true)
-            guard fresh.shares.units >= draft.quote.shares.units else { throw YieldError.notEnoughShares }
-            let value = try await adapter.valueOf(shares: draft.quote.shares, in: venue)
-            guard value >= minimum.units else { throw VaultServiceError.priceMoved }
+            async let freshQuote = adapter.withdrawQuote(position: position, amount: TokenAmount(draft.quote.shares.units), all: true)
+            async let valueRead = adapter.valueOf(shares: draft.quote.shares, in: venue)
+            guard try await freshQuote.shares.units >= draft.quote.shares.units else { throw YieldError.notEnoughShares }
+            guard try await valueRead >= minimum.units else { throw VaultServiceError.priceMoved }
             call = try DeFindexCalls.withdraw(vault: venue.id, from: draft.drawer.address, shares: draft.quote.shares.units, minimumOut: minimum.units)
             shown = SignedTerms(
                 action: .withdraw, contract: venue.id, authorizer: draft.drawer.address, assetIn: venue.id, amountIn: draft.quote.shares.units,
@@ -174,8 +177,7 @@ final class ChainVaultService: VaultService {
         switch draft.drawer.kind {
         case .main:
             authorizer = .account(draft.drawer.address)
-            acceptedKeys = try await ChimpAccountClient(client: client, config: config)
-                .cards(account: draft.drawer.address, source: source).map(\.publicKey)
+            acceptedKeys = try await accountCards
         case .card:
             guard let key = drawers.cardKey(drawerID: draft.drawer.id) else { throw VaultServiceError.unknownDrawer(draft.drawer.id) }
             authorizer = .pocket(draft.drawer.address)
@@ -188,6 +190,12 @@ final class ChainVaultService: VaultService {
             // La simulation du Main account exécute l'appel : un refus du vault a un nom.
             throw DeFindexAdapter.yieldError(for: error) ?? error
         }
+    }
+
+    /// Les cartes du Main account (relues sur la chaîne) ; aucune pour le wallet d'une carte.
+    private func mainAccountCards(of drawer: SendDrawer, source: Account) async throws -> [ChipPublicKey] {
+        guard case .main = drawer.kind else { return [] }
+        return try await ChimpAccountClient(client: client, config: config).cards(account: drawer.address, source: source).map(\.publicKey)
     }
 
     func refreshedIfNeeded(_ prepared: PreparedVault) async throws -> PreparedVault {

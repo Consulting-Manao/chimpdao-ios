@@ -57,6 +57,20 @@ struct SwapFlowTests {
         model.scanCard()
     }
 
+    @Test("Swap : « Getting ready » pendant la préparation après le PIN, plus une fois la fenêtre NFC ouverte")
+    func gettingReadyUntilNFC() async {
+        let (model, service) = await reviewReady()
+        service.delay = .milliseconds(400)
+        model.confirmReview()
+        await waitUntil { model.stage == .enteringPin }
+        model.pinEntered("1234")
+        await waitUntil { model.isGettingReady }
+        #expect(model.isGettingReady)
+        await waitUntil(seconds: 4) { isSent(model) }
+        #expect(isSent(model))
+        #expect(!model.isGettingReady)
+    }
+
     // MARK: Devis en direct
 
     @Test("Devis : 400 XLM → 99,68 USDC (quantités seulement), minimum au slippage par défaut 0,5 % = 99,1816 USDC")
