@@ -13,9 +13,12 @@ struct ChimpPullBackground: View {
     let pull: ChimpPull
     let color: Color
     var patternOpacity: Double = ChimpOpacity.pattern
-    private let height: CGFloat = 320
 
     var body: some View {
+        // Seulement la bande découverte au-dessus de l'en-tête (rien au repos) : sous un en-tête plus court que le Wallet,
+        // un fond de hauteur fixe dépassait derrière les pastilles de Grow (retour de Barth, 2026-11-06). 2 pt de plus,
+        // cachés sous l'en-tête, évitent un liseré.
+        let height = pull.distance + 2
         let tile = ChimpPattern.tileHeight
         color
             .overlay(alignment: .top) {
