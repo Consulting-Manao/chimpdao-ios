@@ -112,7 +112,7 @@ struct GrowView: View {
             if isLoadingFirst {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, ChimpSpacing.xl)
             } else if let drawer = drawers.first(where: { $0.id == selectedDrawerID }) {
-                drawerSection(drawer, compact: false, alwaysShow: true)
+                drawerSection(drawer, alwaysShow: true)
             } else if pots.isEmpty {
                 Text("Nothing growing yet.").chimpFont(.bodyS).foregroundStyle(.chimpTextSecondary).padding(.horizontal, 2)
                 if !model.plantable.isEmpty {
@@ -121,7 +121,7 @@ struct GrowView: View {
             } else {
                 ForEach(drawers) { drawer in
                     if pots.contains(where: { $0.drawerID == drawer.id }) {
-                        drawerSection(drawer, compact: true, alwaysShow: false)
+                        drawerSection(drawer, alwaysShow: false)
                     }
                 }
                 // Les protocoles où rien ne pousse encore, quel que soit le tiroir (Barth, 2026-11-05).
@@ -156,7 +156,7 @@ struct GrowView: View {
     }
 
     @ViewBuilder
-    private func drawerSection(_ drawer: SendDrawer, compact: Bool, alwaysShow: Bool) -> some View {
+    private func drawerSection(_ drawer: SendDrawer, alwaysShow: Bool) -> some View {
         let mine = pots.filter { $0.drawerID == drawer.id }
         if !mine.isEmpty {
             Text(verbatim: drawerLabel(drawer, pots: mine))
@@ -164,7 +164,7 @@ struct GrowView: View {
                 .textCase(.uppercase)
                 .foregroundStyle(.chimpTextSecondary)
             ForEach(mine) { pot in
-                Button { onOpen(.pot(pot.mark, drawerAddress: pot.drawerAddress)) } label: { card(pot, compact: compact) }
+                Button { onOpen(.pot(pot.mark, drawerAddress: pot.drawerAddress)) } label: { card(pot) }
                     .buttonStyle(ChimpPressableStyle())
             }
         } else if alwaysShow {
@@ -183,8 +183,10 @@ struct GrowView: View {
         return "\(name) · \(ChimpPrivacy.amount(Self.dollars(total, locale: locale), hidden: hidesAmounts))"
     }
 
-    private func card(_ pot: GrowPot, compact: Bool) -> some View {
-        ChimpPotCard(mark: pot.mark, subtitle: Self.subtitle(pot), compact: compact) {
+    /// Même taille dans « All drawers » et dans un tiroir : rien ne bouge d'un onglet à l'autre (Barth, 2026-11-06 ; la
+    /// maquette serrait les cartes de « All drawers »).
+    private func card(_ pot: GrowPot) -> some View {
+        ChimpPotCard(mark: pot.mark, subtitle: Self.subtitle(pot)) {
             if let value = pot.value {
                 // Le CETES montre l'évolution de son prix en pourcentage : pas un montant, toujours visible.
                 ChimpPotAmount(
