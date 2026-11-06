@@ -32,6 +32,17 @@ struct GrowTextsTests {
         #expect(GrowView.amount(xoxno.value!, pot: xoxno, locale: us) == "500.84")
     }
 
+    @Test("Pot Solv : six décimales pour le bitcoin (0,00046 SolvBTC n'est plus « 0,00 »), tronquées")
+    func bitcoinPot() {
+        let solv = GrowPot(
+            mark: .solv, drawerID: "main", drawerAddress: "C", asset: .solvbtc, state: .growing,
+            value: Decimal(string: "0.000462379")!, putIn: nil, since: nil, basisPriceUSD: nil, priceUSD: nil, withdrawableNow: nil
+        )
+        #expect(GrowView.amount(solv.value!, pot: solv, locale: us) == "0.000462")
+        #expect(GrowView.potNumber(Decimal(string: "0.000462")!, asset: .solvbtc, locale: fr) == "0,000462")
+        #expect(GrowView.potNumber(Decimal(string: "500.849")!, asset: .usdc, locale: us) == "500.84", "Les autres pots gardent deux décimales")
+    }
+
     @Test("Pastille : croissance réelle en quantité, évolution du prix pour les CETES, rouge si négative, rien sans base")
     func chip() {
         let up = pot(.defindex, value: "50.12", putIn: 50)

@@ -134,7 +134,7 @@ struct PotView: View {
                 Text("You have").textCase(.uppercase).chimpFont(.label).foregroundStyle(Color(.chimpTicketMuted))
                 if let value = pot.value {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(verbatim: ChimpPrivacy.amount(GrowView.twoDecimals(value, locale: locale), hidden: hidesAmounts))
+                        Text(verbatim: ChimpPrivacy.amount(GrowView.potNumber(value, asset: pot.asset, locale: locale), hidden: hidesAmounts))
                             .chimpFont(.receiptBig)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)

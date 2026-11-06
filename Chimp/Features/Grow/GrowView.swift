@@ -267,17 +267,28 @@ struct GrowView: View {
 
     /// DeFindex : « 50.12 XLM » ; XOXNO et Etherfuse : le nombre seul, « 1,820.40 » (maquette).
     static func amount(_ value: Decimal, pot: GrowPot, locale: Locale) -> String {
-        let number = twoDecimals(value, locale: locale)
+        let number = potNumber(value, asset: pot.asset, locale: locale)
         return pot.mark == .defindex ? "\(number) \(pot.asset.code)" : number
+    }
+
+    /// Le montant d'un pot dans son actif : deux décimales, six pour le bitcoin (SolvBTC, xSolvBTC), sinon un pot de
+    /// 0,00046 SolvBTC affichait « 0,00 » (retour de Barth, 2026-11-06).
+    static func potNumber(_ value: Decimal, asset: SendAsset, locale: Locale) -> String {
+        decimals(value, digits: SendAsset.displayedDigits(code: asset.code), locale: locale)
     }
 
     /// Deux décimales, séparateur de milliers, tronqué (jamais arrondi vers le haut).
     static func twoDecimals(_ value: Decimal, locale: Locale) -> String {
+        decimals(value, digits: 2, locale: locale)
+    }
+
+    /// `digits` décimales, séparateur de milliers, tronqué (jamais arrondi vers le haut).
+    static func decimals(_ value: Decimal, digits: Int, locale: Locale) -> String {
         var source = value
         var truncated = Decimal()
-        NSDecimalRound(&truncated, &source, 2, .down)
+        NSDecimalRound(&truncated, &source, digits, .down)
         // L'espace fine des milliers (français) n'existe pas dans Luckiest Guy : une espace normale à la place.
-        return NSDecimalNumber(decimal: truncated).doubleValue.formatted(.number.precision(.fractionLength(2)).grouping(.automatic).locale(locale))
+        return NSDecimalNumber(decimal: truncated).doubleValue.formatted(.number.precision(.fractionLength(digits)).grouping(.automatic).locale(locale))
             .replacingOccurrences(of: "\u{202F}", with: " ").replacingOccurrences(of: "\u{00A0}", with: " ")
     }
 
