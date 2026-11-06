@@ -191,7 +191,9 @@ final class ChainWalletReader: WalletChain {
         let source = try source()
         let sac = SACClient(client: client)
         let assets = try assets()
-        return try await withThrowingTaskGroup(of: (Int, AssetAmount).self) { group in
+        // Les tâches du groupe ne lisent que la chaîne ; la conversion en montants (décimales de chaque actif) se fait
+        // ensuite, sur le fil principal (sans avertissement Swift 6 en Release, 2026-11-06).
+        let units = try await withThrowingTaskGroup(of: (Int, Decimal).self) { group in
             for (index, asset) in assets.enumerated() {
                 group.addTask { [cache, config] in
                     // Clé du terminal : `bal:{passphrase}:{adresse}:{actif}`.
@@ -201,12 +203,15 @@ final class ChainWalletReader: WalletChain {
                     guard let units = read else {
                         throw StellarError.noReturnValue("balance")
                     }
-                    return (index, AssetAmount(code: asset.code, amount: SACClient.amount(fromUnits: units, chainDecimals: SendAsset.decimals(code: asset.code))))
+                    return (index, units)
                 }
             }
-            var result: [(Int, AssetAmount)] = []
+            var result: [(Int, Decimal)] = []
             for try await entry in group { result.append(entry) }
             return result.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+        return zip(assets, units).map { asset, units in
+            AssetAmount(code: asset.code, amount: SACClient.amount(fromUnits: units, chainDecimals: SendAsset.decimals(code: asset.code)))
         }
     }
 
