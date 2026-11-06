@@ -694,6 +694,7 @@ final class VaultFlowModel {
         cardCheck = nil
         prepared = nil
         tapProblem = nil
+        isGettingReady = false
         stage = .idle
     }
 

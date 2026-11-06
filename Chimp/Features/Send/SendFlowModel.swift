@@ -511,6 +511,9 @@ final class SendFlowModel {
                 pinState = .entering
                 cardCheck = nil
                 tapProblem = nil
+                // Retour à la vérification : la feuille « Getting ready » disparaît en même temps, sans attendre la tâche
+                // du scan (course visible dans les tests en Release, 2026-11-06).
+                isGettingReady = false
                 signingStage = .idle
                 signingErrorMessage = Self.preparationMessage(for: error, drawer: draft.drawer)
                 technicalDetails = Self.details(error)
@@ -669,6 +672,7 @@ final class SendFlowModel {
             cardCheck = nil
             prepared = nil
             tapProblem = nil
+            isGettingReady = false
             signingStage = .idle
         case .idle, .preparing, .scanning, .sending, .checking, .finished:
             break

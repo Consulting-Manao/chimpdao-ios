@@ -700,6 +700,7 @@ final class SwapFlowModel {
         cardCheck = nil
         prepared = nil
         tapProblem = nil
+        isGettingReady = false
         stage = .idle
     }
 
