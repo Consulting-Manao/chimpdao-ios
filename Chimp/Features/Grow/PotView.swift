@@ -197,6 +197,9 @@ struct PotView: View {
                 ChimpReceiptRow(label: "Positions", value: "\(pot.positions)")
             }
         }
+        if let rate = model.rates[mark] {
+            ChimpReceiptRow(label: "Rate today", value: GrowView.rateText(rate, locale: locale))
+        }
     }
 
     // MARK: Boutons

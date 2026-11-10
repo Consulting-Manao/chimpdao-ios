@@ -78,7 +78,8 @@ struct GrowDemoRoot: View {
         self.lendingService = lendingService
         _model = State(initialValue: GrowModel(
             service: service, savingsService: MockSavingsService(scenario: savings), lendingService: lendingService,
-            sentoraService: sentoraService, priceOracle: MockPriceOracle(), history: MemoryPotHistoryStore()
+            sentoraService: sentoraService, priceOracle: MockPriceOracle(), history: MemoryPotHistoryStore(),
+            rateReader: MockGrowRates()
         ))
         _path = State(initialValue: start)
     }
@@ -94,6 +95,7 @@ struct GrowDemoRoot: View {
                     destination(route).toolbar(.hidden, for: .navigationBar)
                 }
         }
+        .environment(\.chimpPotRates, model.rates)
     }
 
     @ViewBuilder

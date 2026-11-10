@@ -186,7 +186,7 @@ struct GrowView: View {
     /// Même taille dans « All drawers » et dans un tiroir : rien ne bouge d'un onglet à l'autre (Barth, 2026-11-06 ; la
     /// maquette serrait les cartes de « All drawers »).
     private func card(_ pot: GrowPot) -> some View {
-        ChimpPotCard(mark: pot.mark, subtitle: Self.subtitle(pot)) {
+        ChimpPotCard(mark: pot.mark, subtitle: Self.subtitle(pot, rate: model.rates[pot.mark], locale: locale)) {
             if let value = pot.value {
                 // Le CETES montre l'évolution de son prix en pourcentage : pas un montant, toujours visible.
                 ChimpPotAmount(
@@ -217,7 +217,7 @@ struct GrowView: View {
             VStack(spacing: ChimpSpacing.listGap) {
                 ForEach(choice.marks) { mark in
                     Button { plant(drawer: choice.drawer, marks: [mark]) } label: {
-                        ChimpPotCard(mark: mark, subtitle: Self.grows(mark), compact: true) {
+                        ChimpPotCard(mark: mark, subtitle: Self.withRate(Self.grows(mark), rate: model.rates[mark], locale: locale), compact: true) {
                             Image(systemName: "chevron.right").fontWeight(.black).foregroundStyle(.chimpTextSecondary)
                         }
                     }
@@ -253,6 +253,11 @@ struct GrowView: View {
         case .etherfuse: String(localized: "CETES · Mexican bonds")
         case .ondo: String(localized: "USDY · US Treasuries")
         }
+    }
+
+    /// Le sous-titre d'une carte de pot, avec le taux du moment quand il pousse et qu'on le connaît.
+    static func subtitle(_ pot: GrowPot, rate: Decimal?, locale: Locale) -> String {
+        pot.state == .growing ? withRate(subtitle(pot), rate: rate, locale: locale) : subtitle(pot)
     }
 
     static func subtitle(_ pot: GrowPot) -> String {

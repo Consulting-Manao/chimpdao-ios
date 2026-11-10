@@ -45,7 +45,8 @@ struct MainTabView: View {
             sentoraService: config.features.grow && config.integrations?.sentora != nil ? ChainSentoraService(session: session) : nil,
             solvService: config.solv != nil ? ChainSolvService(session: session) : nil,
             solvPricing: config.solv != nil ? StablebondWalletPrices(config: config) : nil,
-            priceOracle: ReflectorPriceOracle.shared, history: DefaultsPotHistoryStore()
+            priceOracle: ReflectorPriceOracle.shared, history: DefaultsPotHistoryStore(),
+            rateReader: XoxnoRateClient(config: config)
         ))
         // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
@@ -57,6 +58,7 @@ struct MainTabView: View {
     var body: some View {
         tabs
             .environment(\.chimpHidesAmounts, session.preferences.hidesBalances)
+            .environment(\.chimpPotRates, growModel.rates)
     }
 
     @ViewBuilder

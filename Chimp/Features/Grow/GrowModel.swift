@@ -36,6 +36,9 @@ final class GrowModel {
     /// Prix du XLM en dollars (oracle Reflector, lecture seule) : seulement pour le total « grown in total » (G1).
     private let priceOracle: PriceOracle?
     private(set) var xlmUSD: Decimal?
+    /// Les taux du moment, pour l'affichage (`GrowRateReading`) ; le dernier relevé reste affiché si une lecture échoue.
+    private let rateReader: GrowRateReading?
+    private var publishedRates: [ChimpPotProtocol: Decimal] = [:]
     /// Les valeurs relevées une fois par jour (courbe et « THIS WEEK » de G2).
     let history: PotHistoryStore?
     private var loadTask: Task<Void, Never>?
@@ -43,7 +46,7 @@ final class GrowModel {
     init(
         service: VaultService, savingsService: SavingsService? = nil, lendingService: VaultService? = nil,
         sentoraService: VaultService? = nil, solvService: VaultService? = nil, solvPricing: StablebondWalletPrices? = nil,
-        priceOracle: PriceOracle? = nil, history: PotHistoryStore? = nil
+        priceOracle: PriceOracle? = nil, history: PotHistoryStore? = nil, rateReader: GrowRateReading? = nil
     ) {
         self.service = service
         self.savingsService = savingsService
@@ -53,6 +56,14 @@ final class GrowModel {
         self.solvPricing = solvPricing
         self.priceOracle = priceOracle
         self.history = history
+        self.rateReader = rateReader
+    }
+
+    /// Taux du moment par protocole. DeFindex n'en publie pas sans clé ; un vault qui n'investit rien rapporte 0 %.
+    var rates: [ChimpPotProtocol: Decimal] {
+        var values = publishedRates
+        if context?.vault.invested == 0 { values[.defindex] = 0 }
+        return values
     }
 
     // MARK: Pots (maquette « Chimp Grow Final »)
@@ -161,12 +172,18 @@ final class GrowModel {
             async let escrowed: Void = sentora?.refresh() ?? ()
             async let bitcoin: Void = solv?.refresh() ?? ()
             async let price: Void = loadPrice()
-            _ = await (vault, bonds, lent, escrowed, bitcoin, price)
+            async let rates: Void = loadRates()
+            _ = await (vault, bonds, lent, escrowed, bitcoin, price, rates)
             recordHistory()
         }
         loadTask = task
         await task.value
         loadTask = nil
+    }
+
+    private func loadRates() async {
+        guard let rateReader else { return }
+        publishedRates.merge(await rateReader.rates()) { _, new in new }
     }
 
     private func loadVault() async {

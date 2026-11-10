@@ -13,6 +13,7 @@ struct VaultAmountView: View {
     @Environment(\.locale) private var locale
     @Environment(\.chimpScreenInsets) private var screenInsets
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.chimpPotRates) private var rates
 
     private var isDeposit: Bool { model.action == .deposit }
     private var asset: SendAsset { model.asset }
@@ -199,6 +200,11 @@ struct VaultAmountView: View {
             .padding(.trailing, 13)
             .padding(.vertical, 5)
             .cartoonSurface(Capsule(), fill: Color(.chimpSurface))
+            if isDeposit, let rate = rates[mark] {
+                Text("\(GrowView.rateText(rate, locale: locale)) today. It can change.")
+                    .chimpFont(.captionStrong)
+                    .foregroundStyle(.chimpTextSecondary)
+            }
             if let issue {
                 Text(issueLine(issue))
                     .chimpFont(.captionStrong)

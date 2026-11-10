@@ -180,6 +180,8 @@ struct IntegrationConfig: Equatable, Sendable {
         /// Le profil de risque des positions créées par l'app (1, « Blue Chip »).
         let spokeID: UInt32
         let name: String
+        /// API publique de XOXNO, sans clé : le taux de dépôt du marché (affichage seulement).
+        var ratesAPI: URL? = nil
     }
 
     let soroswap: Soroswap
@@ -241,7 +243,8 @@ struct IntegrationConfig: Equatable, Sendable {
             controller: "CCXRWJ6SIU2WPFEGLFGJVITPL57QAYIMIO6OAM2NBGNDQSSCK2FFV3F3",
             pool: "CBSGF6QOQAMPFBEVSYPEQHSZRIHJ6RCGUPCRDMUX36DEKRWFAO2PZB5A",
             positionNFT: "CDVN5JU675MEDPVRPCYC45AHFC275UH57WEU5OTFE4WFGZBNN7HTLPSY",
-            assetCode: "USDC", hubID: 1, spokeID: 1, name: "XOXNO USDC"
+            assetCode: "USDC", hubID: 1, spokeID: 1, name: "XOXNO USDC",
+            ratesAPI: URL(string: "https://testnet-api.xoxno.com")!
         ),
         // Copie de test du 2026-11-05 (`tools/grow-testnet`) : émetteur révocable + clawback, comme celui d'Ondo.
         ondo: Ondo(
