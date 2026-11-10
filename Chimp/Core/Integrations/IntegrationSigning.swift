@@ -144,7 +144,7 @@ struct IntegrationCallClient {
             let transaction = try await AuthorizedCall.assembled(
                 client: client, source: try await client.account(config.feePayer),
                 contract: prepared.call.contract, function: prepared.call.function, arguments: prepared.call.arguments,
-                entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCode: prepared.rejectionCode,
+                entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCodes: prepared.rejectionCodes,
                 envelope: { prepared.envelope($0, card: signed.card.publicKey) }
             )
             trace.transactionMaxTime = transaction.preconditions?.timeBounds?.maxTime
@@ -172,8 +172,8 @@ struct PreparedIntegrationCall {
     /// Clés des cartes qui peuvent signer, vérifiées **avant** tout PIN.
     let acceptedKeys: [ChipPublicKey]
 
-    /// Code d'erreur du contrat quand le `recovery_id` essayé n'est pas le bon.
-    var rejectionCode: Int {
+    /// Codes d'erreur du contrat quand le `recovery_id` essayé n'est pas le bon.
+    var rejectionCodes: Set<Int> {
         authorizer.isPocket ? RecoveryIDSearch.RejectionCode.pocket : RecoveryIDSearch.RejectionCode.account
     }
 

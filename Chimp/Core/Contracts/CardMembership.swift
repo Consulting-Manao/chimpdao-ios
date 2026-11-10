@@ -32,7 +32,7 @@ struct CardMembershipClient {
             case .notEnrolled: "This card has not been set up by ChimpDAO yet."
             case .alreadyInAccount: "This card is already on this account."
             case .belongsToAnotherAccount(let account): "That card belongs to another account (\(account))."
-            case .lastCard: "This is the only card on this account. The account refuses to lose its last card (#303)."
+            case .lastCard: "This is the only card on this account. The account refuses to lose its last card."
             case .notInAccount: "This card isn't on this account."
             }
         }
@@ -154,7 +154,7 @@ struct CardMembershipClient {
             contract: prepared.account, function: "add_card",
             arguments: Self.addCardArguments(publicKey: prepared.newCard, curve: prepared.newCurve),
             entry: prepared.authorization.entry, curve: signed.card.curve, signature: signature,
-            rejectionCode: RecoveryIDSearch.RejectionCode.account,
+            rejectionCodes: RecoveryIDSearch.RejectionCode.account,
             envelope: { ChipAuthEncoding.accountAuth(publicKey: signed.card.publicKey, chipAuth: $0) }
         )
         return try await client.refitAndSubmit(transaction, feeSigner: feeSigner)
@@ -236,7 +236,7 @@ struct CardMembershipClient {
                 contract: prepared.account, function: "remove_card",
                 arguments: Self.removeCardArguments(publicKey: prepared.removedCard),
                 entry: prepared.authorization.entry, curve: signed.card.curve, signature: signature,
-                rejectionCode: RecoveryIDSearch.RejectionCode.account,
+                rejectionCodes: RecoveryIDSearch.RejectionCode.account,
                 envelope: { ChipAuthEncoding.accountAuth(publicKey: signed.card.publicKey, chipAuth: $0) }
             )
             return try await client.refitAndSubmit(transaction, feeSigner: feeSigner)
@@ -246,7 +246,7 @@ struct CardMembershipClient {
         }
     }
 
-    /// `ChimpAccount::LastCard` (`#303`), comme `lib/errors.ts` du terminal (`/error\(contract, #303\)|lastcard/i`).
+    /// `ChimpAccount::LastCard` (`#303`), ou `LastSigner` (`#504`) sur le code récent du compte.
     static func isLastCardRefusal(_ error: StellarError) -> Bool {
         let text: String
         switch error {
@@ -254,7 +254,7 @@ struct CardMembershipClient {
         case .transactionFailed(_, let detail): text = detail
         default: return false
         }
-        return text.range(of: #"error\(contract, #303\)|lastcard"#, options: [.regularExpression, .caseInsensitive]) != nil
+        return text.range(of: #"error\(contract, #(?:303|504)\)|lastcard|lastsigner"#, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     // MARK: Relectures

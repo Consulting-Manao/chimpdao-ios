@@ -99,7 +99,7 @@ struct PaymentClient {
 
     /// Met la signature de la carte dans l'entrée (`ChipAuth` pour une Pocket, `AccountAuth` pour le Main account),
     /// construit la transaction (source = payeur de frais), la simule et l'assemble ; Infineon : `recovery_id` cherché
-    /// par simulation (refus = `#201` Pocket, `#301` compte). Puis `refitAndSubmit` : frais par le serveur de frais,
+    /// par simulation (refus : `RecoveryIDSearch.RejectionCode`). Puis `refitAndSubmit` : frais par le serveur de frais,
     /// envoi, attente. Renvoie le hash.
     ///
     /// Toute erreur est rendue dans un `PaymentFailure` qui porte la trace de l'envoi : l'entrée signée est sortie du
@@ -123,7 +123,7 @@ struct PaymentClient {
                 client: client, source: try await client.account(config.feePayer),
                 contract: prepared.token, function: "transfer",
                 arguments: try SACClient.transferArguments(from: prepared.from, to: prepared.destination, units: prepared.units),
-                entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCode: prepared.rejectionCode,
+                entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCodes: prepared.rejectionCodes,
                 envelope: { prepared.envelope($0, card: signed.card.publicKey) }
             )
             trace.transactionMaxTime = transaction.preconditions?.timeBounds?.maxTime
@@ -280,8 +280,8 @@ struct PreparedPayment {
         }
     }
 
-    /// Code d'erreur du contrat quand le `recovery_id` essayé n'est pas le bon.
-    var rejectionCode: Int {
+    /// Codes d'erreur du contrat quand le `recovery_id` essayé n'est pas le bon.
+    var rejectionCodes: Set<Int> {
         switch authorizer {
         case .account: RecoveryIDSearch.RejectionCode.account
         case .pocket: RecoveryIDSearch.RejectionCode.pocket

@@ -75,7 +75,7 @@ struct PocketClient {
         }
         switch (curve, signed) {
         case (.secp256k1, .secp256k1(let signature)):
-            let found = try await RecoveryIDSearch.first(rejectionCode: RecoveryIDSearch.RejectionCode.pocket, onRejected: onRejected) { recoveryID in
+            let found = try await RecoveryIDSearch.first(rejectionCodes: RecoveryIDSearch.RejectionCode.pocket, onRejected: onRejected) { recoveryID in
                 try await build(try ChipAuthEncoding.chipAuthSecp256k1(signature: signature, recoveryID: recoveryID))
             }
             return (found.result, found.recoveryID)

@@ -50,13 +50,13 @@ struct IntegrationSigningTests {
         let chipAuth = try ChipAuthEncoding.chipAuthSecp256k1(signature: Data(repeating: 0x11, count: 64), recoveryID: 1)
         let pocketCall = try prepared()
         #expect(try base64(pocketCall.envelope(chipAuth, card: card)) == base64(chipAuth))
-        #expect(pocketCall.rejectionCode == RecoveryIDSearch.RejectionCode.pocket)
+        #expect(pocketCall.rejectionCodes == RecoveryIDSearch.RejectionCode.pocket)
         let accountCall = PreparedIntegrationCall(
             authorizer: .account(account), call: pocketCall.call, entry: pocketCall.entry, digest: pocketCall.digest,
             expirationLedger: 1120, preparedAtLedger: 1000, acceptedKeys: [card]
         )
         #expect(try base64(accountCall.envelope(chipAuth, card: card)) == base64(ChipAuthEncoding.accountAuth(publicKey: card, chipAuth: chipAuth)))
-        #expect(accountCall.rejectionCode == RecoveryIDSearch.RejectionCode.account)
+        #expect(accountCall.rejectionCodes == RecoveryIDSearch.RejectionCode.account)
     }
 
     @Test("Nonce neuf à chaque préparation : deux préparations du même swap n'ont ni le même nonce ni le même digest")

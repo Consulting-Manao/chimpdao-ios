@@ -91,7 +91,7 @@ enum AuthorizedCall {
     /// Après le tap : la signature de la carte va dans l'entrée (`envelope` : `ChipAuth` tel quel pour une Pocket,
     /// `AccountAuth { auth, key }` pour un compte), une transaction neuve (source = payeur de frais) porte l'entrée signée,
     /// elle est simulée (`enforce`) et assemblée (`prepareTransaction`). Infineon : `recovery_id` cherché par simulation
-    /// (refus = `rejectionCode`, `#201` Pocket, `#301` compte). Rien n'est envoyé : suivre avec `refitAndSubmit`.
+    /// (refus = `rejectionCodes`). Rien n'est envoyé : suivre avec `refitAndSubmit`.
     static func assembled(
         client: SorobanClient,
         source: Account,
@@ -101,7 +101,7 @@ enum AuthorizedCall {
         entry: SorobanAuthorizationEntryXDR,
         curve: ChipCurve,
         signature: ChipSignedDigest,
-        rejectionCode: Int,
+        rejectionCodes: Set<Int>,
         envelope: @escaping (SCValXDR) -> SCValXDR
     ) async throws -> Transaction {
         let build = { (chipAuth: SCValXDR) async throws -> Transaction in
@@ -116,7 +116,7 @@ enum AuthorizedCall {
         }
         switch (curve, signature) {
         case (.secp256k1, .secp256k1(let bytes)):
-            return try await RecoveryIDSearch.first(rejectionCode: rejectionCode) { recoveryID in
+            return try await RecoveryIDSearch.first(rejectionCodes: rejectionCodes) { recoveryID in
                 try await build(try ChipAuthEncoding.chipAuthSecp256k1(signature: bytes, recoveryID: recoveryID))
             }.result
         case (.p256, .p256(let bytes, let rndB)):

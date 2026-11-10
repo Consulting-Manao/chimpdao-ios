@@ -190,21 +190,48 @@ struct OnboardingCoreTests {
 
     // MARK: recovery_id par simulation
 
+    @Test("Anciens et nouveaux contrats : 201/402, 301/502, 200/101 font essayer le recovery_id suivant ; les autres codes non")
+    func renumberedRejectionCodes() async throws {
+        let code = { (n: Int) in StellarError.simulationFailed("HostError: Error(Contract, #\(n))") as Error }
+        for (codes, known) in [(RecoveryIDSearch.RejectionCode.pocket, [201, 402]), (RecoveryIDSearch.RejectionCode.account, [301, 502]), (RecoveryIDSearch.RejectionCode.nfcNft, [200, 101])] {
+            for n in known { #expect(RecoveryIDSearch.isRejectedSignature(code(n), contractCodes: codes), "\(n)") }
+        }
+        #expect(RecoveryIDSearch.isRejectedSignature(StellarError.simulationFailed(#"["failing with contract error", 402]"#), contractCodes: RecoveryIDSearch.RejectionCode.pocket))
+        // Autres codes du nouveau contrat : ce n'est pas un mauvais recovery_id.
+        #expect(!RecoveryIDSearch.isRejectedSignature(code(401), contractCodes: RecoveryIDSearch.RejectionCode.pocket), "InvalidChip")
+        #expect(!RecoveryIDSearch.isRejectedSignature(code(4020), contractCodes: RecoveryIDSearch.RejectionCode.pocket))
+        #expect(!RecoveryIDSearch.isRejectedSignature(code(501), contractCodes: RecoveryIDSearch.RejectionCode.account), "UnknownCard")
+
+        // Une Pocket récente refuse le mauvais recovery_id en #402 : la recherche passe au suivant au lieu de s'arrêter.
+        let found = try await RecoveryIDSearch.first(rejectionCodes: RecoveryIDSearch.RejectionCode.pocket) { id -> UInt32 in
+            guard id == 1 else { throw code(402) }
+            return id
+        }
+        #expect(found.recoveryID == 1)
+    }
+
+    @Test("Dernière carte : #303 sur l'ancien compte, #504 LastSigner sur le récent ; un autre code n'est pas ce refus")
+    func lastSignerCodes() {
+        #expect(CardMembershipClient.isLastCardRefusal(.simulationFailed("HostError: Error(Contract, #303)")))
+        #expect(CardMembershipClient.isLastCardRefusal(.simulationFailed("HostError: Error(Contract, #504)")))
+        #expect(!CardMembershipClient.isLastCardRefusal(.simulationFailed("HostError: Error(Contract, #503)")))
+    }
+
     @Test("Refus reconnus par contrat : #201 pour la Pocket, #200 pour nfc-nft, jamais l'un pour l'autre ; panne réseau jamais")
     func rejectionCodes() {
         let pocketRefusal = StellarError.simulationFailed("HostError: Error(Auth, InvalidAction) … data:[\"failed account authentication with error\", CA…, Error(Contract, #201)]")
-        #expect(RecoveryIDSearch.isRejectedSignature(pocketRefusal, contractCode: RecoveryIDSearch.RejectionCode.pocket))
-        #expect(!RecoveryIDSearch.isRejectedSignature(pocketRefusal, contractCode: RecoveryIDSearch.RejectionCode.nfcNft))
-        #expect(!RecoveryIDSearch.isRejectedSignature(StellarError.simulationFailed("Error(Contract, #2010)"), contractCode: 201))
-        #expect(RecoveryIDSearch.isRejectedSignature(StellarError.simulationFailed("Error(Crypto, InvalidInput) recover_key_ecdsa"), contractCode: nil))
-        #expect(!RecoveryIDSearch.isRejectedSignature(StellarError.rpc("timeout"), contractCode: 201))
-        #expect(!RecoveryIDSearch.isRejectedSignature(StellarError.simulationFailed("Error(Contract, #201)"), contractCode: nil))
+        #expect(RecoveryIDSearch.isRejectedSignature(pocketRefusal, contractCodes: RecoveryIDSearch.RejectionCode.pocket))
+        #expect(!RecoveryIDSearch.isRejectedSignature(pocketRefusal, contractCodes: RecoveryIDSearch.RejectionCode.nfcNft))
+        #expect(!RecoveryIDSearch.isRejectedSignature(StellarError.simulationFailed("Error(Contract, #2010)"), contractCodes: [201]))
+        #expect(RecoveryIDSearch.isRejectedSignature(StellarError.simulationFailed("Error(Crypto, InvalidInput) recover_key_ecdsa"), contractCodes: nil))
+        #expect(!RecoveryIDSearch.isRejectedSignature(StellarError.rpc("timeout"), contractCodes: [201]))
+        #expect(!RecoveryIDSearch.isRejectedSignature(StellarError.simulationFailed("Error(Contract, #201)"), contractCodes: nil))
     }
 
     @Test("Recherche du recovery_id : passe au suivant sur un refus, s'arrête sur le premier accepté")
     func recoverySearchFindsFirstAccepted() async throws {
         var attempts: [UInt32] = []
-        let found = try await RecoveryIDSearch.first(rejectionCode: 201) { id -> String in
+        let found = try await RecoveryIDSearch.first(rejectionCodes: [201]) { id -> String in
             attempts.append(id)
             if id < 2 { throw StellarError.simulationFailed("Error(Contract, #201)") }
             return "assembled"
@@ -218,17 +245,17 @@ struct OnboardingCoreTests {
     func recoverySearchFailures() async {
         var attempts = 0
         await #expect(throws: StellarError.rpc("down")) {
-            try await RecoveryIDSearch.first(rejectionCode: 201) { _ -> Int in
+            try await RecoveryIDSearch.first(rejectionCodes: [201]) { _ -> Int in
                 attempts += 1
                 throw StellarError.rpc("down")
             }
         }
         #expect(attempts == 1)
         await #expect(throws: StellarError.self) {
-            try await RecoveryIDSearch.first(rejectionCode: 201) { _ -> Int in throw StellarError.simulationFailed("Error(Contract, #201)") }
+            try await RecoveryIDSearch.first(rejectionCodes: [201]) { _ -> Int in throw StellarError.simulationFailed("Error(Contract, #201)") }
         }
         do {
-            _ = try await RecoveryIDSearch.first(rejectionCode: 201) { _ -> Int in throw StellarError.simulationFailed("Error(Contract, #201)") }
+            _ = try await RecoveryIDSearch.first(rejectionCodes: [201]) { _ -> Int in throw StellarError.simulationFailed("Error(Contract, #201)") }
         } catch StellarError.signatureRejected {
         } catch {
             Issue.record("expected signatureRejected, got \(error)")

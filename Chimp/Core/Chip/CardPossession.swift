@@ -75,7 +75,7 @@ enum CardPossession {
                     if try await nfcNft.verifyForCard(publicKey: card.publicKey, digest: challenge, auth: auth, contract: nftContract, source: source) {
                         return recoveryID
                     }
-                } catch where RecoveryIDSearch.isRejectedSignature(error, contractCode: nil) {
+                } catch where RecoveryIDSearch.isRejectedSignature(error, contractCodes: nil) {
                     // `verify_k1` renvoie `false` pour une autre clé, mais « trappe » sur une entrée mal formée : même sens.
                     continue
                 }

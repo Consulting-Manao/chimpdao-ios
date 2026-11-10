@@ -158,13 +158,13 @@ struct PaymentCoreTests {
         let chipAuth = try ChipAuthEncoding.chipAuthSecp256k1(signature: signature, recoveryID: 0)
         let pocketPayment = try preparedFromPocket()
         #expect(try base64(pocketPayment.envelope(chipAuth, card: k1Key)) == base64(chipAuth))
-        #expect(pocketPayment.rejectionCode == 201)
-        #expect(preparedFromAccount().rejectionCode == 301)
+        #expect(pocketPayment.rejectionCodes == [201, 402])
+        #expect(preparedFromAccount().rejectionCodes == [301, 502])
         #expect(RecoveryIDSearch.isRejectedSignature(
-            StellarError.simulationFailed("HostError: Error(Contract, #301)"), contractCode: RecoveryIDSearch.RejectionCode.account
+            StellarError.simulationFailed("HostError: Error(Contract, #301)"), contractCodes: RecoveryIDSearch.RejectionCode.account
         ))
         #expect(!RecoveryIDSearch.isRejectedSignature(
-            StellarError.simulationFailed("HostError: Error(Contract, #300)"), contractCode: RecoveryIDSearch.RejectionCode.account
+            StellarError.simulationFailed("HostError: Error(Contract, #300)"), contractCodes: RecoveryIDSearch.RejectionCode.account
         ))
     }
 

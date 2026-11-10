@@ -67,7 +67,7 @@ struct SetupRehearsalTests {
     @Test("Recherche du recovery_id : chaque refus est transmis avec son texte (question 21)")
     func rejectionsReported() async throws {
         var seen: [UInt32] = []
-        let found = try await RecoveryIDSearch.first(rejectionCode: 201, onRejected: { id, _ in seen.append(id) }) { id -> UInt32 in
+        let found = try await RecoveryIDSearch.first(rejectionCodes: [201], onRejected: { id, _ in seen.append(id) }) { id -> UInt32 in
             if id < 2 { throw StellarError.simulationFailed("Error(Contract, #201)") }
             return id
         }

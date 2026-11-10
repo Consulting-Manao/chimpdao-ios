@@ -154,11 +154,11 @@ struct CardEnrolment: CardEnrolmentService {
 
     /// Recherche du `recovery_id` par simulation (`RecoveryIDSearch`, choix de Pamphile, sans bibliothèque secp256k1) :
     /// on simule le même `mint` avec 0, 1, 2 puis 3 ; le premier accepté est le bon et sa simulation sert directement
-    /// à assembler la transaction envoyée. Refus du contrat `nfc-nft` : `#200`.
+    /// à assembler la transaction envoyée. Refus du contrat `nfc-nft` : `#200`, ou `#101` depuis la renumérotation.
     private func mintWithRecoveryID(_ plan: EnrolmentPlan, signature: Data, source: Account) async throws -> (transaction: Transaction, recoveryID: UInt32) {
         let maxTime = Self.maxTime()
         do {
-            let found = try await RecoveryIDSearch.first(rejectionCode: RecoveryIDSearch.RejectionCode.nfcNft) { recoveryID in
+            let found = try await RecoveryIDSearch.first(rejectionCodes: RecoveryIDSearch.RejectionCode.nfcNft) { recoveryID in
                 let auth = try ChipAuthEncoding.chipAuthSecp256k1(signature: signature, recoveryID: recoveryID)
                 let candidate = try Self.mintTransaction(source: Self.copy(source), plan: plan, auth: auth, maxTime: maxTime)
                 try client.assemble(candidate, with: try await client.simulate(candidate))
@@ -170,9 +170,9 @@ struct CardEnrolment: CardEnrolmentService {
         }
     }
 
-    /// Signature refusée par `nfc-nft` (`#200`) ou récupération de clé impossible.
+    /// Signature refusée par `nfc-nft` (`#200` ou `#101`) ou récupération de clé impossible.
     static func isRejectedSignature(_ error: Error) -> Bool {
-        RecoveryIDSearch.isRejectedSignature(error, contractCode: RecoveryIDSearch.RejectionCode.nfcNft)
+        RecoveryIDSearch.isRejectedSignature(error, contractCodes: RecoveryIDSearch.RejectionCode.nfcNft)
     }
 
     // MARK: Transaction
