@@ -125,10 +125,6 @@ final class ReceiveViewModel {
         }
     }
 
-    func takePaymentInPerson() {
-        // TODO(jalon 4) : shop mode (D2), si le périmètre V1 le retient (DESIGN_NOTES §12, question 2).
-    }
-
     private func resetCopied() {
         copiedResetTask?.cancel()
         isCopied = false

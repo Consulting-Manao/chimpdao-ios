@@ -56,7 +56,7 @@ struct CatalogReceivePartsPage: View {
             }
 
             section("Navigation row and tag") {
-                ChimpNavigationRow(title: "Take a payment in person", subtitle: "They tap their Chimp card on your phone") {}
+                ChimpNavigationRow(title: "Add money from another chain", subtitle: "See a live price from NEAR Intents") {}
                 ChimpTagBadge(text: "Testnet", systemImage: "exclamationmark.triangle.fill")
             }
         }

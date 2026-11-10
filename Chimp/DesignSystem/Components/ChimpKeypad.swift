@@ -24,7 +24,21 @@ struct ChimpKeypad: View {
     var mode: ChimpKeypadMode = .pin
     /// Touches moins hautes (environ 48 pt au lieu de 56), pour les petits écrans (iPhone SE).
     var isCompact = false
+    /// Les dix chiffres dans l'ordre d'affichage : les neuf premiers sur la grille, le dernier à la place du 0.
+    var digits = Self.standardDigits
     let onKey: (ChimpKeypadKey) -> Void
+
+    static let standardDigits = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
+
+    /// Un ordre aléatoire des dix chiffres (générateur système, cryptographique sur iOS).
+    static func shuffledDigits<Generator: RandomNumberGenerator>(using generator: inout Generator) -> [Int] {
+        standardDigits.shuffled(using: &generator)
+    }
+
+    static func shuffledDigits() -> [Int] {
+        var generator = SystemRandomNumberGenerator()
+        return shuffledDigits(using: &generator)
+    }
 
     @Environment(\.locale) private var locale
 
@@ -37,7 +51,7 @@ struct ChimpKeypad: View {
             ForEach(0..<3) { row in
                 GridRow {
                     ForEach(1...3, id: \.self) { column in
-                        digit(row * 3 + column)
+                        digit(digits[row * 3 + column - 1])
                     }
                 }
             }
@@ -54,7 +68,7 @@ struct ChimpKeypad: View {
                         Text(verbatim: decimalSeparator)
                     }
                 }
-                digit(0)
+                digit(digits[9])
                 ChimpKeyButton(accessibilityLabel: Text("Delete"), isCompact: isCompact) {
                     onKey(.delete)
                 } label: {

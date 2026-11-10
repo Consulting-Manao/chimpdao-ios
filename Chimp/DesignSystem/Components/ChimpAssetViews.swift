@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Icône d'un actif (DESIGN_NOTES §2.4) : USDC = carré vert avec « $ », XLM = logo Chimp (`tile-logo`), CETES = carré
-/// pêche avec « C » (maquette E3p du 2026-10-15). USDY : le logo d'Ondo pour l'USDY (2026-11-05).
+/// Icône d'un actif : le vrai logo de chaque jeton, dans un carré arrondi (demande de Barth du 2026-11-10, remplace les
+/// dessins de DESIGN_NOTES §2.4).
 enum ChimpAssetGlyph: Equatable {
     case usdc
     case xlm
@@ -21,31 +21,11 @@ struct ChimpAssetIcon: View {
         Group {
             switch glyph {
             case .usdc:
-                let shape = RoundedRectangle(cornerRadius: size / 3)
-                shape
-                    .fill(Color(.chimpCardLeaf))
-                    .overlay { shape.strokeBorder(Color(.chimpOutline), lineWidth: border) }
-                    .overlay {
-                        Text(verbatim: "$")
-                            .font(Font(ChimpFontFamily.luckiestGuy.uiFont(size: size * 0.5)))
-                            .foregroundStyle(Color(.chimpOnCardBright))
-                            .offset(y: size * 0.04)
-                    }
+                logo(.assetUsdc)
             case .xlm:
-                Image(.tileLogo)
-                    .resizable()
-                    .scaledToFit()
+                logo(.assetXlm)
             case .cetes:
-                let shape = RoundedRectangle(cornerRadius: size / 3)
-                shape
-                    .fill(Color(.chimpAssetCetes))
-                    .overlay { shape.strokeBorder(Color(.chimpOutline), lineWidth: border) }
-                    .overlay {
-                        Text(verbatim: "C")
-                            .font(Font(ChimpFontFamily.luckiestGuy.uiFont(size: size * 0.47)))
-                            .foregroundStyle(Color(.chimpTicketInk))
-                            .offset(y: size * 0.04)
-                    }
+                logo(.assetCetes)
             case .usdy:
                 logo(.assetUsdy)
             case .solvbtc:

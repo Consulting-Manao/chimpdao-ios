@@ -69,6 +69,9 @@ struct ChimpPinPad<Middle: View>: View {
 
     @State private var isShowingError = false
     @State private var shakeTrigger = 0
+    /// Chiffres mélangés à chaque ouverture du pavé, jamais pendant la saisie (demande de Barth, 2026-11-10) : un voisin ne
+    /// peut pas deviner le PIN à la position des doigts.
+    @State private var digits = ChimpKeypad.shuffledDigits()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -77,7 +80,7 @@ struct ChimpPinPad<Middle: View>: View {
             display
             middle
             Spacer(minLength: ChimpSpacing.l)
-            ChimpKeypad(mode: .pin, onKey: handle)
+            ChimpKeypad(mode: .pin, digits: digits, onKey: handle)
                 .disabled(state == .blocked || isShowingError)
                 .opacity(state == .blocked ? ChimpOpacity.disabled : 1)
         }

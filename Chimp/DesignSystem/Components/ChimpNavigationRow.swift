@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Ligne qui mène à un autre écran (« Take a payment in person > », D1) : fond `chimpSurface`,
+/// Ligne qui mène à un autre écran (« Add money from another chain > », D1) : fond `chimpSurface`,
 /// contour 3, rayon 18, titre en Luckiest Guy, sous-titre, chevron. Sans ombre.
 struct ChimpNavigationRow: View {
     let title: LocalizedStringKey
@@ -66,7 +66,7 @@ struct ChimpTagBadge: View {
 #Preview {
     VStack(spacing: ChimpSpacing.xl) {
         ChimpTagBadge(text: "Testnet", systemImage: "exclamationmark.triangle.fill")
-        ChimpNavigationRow(title: "Take a payment in person", subtitle: "They tap their Chimp card on your phone") {}
+        ChimpNavigationRow(title: "Add money from another chain", subtitle: "See a live price from NEAR Intents") {}
     }
     .padding(ChimpSpacing.screenMargin)
     .frame(maxHeight: .infinity)

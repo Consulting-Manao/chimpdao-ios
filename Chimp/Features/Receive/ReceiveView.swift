@@ -114,10 +114,6 @@ struct ReceiveView: View {
             .buttonStyle(ChimpButtonStyle())
             .disabled(isLoading || drawer == nil)
 
-            ChimpNavigationRow(title: "Take a payment in person", subtitle: "They tap their Chimp card on your phone") {
-                model.takePaymentInPerson()
-            }
-
             if let onAddMoney {
                 ChimpNavigationRow(title: "Add money from another chain", subtitle: "See a live price from NEAR Intents", action: onAddMoney)
             }
