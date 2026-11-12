@@ -38,12 +38,33 @@ protocol ChipSigner {
     func verifyPIN(expectedKey: ChipPublicKey, pin: String) async throws
     /// Changer le PIN d'une Infineon (lecture de la clé, puis CHANGE PIN) ; renvoie le nouveau PUK.
     func changePIN(expectedKey: ChipPublicKey, currentPIN: String, newPIN: String) async throws -> Data
+    /// Signatures **enchaînées**, dans le même tap : `digests` d'abord, puis les digests que `followUp` calcule à partir
+    /// de ces premières signatures (sans réseau). Sert au retrait d'une carte partenaire (contrat `prize`) : l'attestation
+    /// de la puce fait partie des arguments de `redeem`, donc de l'appel que la Pocket autorise ensuite. Mêmes garanties
+    /// que `sign(digests:acceptedKeys:pin:)` (clé lue et comparée avant tout PIN). Signatures renvoyées dans l'ordre :
+    /// `digests`, puis ceux de `followUp`.
+    func sign(
+        digests: [Data],
+        followUp: @escaping @Sendable ([ChipSignedDigest]) throws -> [Data],
+        acceptedKeys: [ChipPublicKey],
+        pin: String?
+    ) async throws -> CardSignatures
 }
 
 extension ChipSigner {
     /// Faux signataires des tests qui ne changent pas de PIN : refus, sans rien envoyer.
     func changePIN(expectedKey: ChipPublicKey, currentPIN: String, newPIN: String) async throws -> Data {
         throw ChipError.pinUnsupported
+    }
+
+    /// Faux signataires des tests qui n'enchaînent pas de signatures : refus, sans rien envoyer.
+    func sign(
+        digests: [Data],
+        followUp: @escaping @Sendable ([ChipSignedDigest]) throws -> [Data],
+        acceptedKeys: [ChipPublicKey],
+        pin: String?
+    ) async throws -> CardSignatures {
+        throw ChipError.malformedResponse("chained signing isn't supported by this signer")
     }
 }
 
@@ -141,6 +162,44 @@ enum ChipSigning {
         }
         let card = try await ChipDetector.readKey(transport)
         guard acceptedKeys.contains(card.publicKey) else { throw ChipError.cardNotAccepted(tapped: card.publicKey) }
+        return CardSignatures(card: card, signatures: try await signEach(transport, card: card, digests: digests, pin: pin))
+    }
+
+    /// Signatures enchaînées sur une carte connectée (voir `ChipSigner.sign(digests:followUp:…)`) : lecture de la clé →
+    /// comparaison → les premiers digests → `followUp` (calcul local, sans réseau) → les digests suivants, dans la même
+    /// session. Chaque signature refait la séquence complète du bridge, comme `sign(digests:acceptedKeys:pin:)`.
+    /// La première erreur arrête tout : rien n'est renvoyé, donc rien ne peut partir.
+    static func sign(
+        _ transport: some APDUTransport,
+        digests: [Data],
+        followUp: ([ChipSignedDigest]) throws -> [Data],
+        acceptedKeys: [ChipPublicKey],
+        pin: String?
+    ) async throws -> CardSignatures {
+        try checkDigests(digests)
+        let card = try await ChipDetector.readKey(transport)
+        guard acceptedKeys.contains(card.publicKey) else { throw ChipError.cardNotAccepted(tapped: card.publicKey) }
+        let first = try await signEach(transport, card: card, digests: digests, pin: pin)
+        let next = try followUp(first)
+        try checkDigests(next)
+        return CardSignatures(card: card, signatures: first + (try await signEach(transport, card: card, digests: next, pin: pin)))
+    }
+
+    /// Au moins un digest, tous de 32 octets.
+    private static func checkDigests(_ digests: [Data]) throws {
+        guard !digests.isEmpty else { throw ChipError.malformedResponse("nothing to sign") }
+        for digest in digests where digest.count != 32 {
+            throw ChipError.malformedResponse("digest must be 32 bytes, got \(digest.count)")
+        }
+    }
+
+    /// Infineon : SELECT → VERIFY PIN (si la carte a un PIN actif) → SIGN ; DUOX : Select PICC → Internal Authenticate.
+    private static func signEach(
+        _ transport: some APDUTransport,
+        card: ChipKeyInfo,
+        digests: [Data],
+        pin: String?
+    ) async throws -> [ChipSignedDigest] {
         var signatures: [ChipSignedDigest] = []
         for digest in digests {
             switch card.kind {
@@ -150,7 +209,7 @@ enum ChipSigning {
                 signatures.append(try await Duox.sign(transport, digest: digest))
             }
         }
-        return CardSignatures(card: card, signatures: signatures)
+        return signatures
     }
 
     /// `readOrSign` sur une carte connectée : lecture de la clé → comparaison → carte avec PIN actif : on s'arrête là
@@ -248,6 +307,20 @@ struct NFCChipSigner: ChipSigner {
         }
     }
 
+    func sign(
+        digests: [Data],
+        followUp: @escaping @Sendable ([ChipSignedDigest]) throws -> [Data],
+        acceptedKeys: [ChipPublicKey],
+        pin: String?
+    ) async throws -> CardSignatures {
+        try await NFCTagSession.run(
+            alertMessage: String(localized: "Hold your card near the top of your iPhone."),
+            successMessage: String(localized: "Card read.")
+        ) { transport in
+            try await ChipSigning.sign(transport, digests: digests, followUp: followUp, acceptedKeys: acceptedKeys, pin: pin)
+        }
+    }
+
     func readOrSign(digests: [Data], acceptedKeys: [ChipPublicKey]) async throws -> ReadOrSign {
         try await NFCTagSession.run(
             alertMessage: String(localized: "Hold your card near the top of your iPhone."),
@@ -302,6 +375,18 @@ struct MockChipSigner: ChipSigner {
         let signatures = try await sign(digests: digests, expectedKey: key, pin: pin)
         let kind: ChipKind = if case .p256 = signatures.first { .duox } else { .infineon2Go }
         return CardSignatures(card: ChipKeyInfo(kind: kind, publicKey: key, pinActive: kind == .infineon2Go), signatures: signatures)
+    }
+
+    /// Enchaînées : la même signature factice pour chaque digest, ceux de `followUp` compris.
+    func sign(
+        digests: [Data],
+        followUp: @escaping @Sendable ([ChipSignedDigest]) throws -> [Data],
+        acceptedKeys: [ChipPublicKey],
+        pin: String?
+    ) async throws -> CardSignatures {
+        let first = try await sign(digests: digests, acceptedKeys: acceptedKeys, pin: pin)
+        let next = try followUp(first.signatures)
+        return CardSignatures(card: first.card, signatures: first.signatures + (try next.map { _ in try outcome.get() }))
     }
 
     /// Carte factice avec PIN (Infineon) : lue seulement ; sans PIN (signature P-256) : signe.
