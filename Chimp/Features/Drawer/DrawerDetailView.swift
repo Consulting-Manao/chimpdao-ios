@@ -1,78 +1,54 @@
 import SwiftUI
 
-/// B2r · Main account (« B2 + tiles ») et B3 · wallet d'une carte (maquettes du 2026-09-30) : le total, les pastilles
-/// des cartes qui peuvent signer, une tuile par actif, « LATELY » (Main) ou les actions de la carte (B3), puis Send /
-/// Move / Swap depuis ce tiroir.
+/// B1 · page d'un tiroir (maquette « Chimp Main & Card v2 », 2026-11-12) : Main ou le wallet d'une carte. Un bandeau
+/// illustré (Chimpy dans son hamac pour Main, Chimpy et la carte pour une carte), le panneau du total avec sa barre
+/// « ready » / « growing », quatre tuiles d'action, puis les listes N1b (« Ready to spend », « Growing », « This card »).
 ///
-/// Écarts avec la maquette (DESIGN_NOTES §12) : l'adresse est ajoutée (demande de Barth) ; « Receive » a été retiré de la
-/// barre du bas le 2026-10-14 (quatre boutons coupaient « Receive ») : l'adresse copiable suffit, la place va à Grow ;
-/// « Give this card away » (G4) est masqué, session à part.
-///
-/// Grow (maquettes « B2 / B3 — SWAP + VAULT » du 2026-10-15) : la tuile « DEFINDEX · GROWING » (valeur, évolution réelle
-/// depuis le dépôt) à côté des actifs, dans les deux tiroirs (le Main de l'app est en tuiles, B2r), « Plant more » et
-/// l'avertissement sous la grille ; le bouton Grow ouvre « Put money in » depuis ce tiroir.
+/// Écarts avec la maquette (DESIGN_NOTES §14) : l'adresse copiable est dans le panneau (décision de Barth du
+/// 2026-11-12) ; toute la page défile (le bandeau part avec), pour « tirer pour rafraîchir » et les grandes tailles de
+/// texte ; le bouton retour est celui de l'app ; « Change PIN » est gardé dans « This card » ; « Give this card away »
+/// (G4) reste masqué ; l'avertissement du vault est le bloc complet de l'app (principe 6) ; les stablebonds (CETES)
+/// sont dans « Growing ».
 struct DrawerDetailView: View {
-    /// Swap éteint sur ce réseau : pas de bouton.
+    /// Swap éteint sur ce réseau : pas de tuile.
     @Environment(\.chimpFeatures) private var features
     @Bindable var model: DrawerDetailModel
-    let activity: ActivityViewModel
     var actions: DrawerDetailActions
-    /// Les positions du vault, lues par l'onglet Grow (une par tiroir).
+    /// Les positions du vault, lues par l'onglet Grow (une par tiroir). `nil` : Grow éteint sur ce réseau.
     var grow: GrowModel?
 
     @Environment(\.locale) private var locale
-    @Environment(\.chimpHidesAmounts) private var hidesAmounts
 
     @State private var renameModel: SettingsModel?
     /// G5 : le compte n'a qu'une carte (dernière lecture) ; retirer ou déclarer perdue est refusé avant tout tap.
     @State private var lastCardMode: RemoveCardModel.Mode?
+    /// Distance tirée (rafraîchir) : seul le fond la lit.
+    @State private var pull = ChimpPull()
 
     var body: some View {
-        VStack(spacing: 0) {
-            ChimpHeader(title: title, subtitle: subtitle, onBack: actions.onBack)
+        GeometryReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if model.isMissing {
-                        ChimpySays(text: "This card isn't on your account anymore.", pose: .crawl)
-                    } else if let content = model.content {
-                        balances(content)
-                    } else {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, ChimpSpacing.xl)
-                    }
-                    if !model.isMissing {
-                        if !model.isMain {
-                            sectionLabel("This card")
-                                .padding(.top, ChimpSpacing.xl)
-                            ChimpGroupedList(rows: cardRows)
-                                .padding(.top, ChimpSpacing.sm)
-                        }
-                        history
-                    }
+                    ChimpDrawerBanner(scene: scene, title: title, onBack: actions.onBack)
+                        .onGeometryChange(for: CGFloat.self) { max(0, $0.frame(in: .global).minY) } action: { pull.distance = $0 }
+                    page
                 }
-                .padding(.horizontal, ChimpSpacing.xxl)
-                .padding(.top, ChimpSpacing.xl)
-                .padding(.bottom, ChimpSpacing.xl)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: proxy.size.height + proxy.safeAreaInsets.top, alignment: .top)
             }
             .scrollBounceBehavior(.basedOnSize)
             .refreshable {
                 ChimpSoundPlayer.shared.play(.branch)
                 async let wallet: Void = model.refresh()
-                async let history: Void = activity.refresh()
                 async let vault: Void? = grow?.refresh()
-                _ = await (wallet, history, vault)
+                _ = await (wallet, vault)
             }
-            if !model.isMissing { bottomBar }
+            .background(alignment: .top) {
+                ChimpPullBackground(pull: pull, color: scene.banner, patternOpacity: 0.14)
+            }
+            .ignoresSafeArea(edges: .top)
         }
         .background(Color(.chimpBackground))
-        .task { await activity.refresh() }
         .task { await grow?.refresh() }
-        .activityReceiptSheet(
-            model: activity, onSendPrefilled: actions.onSendPrefilled, onSwapPrefilled: actions.onSwapPrefilled,
-            onPosition: actions.onPosition
-        )
         .chimpSheet(isPresented: Binding(get: { lastCardMode != nil }, set: { if !$0 { lastCardMode = nil } }), height: 560, fitsContent: true) {
             if let mode = lastCardMode {
                 LastCardSheet(mode: mode, name: model.cardName, onAddCard: {
@@ -92,112 +68,203 @@ struct DrawerDetailView: View {
         }
     }
 
-    // MARK: En-tête
-
-    private var title: LocalizedStringKey {
-        model.isMain ? "Main account" : "\(model.cardName) card"
-    }
-
-    private var subtitle: LocalizedStringKey {
-        if model.isMain { return "Shared · any of your cards can sign" }
-        return "N°\(model.card?.number ?? "····") · only this card can sign"
-    }
-
-    // MARK: Soldes
-
-    private func balances(_ content: DrawerDetailContent) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            total(content)
-            HStack(spacing: ChimpSpacing.s) {
-                ForEach(content.signers) { signer in
-                    ChimpSignerChip(name: signer.name, color: signer.color)
-                }
-            }
-            .padding(.top, ChimpSpacing.m)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(model.isMain
-                ? Text("Cards that can sign: \(content.signers.map(\.name).formatted(.list(type: .and)))")
-                : Text("Only this card can sign: \(model.cardName)"))
-
-            if let address = content.address {
-                ChimpAddressPill(address: Self.shortAddress(address), isCopied: model.isCopied, action: model.copyAddress)
-                    .padding(.top, ChimpSpacing.l)
-            }
+    @ViewBuilder
+    private var page: some View {
+        if model.isMissing {
+            ChimpySays(text: "This card isn't on your account anymore.", pose: .crawl)
+                .padding(.horizontal, ChimpSpacing.screenMargin)
+                .padding(.top, ChimpSpacing.xl)
+        } else if let content = model.content, let money = model.money {
+            let split = split(content, money: money)
+            ChimpSplitPanel(
+                kind: kind, total: split.total, ready: split.ready, growing: split.growing,
+                readyWeight: split.readyWeight, growingWeight: split.growingWeight,
+                address: content.address.map(Self.shortAddress), isCopied: model.isCopied, onCopy: model.copyAddress
+            )
+            .padding(.horizontal, ChimpSpacing.screenMargin)
+            .padding(.top, -ChimpDrawerBanner.panelOverlap)
 
             if model.wallet.isShowingStaleData {
                 ChimpNoticeBanner(text: "Couldn't refresh. Showing the last balances.", marker: .error)
+                    .padding(.horizontal, ChimpSpacing.screenMargin)
                     .padding(.top, ChimpSpacing.l)
             }
 
-            if content.isEmpty && holding(content) == nil {
-                ChimpySays(text: emptyText, pose: .plant)
-                    .padding(.top, ChimpSpacing.xl)
-            } else {
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: ChimpSpacing.m), GridItem(.flexible(), spacing: ChimpSpacing.m)],
-                    alignment: .leading,
-                    spacing: ChimpSpacing.m
-                ) {
-                    ForEach(content.assets) { asset in
-                        ChimpAssetTile(
-                            band: asset.band, bandFill: Self.bandFill(asset.code),
-                            value: asset.value ?? asset.amount, detail: asset.value == nil ? nil : asset.amount
-                        )
-                    }
-                    if let holding = holding(content) {
-                        Button { actions.onPosition(holding.drawerAddress) } label: { growingTile(holding) }
-                            .buttonStyle(ChimpPressableStyle())
-                            .accessibilityHint(Text("Opens your position"))
-                    }
-                    ForEach(content.savings) { bond in
-                        Button { if let address = content.address { actions.onSavings(address, bond.code) } } label: { savingsTile(bond, address: content.address) }
-                            .buttonStyle(ChimpPressableStyle())
-                            .accessibilityHint(Text("Opens your savings bonds"))
-                    }
-                }
-                .padding(.top, ChimpSpacing.xl)
-                if holding(content) != nil, let vault = grow?.vault {
-                    plantMore
+            tiles(isEmpty: content.isEmpty)
+                .padding(.horizontal, ChimpSpacing.screenMargin)
+                .padding(.top, ChimpSpacing.l)
+
+            VStack(alignment: .leading, spacing: ChimpSpacing.listGap) {
+                ready(content, split: split)
+                growing(content, split: split)
+                if !model.isMain {
+                    ChimpDrawerListTitle(title: "This card")
                         .padding(.top, ChimpSpacing.m)
-                    ChimpVaultNotice(asset: vault.asset.code, protocols: vault.protocols)
-                        .padding(.top, ChimpSpacing.s)
+                    ChimpGroupedList(rows: cardRows)
+                }
+            }
+            .padding(.horizontal, ChimpSpacing.screenMargin)
+            .padding(.top, ChimpSpacing.xl)
+            .padding(.bottom, 40)
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.top, ChimpSpacing.xl)
+        }
+    }
+
+    // MARK: En-tête
+
+    /// Une carte pas encore lue (premier chargement) : bandeau sans scène ni titre, plutôt qu'une carte « Card » factice.
+    private var scene: ChimpDrawerScene {
+        if model.isMain { return .main }
+        guard let card = model.card else { return .blank }
+        return .card(name: model.cardName, color: model.cardColor, number: card.number)
+    }
+
+    private var title: Text {
+        if model.isMain { return Text("Main") }
+        return model.card == nil ? Text(verbatim: "") : Text("\(model.cardName) card")
+    }
+
+    /// « MAIN · SHARED », « N°0421 · ONLY THIS CARD SIGNS ».
+    private var kind: String {
+        let text = model.isMain
+            ? String(localized: "Main · Shared")
+            : String(localized: "N°\(model.card?.number ?? "····") · Only this card signs")
+        return text.uppercased()
+    }
+
+    // MARK: Panneau
+
+    private func split(_ content: DrawerDetailContent, money: DisplayMoney) -> DrawerDetailModel.Split {
+        var parts: [DrawerDetailModel.GrowingPart] = []
+        if let holding = holding(content) {
+            let asset = grow?.vault?.asset ?? .xlm
+            parts.append(DrawerDetailModel.GrowingPart(
+                value: money.value([AssetAmount(code: asset.code, amount: holding.value)]),
+                fallback: asset.displayedWithCode(holding.value, locale: locale)
+            ))
+        }
+        for bond in model.savingsAssets {
+            let price = grow?.savingsPrice(bond.code)
+            parts.append(DrawerDetailModel.GrowingPart(
+                value: price.flatMap { money.value(usd: $0.value(of: bond.amount)) },
+                fallback: SendAsset(code: bond.code)?.displayedWithCode(bond.amount, locale: locale) ?? "\(bond.amount) \(bond.code)"
+            ))
+        }
+        return DrawerDetailModel.split(ready: model.readyAssets, growing: parts, money: money)
+    }
+
+    // MARK: Actions
+
+    private func tiles(isEmpty: Bool) -> some View {
+        let id = model.selection.drawerID
+        return HStack(spacing: ChimpSize.keypadSpacing) {
+            ChimpActionTile(title: "Send", systemImage: "arrow.up.right", isPrimary: true) { actions.onSend(id) }
+                .disabled(isEmpty)
+            ChimpActionTile(title: "Move", systemImage: "arrow.up.arrow.down") { actions.onMove(id) }
+                .disabled(isEmpty)
+            if features.swap {
+                ChimpActionTile(title: "Swap", systemImage: "arrow.left.arrow.right") { actions.onSwap(id) }
+                    .disabled(isEmpty)
+            }
+            if grow != nil {
+                ChimpActionTile(title: "Grow", systemImage: "leaf", image: .tileBanana) { actions.onGrow(id) }
+                    .disabled(isEmpty)
+            }
+        }
+    }
+
+    // MARK: Ready to spend
+
+    @ViewBuilder
+    private func ready(_ content: DrawerDetailContent, split: DrawerDetailModel.Split) -> some View {
+        if content.isEmpty && holding(content) == nil {
+            ChimpySays(text: emptyText, pose: .plant)
+        } else if !content.assets.isEmpty {
+            ChimpDrawerListTitle(title: "Ready to spend", amount: split.readyTotal)
+            ForEach(content.assets) { asset in
+                let known = SendAsset(code: asset.code)
+                ChimpHoldingRow(name: Self.assetName(asset.code), detail: asset.amount, amount: asset.value ?? asset.amount) {
+                    if let known {
+                        ChimpAssetIcon(glyph: known.glyph, size: 38)
+                    } else {
+                        Image(.tileLogo).resizable().scaledToFit()
+                    }
                 }
             }
         }
     }
 
-    // MARK: Grow
+    /// « US Dollar », « Stellar » (maquette N1b) ; les autres actifs par leur code.
+    static func assetName(_ code: String) -> String {
+        switch code {
+        case "USDC": String(localized: "US Dollar")
+        case "XLM": String(localized: "Stellar")
+        default: code
+        }
+    }
+
+    // MARK: Growing
 
     private func holding(_ content: DrawerDetailContent) -> VaultHolding? {
         content.address.flatMap { grow?.holding(drawerAddress: $0) }
     }
 
-    /// « DEFINDEX · GROWING », « 40.09 XLM », « +0.11 XLM since 22 Sep » (la valeur seule si la base n'est pas connue).
-    private func growingTile(_ holding: VaultHolding) -> some View {
-        let asset = grow?.vault?.asset ?? .xlm
-        let runner = grow?.vault?.protocols.first ?? "DeFindex"
-        return ChimpAssetTile(
-            band: "\(runner.uppercased()) · \(String(localized: "Growing").uppercased())",
-            bandFill: Color(.chimpHeader), bandInk: Color(.chimpOnHeaderPrimary),
-            value: asset.displayedWithCode(holding.value, locale: locale),
-            detail: holding.change.flatMap { change in
-                holding.basis.map { basis in
-                    String(localized: "\(GrowView.changeText(change, asset: asset, locale: locale)) since \(basis.since.formatted(.dateTime.day().month(.abbreviated)))")
+    @ViewBuilder
+    private func growing(_ content: DrawerDetailContent, split: DrawerDetailModel.Split) -> some View {
+        let holding = holding(content)
+        if holding != nil || !content.savings.isEmpty {
+            ChimpDrawerListTitle(title: "Growing", amount: split.growingTotal, tint: Color(.chimpPositive))
+                .padding(.top, ChimpSpacing.m)
+            if let holding {
+                Button { actions.onPosition(holding.drawerAddress) } label: { vaultRow(holding) }
+                    .buttonStyle(ChimpPressableStyle())
+                    .accessibilityHint(Text("Opens your position"))
+            }
+            ForEach(content.savings) { bond in
+                Button { if let address = content.address { actions.onSavings(address, bond.code) } } label: {
+                    savingsRow(bond, address: content.address)
                 }
-            },
-            detailColor: (holding.change ?? 0) < 0 ? Color(.chimpNegative) : Color(.chimpPositive)
-        )
+                .buttonStyle(ChimpPressableStyle())
+                .accessibilityHint(Text("Opens your savings bonds"))
+            }
+            if holding != nil, let vault = grow?.vault {
+                ChimpVaultNotice(asset: vault.asset.code, protocols: vault.protocols)
+            }
+        }
     }
 
-    /// Tuile d'un stablebond, construite comme « GROWING » (décision de Barth du 2026-10-15) : « ETHERFUSE · CETES »,
-    /// la quantité, puis « Price +0.62% since 22 Sep » si la base est connue, sinon « ≈ 99.58 USDC » au prix d'Etherfuse,
-    /// sinon rien ; gelés : « Frozen by Etherfuse » en rouge.
-    private func savingsTile(_ bond: DrawerDetailContent.Asset, address: String?) -> some View {
+    /// « XLM vault », « +0.48 XLM since 22 Sep » (vert, rouge si ça a baissé ; le nom du protocole si la base n'est pas
+    /// connue), « 2,000.48 XLM ».
+    private func vaultRow(_ holding: VaultHolding) -> some View {
+        let asset = grow?.vault?.asset ?? .xlm
+        let runner = grow?.vault?.protocols.first ?? "DeFindex"
+        let change = holding.change.flatMap { change in
+            holding.basis.map { basis in
+                String(localized: "\(GrowView.changeText(change, asset: asset, locale: locale)) since \(basis.since.formatted(.dateTime.day().month(.abbreviated)))")
+            }
+        }
+        return ChimpHoldingRow(
+            name: String(localized: "\(asset.code) vault"),
+            detail: change ?? runner,
+            detailColor: change == nil ? Color(.chimpTextSecondary) : (holding.change ?? 0) < 0 ? Color(.chimpNegative) : Color(.chimpPositive),
+            amount: asset.displayedWithCode(holding.value, locale: locale)
+        ) {
+            ChimpProtocolLogo(mark: .defindex, size: 38)
+        }
+    }
+
+    /// Un stablebond (décision de Barth du 2026-10-15, construit comme le vault) : « CETES », puis « Price +0.62% since
+    /// 22 Sep » si la base est connue, sinon « ≈ 99.58 USDC » au prix d'Etherfuse, sinon l'émetteur ; gelés : « Frozen by
+    /// Etherfuse » en rouge.
+    private func savingsRow(_ bond: DrawerDetailContent.Asset, address: String?) -> some View {
         let asset = SendAsset(code: bond.code) ?? .cetes
         let holding = address.flatMap { grow?.savingsHolding(drawerAddress: $0, code: bond.code) }
         let price = grow?.savingsPrice(bond.code)
         let issuer = asset.issuerName ?? String(localized: "The issuer")
-        let detail: String?
+        let detail: String
         var color = Color(.chimpTextSecondary)
         if holding?.frozen == true {
             detail = String(localized: "Frozen by \(issuer)")
@@ -208,43 +275,11 @@ struct DrawerDetailView: View {
         } else if let holding, let price {
             detail = SavingsText.value(holding.amount, price: price, locale: locale)
         } else {
-            detail = nil
+            detail = issuer
         }
-        return ChimpAssetTile(
-            band: "\(issuer.uppercased()) · \(asset.code)", bandFill: Color(.chimpAssetCetes), bandInk: Color(.chimpTicketInk),
-            value: bond.amount, detail: detail, detailColor: color
-        )
-    }
-
-    /// « Plant more » : mettre encore depuis ce tiroir (bordure pointillée, maquette B3).
-    private var plantMore: some View {
-        Button { actions.onGrow(model.selection.drawerID) } label: {
-            HStack(spacing: ChimpSpacing.s) {
-                Image(.tileBanana).resizable().scaledToFit().frame(width: 24).accessibilityHidden(true)
-                Text("Plant more").chimpFont(.buttonSmall)
-            }
-            .foregroundStyle(.chimpTextSecondary)
-            .frame(maxWidth: .infinity, minHeight: ChimpSize.minimumTouchTarget)
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(Color(.chimpTextSecondary), style: StrokeStyle(lineWidth: ChimpBorder.regular, dash: [7, 5]))
-            }
-            .contentShape(Rectangle())
+        return ChimpHoldingRow(name: asset.code, detail: detail, detailColor: color, amount: bond.amount) {
+            ChimpAssetIcon(glyph: asset.glyph, size: 38)
         }
-        .buttonStyle(ChimpPressableStyle())
-    }
-
-    private func total(_ content: DrawerDetailContent) -> some View {
-        Text(verbatim: ChimpPrivacy.amount(content.total, hidden: hidesAmounts))
-            .chimpFont(.amountL)
-            .foregroundStyle(.chimpTextPrimary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-    }
-
-    /// Couleur du bandeau d'une tuile (maquette : USDC vert, XLM jaune).
-    static func bandFill(_ code: String) -> Color {
-        code == "USDC" ? Color(.chimpCardLeaf) : Color(.chimpCardBanana)
     }
 
     private var emptyText: LocalizedStringKey {
@@ -275,93 +310,6 @@ struct DrawerDetailView: View {
             actions.onRemove(mode, key)
         }
     }
-
-    // MARK: Historique
-
-    /// B2r « LATELY » : les deux derniers mouvements de Main, « All activity » ouvre l'onglet Activity sur Main.
-    /// B3 : rien (maquette).
-    @ViewBuilder
-    private var history: some View {
-        if model.isMain, let address = model.content?.address {
-            let rows = DrawerDetailModel.lately(
-                records: activity.records, drawer: address, drawers: activity.drawers,
-                cardName: { [source = activity.source] in source.cardName(key: $0) }
-            )
-            HStack(alignment: .firstTextBaseline) {
-                sectionLabel("Lately")
-                Spacer()
-                Button { actions.onAllActivity(address) } label: {
-                    Text("All activity")
-                        .chimpFont(.captionStrong)
-                        .underline()
-                        .foregroundStyle(.chimpTextPrimary)
-                        // Zone de toucher de 44 pt sans écarter la ligne (la maquette la veut serrée).
-                        .padding(ChimpSpacing.m)
-                        .contentShape(Rectangle())
-                        .padding(-ChimpSpacing.m)
-                }
-                .buttonStyle(ChimpPressableStyle())
-            }
-            .padding(.top, ChimpSpacing.xl)
-            .padding(.bottom, ChimpSpacing.xxs)
-            if rows.isEmpty {
-                Text(activity.phase == .loaded && !activity.isSyncing ? "Nothing moved here yet." : "Reading the last 7 days on Stellar…")
-                    .chimpFont(.captionS)
-                    .foregroundStyle(.chimpTextSecondary)
-                    .padding(.vertical, 9)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                        if index > 0 {
-                            Rectangle().fill(Color(.chimpSurfaceSecondary)).frame(height: ChimpBorder.thin)
-                        }
-                        Button { activity.selectedRecord = row.record } label: {
-                            ChimpRecentRow(title: row.title, meta: row.meta, amount: row.amount, isIncoming: row.isIncoming)
-                        }
-                        .buttonStyle(ChimpPressableStyle())
-                        .accessibilityHint(Text("Opens the receipt"))
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: Actions
-
-    private var bottomBar: some View {
-        let isEmpty = model.content?.isEmpty ?? true
-        let id = model.selection.drawerID
-        return HStack(spacing: ChimpSpacing.sm) {
-            ChimpButton("Send", size: .compact) { actions.onSend(id) }
-                .disabled(isEmpty)
-            ChimpButton("Move", kind: .secondary, size: .compact) { actions.onMove(id) }
-                .disabled(isEmpty)
-            // Maquette B2 / B3 « with Swap » : Swap s'ouvre avec ce tiroir déjà choisi.
-            if features.swap {
-                ChimpButton("Swap", kind: .secondary, size: .compact) { actions.onSwap(id) }
-                    .disabled(isEmpty)
-            }
-            // Maquette B2 / B3 « Swap + Vault » : « Put money in » depuis ce tiroir.
-            if grow != nil {
-                ChimpButton("Grow", kind: .secondary, size: .compact) { actions.onGrow(id) }
-                    .disabled(isEmpty)
-            }
-        }
-        .padding(ChimpSpacing.bottomBar)
-        .background(Color(.chimpBackground))
-    }
-
-    private func sectionLabel(_ text: LocalizedStringKey) -> some View {
-        sectionLabel(Text(text))
-    }
-
-    private func sectionLabel(_ text: Text) -> some View {
-        text
-            .chimpFont(.label)
-            .textCase(.uppercase)
-            .foregroundStyle(.chimpTextSecondary)
-            .accessibilityAddTraits(.isHeader)
-    }
 }
 
 extension DrawerDetailView {
@@ -380,25 +328,16 @@ struct DrawerDetailActions {
     var onMove: (String) -> Void = { _ in }
     /// Swap, dans ce tiroir.
     var onSwap: (String) -> Void = { _ in }
-    /// « Pay again » ou « Send back » d'un reçu.
-    var onSendPrefilled: (SendPrefill) -> Void = { _ in }
-    /// « Swap again » d'un reçu.
-    var onSwapPrefilled: (SwapPrefill) -> Void = { _ in }
-    /// Paiement en attente touché dans l'historique.
-    var onPending: () -> Void = {}
-    /// « All activity » (B2r) : l'onglet Activity, filtré sur ce tiroir (adresse).
-    var onAllActivity: (String) -> Void = { _ in }
     /// Changer le PIN de cette carte (clé).
     var onChangePIN: (String) -> Void = { _ in }
     /// G6 (retirer) ou G7 (carte perdue) pour cette carte (clé).
     var onRemove: (RemoveCardModel.Mode, String) -> Void = { _, _ in }
     /// G5 « Add a card ».
     var onAddCard: () -> Void = {}
-    /// Grow, « Plant more » : mettre dans le vault depuis ce tiroir (identifiant).
+    /// Grow : mettre dans le vault depuis ce tiroir (identifiant).
     var onGrow: (String) -> Void = { _ in }
-    /// La tuile « GROWING », « See my position » d'un reçu : F6 pour ce tiroir (adresse).
+    /// La ligne du vault : F6 pour ce tiroir (adresse).
     var onPosition: (String) -> Void = { _ in }
-    /// La tuile d'un stablebond (CETES) : F10 pour ce tiroir (adresse).
-    /// La tuile d'un actif d'émetteur (adresse du tiroir, code de l'actif) : son pot.
+    /// La ligne d'un actif d'émetteur (adresse du tiroir, code de l'actif) : son pot.
     var onSavings: (String, String) -> Void = { _, _ in }
 }

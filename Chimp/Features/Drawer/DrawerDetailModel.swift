@@ -21,11 +21,8 @@ struct DrawerDetailContent: Equatable {
         let code: String
         /// « 620 USDC », « 800 XLM ».
         let amount: String
-        /// « $620 », « $62.50 » (tuile de B2e / B3) ; `nil` si l'actif n'a pas de prix.
+        /// « $620.00 » (ligne de la liste N1b, B1) ; `nil` si l'actif n'a pas de prix.
         let value: String?
-
-        /// Bandeau de la tuile (« USDC · READY »).
-        var band: String { String(localized: "\(code) · Ready").uppercased() }
 
         var id: String { code }
     }
@@ -42,7 +39,8 @@ struct DrawerDetailContent: Equatable {
     let total: String
     /// Actifs non nuls, dans l'ordre du Wallet (XLM, USDC).
     let assets: [Asset]
-    /// Stablebonds détenus (CETES) : leur propre tuile, construite comme « GROWING » (décision de Barth du 2026-10-15).
+    /// Stablebonds détenus (CETES) : dans « Growing » (B1), comme le vault (décision de Barth du 2026-10-15 : construits
+    /// comme « GROWING »).
     var savings: [Asset] = []
     /// Cartes qui peuvent signer pour ce tiroir : toutes celles du compte pour Main, la carte seule pour son wallet.
     let signers: [Signer]
@@ -188,7 +186,88 @@ final class DrawerDetailModel {
         session.wallet.account?.cards.first { $0.publicKey == key }
     }
 
+    /// Ce qui est prêt à dépenser dans ce tiroir (tout sauf les stablebonds), tel que lu par le Wallet.
+    var readyAssets: [AssetAmount] { drawerAssets.filter { !Self.isSavings($0.code) } }
+
+    /// Les stablebonds de ce tiroir (CETES), tels que lus par le Wallet.
+    var savingsAssets: [AssetAmount] { drawerAssets.filter { Self.isSavings($0.code) && $0.amount != 0 } }
+
+    private var drawerAssets: [AssetAmount] {
+        guard let snapshot = wallet.snapshot else { return [] }
+        return switch selection {
+        case .main: snapshot.main.assets
+        case .card: card?.assets ?? []
+        }
+    }
+
+    /// Devise et prix de la dernière lecture du Wallet.
+    var money: DisplayMoney? { wallet.snapshot?.money }
+
     // MARK: Formatage (fonction pure, testée)
+
+    /// Un actif qui ne s'envoie pas (CETES) : de l'épargne, rangée dans « Growing ».
+    static func isSavings(_ code: String) -> Bool {
+        SendAsset.allCases.first { $0.code == code }.map { !$0.isSendable } ?? false
+    }
+
+    /// Une part de « Growing » : sa valeur dans la devise d'affichage (`nil` sans prix) et, à défaut, son texte par actif.
+    struct GrowingPart: Equatable {
+        let value: Decimal?
+        /// « 2,000.48 XLM », « 1,820 CETES ».
+        let fallback: String
+    }
+
+    /// Le panneau du total de B1 : total (prêt + qui pousse), les deux parts et la barre.
+    struct Split: Equatable {
+        /// « $1,320.00 ».
+        let total: String
+        /// Parts du panneau, sans centimes quand c'est rond (« $820 », « $62.50 »).
+        let ready: String
+        /// `nil` : rien ne pousse.
+        let growing: String?
+        /// Titres des listes N1b, avec centimes (« $820.00 ») ; par actif sans prix.
+        let readyTotal: String
+        let growingTotal: String?
+        /// Parts de la barre ; toutes deux à 0 pour un tiroir vide.
+        let readyWeight: Double
+        let growingWeight: Double
+    }
+
+    /// Le total compte ce qui pousse (maquette B1 : $820 prêts + $500 qui poussent = $1,320). Sans prix pour une part,
+    /// pas de total partiel : les montants par actif, comme le Wallet, et une barre à parts égales.
+    static func split(ready assets: [AssetAmount], growing parts: [GrowingPart], money: DisplayMoney) -> Split {
+        let readyValue = money.value(assets)
+        let hasGrowing = !parts.isEmpty
+        let growingValue: Decimal? = parts.contains { $0.value == nil } ? nil : parts.reduce(0) { $0 + ($1.value ?? 0) }
+        let readyAssetText = WalletViewModel.assetText(assets)
+        let growingFallback = parts.map(\.fallback).joined(separator: " · ")
+        let hasReady = assets.contains { $0.amount != 0 }
+
+        if let readyValue, let growingValue {
+            let readyWeight = NSDecimalNumber(decimal: readyValue).doubleValue
+            let growingWeight = hasGrowing ? NSDecimalNumber(decimal: growingValue).doubleValue : 0
+            return Split(
+                total: money.text(readyValue + growingValue),
+                ready: money.text(readyValue, style: .wholeWhenRound),
+                growing: hasGrowing ? money.text(growingValue, style: .wholeWhenRound) : nil,
+                readyTotal: money.text(readyValue),
+                growingTotal: hasGrowing ? money.text(growingValue) : nil,
+                readyWeight: max(0, readyWeight),
+                growingWeight: max(0, growingWeight)
+            )
+        }
+        let readyText = readyValue.map { money.text($0, style: .wholeWhenRound) } ?? readyAssetText
+        let growingText = hasGrowing ? (growingValue.map { money.text($0, style: .wholeWhenRound) } ?? growingFallback) : nil
+        return Split(
+            total: [readyAssetText, hasGrowing ? growingFallback : nil].compactMap { $0 }.joined(separator: " · "),
+            ready: readyText,
+            growing: growingText,
+            readyTotal: readyValue.map { money.text($0) } ?? readyAssetText,
+            growingTotal: hasGrowing ? (growingValue.map { money.text($0) } ?? growingFallback) : nil,
+            readyWeight: hasReady ? 1 : 0,
+            growingWeight: hasGrowing ? 1 : 0
+        )
+    }
 
     static func content(
         assets: [AssetAmount], snapshot: WalletSnapshot, signers: [DrawerDetailContent.Signer], address: String?
@@ -205,15 +284,15 @@ final class DrawerDetailModel {
         func line(_ code: String) -> DrawerDetailContent.Asset? {
             guard let amount = sums[code], amount != 0 else { return nil }
             let known = SendAsset.allCases.first { $0.code == code }
-            let value = money.value([AssetAmount(code: code, amount: amount)]).map { money.text($0, style: .wholeWhenRound) }
+            let value = money.value([AssetAmount(code: code, amount: amount)]).map { money.text($0) }
             return DrawerDetailContent.Asset(
                 code: code,
                 amount: known?.displayedWithCode(amount) ?? "\(SendAsset.displayed(amount, code: code)) \(code)",
                 value: value
             )
         }
-        // Un actif qui ne s'envoie pas (CETES) n'est pas une tuile « READY » : il a sa tuile d'épargne.
-        let isSavings = { (code: String) in SendAsset.allCases.first { $0.code == code }.map { !$0.isSendable } ?? false }
+        // Un actif qui ne s'envoie pas (CETES) n'est pas « prêt à dépenser » : il va dans « Growing ».
+        let isSavings = Self.isSavings
         let lines = codes.filter { !isSavings($0) }.compactMap(line)
         let savings = codes.filter(isSavings).compactMap(line)
         return DrawerDetailContent(
@@ -225,47 +304,4 @@ final class DrawerDetailModel {
             isEmpty: lines.isEmpty && savings.isEmpty
         )
     }
-
-    // MARK: LATELY (B2r)
-
-    /// Une ligne de « LATELY » : les derniers mouvements de Main, du point de vue de Main.
-    struct LatelyRow: Identifiable, Equatable {
-        let id: String
-        let title: String
-        /// « 11:20 · today ».
-        let meta: String
-        /// Signé du point de vue du tiroir (« −$50.00 » pour un Move qui en sort) ; `nil` pour une carte ajoutée.
-        let amount: String?
-        let isIncoming: Bool
-        let record: ActivityRecord
-    }
-
-    /// Les `limit` derniers mouvements de ce tiroir (maquette : deux), titres de l'Activity, montant signé pour ce tiroir.
-    static func lately(
-        records: [ActivityRecord], drawer address: String, drawers: [ActivityDrawer], cardName: (String) -> String?,
-        calendar: Calendar = .current, now: Date = .now, limit: Int = 2
-    ) -> [LatelyRow] {
-        let addresses = Set(drawers.map(\.address))
-        let visible = ActivityViewModel.filtered(records, filter: .drawer(address), drawers: drawers)
-            .sorted { $0.at > $1.at }
-            .prefix(limit)
-        return visible.compactMap { record in
-            guard let row = ActivityViewModel.row(for: record, drawers: drawers, addresses: addresses, cardName: cardName) else { return nil }
-            let incoming = record.event == .transfer && record.to == address
-            let amount = record.event == .cardAdded ? nil : record.amount.map {
-                ActivityViewModel.amountText($0, code: record.assetCode ?? "", sign: incoming ? .positive : .negative)
-            }
-            let time = record.at.formatted(date: .omitted, time: .shortened)
-            let day: String = if calendar.isDate(record.at, inSameDayAs: now) {
-                String(localized: "today")
-            } else if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(record.at, inSameDayAs: yesterday) {
-                String(localized: "yesterday")
-            } else {
-                record.at.formatted(.dateTime.month(.abbreviated).day())
-            }
-            return LatelyRow(id: record.id, title: row.title, meta: "\(time) · \(day)", amount: amount, isIncoming: incoming, record: record)
-        }
-    }
-
-
 }

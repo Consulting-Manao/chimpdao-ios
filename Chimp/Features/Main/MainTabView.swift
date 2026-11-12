@@ -146,17 +146,6 @@ struct MainTabView: View {
                             pendingFirst(onExit: closeFlow) {
                                 SendFlowRoot(service: ChainSendService(session: session), kind: .move, fromDrawerID: drawerID, onExit: closeFlow)
                             }
-                        case .prefilledSend(let prefill):
-                            // « Pay again » ou « Send back » d'un reçu ouvert depuis la page d'un tiroir.
-                            pendingFirst(onExit: closeFlow) {
-                                SendFlowRoot(service: ChainSendService(session: session), prefill: prefill, onExit: closeFlow)
-                            }
-                        case .pendingSend:
-                            // L'état de l'opération en attente (« Check again »), jamais une nouvelle : un swap s'ouvre
-                            // dans Swap, une opération du vault dans le vault, un envoi ou un Move dans Envoyer.
-                            pendingFirst(onExit: closeFlow) {
-                                SendFlowRoot(service: ChainSendService(session: session), onExit: closeFlow)
-                            }
                         case .swap(let drawerID):
                             // E3 : le vrai swap (testnet), dans le tiroir choisi d'avance ou dans Main. Un envoi en
                             // attente : E3f (« Check again » à la place du bouton).
@@ -164,7 +153,7 @@ struct MainTabView: View {
                                 SwapFlowRoot(service: ChainSwapService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
                             }
                         case .prefilledSwap(let prefill):
-                            // « Swap again » d'un reçu ouvert depuis la page d'un tiroir.
+                            // Un swap pré-rempli depuis la page d'un pot (G2).
                             pendingFirst(onExit: closeFlow) {
                                 SwapFlowRoot(service: ChainSwapService(session: session), prefill: prefill, onExit: closeFlow)
                             }
@@ -205,7 +194,7 @@ struct MainTabView: View {
                         case .drawer(let selection):
                             // B2 / B3 : le détail d'un tiroir, sur les soldes déjà lus par le Wallet.
                             DrawerDestination(
-                                selection: selection, wallet: walletModel, activity: activityModel, grow: config.features.grow ? growModel : nil, session: session,
+                                selection: selection, wallet: walletModel, grow: config.features.grow ? growModel : nil, session: session,
                                 actions: drawerActions
                             )
                         case .addCard:
@@ -496,7 +485,7 @@ struct MainTabView: View {
         refreshAll()
     }
 
-    /// Actions de la page d'un tiroir (B2, B3) : chacune part de ce tiroir.
+    /// Actions de la page d'un tiroir (B1) : chacune part de ce tiroir.
     private var drawerActions: DrawerDetailActions {
         DrawerDetailActions(
             onBack: {
@@ -505,13 +494,6 @@ struct MainTabView: View {
             onSend: { walletPath.append(.send($0)) },
             onMove: { walletPath.append(.move($0)) },
             onSwap: { walletPath.append(.swap($0)) },
-            onSendPrefilled: { walletPath.append(.prefilledSend($0)) },
-            onSwapPrefilled: { walletPath.append(.prefilledSwap($0)) },
-            onPending: { walletPath.append(.pendingSend) },
-            onAllActivity: { address in
-                activityModel.filter = .drawer(address)
-                selection = .activity
-            },
             onChangePIN: { walletPath.append(.changePIN($0)) },
             onRemove: { walletPath.append(.removeCard($0, $1)) },
             onAddCard: { walletPath = [.addCard] },
@@ -544,12 +526,9 @@ enum WalletRoute: Hashable {
     case send(String?)
     /// Move, depuis un tiroir choisi d'avance ou depuis Main.
     case move(String?)
-    /// « Pay again » ou « Send back » d'un reçu.
-    case prefilledSend(SendPrefill)
-    case pendingSend
     /// Swap (E3), dans un tiroir choisi d'avance ou dans Main.
     case swap(String?)
-    /// « Swap again » d'un reçu.
+    /// Un swap pré-rempli (page d'un pot, G2).
     case prefilledSwap(SwapPrefill)
     case settings
     case addCard
@@ -655,26 +634,24 @@ private struct RozoTransferDestination: View {
     }
 }
 
-/// Détail d'un tiroir (B2, B3) : un ViewModel neuf à chaque ouverture, sur les soldes du Wallet.
+/// Page d'un tiroir (B1) : un ViewModel neuf à chaque ouverture, sur les soldes du Wallet.
 private struct DrawerDestination: View {
     @State private var model: DrawerDetailModel
-    let activity: ActivityViewModel
     /// `nil` quand Grow est éteint sur ce réseau : ni tuile « GROWING » ni bouton « Grow ».
     let grow: GrowModel?
     let actions: DrawerDetailActions
 
     init(
-        selection: DrawerSelection, wallet: WalletViewModel, activity: ActivityViewModel, grow: GrowModel?, session: AppSession,
+        selection: DrawerSelection, wallet: WalletViewModel, grow: GrowModel?, session: AppSession,
         actions: DrawerDetailActions
     ) {
         _model = State(initialValue: DrawerDetailModel(selection: selection, wallet: wallet, session: session))
-        self.activity = activity
         self.grow = grow
         self.actions = actions
     }
 
     var body: some View {
-        DrawerDetailView(model: model, activity: activity, actions: actions, grow: grow)
+        DrawerDetailView(model: model, actions: actions, grow: grow)
             .toolbar(.hidden, for: .navigationBar)
     }
 }

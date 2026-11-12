@@ -2,8 +2,9 @@ import Foundation
 import Testing
 @testable import ChimpDAO
 
-/// B2 · Main account et B3 · wallet d'une carte : soldes par actif, cartes qui signent, adresse, actions pré-remplies
-/// depuis ce tiroir, historique filtré sans toucher au filtre de l'onglet Activity.
+/// B1 · page d'un tiroir (Main ou le wallet d'une carte) : soldes par actif, cartes qui signent, adresse, actions
+/// pré-remplies depuis ce tiroir, panneau du total (prêt / qui pousse), historique filtré sans toucher au filtre de
+/// l'onglet Activity.
 @MainActor
 struct DrawerDetailTests {
     private let account = "CCDO6J7WOGPTKZA73FWECCIJ75TTOMHMCWLEGPYWIFCNSINM63UJDDYB"
@@ -50,9 +51,8 @@ struct DrawerDetailTests {
         let content = try #require(model.content)
         #expect(content.total == Decimal(820).formatted(.currency(code: "USD").presentation(.narrow)))
         #expect(content.assets.map(\.code) == ["XLM", "USDC"])
-        #expect(content.assets.map(\.band) == ["XLM · READY", "USDC · READY"])
         #expect(content.assets.first?.amount == SendAsset.xlm.formattedWithCode(800))
-        #expect(content.assets.first?.value == Decimal(200).formatted(.currency(code: "USD").presentation(.narrow).precision(.fractionLength(0))), "Tuile : « $200 » (maquette B2e)")
+        #expect(content.assets.first?.value == Decimal(200).formatted(.currency(code: "USD").presentation(.narrow)), "Ligne N1b : « $200.00 » (maquette B1)")
         #expect(content.signers.first?.number == "0007", "Numéro pour le plateau des cartes")
         #expect(content.signers.map(\.name) == ["Banana", "Card"], "Nom du téléphone, sinon celui du Wallet")
         #expect(content.signers.first?.color == .banana)
@@ -165,25 +165,76 @@ struct DrawerDetailTests {
         #expect(!activity.isEmpty(for: .drawer(ActivityViewModelTests.jungle)))
     }
 
-    @Test("LATELY (B2r) : les deux derniers mouvements de Main, signés pour Main, « today » / « yesterday »")
-    func lately() {
-        let t = ActivityViewModelTests.self
-        let records = [
-            t.transfer("old", t.maya, t.main, "USDC", "1", t.at(3, 9)),
-            t.transfer("got", t.maya, t.main, "USDC", "12.5", t.at(1, 16)),
-            t.transfer("move", t.main, t.jungle, "USDC", "50", t.at(0, 11)),
-            t.transfer("other", t.jungle, t.maya, "USDC", "25", t.at(0, 14)),
-        ]
-        let rows = DrawerDetailModel.lately(
-            records: records, drawer: t.main, drawers: t.drawers, cardName: { _ in nil }, calendar: t.calendar, now: t.now
+    // MARK: Panneau du total (B1)
+
+    private func usd(_ value: Decimal, whole: Bool = false) -> String {
+        DisplayMoney(currency: .usd, usdPrices: ["USD": 1]).text(value, style: whole ? .wholeWhenRound : .standard)
+    }
+
+    private let prices: DisplayMoney = DisplayMoney(currency: .usd, usdPrices: ["XLM": Decimal(string: "0.25")!, "USDC": 1])
+
+    @Test("B1 Main : le total compte ce qui pousse ($820 prêts + $500 = $1,320), parts sans centimes quand c'est rond")
+    func splitWithGrowing() {
+        let split = DrawerDetailModel.split(
+            ready: [AssetAmount(code: "USDC", amount: 620), AssetAmount(code: "XLM", amount: 800)],
+            growing: [DrawerDetailModel.GrowingPart(value: 500, fallback: "2,000 XLM")],
+            money: prices
         )
-        #expect(rows.map(\.id) == ["stellar:move", "stellar:got"], "Main seulement, les plus récents, deux au plus")
-        #expect(rows[0].title == "Moved to Jungle's wallet")
-        #expect(rows[0].amount == ActivityViewModel.amountText(50, code: "USDC", sign: .negative))
-        #expect(!rows[0].isIncoming)
-        #expect(rows[0].meta.hasSuffix("· today"))
-        #expect(rows[1].amount == ActivityViewModel.amountText(Decimal(string: "12.5")!, code: "USDC", sign: .positive))
-        #expect(rows[1].isIncoming)
-        #expect(rows[1].meta.hasSuffix("· yesterday"))
+        #expect(split.total == usd(1320))
+        #expect(split.ready == usd(820, whole: true))
+        #expect(split.growing == usd(500, whole: true))
+        #expect(split.readyTotal == usd(820))
+        #expect(split.growingTotal == usd(500))
+        #expect(split.readyWeight == 820)
+        #expect(split.growingWeight == 500)
+    }
+
+    @Test("B1 carte : rien ne pousse → pas de part verte, barre toute jaune")
+    func splitNothingGrowing() {
+        let split = DrawerDetailModel.split(ready: [AssetAmount(code: "XLM", amount: 250)], growing: [], money: prices)
+        #expect(split.total == usd(Decimal(string: "62.5")!))
+        #expect(split.ready == usd(Decimal(string: "62.5")!, whole: true))
+        #expect(split.growing == nil)
+        #expect(split.growingTotal == nil)
+        #expect(split.readyWeight > 0)
+        #expect(split.growingWeight == 0)
+    }
+
+    @Test("B1 tiroir vide : barre vide (deux parts à zéro)")
+    func splitEmpty() {
+        let split = DrawerDetailModel.split(ready: [], growing: [], money: prices)
+        #expect(split.total == usd(0))
+        #expect(split.readyWeight == 0)
+        #expect(split.growingWeight == 0)
+    }
+
+    @Test("B1 sans prix pour une part : jamais de total partiel, montants par actif, barre à parts égales")
+    func splitWithoutPrice() {
+        let split = DrawerDetailModel.split(
+            ready: [AssetAmount(code: "XLM", amount: 800)],
+            growing: [DrawerDetailModel.GrowingPart(value: nil, fallback: "1,820 CETES")],
+            money: prices
+        )
+        #expect(split.total == "\(WalletViewModel.assetText([AssetAmount(code: "XLM", amount: 800)])) · 1,820 CETES")
+        #expect(split.ready == usd(200, whole: true), "La part prête a son prix : en dollars")
+        #expect(split.growing == "1,820 CETES")
+        #expect(split.readyWeight == 1)
+        #expect(split.growingWeight == 1)
+    }
+
+    @Test("B1 : les stablebonds (CETES) vont dans « Growing », pas dans « Ready to spend »")
+    func savingsAreGrowing() async {
+        let model = await model(.card(k1), snapshot: snapshot(cardAssets: [AssetAmount(code: "XLM", amount: 250), AssetAmount(code: "CETES", amount: 1820)]))
+        #expect(model.readyAssets.map(\.code) == ["XLM"])
+        #expect(model.savingsAssets.map(\.code) == ["CETES"])
+        #expect(model.content?.savings.map(\.code) == ["CETES"])
+    }
+
+    @Test("B1 : un sticker et un bandeau par couleur de carte")
+    func scenes() {
+        #expect(Set(ChimpCardColor.allCases.map { "\($0.sceneSticker)" }).count == ChimpCardColor.allCases.count)
+        #expect(DrawerDetailView.assetName("USDC") == String(localized: "US Dollar"))
+        #expect(DrawerDetailView.assetName("XLM") == String(localized: "Stellar"))
+        #expect(DrawerDetailView.assetName("CETES") == "CETES")
     }
 }

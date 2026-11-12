@@ -84,6 +84,7 @@ struct DesignSystemCatalogView: View {
                 Section("Screens") {
                     link("Onboarding", systemImage: "hand.wave.fill") { OnboardingCatalogPage(settings: settings) }
                     link("Wallet states", systemImage: "wallet.pass.fill") { WalletStatesCatalogPage(settings: settings) }
+                    link("Drawer page (B1)", systemImage: "rectangle.stack.fill") { DrawerCatalogPage(settings: settings) }
                     link("Receive states", systemImage: "qrcode") { ReceiveStatesCatalogPage(settings: settings) }
                     link("Send", systemImage: "paperplane.fill") { SendCatalogPage(settings: settings) }
                     link("Swap", systemImage: "arrow.left.arrow.right") { SwapCatalogPage(settings: settings) }
