@@ -7,6 +7,8 @@ struct ChimpActionTile: View {
     /// Nom d'un SF Symbol (ex. `arrow.up.right`).
     let systemImage: String
     var isPrimary = false
+    /// Une image à la place du symbole (B1 · Grow : la banane, `tileBanana`).
+    var image: ImageResource?
     let action: () -> Void
 
     @ScaledMetric(relativeTo: .title3) private var glyphSize = ChimpSize.actionTileGlyph
@@ -14,10 +16,16 @@ struct ChimpActionTile: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                Image(systemName: systemImage)
-                    .font(.system(size: glyphSize, weight: .heavy))
-                    .frame(height: glyphSize)
-                    .accessibilityHidden(true)
+                Group {
+                    if let image {
+                        Image(image).resizable().scaledToFit()
+                    } else {
+                        Image(systemName: systemImage)
+                            .font(.system(size: glyphSize, weight: .heavy))
+                    }
+                }
+                .frame(height: glyphSize)
+                .accessibilityHidden(true)
                 Text(title)
                     .chimpFont(.tile)
                     .lineLimit(1)

@@ -39,6 +39,51 @@ struct CatalogWalletPartsPage: View {
                 }
             }
 
+            section("Drawer page (B1)") {
+                VStack(spacing: 0) {
+                    ChimpDrawerBanner(scene: .main, title: Text(verbatim: "Main")) {}
+                    ChimpSplitPanel(
+                        kind: "MAIN · SHARED", total: "$1,320.00", ready: "$820", growing: "$500",
+                        readyWeight: 820, growingWeight: 500, address: "CAIO2SJ6…VOX2QF"
+                    )
+                    .padding(.horizontal, ChimpSpacing.m)
+                    .padding(.top, -ChimpDrawerBanner.panelOverlap)
+                    .padding(.bottom, ChimpSpacing.l)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: ChimpRadius.control))
+                ForEach(ChimpCardColor.allCases) { color in
+                    VStack(spacing: 0) {
+                        ChimpDrawerBanner(
+                            scene: .card(name: color.rawValue.capitalized, color: color, number: "0421"),
+                            title: Text(verbatim: "\(color.rawValue.capitalized) card")
+                        ) {}
+                        ChimpSplitPanel(
+                            kind: "N°0421 · ONLY THIS CARD SIGNS", total: "$62.50", ready: "$62.50", growing: nil,
+                            readyWeight: 1, growingWeight: 0
+                        )
+                        .padding(.horizontal, ChimpSpacing.m)
+                        .padding(.top, -ChimpDrawerBanner.panelOverlap)
+                        .padding(.bottom, ChimpSpacing.l)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: ChimpRadius.control))
+                }
+                Text("Empty drawer").chimpFont(.captionS).foregroundStyle(.chimpTextSecondary)
+                ChimpSplitPanel(kind: "MAIN · SHARED", total: "$0.00", ready: "$0", growing: nil, readyWeight: 0, growingWeight: 0)
+                ChimpDrawerListTitle(title: "Ready to spend", amount: "$820.00")
+                ChimpHoldingRow(name: "US Dollar", detail: "620 USDC", amount: "$620.00") { ChimpAssetIcon(glyph: .usdc, size: 38) }
+                ChimpDrawerListTitle(title: "Growing", amount: "$500.00", tint: Color(.chimpPositive))
+                ChimpHoldingRow(name: "XLM vault", detail: "+0.48 XLM since 22 Sep", detailColor: Color(.chimpPositive), amount: "2,000.48 XLM") {
+                    ChimpProtocolLogo(mark: .defindex, size: 38)
+                }
+                HStack(spacing: ChimpSize.keypadSpacing) {
+                    ChimpActionTile(title: "Send", systemImage: "arrow.up.right", isPrimary: true) {}
+                    ChimpActionTile(title: "Move", systemImage: "arrow.up.arrow.down") {}
+                    ChimpActionTile(title: "Swap", systemImage: "arrow.left.arrow.right") {}
+                    ChimpActionTile(title: "Grow", systemImage: "leaf", image: .tileBanana) {}
+                }
+            }
+            .environment(\.chimpScreenInsets, EdgeInsets())
+
             section("Drawer card") {
                 ChimpDrawerCard(label: "Main", amount: "$1,320.00", ready: "$820", growing: "$500") {}
                 ChimpDrawerCard(label: "Main", amount: "$1,320.00", ready: "$820") {}
