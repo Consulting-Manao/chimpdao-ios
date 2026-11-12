@@ -12,6 +12,7 @@ struct MainTabView: View {
     private let config: ChimpNetworkConfig
     /// Écrans poussés dans l'onglet Wallet.
     @State private var walletPath: [WalletRoute] = []
+    @Environment(\.scenePhase) private var scenePhase
     /// Gardé ici pour que l'historique reste affiché quand on change d'onglet.
     @State private var activityModel: ActivityViewModel
     /// Écran d'état d'un paiement en attente, ouvert depuis l'Activity.
@@ -59,6 +60,14 @@ struct MainTabView: View {
         tabs
             .environment(\.chimpHidesAmounts, session.preferences.hidesBalances)
             .environment(\.chimpPotRates, growModel.rates)
+            // J2 : à l'ouverture de l'app (lancement ou retour), sur le Wallet seul, sans opération en attente.
+            .task { checkNightOwl() }
+            .onChange(of: scenePhase) { _, phase in if phase == .active { checkNightOwl() } }
+    }
+
+    private func checkNightOwl() {
+        guard selection == .wallet, walletPath.isEmpty, session.wallet.pendingSend == nil else { return }
+        walletModel.openedAt(.now)
     }
 
     @ViewBuilder

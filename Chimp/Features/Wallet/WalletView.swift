@@ -21,6 +21,9 @@ struct WalletView: View {
     /// « Add money » (D4, sans maquette) : affiché seulement si une action est fournie.
     var onAddMoney: (() -> Void)?
 
+    /// J2, J3 : seulement quand le Wallet lui-même est à l'écran, jamais par-dessus un autre écran.
+    @State private var isVisible = false
+
     /// De combien l'en-tête est tiré vers le bas (« tirer pour rafraîchir »).
     @State private var pull = ChimpPull()
 
@@ -32,6 +35,14 @@ struct WalletView: View {
         }
         .background(Color(.chimpBackground))
         .task { await model.loadIfNeeded() }
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
+        .fullScreenCover(item: Binding(
+            get: { isVisible ? model.celebration : nil },
+            set: { if $0 == nil { model.dismissCelebration() } }
+        )) { egg in
+            ChimpEasterEggView(egg: egg) { model.dismissCelebration() }
+        }
     }
 
     private func scrollView(topSafeArea: CGFloat) -> some View {

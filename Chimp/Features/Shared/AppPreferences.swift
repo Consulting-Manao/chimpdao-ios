@@ -56,6 +56,16 @@ final class AppPreferences {
         didSet { store.set(hidesBalances ? "hidden" : nil, for: .hidesBalances) }
     }
 
+    /// J2 : la dernière nuit où « Shhh. » s'est montré (« 2026-11-12 »).
+    var lastNightOwl: String? {
+        didSet { store.set(lastNightOwl, for: .nightOwl) }
+    }
+
+    /// J3 : les comptes (adresses du Main) qui ont déjà fêté leurs 1 000 $.
+    var thousandaireAccounts: Set<String> {
+        didSet { store.set(thousandaireAccounts.isEmpty ? nil : thousandaireAccounts.sorted().joined(separator: ","), for: .thousandaire) }
+    }
+
     init(store: PreferencesStore) {
         self.store = store
         look = store.string(for: .look).flatMap(ChimpLook.init(rawValue:)) ?? .auto
@@ -63,6 +73,8 @@ final class AppPreferences {
         soundsEnabled = store.string(for: .sounds) != "off"
         hasAcceptedTestnetNotice = store.string(for: .testnetNotice) == "accepted"
         hidesBalances = store.string(for: .hidesBalances) == "hidden"
+        lastNightOwl = store.string(for: .nightOwl)
+        thousandaireAccounts = Set((store.string(for: .thousandaire) ?? "").split(separator: ",").map(String.init))
     }
 
     /// Préférences gardées dans `UserDefaults` (l'app) ; en mémoire pour les tests et le catalogue.
@@ -77,6 +89,8 @@ final class AppPreferences {
         soundsEnabled = true
         hasAcceptedTestnetNotice = false
         hidesBalances = false
+        lastNightOwl = nil
+        thousandaireAccounts = []
         // Après les valeurs par défaut (leur `didSet` les écrit) : rien ne reste dans le stockage.
         store.removeAll()
     }
@@ -89,6 +103,8 @@ enum PreferenceKey: String, CaseIterable {
     case sounds = "chimp.sounds"
     case testnetNotice = "chimp.testnetNotice"
     case hidesBalances = "chimp.hidesBalances"
+    case nightOwl = "chimp.easterEgg.nightOwl"
+    case thousandaire = "chimp.easterEgg.thousandaire"
 }
 
 /// Lecture et écriture des préférences. Implémenté par `UserDefaultsPreferencesStore` et `InMemoryPreferencesStore`.

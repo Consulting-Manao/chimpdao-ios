@@ -53,6 +53,7 @@ struct ChimpApp: App {
                     .modifier(VaultDemoLaunch())
                     .modifier(CrossChainDemoLaunch())
                     .modifier(RozoDemoLaunch())
+                    .modifier(EasterEggDemoLaunch())
                 #endif
                     // Les fonctions du réseau (Swap, Grow, Add money, CETES), pour tous les écrans, démos comprises.
                     .environment(\.chimpFeatures, session.config.features)

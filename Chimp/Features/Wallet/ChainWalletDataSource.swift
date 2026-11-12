@@ -40,6 +40,7 @@ struct ChainWalletDataSource: WalletDataSource {
     var config: ChimpNetworkConfig { session.config }
 
     var firstName: String? { session.wallet.firstName }
+    var accountAddress: String? { session.wallet.account?.address }
 
     enum ReadError: LocalizedError {
         case noAccount

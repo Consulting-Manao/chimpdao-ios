@@ -11,6 +11,9 @@ struct SettingsView: View {
     let onBack: () -> Void
     var onDeveloper: (() -> Void)?
     @State private var isShowingLicenses = false
+    /// J1 : les derniers taps sur la banane du pied de page.
+    @State private var bananaTaps: [Date] = []
+    @State private var isShowingBananaMode = false
     /// Carte dont on change le PIN.
     @State private var pinCard: PINCard?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -269,6 +272,18 @@ struct SettingsView: View {
                 .foregroundStyle(.chimpTextSecondary)
         }
         .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        // J1 : 7 taps en moins de 3 s sur la banane.
+        .onTapGesture {
+            bananaTaps = (bananaTaps + [.now]).suffix(EasterEggRules.bananaTaps)
+            if EasterEggRules.isBananaMode(bananaTaps) {
+                bananaTaps = []
+                isShowingBananaMode = true
+            }
+        }
+        .fullScreenCover(isPresented: $isShowingBananaMode) {
+            ChimpEasterEggView(egg: .bananaMode) { isShowingBananaMode = false }
+        }
     }
 
     // MARK: Face ID

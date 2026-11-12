@@ -79,6 +79,11 @@ final class WalletViewModel {
     private let dataSource: WalletDataSource
     private var hasLoaded = false
 
+    /// Easter egg à montrer en plein écran (J2, J3), dès que le Wallet est à l'écran.
+    private(set) var celebration: ChimpEasterEgg?
+    /// Le compte de la dernière lecture : J3 ne compare jamais deux comptes différents.
+    private var snapshotAccount: String?
+
     /// Les soldes affichés viennent du téléphone (dernier lancement) et sont en train d'être relus sur la chaîne.
     private(set) var isUpdatingStoredData = false
 
@@ -147,6 +152,7 @@ final class WalletViewModel {
     }
 
     private func show(_ snapshot: WalletSnapshot) {
+        snapshotAccount = dataSource.accountAddress
         content = Self.format(snapshot)
         cards = snapshot.cards
         self.snapshot = snapshot
@@ -164,7 +170,9 @@ final class WalletViewModel {
         if content == nil { phase = .loading }
         do {
             let snapshot = try await dataSource.fetchWallet()
+            let previous = snapshotAccount == dataSource.accountAddress ? self.snapshot.flatMap(EasterEggRules.usdTotal) : nil
             show(snapshot)
+            checkThousand(from: previous, to: EasterEggRules.usdTotal(snapshot))
             isShowingStaleData = false
             securityProblem = nil
         } catch is CancellationError {
@@ -178,6 +186,29 @@ final class WalletViewModel {
                 phase = .failed
             }
         }
+    }
+
+    // MARK: Easter eggs
+
+    /// J3 : le total vient de passer 1 000 $ ; une seule fois par compte (gardé dans les préférences).
+    private func checkThousand(from previous: Decimal?, to current: Decimal?) {
+        guard EasterEggRules.crossesThousand(from: previous, to: current), let preferences,
+              let account = dataSource.accountAddress, !preferences.thousandaireAccounts.contains(account) else { return }
+        preferences.thousandaireAccounts.insert(account)
+        celebration = .thousandaire
+    }
+
+    /// J2 : l'app vient de s'ouvrir sur le Wallet, à 3 h du matin ; une fois par nuit.
+    func openedAt(_ date: Date, calendar: Calendar = .current) {
+        guard celebration == nil, EasterEggRules.isNightOwlHour(date, calendar: calendar), let preferences else { return }
+        let night = EasterEggRules.night(of: date, calendar: calendar)
+        guard preferences.lastNightOwl != night else { return }
+        preferences.lastNightOwl = night
+        celebration = .nightOwl
+    }
+
+    func dismissCelebration() {
+        celebration = nil
     }
 
     /// Une tuile est-elle utilisable ? Avec un solde nul, seul Receive a un sens.

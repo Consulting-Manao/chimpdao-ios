@@ -67,11 +67,14 @@ protocol WalletDataSource {
     func discardCachedReads()
     /// Les derniers soldes lus du compte affiché, gardés sur le téléphone (`BalanceStore`), à montrer en attendant la chaîne.
     func storedWallet() -> WalletSnapshot?
+    /// Le Main affiché (J3 : une fête par compte) ; `nil` sans compte.
+    var accountAddress: String? { get }
 }
 
 extension WalletDataSource {
     func discardCachedReads() {}
     func storedWallet() -> WalletSnapshot? { nil }
+    var accountAddress: String? { nil }
 }
 
 /// Données factices (noms et montants de la maquette), avec des scénarios pour tester chaque état.
