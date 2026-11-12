@@ -47,9 +47,6 @@ struct ChimpNetworkConfig: Equatable, Sendable {
         /// Admin des contrats (`chimp-agent`, `chimp-contracts/.config/stellar/`, ARCHITECTURE §2.4).
         /// Sert seulement à avertir si la clé saisie dans le mode admin n'est pas celle-ci.
         let admin: String
-        /// Contrat `prize` (carte partenaire, D5 : de l'argent mis de côté pour une carte). `nil` tant qu'il n'est pas
-        /// déployé : rien n'est lu, rien ne s'affiche.
-        var prize: String? = nil
     }
 
     /// Page de l'explorateur pour une transaction (`explorerTx` dans `chain/env.ts`).
@@ -74,10 +71,7 @@ struct ChimpNetworkConfig: Equatable, Sendable {
             nfcNft: "CC6Z7JDXX2RXULI2TMY7OGJJ57WXTBRCQDRR4W4IFEJZZ7SPGCPYJEJT",
             accountWasmHash: "044275ac1be3fd505922fb0c564370331753fe808e31990b7e74ebf395614271",
             router: "CAOL3K7VQTDZELQMKTAJB3WUQGL5JLXJKZ2Y44F77NH4CZNLW5I755XI",
-            admin: "GBLWPGXVH47YGMODIUHZJ7FETRISFU3TB7JGADTRIMU36OLWJ7PYEZ6M",
-            // À remplir avec l'adresse donnée par Pamphile quand il aura déployé `examples/prize` sur testnet
-            // (`--token` SAC XLM, `--nfc_contract` chi4).
-            prize: nil
+            admin: "GBLWPGXVH47YGMODIUHZJ7FETRISFU3TB7JGADTRIMU36OLWJ7PYEZ6M"
         ),
         feeSignerURL: URL(string: "https://chimpdao-signer.tansu-964.workers.dev/")!,
         feePayer: "GDZE7UWGO3PS6R6RI6F3XIJLX7WGIEFD3X4YQO4AJH4LS3KDY6LLFXG2",

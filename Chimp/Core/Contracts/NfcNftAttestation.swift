@@ -12,9 +12,13 @@ enum NfcNftAttestation {
     static let domain = "chimpdao.nfc-nft.v3"
 
     /// `sha256(domain ‖ XDR(adresse du contrat) ‖ XDR(Symbol fonction) ‖ XDR(Vec arguments) ‖ XDR(u32 nonce))`.
-    /// Le calcul lui-même est partagé avec le contrat `prize` (`ChipCallDigest`, compilé aussi hors du mode admin).
     static func callDigest(domain: String, contractID: String, function: String, arguments: [SCValXDR], nonce: UInt32) throws -> Data {
-        try ChipCallDigest.callDigest(domain: domain, contractID: contractID, function: function, arguments: arguments, nonce: nonce)
+        var preimage = Data(domain.utf8)
+        preimage.append(contentsOf: try XDREncoder.encode(SCValXDR.address(try SCAddressXDR(contractId: contractID))))
+        preimage.append(contentsOf: try XDREncoder.encode(SCValXDR.symbol(function)))
+        preimage.append(contentsOf: try XDREncoder.encode(SCValXDR.vec(arguments)))
+        preimage.append(contentsOf: try XDREncoder.encode(SCValXDR.u32(nonce)))
+        return Data(SHA256.hash(data: preimage))
     }
 
     /// Arguments attestés par `mint` : `[clé publique, courbe, politique, uri]` (tout fait partie de ce que la carte signe).

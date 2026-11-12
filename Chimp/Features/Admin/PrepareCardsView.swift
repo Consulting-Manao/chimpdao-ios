@@ -500,11 +500,10 @@ struct PreparedCardsListView: View {
 
 // MARK: - « Check a card »
 
-/// « Check a card » : tap d'une carte (lecture seule), puis sa fiche en langage simple, « Send test money » et, si le
-/// contrat `prize` est déployé, « Reserve money for this card » (carte partenaire, D5).
+/// « Check a card » : tap d'une carte (lecture seule), puis sa fiche en langage simple et une seule action,
+/// « Send test money ».
 struct CheckCardView: View {
     let model: PrepareCardsModel
-    @State private var reserving: AdminPrizeModel?
 
     var body: some View {
         content
@@ -514,9 +513,6 @@ struct CheckCardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .navigationBarBackButtonHidden(model.isChecking)
-            .navigationDestination(item: $reserving) { prize in
-                AdminPrizeView(model: prize)
-            }
     }
 
     @ViewBuilder
@@ -568,12 +564,6 @@ struct CheckCardView: View {
                 ChimpButton(untranslated("Send test money (\(PrepareCardsModel.defaultStartingXLM) XLM)"), size: .large,
                             isLoading: model.isSendingCheckMoney) {
                     Task { await model.sendTestMoneyToCheckedCard() }
-                }
-                if AdminPrizeModel.isAvailable, let key = result.publicKey {
-                    ChimpButton(untranslated("Reserve money for this card"), kind: .secondary) {
-                        reserving = AdminPrizeModel.live(card: key, title: Self.title(result))
-                    }
-                    .disabled(model.isChecking)
                 }
             }
             ChimpButton(untranslated("Check another card"), kind: result.canReceiveMoney ? .link : .primary,

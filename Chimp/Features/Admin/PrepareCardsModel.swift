@@ -496,8 +496,6 @@ final class PrepareCardsModel {
         let wallet: String?
         /// Résultat du dernier « Send test money ».
         var sent: SendResult?
-        /// Clé de la carte lue (« Reserve money for this card »).
-        var publicKey: ChipPublicKey? = nil
 
         enum SendResult: Equatable {
             case sent(xlm: Int)
@@ -548,7 +546,7 @@ final class PrepareCardsModel {
             let result: CardCheck
             switch try await makeService().inspect(card) {
             case let .alreadyEnrolled(_, pocket):
-                result = CardCheck(readiness: .ready, entry: entry, wallet: pocket, publicKey: card.publicKey)
+                result = CardCheck(readiness: .ready, entry: entry, wallet: pocket)
             case .ready(let plan):
                 result = CardCheck(readiness: card.pinActive ? .hasPIN : .notPrepared, entry: entry, wallet: plan.predictedPocket)
             }
