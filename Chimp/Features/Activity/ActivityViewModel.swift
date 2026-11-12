@@ -238,7 +238,9 @@ final class ActivityViewModel {
         let isMove = addresses.contains(pending.trace.destination)
         let to = drawers.first { $0.address == pending.trace.destination }
         let given = SendAsset(rawValue: pending.asset)?.code ?? pending.asset
-        let title = if let swap = pending.swap {
+        let title = if let prize = pending.prize {
+            String(localized: "Opening a gift for \(prize.cardName)")
+        } else if let swap = pending.swap {
             String(localized: "Swapping \(given) for \(SendAsset(rawValue: swap.receivedAsset)?.code ?? swap.receivedAsset)")
         } else if isMove {
             String(localized: "Moving to \(to?.title ?? StellarAddressParser.short(pending.recipient))")
@@ -248,7 +250,9 @@ final class ActivityViewModel {
         let time = pending.signedAt.formatted(date: .omitted, time: .shortened)
         let row = ActivityRow(
             id: "pending", title: title, meta: "\(time) · \(Self.statusText(pendingStatus))", stamp: .pending,
-            amount: pending.swap != nil
+            amount: pending.prize != nil
+                ? Self.amountText(pending.amount, code: given, sign: .positive)
+                : pending.swap != nil
                 ? Self.quantityText(pending.amount, code: given, sign: .negative)
                 : Self.amountText(pending.amount, code: given, sign: isMove ? nil : .negative),
             tone: .neutral, record: nil
@@ -314,7 +318,10 @@ final class ActivityViewModel {
             )
         case .received:
             return ActivityRow(
-                id: record.id, title: String(localized: "\(StellarAddressParser.short(record.from)) paid you"),
+                id: record.id,
+                title: record.isGift == true
+                    ? String(localized: "A gift for \(drawer(record.to)?.name ?? "")")
+                    : String(localized: "\(StellarAddressParser.short(record.from)) paid you"),
                 meta: "\(time) · " + String(localized: "into \(drawer(record.to)?.name ?? "")"), stamp: .gotIt,
                 amount: record.amount.map { amountText($0, code: code, sign: .positive) }, tone: .positive, record: record
             )

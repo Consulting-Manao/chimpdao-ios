@@ -70,6 +70,9 @@ struct ActivityRecord: Codable, Equatable, Identifiable, Sendable {
     var sourceChain: String? = nil
     var sourceAddress: String? = nil
     var bridgeFee: Decimal? = nil
+    /// Cadeau d'une carte partenaire (contrat `prize`, D5) ouvert sur ce téléphone : un `transfer` du contrat vers le
+    /// wallet de la carte. Optionnel : les fichiers écrits avant restent lisibles.
+    var isGift: Bool? = nil
 
     /// Ce que la ligne représente pour ce compte. `classifyTransfer` du terminal (`lib/chain-history.ts`), sans les
     /// protocoles DeFi (hors V1), plus **Move** : les deux côtés sont des tiroirs du compte (DESIGN_NOTES §13).
@@ -109,6 +112,13 @@ extension ActivityRecord {
             id: "stellar:\(hash)", event: .transfer, hash: hash, from: from, to: to, assetCode: assetCode, amount: amount,
             at: at, isLocal: true
         )
+    }
+
+    /// Un cadeau ouvert (carte partenaire, D5), écrit par ce téléphone : le contrat `prize` a payé le wallet de la carte.
+    static func gift(hash: String, prize: String, wallet: String, assetCode: String, amount: Decimal, at: Date = .now) -> ActivityRecord {
+        var record = payment(hash: hash, from: prize, to: wallet, assetCode: assetCode, amount: amount, at: at)
+        record.isGift = true
+        return record
     }
 
     /// Un swap confirmé, écrit par ce téléphone : ce qui est parti, ce qui est arrivé (quantité rendue par le router), le

@@ -122,9 +122,13 @@ final class ChainActivityDataSource: ActivityDataSource {
 
     func checkPending(_ pending: PendingSend) async throws -> PaymentCheck {
         // Un swap en attente se vérifie comme un envoi ; le service du swap écrit sa ligne s'il est parti.
-        let result = pending.swap == nil
-            ? try await ChainSendService(session: session).check(pending.trace)
-            : try await ChainSwapService(session: session).check(pending.trace)
+        let result = if pending.prize != nil {
+            try await ChainPrizeService(session: session).check(pending.trace)
+        } else if pending.swap == nil {
+            try await ChainSendService(session: session).check(pending.trace)
+        } else {
+            try await ChainSwapService(session: session).check(pending.trace)
+        }
         switch result {
         case .sent, .nothingSent:
             try? session.setPendingSend(nil)

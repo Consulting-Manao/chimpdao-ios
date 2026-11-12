@@ -20,6 +20,9 @@ struct WalletView: View {
     var onOpenDrawer: (DrawerSelection) -> Void = { _ in }
     /// « Add money » (D4, sans maquette) : affiché seulement si une action est fournie.
     var onAddMoney: (() -> Void)?
+    /// Cartes du compte qui ont un cadeau qui attend (carte partenaire, D5) : une ligne chacune, qui ouvre H1.
+    var gifts: [PrizeGift] = []
+    var onOpenGift: (PrizeGift) -> Void = { _ in }
 
     /// J2, J3 : seulement quand le Wallet lui-même est à l'écran, jamais par-dessus un autre écran.
     @State private var isVisible = false
@@ -145,6 +148,14 @@ struct WalletView: View {
 
             if let onAddMoney {
                 ChimpNavigationRow(title: "Add money", subtitle: "From another chain", action: onAddMoney)
+                    .padding(.top, ChimpSpacing.m)
+            }
+
+            ForEach(gifts) { gift in
+                ChimpNavigationRow(
+                    title: "A gift for \(gift.cardName)",
+                    subtitle: "\(gift.asset.displayedWithCode(gift.amount)) waiting · Open it"
+                ) { onOpenGift(gift) }
                     .padding(.top, ChimpSpacing.m)
             }
 

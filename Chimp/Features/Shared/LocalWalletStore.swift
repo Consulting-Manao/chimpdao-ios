@@ -90,6 +90,9 @@ struct PendingSend: Codable, Equatable {
     /// Dépôt ou retrait d'un vault signé (tranche 2, D1). `recipient` est alors le vault, `asset` et `amount` l'actif
     /// mis (dépôt) ou attendu (retrait). Optionnel : un fichier écrit avant ce champ reste lisible.
     var vault: PendingVault? = nil
+    /// Retrait d'une carte partenaire signé (contrat `prize`, D5). `recipient` est alors le wallet de la carte, `asset` et
+    /// `amount` ce qui doit arriver. Optionnel : un fichier écrit avant ce champ reste lisible.
+    var prize: PendingPrize? = nil
 }
 
 /// Ce qu'un dépôt ou un retrait à l'issue incertaine portait, pour réafficher son état (« Check again »).

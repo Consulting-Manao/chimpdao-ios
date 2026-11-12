@@ -25,6 +25,12 @@ struct MainTabView: View {
     @State private var growModel: GrowModel
     /// Écrans poussés dans l'onglet Grow.
     @State private var growPath: [GrowRoute] = []
+    /// Cadeaux qui attendent sur les cartes du compte (carte partenaire, D5), relus avec les soldes.
+    @State private var gifts: [PrizeGift] = []
+    /// « Somebody likes you! » en plein écran.
+    @State private var openGift: PrizeGift?
+    /// Cadeaux déjà montrés tout seuls depuis le lancement (« Later » : la ligne du Wallet reste).
+    @State private var shownGifts: Set<String> = []
     #if DESIGN_CATALOG
     @State private var isShowingCatalog = false
     #endif
@@ -63,6 +69,32 @@ struct MainTabView: View {
             // J2 : à l'ouverture de l'app (lancement ou retour), sur le Wallet seul, sans opération en attente.
             .task { checkNightOwl() }
             .onChange(of: scenePhase) { _, phase in if phase == .active { checkNightOwl() } }
+            .task { await loadGifts() }
+            .fullScreenCover(item: $openGift) { gift in
+                NavigationStack {
+                    PrizeClaimRoot(service: ChainPrizeService(session: session), gift: gift) {
+                        openGift = nil
+                        refreshAll()
+                    }
+                }
+            }
+    }
+
+    /// Les cadeaux des cartes du compte (rien si le contrat `prize` n'est pas configuré). Le premier qui n'a pas encore été
+    /// montré s'ouvre tout seul, sur le Wallet seulement et sans opération en attente.
+    private func loadGifts() async {
+        guard ChainPrizeService.isAvailable(config) else { return }
+        guard let found = try? await ChainPrizeService(session: session).gifts() else { return }
+        gifts = found
+        guard openGift == nil, selection == .wallet, walletPath.isEmpty, session.wallet.pendingSend == nil,
+              let next = found.first(where: { !shownGifts.contains(Self.giftKey($0)) }) else { return }
+        shownGifts.insert(Self.giftKey(next))
+        openGift = next
+    }
+
+    /// Un cadeau montré une fois par carte et par montant : un nouveau dépôt se montre de nouveau.
+    private static func giftKey(_ gift: PrizeGift) -> String {
+        "\(gift.id):\(gift.amount)"
     }
 
     private func checkNightOwl() {
@@ -78,7 +110,8 @@ struct MainTabView: View {
                 WalletView(
                     model: walletModel, onSettings: settingsAction, onAction: openWalletAction,
                     onAddCard: { walletPath.append(.addCard) }, onOpenDrawer: { walletPath.append(.drawer($0)) },
-                    onAddMoney: config.features.addMoney && config.integrations != nil ? { walletPath.append(.addMoney) } : nil
+                    onAddMoney: config.features.addMoney && config.integrations != nil ? { walletPath.append(.addMoney) } : nil,
+                    gifts: gifts, onOpenGift: { openGift = $0 }
                 )
                     .toolbar(.hidden, for: .navigationBar)
                     .withTabBar($selection)
@@ -401,6 +434,7 @@ struct MainTabView: View {
 
     private func refreshAll() {
         Task { await walletModel.refresh() }
+        Task { await loadGifts() }
         Task { await activityModel.refresh() }
         // Grow éteint sur ce réseau : rien à relire (aucun écran ne le montre).
         if config.features.grow { Task { await growModel.refresh() } }
@@ -412,7 +446,9 @@ struct MainTabView: View {
     @ViewBuilder
     private func pendingFirst(onExit: @escaping () -> Void, @ViewBuilder content: () -> some View) -> some View {
         Group {
-            if hasPendingVault {
+            if hasPendingPrize {
+                PrizeClaimRoot(service: ChainPrizeService(session: session), gift: nil, onExit: onExit)
+            } else if hasPendingVault {
                 VaultFlowRoot(
                     service: ChainVaultService(session: session), action: .deposit,
                     onSeePosition: showPositionInGrow, onExit: onExit
@@ -445,6 +481,9 @@ struct MainTabView: View {
 
     /// Une opération signée attend son issue, et c'est un dépôt ou un retrait du vault.
     private var hasPendingVault: Bool { session.wallet.pendingSend?.vault != nil }
+
+    /// Une opération signée attend son issue, et c'est le retrait d'un cadeau (carte partenaire, D5).
+    private var hasPendingPrize: Bool { session.wallet.pendingSend?.prize != nil }
 
     /// Fin d'un parcours (Send, Move…) : retour à la page du tiroir d'où il est parti, sinon au Wallet ; soldes et
     /// historique relus.

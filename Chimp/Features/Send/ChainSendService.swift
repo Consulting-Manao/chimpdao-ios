@@ -189,6 +189,7 @@ final class ChainSendService: SendService {
         // Un paiement en attente finalement parti : écrit dans l'historique comme un envoi confirmé. Pas un swap ni une
         // opération de vault : leur service écrit leur propre ligne.
         if case .sent(let hash) = result, session.wallet.pendingSend?.swap == nil, session.wallet.pendingSend?.vault == nil,
+           session.wallet.pendingSend?.prize == nil,
            let account = session.wallet.account?.address,
            let code = (try? SACClient.stellarAssets(config: config))?.first(where: { $0.contract == trace.token })?.code {
             session.recordActivity(.payment(
