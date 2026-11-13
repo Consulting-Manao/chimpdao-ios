@@ -36,6 +36,10 @@ final class UpdatesModel {
 
     private(set) var rows: [Row] = []
     private(set) var phase = Phase.idle
+    /// La version visée par les mises à jour en attente (tête de la flotte) : ce que la pop-up annonce.
+    private(set) var pendingHead: String?
+    /// « Later » : plus de pop-up jusqu'au prochain lancement de l'app.
+    private var dismissedThisLaunch = false
 
     let session: AppSession
     let service: UpdatesService
@@ -52,6 +56,24 @@ final class UpdatesModel {
     var summary: String? {
         guard phase == .loaded else { return nil }
         return readyCount == 0 ? String(localized: "Up to date") : String(localized: "\(readyCount) ready")
+    }
+
+    /// Faut-il montrer la pop-up « An update is ready » ? Une fois par version de ChimpDAO, et une fois par lancement
+    /// après un « Later » : jamais un rappel qui revient sans cesse. Jamais pendant une opération en attente.
+    var shouldAnnounce: Bool {
+        guard let pendingHead, !dismissedThisLaunch, session.wallet.pendingSend == nil else { return false }
+        return session.preferences.lastUpdateNotice != ContractUpdates.normHash(pendingHead)
+    }
+
+    /// La pop-up a été montrée pour cette version : elle ne reviendra que pour la suivante.
+    func announced() {
+        guard let pendingHead else { return }
+        session.preferences.lastUpdateNotice = ContractUpdates.normHash(pendingHead)
+    }
+
+    /// « Later » : rien jusqu'au prochain lancement, et la version reste à proposer (la ligne des Réglages ne bouge pas).
+    func postpone() {
+        dismissedThisLaunch = true
     }
 
     /// Les contrats à juger : le Main account, puis le wallet de chaque carte que le Wallet a lu (noms et couleurs du
@@ -78,6 +100,7 @@ final class UpdatesModel {
         let subjects = Self.subjects(account: session.wallet.account?.address, cards: cards, saved: session.wallet.account?.cards ?? [])
         guard !subjects.isEmpty else {
             rows = []
+            pendingHead = nil
             phase = .loaded
             return
         }
@@ -92,6 +115,7 @@ final class UpdatesModel {
                 }
                 return row
             }
+            pendingHead = rows.compactMap(\.target).first?.wasmHash
             phase = .loaded
         } catch {
             phase = .failed(details: OnboardingModel.details(error))

@@ -25,6 +25,8 @@ struct MainTabView: View {
     @State private var growModel: GrowModel
     /// Réglages › Updates : le code du Main account et des wallets des cartes face à la flotte.
     @State private var updatesModel: UpdatesModel
+    /// La pop-up « An update is ready » du Wallet.
+    @State private var isShowingUpdateNotice = false
     /// Écrans poussés dans l'onglet Grow.
     @State private var growPath: [GrowRoute] = []
     #if DESIGN_CATALOG
@@ -66,6 +68,27 @@ struct MainTabView: View {
             // J2 : à l'ouverture de l'app (lancement ou retour), sur le Wallet seul, sans opération en attente.
             .task { checkNightOwl() }
             .onChange(of: scenePhase) { _, phase in if phase == .active { checkNightOwl() } }
+            // Mises à jour des contrats : lues avec les soldes, annoncées une fois par version de ChimpDAO.
+            .task { await loadUpdates() }
+            .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await loadUpdates() } } }
+            .chimpSheet(isPresented: $isShowingUpdateNotice, height: 560, fitsContent: true) {
+                UpdateNoticeSheet(count: updatesModel.readyCount) {
+                    isShowingUpdateNotice = false
+                    walletPath.append(.updates)
+                } onLater: {
+                    isShowingUpdateNotice = false
+                    updatesModel.postpone()
+                }
+            }
+    }
+
+    /// Relit où en sont les contrats, puis annonce la mise à jour **une seule fois par version**, sur le Wallet seulement,
+    /// sans opération en attente et sans rien d'autre d'ouvert : elle ne coupe jamais un parcours en cours.
+    private func loadUpdates() async {
+        await updatesModel.refresh(cards: walletModel.cards)
+        guard updatesModel.shouldAnnounce, selection == .wallet, walletPath.isEmpty, !isShowingUpdateNotice else { return }
+        updatesModel.announced()
+        isShowingUpdateNotice = true
     }
 
     private func checkNightOwl() {
@@ -188,7 +211,6 @@ struct MainTabView: View {
                                 walletPath.removeAll()
                                 Task { await walletModel.refresh() }
                             }
-                            .task { await updatesModel.refresh(cards: walletModel.cards) }
                         }
                     }
                 #if DESIGN_CATALOG

@@ -368,3 +368,45 @@ private extension String {
     /// « your Main account » → « Your Main account ».
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
+
+/// La pop-up du Wallet (demande de Barth du 2026-11-13) : une mise à jour est prête. Elle ne bloque jamais l'accès à
+/// l'argent, ne revient qu'une fois par version de ChimpDAO (et une fois par lancement après « Later »), et se contente
+/// d'ouvrir Réglages › Updates : rien n'est signé ici.
+struct UpdateNoticeSheet: View {
+    /// Combien de contrats ont une mise à jour prête.
+    let count: Int
+    let onUpdate: () -> Void
+    let onLater: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Image(.chimpyTeacher)
+                .resizable()
+                .scaledToFit()
+                .frame(height: 150)
+                .chimpBob(duration: 3.4)
+                .accessibilityHidden(true)
+            Text("An update is ready")
+                .chimpFont(.sheetTitle)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.chimpTextPrimary)
+                .padding(.top, ChimpSpacing.m)
+                .accessibilityAddTraits(.isHeader)
+            Text(count > 1
+                 ? "ChimpDAO improved the code behind your account and your cards. It takes one tap of a card, and no money moves."
+                 : "ChimpDAO improved the code behind your account. It takes one tap of a card, and no money moves.")
+                .chimpFont(.bodyL)
+                .lineSpacing(4)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.chimpTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, ChimpSpacing.sm)
+            VStack(spacing: 11) {
+                ChimpButton("See the update", action: onUpdate)
+                ChimpButton("Later", kind: .link, action: onLater)
+            }
+            .padding(.top, ChimpSpacing.xl)
+        }
+        .padding(.horizontal, ChimpSpacing.xxl)
+    }
+}

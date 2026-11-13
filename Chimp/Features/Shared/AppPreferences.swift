@@ -66,6 +66,12 @@ final class AppPreferences {
         didSet { store.set(thousandaireAccounts.isEmpty ? nil : thousandaireAccounts.sorted().joined(separator: ","), for: .thousandaire) }
     }
 
+    /// La dernière version de ChimpDAO pour laquelle la pop-up « An update is ready » s'est montrée (hash du code visé).
+    /// Une nouvelle version la remontre ; « Later » la met en sommeil jusqu'au prochain lancement (en mémoire).
+    var lastUpdateNotice: String? {
+        didSet { store.set(lastUpdateNotice, for: .updateNotice) }
+    }
+
     init(store: PreferencesStore) {
         self.store = store
         look = store.string(for: .look).flatMap(ChimpLook.init(rawValue:)) ?? .auto
@@ -75,6 +81,7 @@ final class AppPreferences {
         hidesBalances = store.string(for: .hidesBalances) == "hidden"
         lastNightOwl = store.string(for: .nightOwl)
         thousandaireAccounts = Set((store.string(for: .thousandaire) ?? "").split(separator: ",").map(String.init))
+        lastUpdateNotice = store.string(for: .updateNotice)
     }
 
     /// Préférences gardées dans `UserDefaults` (l'app) ; en mémoire pour les tests et le catalogue.
@@ -105,6 +112,7 @@ enum PreferenceKey: String, CaseIterable {
     case hidesBalances = "chimp.hidesBalances"
     case nightOwl = "chimp.easterEgg.nightOwl"
     case thousandaire = "chimp.easterEgg.thousandaire"
+    case updateNotice = "chimp.updates.lastNotice"
 }
 
 /// Lecture et écriture des préférences. Implémenté par `UserDefaultsPreferencesStore` et `InMemoryPreferencesStore`.

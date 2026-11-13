@@ -19,7 +19,7 @@ struct UpdatesFlowTests {
         }
     }
 
-    private func session(pending: Bool = false) -> AppSession {
+    private func session(pending: Bool = false, preferences: AppPreferences? = nil) -> AppSession {
         var wallet = LocalWallet(firstName: "Barth", tourSeen: true, account: SavedAccount(address: Self.account, cards: [
             SavedCard(publicKey: k1, chip: "infineon2Go", tokenID: 7, pocket: Self.bananaPocket, name: "Banana", color: "banana"),
             SavedCard(publicKey: r1, chip: "duox", tokenID: 8, pocket: Self.leafPocket, name: "Leaf", color: "leaf"),
@@ -28,7 +28,10 @@ struct UpdatesFlowTests {
             let trace = PaymentTrace(token: "C", from: "C", destination: "G", units: 1, nonce: 1, preparedAtLedger: 1, expirationLedger: 2)
             wallet.pendingSend = PendingSend(trace: trace, recipient: "G", recipientName: nil, drawerTitle: "Main account", asset: "XLM", amount: 1, signedAt: .now)
         }
-        return AppSession(store: InMemoryLocalWalletStore(wallet), config: .testnet)
+        return AppSession(
+            store: InMemoryLocalWalletStore(wallet), config: .testnet,
+            preferences: preferences ?? AppPreferences(store: InMemoryPreferencesStore())
+        )
     }
 
     private var cards: [CardBalance] {
@@ -79,6 +82,45 @@ struct UpdatesFlowTests {
         await model.refresh(cards: cards)
         guard case .failed = model.phase else { Issue.record("expected failed, got \(model.phase)"); return }
         #expect(model.summary == nil)
+    }
+
+    // MARK: Pop-up du Wallet
+
+    @Test("Pop-up : annoncée une fois par version de ChimpDAO, plus jamais pour la même")
+    func announceOncePerVersion() async {
+        let preferences = AppPreferences(store: InMemoryPreferencesStore())
+        let model = UpdatesModel(session: session(preferences: preferences), service: MockUpdatesService(scenario: .accountUpdate, delay: .zero))
+        await model.refresh(cards: cards)
+        #expect(model.shouldAnnounce)
+        model.announced()
+        #expect(!model.shouldAnnounce)
+        #expect(preferences.lastUpdateNotice == MockUpdatesService.headHash)
+
+        // Un autre lancement, même version : rien.
+        let again = UpdatesModel(session: session(preferences: preferences), service: MockUpdatesService(scenario: .accountUpdate, delay: .zero))
+        await again.refresh(cards: cards)
+        #expect(!again.shouldAnnounce)
+    }
+
+    @Test("Pop-up : « Later » la tait jusqu'au prochain lancement, sans masquer la mise à jour")
+    func postpone() async {
+        let model = UpdatesModel(session: session(), service: MockUpdatesService(scenario: .accountUpdate, delay: .zero))
+        await model.refresh(cards: cards)
+        model.announced()
+        model.postpone()
+        #expect(!model.shouldAnnounce)
+        #expect(model.readyCount == 1, "la ligne des Réglages reste proposée")
+    }
+
+    @Test("Pop-up : rien à annoncer si tout est à jour, ou pendant une opération en attente")
+    func noAnnounce() async {
+        let upToDate = UpdatesModel(session: session(), service: MockUpdatesService(scenario: .upToDate, delay: .zero))
+        await upToDate.refresh(cards: cards)
+        #expect(!upToDate.shouldAnnounce)
+
+        let pending = UpdatesModel(session: session(pending: true), service: MockUpdatesService(scenario: .accountUpdate, delay: .zero))
+        await pending.refresh(cards: cards)
+        #expect(!pending.shouldAnnounce)
     }
 
     // MARK: Parcours

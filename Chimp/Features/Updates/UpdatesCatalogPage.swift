@@ -7,6 +7,7 @@ struct UpdatesCatalogPage: View {
     let settings: CatalogSettings
     @State private var scenario = MockUpdatesService.Scenario.accountUpdate
     @State private var isShowingDemo = false
+    @State private var isShowingNotice = false
 
     var body: some View {
         CatalogPage("Updates", settings: settings, scrolls: false) {
@@ -32,10 +33,18 @@ struct UpdatesCatalogPage: View {
                     } label: {
                         Text(verbatim: "Open Updates").chimpFont(.rowTitle)
                     }
+                    Button {
+                        isShowingNotice = true
+                    } label: {
+                        Text(verbatim: "The Wallet pop-up").chimpFont(.rowTitle)
+                    }
                 }
                 .listRowBackground(Color(.chimpSurface))
             }
             .scrollContentBackground(.hidden)
+        }
+        .chimpSheet(isPresented: $isShowingNotice, height: 560, fitsContent: true) {
+            UpdateNoticeSheet(count: 1, onUpdate: { isShowingNotice = false }, onLater: { isShowingNotice = false })
         }
         .fullScreenCover(isPresented: $isShowingDemo) {
             UpdatesDemoRoot(scenario: scenario) { isShowingDemo = false }
