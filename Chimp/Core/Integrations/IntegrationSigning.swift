@@ -129,31 +129,46 @@ struct IntegrationCallClient {
         onProgress: ((PaymentProgress) -> Void)? = nil
     ) async throws -> String {
         var trace = trace
-        onProgress?(.checking)
         do {
-            guard prepared.acceptedKeys.contains(signed.card.publicKey) else {
-                throw ChipError.cardNotAccepted(tapped: signed.card.publicKey)
+            return try await sendSigned(prepared, signed: signed, feeSigner: feeSigner, onProgress: onProgress) { maxTime in
+                trace.transactionMaxTime = maxTime
             }
-            guard signed.signatures.count == 1, let signature = signed.signatures.first else {
-                throw ChipError.malformedResponse("expected 1 signature, got \(signed.signatures.count)")
-            }
-            let current = try await client.latestLedger()
-            guard current < prepared.expirationLedger else {
-                throw SigningError.authorizationExpiring(expirationLedger: prepared.expirationLedger, currentLedger: current)
-            }
-            let transaction = try await AuthorizedCall.assembled(
-                client: client, source: try await client.account(config.feePayer),
-                contract: prepared.call.contract, function: prepared.call.function, arguments: prepared.call.arguments,
-                entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCodes: prepared.rejectionCodes,
-                envelope: { prepared.envelope($0, card: signed.card.publicKey) }
-            )
-            trace.transactionMaxTime = transaction.preconditions?.timeBounds?.maxTime
-            onProgress?(.sending)
-            return try await client.refitAndSubmit(transaction, feeSigner: feeSigner) { onProgress?(.confirming) }
         } catch {
             trace.transactionHash = PaymentClient.sentHash(in: error)
             throw PaymentFailure(trace: trace, underlying: error)
         }
+    }
+
+    /// Le cœur de `submit`, sans trace de paiement : carte acceptée, une signature, autorisation pas expirée, transaction
+    /// assemblée (`recovery_id` cherché par simulation), frais, envoi, attente. Les erreurs remontent telles quelles.
+    /// Sert aussi aux mises à jour du code (`ContractUpdateClient`), qui se vérifient en relisant le contrat.
+    func sendSigned(
+        _ prepared: PreparedIntegrationCall,
+        signed: CardSignatures,
+        feeSigner: FeeSigner,
+        onProgress: ((PaymentProgress) -> Void)? = nil,
+        onAssembled: (UInt64?) -> Void = { _ in }
+    ) async throws -> String {
+        onProgress?(.checking)
+        guard prepared.acceptedKeys.contains(signed.card.publicKey) else {
+            throw ChipError.cardNotAccepted(tapped: signed.card.publicKey)
+        }
+        guard signed.signatures.count == 1, let signature = signed.signatures.first else {
+            throw ChipError.malformedResponse("expected 1 signature, got \(signed.signatures.count)")
+        }
+        let current = try await client.latestLedger()
+        guard current < prepared.expirationLedger else {
+            throw SigningError.authorizationExpiring(expirationLedger: prepared.expirationLedger, currentLedger: current)
+        }
+        let transaction = try await AuthorizedCall.assembled(
+            client: client, source: try await client.account(config.feePayer),
+            contract: prepared.call.contract, function: prepared.call.function, arguments: prepared.call.arguments,
+            entry: prepared.entry, curve: signed.card.curve, signature: signature, rejectionCodes: prepared.rejectionCodes,
+            envelope: { prepared.envelope($0, card: signed.card.publicKey) }
+        )
+        onAssembled(transaction.preconditions?.timeBounds?.maxTime)
+        onProgress?(.sending)
+        return try await client.refitAndSubmit(transaction, feeSigner: feeSigner) { onProgress?(.confirming) }
     }
 }
 
