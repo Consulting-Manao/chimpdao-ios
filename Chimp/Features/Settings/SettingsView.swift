@@ -10,6 +10,10 @@ struct SettingsView: View {
     @Bindable var model: SettingsModel
     let onBack: () -> Void
     var onDeveloper: (() -> Void)?
+    /// « Updates » : « 1 ready », « Up to date », ou rien tant que ce n'est pas lu.
+    var updatesSummary: String?
+    /// Réglages › Updates ; pas de ligne sans action (aperçus).
+    var onUpdates: (() -> Void)?
     @State private var isShowingLicenses = false
     /// J1 : les derniers taps sur la banane du pied de page.
     @State private var bananaTaps: [Date] = []
@@ -51,6 +55,9 @@ struct SettingsView: View {
                         faceIDRow
                         ForEach(model.pinCards) { card in
                             ChimpSettingsRow(title: "Change PIN", value: card.name) { pinCard = card }
+                        }
+                        if let onUpdates {
+                            ChimpSettingsRow(title: "Updates", value: updatesSummary, action: onUpdates)
                         }
                     }
                     .padding(.top, ChimpSpacing.s)

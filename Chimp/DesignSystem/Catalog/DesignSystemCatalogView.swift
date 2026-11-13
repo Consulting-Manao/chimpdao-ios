@@ -89,6 +89,7 @@ struct DesignSystemCatalogView: View {
                     link("Send", systemImage: "paperplane.fill") { SendCatalogPage(settings: settings) }
                     link("Swap", systemImage: "arrow.left.arrow.right") { SwapCatalogPage(settings: settings) }
                     link("Grow", systemImage: "leaf.fill") { GrowCatalogPage(settings: settings) }
+                    link("Updates", systemImage: "arrow.triangle.2.circlepath") { UpdatesCatalogPage(settings: settings) }
                     link("Activity states", systemImage: "list.bullet.rectangle.portrait.fill") { ActivityStatesCatalogPage(settings: settings) }
                 }
                 .listRowBackground(Color(.chimpSurface))

@@ -23,6 +23,8 @@ struct MainTabView: View {
     @State private var prefilledSwap: SwapPrefill?
     /// Les positions du vault, partagées par l'onglet Grow et les pages des tiroirs (tuile « GROWING »).
     @State private var growModel: GrowModel
+    /// Réglages › Updates : le code du Main account et des wallets des cartes face à la flotte.
+    @State private var updatesModel: UpdatesModel
     /// Écrans poussés dans l'onglet Grow.
     @State private var growPath: [GrowRoute] = []
     #if DESIGN_CATALOG
@@ -49,6 +51,7 @@ struct MainTabView: View {
             priceOracle: ReflectorPriceOracle.shared, history: DefaultsPotHistoryStore(),
             rateReader: XoxnoRateClient(config: config)
         ))
+        _updatesModel = State(initialValue: UpdatesModel(session: session, service: UpdatesModel.liveService(config)))
         // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
             session: session, walletCards: { [weak wallet] in wallet?.cards ?? [] }
@@ -119,6 +122,11 @@ struct MainTabView: View {
                             pendingFirst(onExit: closeFlow) {
                                 SwapFlowRoot(service: ChainSwapService(session: session), fromDrawerID: drawerID, onExit: closeFlow)
                             }
+                        case .updates:
+                            UpdatesView(model: updatesModel, cards: walletModel.cards) {
+                                if !walletPath.isEmpty { walletPath.removeLast() }
+                            }
+                            .toolbar(.hidden, for: .navigationBar)
                         case .prefilledSwap(let prefill):
                             // Un swap pré-rempli depuis la page d'un pot (G2).
                             pendingFirst(onExit: closeFlow) {
@@ -174,11 +182,13 @@ struct MainTabView: View {
                             // I2 : au retour, le Wallet relit les noms et couleurs des cartes.
                             SettingsDestination(
                                 session: session, walletCards: walletModel.cards, walletTotal: walletModel.content?.total,
-                                config: config, onDeveloper: developerAction
+                                config: config, onDeveloper: developerAction,
+                                updatesSummary: updatesModel.summary, onUpdates: { walletPath.append(.updates) }
                             ) {
                                 walletPath.removeAll()
                                 Task { await walletModel.refresh() }
                             }
+                            .task { await updatesModel.refresh(cards: walletModel.cards) }
                         }
                     }
                 #if DESIGN_CATALOG
@@ -492,6 +502,8 @@ enum WalletRoute: Hashable {
     /// Un swap pré-rempli (page d'un pot, G2).
     case prefilledSwap(SwapPrefill)
     case settings
+    /// Réglages › Updates.
+    case updates
     case addCard
     case drawer(DrawerSelection)
     /// G6 (retirer) ou G7 (carte perdue), pour la carte de cette clé.
@@ -701,11 +713,13 @@ private struct AddCardDestination: View {
 private struct SettingsDestination: View {
     @State private var model: SettingsModel
     let onDeveloper: (() -> Void)?
+    let updatesSummary: String?
+    let onUpdates: () -> Void
     let onExit: () -> Void
 
     init(
         session: AppSession, walletCards: [CardBalance], walletTotal: String?, config: ChimpNetworkConfig,
-        onDeveloper: (() -> Void)?, onExit: @escaping () -> Void
+        onDeveloper: (() -> Void)?, updatesSummary: String?, onUpdates: @escaping () -> Void, onExit: @escaping () -> Void
     ) {
         let summaries = ChainAccountSummaryReader(wallet: ChainWalletDataSource(
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle.shared,
@@ -715,11 +729,13 @@ private struct SettingsDestination: View {
             session: session, walletCards: walletCards, walletTotal: walletTotal, summaries: summaries
         ))
         self.onDeveloper = onDeveloper
+        self.updatesSummary = updatesSummary
+        self.onUpdates = onUpdates
         self.onExit = onExit
     }
 
     var body: some View {
-        SettingsView(model: model, onBack: onExit, onDeveloper: onDeveloper)
+        SettingsView(model: model, onBack: onExit, onDeveloper: onDeveloper, updatesSummary: updatesSummary, onUpdates: onUpdates)
             .toolbar(.hidden, for: .navigationBar)
     }
 }
