@@ -4,7 +4,7 @@ import SwiftUI
 /// hamac sous un bananier pour Main, Chimpy et la carte pour le wallet d'une carte.
 enum ChimpDrawerScene: Equatable {
     case main
-    case card(name: String, color: ChimpCardColor, number: String)
+    case card(name: String, color: ChimpCardColor, number: String, key: String? = nil)
     /// La carte n'est pas encore lue : le fond de l'en-tête, sans scène.
     case blank
 
@@ -13,7 +13,7 @@ enum ChimpDrawerScene: Equatable {
     var banner: Color {
         switch self {
         case .main: Color(.chimpCardLeaf)
-        case .card(_, let color, _): color.sceneBanner
+        case .card(_, let color, _, _): color.sceneBanner
         case .blank: Color(.chimpHeader)
         }
     }
@@ -107,7 +107,7 @@ struct ChimpDrawerBanner: View {
                     .chimpSway(duration: 4, angle: .degrees(3))
                     .offset(x: -52, y: 52)
             }
-        case .card(let name, let color, let number):
+        case .card(let name, let color, let number, let key):
             ZStack(alignment: .topLeading) {
                 Image(color.sceneSticker)
                     .resizable()
@@ -116,7 +116,7 @@ struct ChimpDrawerBanner: View {
                     .frame(maxWidth: .infinity, alignment: .topTrailing)
                     .padding(.trailing, 6)
                     .offset(y: 34)
-                ChimpCard(name: name, color: color, number: number)
+                ChimpCard(name: name, color: color, number: number, cardKey: key)
                     .frame(width: 200)
                     .rotationEffect(.degrees(-8))
                     .chimpBob(duration: 4)

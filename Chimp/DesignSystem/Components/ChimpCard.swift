@@ -18,17 +18,34 @@ struct ChimpCard: View {
     var subtitle: LocalizedStringKey?
     /// `true` : `number` est un libellé affiché tel quel, sans « N° » (visite guidée : « CHIMP CARD »).
     var numberIsLabel = false
+    /// Clé publique de la carte : si son NFT a un dessin en forme de carte, il **remplace** la face (décision de Barth
+    /// du 2026-11-16 : dessin seul, le nom et le numéro ne sont plus écrits dessus). Sans clé, ou sans dessin, la carte
+    /// garde sa couleur.
+    var cardKey: String?
+
+    @Environment(\.chimpCardArt) private var cardArt
+
+    /// Le dessin imprimé de cette carte, s'il y en a un.
+    private var art: CardArt? { cardKey.flatMap { cardArt($0) } }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: ChimpRadius.chimpCard)
-        Color.clear
+        let art = art
+        return Color.clear
             .aspectRatio(ChimpSize.cardAspectRatio, contentMode: .fit)
-            .overlay { content }
+            .overlay { if art == nil { content } }
             .foregroundStyle(color.ink)
             .background {
-                color.fill
-                    .overlay { ChimpPattern(tileWidth: ChimpSize.patternTileOnCard, opacity: ChimpOpacity.patternOnCard) }
-                    .clipShape(shape)
+                Group {
+                    if let art {
+                        // Le dessin a les mêmes proportions que la carte (vérifié à la lecture) : il la remplit sans être coupé.
+                        Image(uiImage: art.image).resizable().scaledToFill()
+                    } else {
+                        color.fill
+                            .overlay { ChimpPattern(tileWidth: ChimpSize.patternTileOnCard, opacity: ChimpOpacity.patternOnCard) }
+                    }
+                }
+                .clipShape(shape)
             }
             .overlay { shape.strokeBorder(Color(.chimpOutline), lineWidth: ChimpBorder.regular) }
             .background {
@@ -36,8 +53,15 @@ struct ChimpCard: View {
             }
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(numberIsLabel ? Text(verbatim: name) : Text("\(name) card, number \(number)"))
+            .accessibilityLabel(accessibilityLabel(art))
             .accessibilityValue(accessibilityValue)
+    }
+
+    /// VoiceOver dit toujours le nom et le numéro, même quand le dessin les remplace à l'écran, et nomme le dessin.
+    private func accessibilityLabel(_ art: CardArt?) -> Text {
+        let base = numberIsLabel ? Text(verbatim: name) : Text("\(name) card, number \(number)")
+        guard let design = art?.design else { return base }
+        return base + Text(verbatim: ", ") + Text("\(design) design")
     }
 
     private var content: some View {

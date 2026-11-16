@@ -27,6 +27,8 @@ struct MainTabView: View {
     @State private var updatesModel: UpdatesModel
     /// La pop-up « An update is ready » du Wallet.
     @State private var isShowingUpdateNotice = false
+    /// Les dessins imprimés des cartes du compte (NFT), lus avec les soldes.
+    @State private var cardArt: CardArtStore
     /// Écrans poussés dans l'onglet Grow.
     @State private var growPath: [GrowRoute] = []
     #if DESIGN_CATALOG
@@ -54,6 +56,7 @@ struct MainTabView: View {
             rateReader: XoxnoRateClient(config: config)
         ))
         _updatesModel = State(initialValue: UpdatesModel(session: session, service: UpdatesModel.liveService(config)))
+        _cardArt = State(initialValue: CardArtStore(reader: ChainCardArtReader(config: config)))
         // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
             session: session, walletCards: { [weak wallet] in wallet?.cards ?? [] }
@@ -63,6 +66,7 @@ struct MainTabView: View {
     /// L'œil du Wallet (et de Grow) vaut pour tous les onglets ; les parcours qui font signer le remettent à `false`.
     var body: some View {
         tabs
+            .environment(\.chimpCardArt) { [cardArt] key in cardArt.art(forKey: key) }
             .environment(\.chimpHidesAmounts, session.preferences.hidesBalances)
             .environment(\.chimpPotRates, growModel.rates)
             // J2 : à l'ouverture de l'app (lancement ou retour), sur le Wallet seul, sans opération en attente.
@@ -70,6 +74,7 @@ struct MainTabView: View {
             .onChange(of: scenePhase) { _, phase in if phase == .active { checkNightOwl() } }
             // Mises à jour des contrats : lues avec les soldes, annoncées une fois par version de ChimpDAO.
             .task { await loadUpdates() }
+            .task(id: walletModel.cards.map(\.id)) { await loadCardArt() }
             .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await loadUpdates() } } }
             .chimpSheet(isPresented: $isShowingUpdateNotice, height: 560, fitsContent: true) {
                 UpdateNoticeSheet(count: updatesModel.readyCount) {
@@ -80,6 +85,12 @@ struct MainTabView: View {
                     updatesModel.postpone()
                 }
             }
+    }
+
+    /// Les dessins des cartes du compte : lus une fois chacun, avec les soldes. Une carte sans dessin en forme de carte
+    /// garde sa couleur.
+    private func loadCardArt() async {
+        await cardArt.load(cards: walletModel.cards.compactMap { try? ChipPublicKey(Data(hex: $0.id) ?? Data()) })
     }
 
     /// Relit où en sont les contrats, puis annonce la mise à jour **une seule fois par version**, sur le Wallet seulement,

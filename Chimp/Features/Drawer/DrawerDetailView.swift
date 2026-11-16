@@ -119,7 +119,7 @@ struct DrawerDetailView: View {
     private var scene: ChimpDrawerScene {
         if model.isMain { return .main }
         guard let card = model.card else { return .blank }
-        return .card(name: model.cardName, color: model.cardColor, number: card.number)
+        return .card(name: model.cardName, color: model.cardColor, number: card.number, key: card.id)
     }
 
     private var title: Text {

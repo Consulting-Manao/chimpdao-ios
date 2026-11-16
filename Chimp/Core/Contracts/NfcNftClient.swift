@@ -44,6 +44,14 @@ struct NfcNftClient {
         return try address.toStrKey()
     }
 
+    /// `token_uri(token_id)` (SEP-50) : où sont les métadonnées du NFT de cette carte (son dessin). Les cartes d'un même
+    /// dessin partagent le même fichier.
+    func tokenURI(tokenID: UInt32, contract: String, source: Account) async throws -> String {
+        let value = try await client.readValue(source: source, contract: contract, function: "token_uri", arguments: [.u32(tokenID)])
+        guard let uri = value.string, !uri.isEmpty else { throw StellarError.invalidResponse("token_uri returned \(value)") }
+        return uri
+    }
+
     /// `verify_for_card(public_key, digest, auth) -> bool`, en lecture seule (simulation, rien n'est payé).
     /// `false` pour une carte inconnue, une variante qui ne correspond pas à la courbe, ou une mauvaise signature k1.
     func verifyForCard(publicKey: ChipPublicKey, digest: Data, auth: SCValXDR, contract: String, source: Account) async throws -> Bool {
