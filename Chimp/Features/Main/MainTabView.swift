@@ -27,8 +27,8 @@ struct MainTabView: View {
     @State private var updatesModel: UpdatesModel
     /// La pop-up « An update is ready » du Wallet.
     @State private var isShowingUpdateNotice = false
-    /// Les dessins imprimés des cartes du compte (NFT), lus avec les soldes.
-    @State private var cardArt: CardArtStore
+    /// Les dessins imprimés des cartes du compte (NFT), lus avec les soldes. Tenu par `RootView`.
+    private let cardArt: CardArtStore
     /// Écrans poussés dans l'onglet Grow.
     @State private var growPath: [GrowRoute] = []
     #if DESIGN_CATALOG
@@ -36,10 +36,11 @@ struct MainTabView: View {
     #endif
 
     /// Le vrai Wallet : soldes lus sur le réseau de la session (celui de ce build), prix du XLM par l’oracle de mainnet.
-    init(session: AppSession) {
+    init(session: AppSession, cardArt: CardArtStore) {
         let config = session.config
         self.session = session
         self.config = config
+        self.cardArt = cardArt
         let wallet = WalletViewModel(dataSource: ChainWalletDataSource(
             session: session, chain: ChainWalletReader(config: config), oracle: ReflectorPriceOracle.shared,
             stablebondPrices: StablebondWalletPrices(config: config)
@@ -56,7 +57,6 @@ struct MainTabView: View {
             rateReader: XoxnoRateClient(config: config)
         ))
         _updatesModel = State(initialValue: UpdatesModel(session: session, service: UpdatesModel.liveService(config)))
-        _cardArt = State(initialValue: CardArtStore(reader: ChainCardArtReader(config: config)))
         // L’historique : téléphone + RPC du réseau de la session ; les cartes lues par le Wallet complètent celles du téléphone.
         _activityModel = State(initialValue: ActivityViewModel(source: ChainActivityDataSource(
             session: session, walletCards: { [weak wallet] in wallet?.cards ?? [] }
@@ -66,7 +66,6 @@ struct MainTabView: View {
     /// L'œil du Wallet (et de Grow) vaut pour tous les onglets ; les parcours qui font signer le remettent à `false`.
     var body: some View {
         tabs
-            .environment(\.chimpCardArt) { [cardArt] key in cardArt.art(forKey: key) }
             .environment(\.chimpHidesAmounts, session.preferences.hidesBalances)
             .environment(\.chimpPotRates, growModel.rates)
             // J2 : à l'ouverture de l'app (lancement ou retour), sur le Wallet seul, sans opération en attente.
@@ -783,5 +782,8 @@ private extension View {
 }
 
 #Preview {
-    MainTabView(session: AppSession(store: InMemoryLocalWalletStore(), config: .testnet))
+    MainTabView(
+        session: AppSession(store: InMemoryLocalWalletStore(), config: .testnet),
+        cardArt: CardArtStore(reader: MockCardArtReader())
+    )
 }

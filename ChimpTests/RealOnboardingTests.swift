@@ -168,6 +168,7 @@ struct RealOnboardingTests {
         model.firstName = "Barth"
         model.cardName = "Jungle"
         model.cardColor = .leaf
+        model.usesCardDesign = true
         await model.pinEnter("1234", "1234")
         model.openTapSheet(.real)
         #expect(await model.scan() == .signed)
@@ -177,6 +178,7 @@ struct RealOnboardingTests {
         #expect(store.wallet.firstName == "Barth")
         #expect(store.wallet.account?.cards.first?.name == "Jungle")
         #expect(store.wallet.account?.cards.first?.color == "leaf")
+        #expect(store.wallet.account?.cards.first?.usesDesign == true, "Le dessin choisi en A5 est gardé avec la couleur")
         #expect(store.wallet.hint(for: k1Key) == account)
         #expect(session.showsOnboarding)
         session.finishOnboarding()

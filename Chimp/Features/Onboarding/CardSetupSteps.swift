@@ -13,7 +13,11 @@ protocol FirstNameEditing: AnyObject, Observable {
 protocol CardNaming: AnyObject, Observable {
     var cardName: String { get set }
     var cardColor: ChimpCardColor { get set }
+    /// La carte s'affichera avec le dessin de son NFT au lieu de sa couleur (choix local, comme la couleur).
+    var usesCardDesign: Bool { get set }
     var trimmedCardName: String { get }
+    /// Clé publique de la carte qu'on nomme, pour aller chercher son dessin ; `nil` tant qu'elle n'est pas lue.
+    var namedCardKey: ChipPublicKey? { get }
     /// « 0007 ».
     var cardNumber: String { get }
     /// Le wallet de la carte est vide ; `nil` si on ne le sait pas.

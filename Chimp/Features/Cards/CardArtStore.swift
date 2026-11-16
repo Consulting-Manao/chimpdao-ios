@@ -98,4 +98,8 @@ extension EnvironmentValues {
     /// Le dessin d'une carte, par sa clé publique : `ChimpCard` le prend quand il existe. Vide par défaut, pour que tous
     /// les aperçus et les écrans qui ne connaissent pas la carte gardent la couleur.
     @Entry var chimpCardArt: @MainActor (String) -> CardArt? = { _ in nil }
+    /// Le magasin lui-même, pour les écrans qui doivent **demander** le dessin d'une carte qu'ils viennent de lire
+    /// (nommer une carte neuve, reconnexion) : le Wallet, lui, les charge déjà avec les soldes. `nil` au catalogue et
+    /// dans les aperçus : pas de dessin proposé, la carte garde sa couleur.
+    @Entry var chimpCardArtStore: CardArtStore? = nil
 }

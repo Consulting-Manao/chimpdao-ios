@@ -67,6 +67,10 @@ struct WelcomeBackView: View {
     @FocusState private var focusedField: Field?
 
     private enum Field { case firstName, cardName }
+    @Environment(\.chimpCardArtStore) private var artStore
+
+    /// Le dessin du NFT de la carte retrouvée, s'il en a un en forme de carte.
+    private var design: CardArt? { artStore?.art(forKey: model.card.publicKey.hex) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -98,11 +102,13 @@ struct WelcomeBackView: View {
                         ChimpCard(
                             name: model.trimmedCardName.isEmpty ? String(localized: "Jungle") : model.trimmedCardName,
                             color: model.cardColor,
-                            number: model.cardNumber
+                            number: model.cardNumber,
+                            cardKey: model.usesCardDesign ? model.card.publicKey.hex : nil
                         )
                         .frame(width: 210)
                         .frame(maxWidth: .infinity)
                         .animation(.easeInOut(duration: 0.2), value: model.cardColor)
+                        .animation(.easeInOut(duration: 0.2), value: model.usesCardDesign)
                         .padding(.top, ChimpSpacing.xxl)
 
                         label("This card's name")
@@ -120,10 +126,13 @@ struct WelcomeBackView: View {
                                 .padding(.top, ChimpSpacing.s)
                         }
 
-                        label("Colour")
+                        label(design == nil ? "Colour" : "Colour & design")
                             .padding(.top, ChimpSpacing.xl)
-                        ChimpColorSwatchPicker(selection: $model.cardColor)
-                            .padding(.top, ChimpSpacing.xs)
+                        ChimpColorSwatchPicker(
+                            selection: $model.cardColor, design: design,
+                            designSelection: design == nil ? nil : $model.usesCardDesign
+                        )
+                        .padding(.top, ChimpSpacing.xs)
                     }
 
                     if let error = model.saveError {
@@ -148,6 +157,8 @@ struct WelcomeBackView: View {
         }
         .background(Color(.chimpBackground))
         .onAppear { focusedField = model.asksFirstName && model.firstName.isEmpty ? .firstName : nil }
+        // Après la session NFC : une lecture réseau qui ne bloque rien. Sans dessin, l'écran est celui d'avant.
+        .task { if model.asksCard { await artStore?.load(cards: [model.card.publicKey]) } }
     }
 
     private func label(_ text: LocalizedStringKey) -> some View {

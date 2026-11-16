@@ -4,12 +4,21 @@ import SwiftUI
 struct RootView: View {
     let session: AppSession
     let lock: AppLock
+    /// Les dessins imprimés des cartes (NFT). Ici et pas dans les onglets : l'onboarding et la reconnexion nomment des
+    /// cartes eux aussi, et changer de compte ne doit pas faire tout relire.
+    @State private var cardArt: CardArtStore
+
+    init(session: AppSession, lock: AppLock) {
+        self.session = session
+        self.lock = lock
+        _cardArt = State(initialValue: CardArtStore(reader: ChainCardArtReader(config: session.config)))
+    }
 
     var body: some View {
         Group {
             if !session.showsOnboarding {
                 // Un écran principal par compte : changer de compte (I6) le reconstruit, avec ses soldes et son historique.
-                MainTabView(session: session)
+                MainTabView(session: session, cardArt: cardArt)
                     .id(session.wallet.account?.address)
                     .transition(.opacity)
             } else {
@@ -33,6 +42,8 @@ struct RootView: View {
         } message: {
             Text(TestnetNotice.message)
         }
+        .environment(\.chimpCardArt) { [cardArt] key in cardArt.art(forKey: key) }
+        .environment(\.chimpCardArtStore, cardArt)
         .environment(session)
         .environment(lock)
     }

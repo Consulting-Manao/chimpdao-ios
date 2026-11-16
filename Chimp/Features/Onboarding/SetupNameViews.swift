@@ -66,6 +66,10 @@ struct NameYourCardView<Model: CardNaming>: View {
     let onBack: () -> Void
     let onContinue: () -> Void
     @FocusState private var isFocused: Bool
+    @Environment(\.chimpCardArtStore) private var artStore
+
+    /// Le dessin du NFT de cette carte, s'il en a un en forme de carte : sans lui, l'écran ne propose que les couleurs.
+    private var design: CardArt? { model.namedCardKey.flatMap { artStore?.art(forKey: $0.hex) } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -77,11 +81,13 @@ struct NameYourCardView<Model: CardNaming>: View {
                         color: model.cardColor,
                         number: model.cardNumber,
                         amount: model.pocketIsEmpty == true ? Decimal(0).formatted(.currency(code: "USD").presentation(.narrow)) : nil,
-                        subtitle: model.pocketIsEmpty == true ? "on card" : nil
+                        subtitle: model.pocketIsEmpty == true ? "on card" : nil,
+                        cardKey: model.usesCardDesign ? model.namedCardKey?.hex : nil
                     )
                     .frame(width: 250)
                     .frame(maxWidth: .infinity)
                     .animation(.easeInOut(duration: 0.2), value: model.cardColor)
+                    .animation(.easeInOut(duration: 0.2), value: model.usesCardDesign)
 
                     Text("Name")
                         .chimpFont(.label)
@@ -101,13 +107,16 @@ struct NameYourCardView<Model: CardNaming>: View {
                             .padding(.top, ChimpSpacing.s)
                     }
 
-                    Text("Colour")
+                    Text(design == nil ? "Colour" : "Colour & design")
                         .chimpFont(.label)
                         .textCase(.uppercase)
                         .foregroundStyle(.chimpTextSecondary)
                         .padding(.top, ChimpSpacing.xl)
-                    ChimpColorSwatchPicker(selection: $model.cardColor)
-                        .padding(.top, ChimpSpacing.xs)
+                    ChimpColorSwatchPicker(
+                        selection: $model.cardColor, design: design,
+                        designSelection: design == nil ? nil : $model.usesCardDesign
+                    )
+                    .padding(.top, ChimpSpacing.xs)
 
                     Text("You'll see this name every time the app asks for a card, so you always know which one to grab.")
                         .chimpFont(.bodyM)
@@ -127,5 +136,11 @@ struct NameYourCardView<Model: CardNaming>: View {
                 .padding(.bottom, ChimpSpacing.l)
         }
         .background(Color(.chimpBackground))
+        // Après la session NFC, jamais pendant : une lecture réseau qui ne bloque rien. La pastille apparaît si elle
+        // aboutit, et l'écran reste celui d'avant si elle échoue.
+        .task(id: model.namedCardKey?.hex) {
+            guard let key = model.namedCardKey else { return }
+            await artStore?.load(cards: [key])
+        }
     }
 }

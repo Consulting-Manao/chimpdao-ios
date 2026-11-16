@@ -123,6 +123,8 @@ final class AccountSetupModel {
     var firstName = ""
     var cardName = ""
     var cardColor: ChimpCardColor = .jungle
+    /// La carte s'affichera avec le dessin de son NFT au lieu de sa couleur (choix local, comme la couleur).
+    var usesCardDesign = false
 
     /// Chiffres en cours de saisie (liés au pavé). Jamais enregistrés ni journalisés.
     var pinEntry = ""
@@ -235,6 +237,9 @@ final class AccountSetupModel {
     var cardNumber: String {
         choice.tokenID.map { String(format: "%04u", $0) } ?? "····"
     }
+
+    /// La carte lue au tap (A2/A3) : c'est elle dont on va chercher le dessin.
+    var namedCardKey: ChipPublicKey? { choice.card.publicKey }
 
     /// Nom affiché dans A6 et la feuille du tap (« Jungle »), ou « your » à défaut.
     var displayCardName: String { trimmedCardName.isEmpty ? String(localized: "your") : trimmedCardName }
@@ -461,7 +466,8 @@ final class AccountSetupModel {
                 account: result.account,
                 card: SavedCard(
                     publicKey: choice.card.publicKey.hex, chip: choice.card.kind.rawValue, tokenID: choice.tokenID,
-                    pocket: choice.pocket, name: trimmedCardName, color: cardColor.rawValue
+                    pocket: choice.pocket, name: trimmedCardName, color: cardColor.rawValue,
+                    usesDesign: usesCardDesign ? true : nil
                 ),
                 firstName: trimmedFirstName
             )

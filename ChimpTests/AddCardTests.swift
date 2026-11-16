@@ -111,6 +111,7 @@ struct AddCardTests {
 
         let saved = try #require(store.wallet.account?.cards.first { $0.publicKey == k1.hex })
         #expect(saved == SavedCard(publicKey: k1.hex, chip: "infineon2Go", tokenID: 913, pocket: MockAddCardService.pocket(for: k1), name: "Leaf", color: "leaf"))
+        #expect(saved.usesDesign == nil, "Dessin non choisi : rien d'écrit, la carte garde sa couleur")
         #expect(store.wallet.hint(for: k1) == account, "Une carte ajoutée n'a que son indice pour retrouver son compte")
         #expect(store.wallet.account?.cards.count == 2)
 

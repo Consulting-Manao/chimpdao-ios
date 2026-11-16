@@ -85,12 +85,14 @@ struct ReconnectTests {
         reconnect.firstName = " Barth "
         reconnect.cardName = "Jungle"
         reconnect.cardColor = .leaf
+        reconnect.usesCardDesign = true
         model.finishWelcomeBack()
         #expect(session.showsOnboarding == false)
         #expect(store.wallet.firstName == "Barth")
         #expect(store.wallet.account?.address == MockOnboardingService.memberAccount)
         let saved = try #require(store.wallet.account?.cards.first)
         #expect(saved.name == "Jungle" && saved.color == "leaf" && saved.tokenID == 421 && saved.chip == "infineon2Go")
+        #expect(saved.usesDesign == true, "Le dessin choisi à la reconnexion est gardé avec la couleur")
         #expect(store.wallet.hint(for: key) == MockOnboardingService.memberAccount)
     }
 

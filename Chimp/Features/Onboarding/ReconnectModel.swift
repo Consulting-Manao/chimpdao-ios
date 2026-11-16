@@ -43,6 +43,8 @@ final class ReconnectModel {
     var firstName: String
     var cardName: String
     var cardColor: ChimpCardColor
+    /// La carte s'affichera avec le dessin de son NFT au lieu de sa couleur (choix local, comme la couleur).
+    var usesCardDesign = false
     /// Ce que « Welcome back! » demande : seulement ce qui manque sur ce téléphone.
     let asksFirstName: Bool
     let asksCard: Bool
@@ -169,7 +171,8 @@ final class ReconnectModel {
                 account: account,
                 card: SavedCard(
                     publicKey: card.publicKey.hex, chip: card.kind.rawValue, tokenID: tokenID, pocket: pocket,
-                    name: asksCard ? trimmedCardName : nil, color: asksCard ? cardColor.rawValue : nil
+                    name: asksCard ? trimmedCardName : nil, color: asksCard ? cardColor.rawValue : nil,
+                    usesDesign: asksCard && usesCardDesign ? true : nil
                 ),
                 firstName: asksFirstName ? trimmedFirstName : nil
             )

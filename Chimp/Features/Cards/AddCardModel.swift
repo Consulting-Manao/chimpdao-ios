@@ -112,6 +112,8 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     var firstName = ""
     var cardName = ""
     var cardColor: ChimpCardColor
+    /// La carte s'affichera avec le dessin de son NFT au lieu de sa couleur (choix local, comme la couleur).
+    var usesCardDesign = false
 
     // MARK: PIN de la nouvelle carte
 
@@ -264,6 +266,9 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     }
 
     var cardNumber: String { tokenID.map { String(format: "%04u", $0) } ?? "····" }
+
+    /// La carte neuve, lue au tap : c'est elle dont on va chercher le dessin. `nil` tant qu'elle n'est pas tapée.
+    var namedCardKey: ChipPublicKey? { newCard?.publicKey }
     var pocketIsEmpty: Bool? { nil }
     var displayCardName: String { trimmedCardName.isEmpty ? String(localized: "new") : trimmedCardName }
 
@@ -799,7 +804,8 @@ final class AddCardModel: FirstNameEditing, CardNaming, CardPINChoosing {
     private func save(account: String, card: ChipKeyInfo, addable: CardMembershipClient.AddableCard) throws {
         let saved = SavedCard(
             publicKey: card.publicKey.hex, chip: card.kind.rawValue, tokenID: tokenID ?? addable.state.tokenID,
-            pocket: addable.pocket, name: trimmedCardName, color: cardColor.rawValue
+            pocket: addable.pocket, name: trimmedCardName, color: cardColor.rawValue,
+            usesDesign: usesCardDesign ? true : nil
         )
         switch entry {
         case .wallet:
