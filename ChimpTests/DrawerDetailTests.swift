@@ -230,6 +230,24 @@ struct DrawerDetailTests {
         #expect(model.content?.savings.map(\.code) == ["CETES"])
     }
 
+    @Test("B1 : un actif qui pousse et qui a un prix compte en dollars (CETES, USDY, SolvBTC), jamais la liste des quantités")
+    func growingPricedFromSnapshot() {
+        // Les prix du Wallet couvrent les stablebonds : le panneau doit rester en dollars.
+        let money = DisplayMoney(currency: .usd, usdPrices: ["XLM": Decimal(string: "0.25")!, "USDC": 1, "CETES": Decimal(string: "0.1")!])
+        let split = DrawerDetailModel.split(
+            ready: [AssetAmount(code: "XLM", amount: 800)],
+            growing: [
+                DrawerDetailModel.GrowingPart(value: money.value([AssetAmount(code: "XLM", amount: 200)]), fallback: "200 XLM"),
+                DrawerDetailModel.GrowingPart(value: money.value([AssetAmount(code: "CETES", amount: 1000)]), fallback: "1,000 CETES"),
+            ],
+            money: money
+        )
+        #expect(split.total == usd(350), "200 prêts + 50 du vault + 100 de CETES")
+        #expect(split.growing == usd(150, whole: true))
+        #expect(!split.total.contains("XLM"))
+        #expect(!split.growingTotal!.contains("CETES"))
+    }
+
     @Test("B1 : un sticker et un bandeau par couleur de carte")
     func scenes() {
         #expect(Set(ChimpCardColor.allCases.map { "\($0.sceneSticker)" }).count == ChimpCardColor.allCases.count)

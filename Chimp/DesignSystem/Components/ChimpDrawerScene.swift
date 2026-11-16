@@ -98,12 +98,14 @@ struct ChimpDrawerBanner: View {
                     .frame(height: 250)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .offset(x: 30, y: 14)
+                // Le dessin a une corde qui s'arrête en l'air à gauche (12 % de sa largeur) : on la fait sortir de
+                // l'écran, et la corde de droite monte dans le bananier. Retour de Barth du 2026-11-16.
                 Image(.chimpyHamac)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 240)
+                    .frame(width: 300)
                     .chimpSway(duration: 4, angle: .degrees(3))
-                    .offset(x: -6, y: 58)
+                    .offset(x: -52, y: 52)
             }
         case .card(let name, let color, let number):
             ZStack(alignment: .topLeading) {

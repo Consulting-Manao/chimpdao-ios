@@ -147,9 +147,12 @@ struct DrawerDetailView: View {
             ))
         }
         for bond in model.savingsAssets {
-            let price = grow?.savingsPrice(bond.code)
+            // Le prix lu par le Wallet d'abord (il couvre CETES, USDY, SolvBTC, xSolvBTC) : `grow` ne connaît que les
+            // stablebonds de son service, et un seul prix manquant faisait retomber tout le panneau sur les quantités.
+            let value = money.value([AssetAmount(code: bond.code, amount: bond.amount)])
+                ?? grow?.savingsPrice(bond.code).flatMap { money.value(usd: $0.value(of: bond.amount)) }
             parts.append(DrawerDetailModel.GrowingPart(
-                value: price.flatMap { money.value(usd: $0.value(of: bond.amount)) },
+                value: value,
                 fallback: SendAsset(code: bond.code)?.displayedWithCode(bond.amount, locale: locale) ?? "\(bond.amount) \(bond.code)"
             ))
         }
