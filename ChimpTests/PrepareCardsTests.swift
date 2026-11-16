@@ -57,9 +57,12 @@ struct PrepareCardsTests {
         var failNextEnrol = false
         /// Simulation refusée par le contrat (ex. : « UnexpectedSize ») : rien n'est envoyé.
         var rejectNextEnrol = false
-        func inspect(_ card: ChipKeyInfo) async throws -> EnrolmentInspection {
+        /// Le dessin demandé au dernier `inspect` : il fait partie du digest que la carte signe.
+        private(set) var lastURI: String?
+        func inspect(_ card: ChipKeyInfo, uri: String?) async throws -> EnrolmentInspection {
+            lastURI = uri
             let mock = MockCardEnrolmentService(alreadyEnrolled: enrolled.contains(card.publicKey), delay: .zero)
-            return try await mock.inspect(card)
+            return try await mock.inspect(card, uri: uri)
         }
         func enrol(_ plan: EnrolmentPlan, signed: ChipSignedDigest) async throws -> EnrolmentResult {
             if rejectNextEnrol {

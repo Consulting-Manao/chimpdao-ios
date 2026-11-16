@@ -46,13 +46,29 @@ struct EnrolmentTests {
     @Test("Digest de mint (v3, [clé, courbe, Managed, uri None], nonce 7) : contrat à jour, Infineon et DUOX")
     func mintDigest() throws {
         #expect(NfcNftAttestation.domain == "chimpdao.nfc-nft.v3")
-        #expect(try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: k1Key, curve: .secp256k1, managed: true, nonce: 7).hexString
+        #expect(try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: k1Key, curve: .secp256k1, managed: true, uri: nil, nonce: 7).hexString
             == "99fd618f3126b96165bbc3b75b9ee9fa80d467564ccbe72e1a30ccc570b70f1d")
-        #expect(try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: r1Key, curve: .p256, managed: true, nonce: 7).hexString
+        #expect(try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: r1Key, curve: .p256, managed: true, uri: nil, nonce: 7).hexString
             == "f85088d7846cedf56f535d471e1a48a04aba30cae3a1c1179172bda0c88b6012")
-        let arguments = NfcNftAttestation.mintArguments(auth: .void, publicKey: k1Key, curve: .secp256k1, managed: true, nonce: 7)
+        let arguments = NfcNftAttestation.mintArguments(auth: .void, publicKey: k1Key, curve: .secp256k1, managed: true, uri: nil, nonce: 7)
         #expect(arguments.count == 6, "mint(auth, public_key, curve, upgrade_policy, uri, nonce)")
         #expect(try xdr(arguments[4]) == "AAAAAQ==", "uri = None")
+    }
+
+    /// Un dessin choisi dans Chimp Admin (décision de Barth du 2026-11-16) : `Some(uri)` est attesté comme la chaîne
+    /// telle quelle (`uri.into_val(e)` du `mint_digest` des tests du contrat), à la place du `Void` de `None`.
+    /// Vecteurs recalculés par un script indépendant qui **retrouve d'abord** le vecteur Rust figé (`2b23d024…`) et les
+    /// deux vecteurs `uri = None` ci-dessus, avec la même adresse de campagne.
+    @Test("Digest de mint avec un dessin choisi : la carte signe l'adresse du dessin")
+    func mintDigestWithDesign() throws {
+        let hamac = "ipfs://bafkreibgyrqijx6cz5lkyddcb4y2gs2em6rawbd4qihtvy5xgqnvuo3vqq"
+        #expect(try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: k1Key, curve: .secp256k1, managed: true, uri: hamac, nonce: 7).hexString
+            == "2f7ba9028bed4dcd85fd79524f3dfbd8197c3e5919964f9b712ae794b4f6c234")
+        // Le dessin change ce que la carte signe : un digest sans dessin ne vaut pas pour une carte avec dessin.
+        #expect(try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: k1Key, curve: .secp256k1, managed: true, uri: hamac, nonce: 7)
+            != NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: k1Key, curve: .secp256k1, managed: true, uri: nil, nonce: 7))
+        let arguments = NfcNftAttestation.mintArguments(auth: .void, publicKey: k1Key, curve: .secp256k1, managed: true, uri: hamac, nonce: 7)
+        #expect(try xdr(arguments[4]) == (try xdr(SCValXDR.string(hamac))), "uri = Some(adresse)")
     }
 
     // MARK: Encodages ScVal
@@ -261,10 +277,10 @@ struct EnrolmentTests {
         Data(try XDREncoder.encode(value)).base64EncodedString()
     }
 
-    private func mintEnvelope(card: ChipPublicKey, kind: ChipKind, auth: SCValXDR) throws -> String {
+    private func mintEnvelope(card: ChipPublicKey, kind: ChipKind, auth: SCValXDR, uri: String? = nil) throws -> String {
         let plan = EnrolmentPlan(
             card: ChipKeyInfo(kind: kind, publicKey: card, pinActive: false), nfcNft: nfcNft, admin: admin,
-            nonce: 7, managed: true, digest: Data(count: 32), predictedPocket: ""
+            nonce: 7, managed: true, uri: uri, digest: Data(count: 32), predictedPocket: ""
         )
         let source = try Account(accountId: admin, sequenceNumber: 1_234_567_890)
         return try CardEnrolment.mintTransaction(source: source, plan: plan, auth: auth, maxTime: 1_800_000_000).encodedEnvelope()

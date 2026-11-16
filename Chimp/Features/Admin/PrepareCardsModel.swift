@@ -141,6 +141,22 @@ final class MemoryPreparedCardsStore: PreparedCardsStore {
 /// avant tout nouvel envoi : une reprise n'enregistre jamais deux fois la même carte.
 @Observable
 final class PrepareCardsModel {
+    /// Dessin choisi pour les cartes enregistrées ici (`nil` : l'image par défaut de la campagne). Il fait partie de ce
+    /// que la carte signe : le changer refait la préparation.
+    var design: CardDesign?
+    var designURI: String? { design?.uri }
+    private(set) var designs: [CardDesign] = []
+    private(set) var isLoadingDesigns = false
+
+    /// Les dessins déjà imprimés de la campagne (lecture seule). Chargés une fois.
+    func loadDesigns() async {
+        guard designs.isEmpty, !isLoadingDesigns else { return }
+        isLoadingDesigns = true
+        defer { isLoadingDesigns = false }
+        let config = ChimpNetworkConfig.testnet
+        designs = (try? await CardDesignCatalog.designs(contract: config.contracts.nfcNft, client: SorobanClient(config: config))) ?? []
+    }
+
     /// Ce que l'assistant sait d'une carte entre le tap 1 et la fin.
     struct Draft: Equatable {
         let card: ChipKeyInfo
@@ -300,7 +316,7 @@ final class PrepareCardsModel {
         }
         step = .checking
         do {
-            switch try await makeService().inspect(card) {
+            switch try await makeService().inspect(card, uri: designURI) {
             case let .alreadyEnrolled(_, pocket):
                 if var entry = known(key) {
                     // Envoi d'une reprise : il était bien parti. Rien à signer ; l'argent reste à envoyer (fiche).
@@ -431,7 +447,7 @@ final class PrepareCardsModel {
         guard case .finishing(let draft, .registerFailed) = step else { return }
         step = .finishing(draft, .registering)
         do {
-            switch try await makeService().inspect(draft.card) {
+            switch try await makeService().inspect(draft.card, uri: designURI) {
             case let .alreadyEnrolled(_, pocket):
                 var done = draft.entry
                 done.wallet = pocket
@@ -544,7 +560,7 @@ final class PrepareCardsModel {
         check = .checking
         do {
             let result: CardCheck
-            switch try await makeService().inspect(card) {
+            switch try await makeService().inspect(card, uri: designURI) {
             case let .alreadyEnrolled(_, pocket):
                 result = CardCheck(readiness: .ready, entry: entry, wallet: pocket)
             case .ready(let plan):

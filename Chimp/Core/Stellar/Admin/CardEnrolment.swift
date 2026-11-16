@@ -9,7 +9,8 @@ import stellarsdk
 /// Jamais via le serveur de frais : l'admin est la source de la transaction et la signe lui-même.
 protocol CardEnrolmentService {
     /// Tap 1 fait : lit l'état de la carte sur la chaîne (sans rien écrire) et prépare ce que la carte signera.
-    func inspect(_ card: ChipKeyInfo) async throws -> EnrolmentInspection
+    /// `uri` : le dessin choisi (il fait partie du digest), ou `nil` pour l'image par défaut de la campagne.
+    func inspect(_ card: ChipKeyInfo, uri: String?) async throws -> EnrolmentInspection
     /// Tap 2 fait : construit, simule, signe (admin) et envoie `mint`, puis relit l'état.
     func enrol(_ plan: EnrolmentPlan, signed: ChipSignedDigest) async throws -> EnrolmentResult
 }
@@ -32,6 +33,9 @@ struct EnrolmentPlan: Equatable {
     let nonce: UInt32
     /// Politique de mise à jour de la Pocket : toujours `Managed` à l'enregistrement (`upgrade: "managed"`).
     let managed: Bool
+    /// Adresse des métadonnées du dessin choisi (`uri` du `mint`), ou `nil` pour l'image par défaut de la campagne.
+    /// La carte le signe : le changer demande un nouveau digest, donc une nouvelle préparation.
+    let uri: String?
     /// Digest que la carte signe (attestation, modèle B).
     let digest: Data
     /// Adresse de la Pocket, calculée hors ligne (`predictPocket`).
@@ -94,7 +98,7 @@ struct CardEnrolment: CardEnrolmentService {
 
     // MARK: Tap 1 → état et plan
 
-    func inspect(_ card: ChipKeyInfo) async throws -> EnrolmentInspection {
+    func inspect(_ card: ChipKeyInfo, uri: String?) async throws -> EnrolmentInspection {
         let admin = try adminKeyPair()
         let source = try await client.account(admin.accountId)
         let predicted = try Self.predictPocket(factory: config.contracts.factory, publicKey: card.publicKey, network: client.network)
@@ -108,9 +112,11 @@ struct CardEnrolment: CardEnrolmentService {
         let stored = try await client.readValue(source: source, contract: nfcNft, function: "get_nonce", arguments: [.bytes(card.publicKey.bytes)])
         guard let storedNonce = stored.u32 else { throw StellarError.invalidResponse("get_nonce returned \(stored)") }
         let nonce = storedNonce + 1
-        let digest = try NfcNftAttestation.mintDigest(nfcNft: nfcNft, publicKey: card.publicKey, curve: card.curve, managed: true, nonce: nonce)
+        let digest = try NfcNftAttestation.mintDigest(
+            nfcNft: nfcNft, publicKey: card.publicKey, curve: card.curve, managed: true, uri: uri, nonce: nonce
+        )
         return .ready(EnrolmentPlan(
-            card: card, nfcNft: nfcNft, admin: admin.accountId, nonce: nonce, managed: true,
+            card: card, nfcNft: nfcNft, admin: admin.accountId, nonce: nonce, managed: true, uri: uri,
             digest: digest, predictedPocket: predicted
         ))
     }
@@ -183,7 +189,8 @@ struct CardEnrolment: CardEnrolmentService {
             contractId: plan.nfcNft,
             functionName: "mint",
             functionArguments: NfcNftAttestation.mintArguments(
-                auth: auth, publicKey: plan.card.publicKey, curve: plan.card.curve, managed: plan.managed, nonce: plan.nonce
+                auth: auth, publicKey: plan.card.publicKey, curve: plan.card.curve, managed: plan.managed,
+                uri: plan.uri, nonce: plan.nonce
             )
         )
         return try Transaction(
@@ -232,19 +239,20 @@ struct MockCardEnrolmentService: CardEnrolmentService {
     var alreadyEnrolled = false
     var delay: Duration = .milliseconds(800)
 
-    func inspect(_ card: ChipKeyInfo) async throws -> EnrolmentInspection {
+    func inspect(_ card: ChipKeyInfo, uri: String?) async throws -> EnrolmentInspection {
         try await Task.sleep(for: delay)
         let pocket = try CardEnrolment.predictPocket(
             factory: ChimpNetworkConfig.testnet.contracts.factory, publicKey: card.publicKey, network: .testnet
         )
         if alreadyEnrolled { return .alreadyEnrolled(tokenID: 42, pocket: pocket) }
         let digest = try NfcNftAttestation.mintDigest(
-            nfcNft: ChimpNetworkConfig.testnet.contracts.nfcNft, publicKey: card.publicKey, curve: card.curve, managed: true, nonce: 1
+            nfcNft: ChimpNetworkConfig.testnet.contracts.nfcNft, publicKey: card.publicKey, curve: card.curve,
+            managed: true, uri: uri, nonce: 1
         )
         return .ready(EnrolmentPlan(
             card: card, nfcNft: ChimpNetworkConfig.testnet.contracts.nfcNft,
             admin: ChimpNetworkConfig.testnet.contracts.admin,
-            nonce: 1, managed: true, digest: digest, predictedPocket: pocket
+            nonce: 1, managed: true, uri: uri, digest: digest, predictedPocket: pocket
         ))
     }
 

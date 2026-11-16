@@ -22,27 +22,39 @@ enum NfcNftAttestation {
     }
 
     /// Arguments attestés par `mint` : `[clé publique, courbe, politique, uri]` (tout fait partie de ce que la carte signe).
-    /// `uri` : `Option<String>` ajouté au contrat nfc-nft déployé sur testnet (`reference/chimp-contracts` e9e6c84,
-    /// `mint_digest` des tests du contrat). Toujours `None` (`ScVal::Void`) : la carte garde l'image par défaut
-    /// `{base_uri}/{token_id}`, comme avant (décision de Barth du 2026-10-23 : le même système qu'avant).
-    static func mintAttestedArguments(publicKey: ChipPublicKey, curve: ChipCurve, managed: Bool) -> [SCValXDR] {
-        [.bytes(publicKey.bytes), ChipAuthEncoding.curve(curve), ChipAuthEncoding.upgradePolicy(managed: managed), .void]
+    /// `uri` : `Option<String>` du contrat nfc-nft (`reference/chimp-contracts`, `mint_digest` de ses tests ;
+    /// `uri.into_val(e)`, donc la chaîne telle quelle pour `Some`, `ScVal::Void` pour `None`).
+    ///
+    /// - `nil` : la carte prend l'image par défaut de la campagne, `{base_uri}/{token_id}`.
+    /// - une adresse : le **dessin choisi** dans Chimp Admin (décision de Barth du 2026-11-16). Les cartes d'un même
+    ///   dessin partagent la même adresse de métadonnées, comme les cartes imprimées.
+    static func mintAttestedArguments(publicKey: ChipPublicKey, curve: ChipCurve, managed: Bool, uri: String?) -> [SCValXDR] {
+        [
+            .bytes(publicKey.bytes),
+            ChipAuthEncoding.curve(curve),
+            ChipAuthEncoding.upgradePolicy(managed: managed),
+            uri.map { SCValXDR.string($0) } ?? .void,
+        ]
     }
 
     /// Digest que la carte signe pour `mint`.
-    static func mintDigest(nfcNft: String, publicKey: ChipPublicKey, curve: ChipCurve, managed: Bool, nonce: UInt32) throws -> Data {
+    static func mintDigest(
+        nfcNft: String, publicKey: ChipPublicKey, curve: ChipCurve, managed: Bool, uri: String?, nonce: UInt32
+    ) throws -> Data {
         try callDigest(
             domain: domain,
             contractID: nfcNft,
             function: "mint",
-            arguments: mintAttestedArguments(publicKey: publicKey, curve: curve, managed: managed),
+            arguments: mintAttestedArguments(publicKey: publicKey, curve: curve, managed: managed, uri: uri),
             nonce: nonce
         )
     }
 
     /// Arguments complets de `mint(auth, public_key, curve, upgrade_policy, uri, nonce)`.
-    static func mintArguments(auth: SCValXDR, publicKey: ChipPublicKey, curve: ChipCurve, managed: Bool, nonce: UInt32) -> [SCValXDR] {
-        [auth] + mintAttestedArguments(publicKey: publicKey, curve: curve, managed: managed) + [.u32(nonce)]
+    static func mintArguments(
+        auth: SCValXDR, publicKey: ChipPublicKey, curve: ChipCurve, managed: Bool, uri: String?, nonce: UInt32
+    ) -> [SCValXDR] {
+        [auth] + mintAttestedArguments(publicKey: publicKey, curve: curve, managed: managed, uri: uri) + [.u32(nonce)]
     }
 }
 #endif

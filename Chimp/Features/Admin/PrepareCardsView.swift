@@ -109,6 +109,10 @@ struct PrepareCardsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.panel), fill: Color(.chimpSurface), shadow: .card)
             .accessibilityElement(children: .combine)
+            CardDesignPicker(
+                designs: model.designs, isLoading: model.isLoadingDesigns,
+                selection: Binding(get: { model.design }, set: { model.design = $0 })
+            )
             if !hasAdminKey {
                 ChimpNoticeBanner(text: untranslated("No admin key on this iPhone yet."), marker: .error)
             }
@@ -124,7 +128,10 @@ struct PrepareCardsView: View {
             }
             ChimpButton(untranslated("See all cards"), kind: .link) { isShowingAllCards = true }
         }
+        .task { await designTask() }
     }
+
+    private func designTask() async { await model.loadDesigns() }
 
     private func prepareCard() {
         if hasConfirmed {
@@ -655,6 +662,77 @@ struct PrepareFacts: View {
         .padding(ChimpSpacing.lg + ChimpBorder.regular)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cartoonSurface(RoundedRectangle(cornerRadius: ChimpRadius.panel), fill: Color(.chimpSurface), shadow: .card)
+    }
+}
+
+/// Le dessin donné aux cartes enregistrées ici (Chimp Admin, décision de Barth du 2026-11-16). Les dessins viennent de
+/// la campagne elle-même : ce sont ceux déjà imprimés sur de vraies cartes. « No design » garde l'image par défaut.
+///
+/// Le dessin fait partie de ce que la carte signe : il est choisi **avant** le premier tap, et le changer refait la
+/// préparation (une carte déjà enregistrée ne change jamais de dessin).
+struct CardDesignPicker: View {
+    let designs: [CardDesign]
+    let isLoading: Bool
+    @Binding var selection: CardDesign?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ChimpSpacing.s) {
+            HStack {
+                Text(untranslated("Design of the next cards"))
+                    .chimpFont(.label)
+                    .textCase(.uppercase)
+                    .foregroundStyle(.chimpTextSecondary)
+                    .accessibilityAddTraits(.isHeader)
+                if isLoading { ProgressView().padding(.leading, ChimpSpacing.xs) }
+            }
+            if designs.isEmpty {
+                Text(untranslated(isLoading ? "Reading the campaign…" : "No design on this campaign yet: cards keep the default image."))
+                    .chimpFont(.captionS)
+                    .foregroundStyle(.chimpTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: ChimpSpacing.m) {
+                        tile(nil, title: untranslated("No design"), subtitle: untranslated("Default image"))
+                        ForEach(designs) { design in
+                            tile(design, title: untranslated(design.name),
+                                 subtitle: untranslated(design.count == 1 ? "1 card" : "\(design.count) cards"))
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    private func tile(_ design: CardDesign?, title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
+        let isSelected = selection?.uri == design?.uri
+        return Button {
+            selection = design
+        } label: {
+            VStack(alignment: .leading, spacing: ChimpSpacing.xxs) {
+                Group {
+                    if let image = design?.image {
+                        Image(uiImage: image).resizable().scaledToFill()
+                    } else {
+                        Color(.chimpSurfaceSecondary)
+                            .overlay { Image(systemName: design == nil ? "square.slash" : "photo").foregroundStyle(.chimpTextSecondary) }
+                    }
+                }
+                .frame(width: 132, height: 132 / ChimpSize.cardAspectRatio)
+                .clipShape(RoundedRectangle(cornerRadius: ChimpRadius.control))
+                .overlay {
+                    RoundedRectangle(cornerRadius: ChimpRadius.control)
+                        .strokeBorder(isSelected ? Color(.chimpAccent) : Color(.chimpOutline), lineWidth: isSelected ? 4 : ChimpBorder.regular)
+                }
+                Text(title).chimpFont(.captionStrong).foregroundStyle(.chimpTextPrimary).lineLimit(1)
+                Text(subtitle).chimpFont(.captionS).foregroundStyle(.chimpTextSecondary).lineLimit(1)
+            }
+            .frame(width: 132, alignment: .leading)
+        }
+        .buttonStyle(ChimpPressableStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 #endif

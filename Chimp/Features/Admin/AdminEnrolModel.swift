@@ -50,6 +50,22 @@ final class AdminKeyModel {
 
 @Observable
 final class AdminEnrolModel {
+    /// Dessin choisi pour les cartes enregistrées ici (`nil` : l'image par défaut de la campagne). Il fait partie de ce
+    /// que la carte signe : le changer refait la préparation.
+    var design: CardDesign?
+    var designURI: String? { design?.uri }
+    private(set) var designs: [CardDesign] = []
+    private(set) var isLoadingDesigns = false
+
+    /// Les dessins déjà imprimés de la campagne (lecture seule). Chargés une fois.
+    func loadDesigns() async {
+        guard designs.isEmpty, !isLoadingDesigns else { return }
+        isLoadingDesigns = true
+        defer { isLoadingDesigns = false }
+        let config = ChimpNetworkConfig.testnet
+        designs = (try? await CardDesignCatalog.designs(contract: config.contracts.nfcNft, client: SorobanClient(config: config))) ?? []
+    }
+
     enum State: Equatable {
         case idle
         case checking
@@ -86,7 +102,7 @@ final class AdminEnrolModel {
         guard !isBusy else { return }
         state = .checking
         do {
-            switch try await makeService().inspect(card) {
+            switch try await makeService().inspect(card, uri: designURI) {
             case .alreadyEnrolled(let tokenID, let pocket): state = .alreadyEnrolled(tokenID: tokenID, pocket: pocket)
             case .ready(let plan): state = .ready(plan)
             }
