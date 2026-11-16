@@ -38,7 +38,10 @@ struct ChimpNetworkConfig: Equatable, Sendable {
         let factory: String
         /// Registre des campagnes NFT (`collection`).
         let collection: String
-        /// `nfc-nft` de la campagne par défaut (testnet : `chi4`).
+        /// `nfc-nft` de la campagne par défaut : celle où le mode admin **enregistre** les nouvelles cartes, et celle
+        /// qu'on interroge en premier pour retrouver la carte d'une puce. Une carte d'une autre campagne reste trouvée
+        /// par le registre `collection` (`NfcNftClient.token`), vérifié sur le testnet le 2026-11-16.
+        /// Testnet : `og` (« Chimp OG »), comme le terminal depuis le 2026-10-26 ; `chi4` (« Palta Chimpy ») reste lue.
         let nfcNft: String
         /// Hash du wasm du Chimp account déjà installé.
         let accountWasmHash: String
@@ -68,7 +71,7 @@ struct ChimpNetworkConfig: Equatable, Sendable {
         contracts: Contracts(
             factory: "CDWPHF7DRJ37GLFZGQDSO6RTX4QR75WTNKJUMFJRETQLIOAHFBU6RGYR",
             collection: "CDGFNWFN7ZKU4XDPNXOGDQ4JZ7SZCMXLL3PYFESOCCA2L5DM3ZBCPEKC",
-            nfcNft: "CC6Z7JDXX2RXULI2TMY7OGJJ57WXTBRCQDRR4W4IFEJZZ7SPGCPYJEJT",
+            nfcNft: "CAHOJMBLANFG7YQGCY4BRWSQ5N5Q5FVM5D3WA4S5ZON3QSNP2OJDRJPT",
             accountWasmHash: "044275ac1be3fd505922fb0c564370331753fe808e31990b7e74ebf395614271",
             router: "CAOL3K7VQTDZELQMKTAJB3WUQGL5JLXJKZ2Y44F77NH4CZNLW5I755XI",
             admin: "GBLWPGXVH47YGMODIUHZJ7FETRISFU3TB7JGADTRIMU36OLWJ7PYEZ6M"

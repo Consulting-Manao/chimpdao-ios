@@ -15,7 +15,11 @@ import Testing
 struct EnrolmentTests {
     private let k1Key = MockChipReader.secp256k1Key
     private let r1Key = MockChipReader.p256Key
-    private let nfcNft = ChimpNetworkConfig.testnet.contracts.nfcNft
+    /// **L'adresse avec laquelle les vecteurs ci-dessous ont été calculés** (campagne `chi4`), et non la campagne par
+    /// défaut de `Config/` : le digest et l'enveloppe du `mint` portent l'adresse du contrat appelé, donc changer de
+    /// campagne changerait les valeurs attendues et ces tests ne prouveraient plus le **format**. La campagne par
+    /// défaut est vérifiée à part (`testnetAddresses`).
+    private let nfcNft = "CC6Z7JDXX2RXULI2TMY7OGJJ57WXTBRCQDRR4W4IFEJZZ7SPGCPYJEJT"
     private let factory = ChimpNetworkConfig.testnet.contracts.factory
     private let admin = ChimpNetworkConfig.testnet.contracts.admin
     private let signature = Data(hex: String(repeating: "11", count: 32) + String(repeating: "22", count: 32))!
@@ -159,7 +163,8 @@ struct EnrolmentTests {
     @Test("Config testnet : valeurs transmises par Pamphile")
     func testnetConfig() {
         let config = ChimpNetworkConfig.testnet
-        #expect(config.contracts.nfcNft == "CC6Z7JDXX2RXULI2TMY7OGJJ57WXTBRCQDRR4W4IFEJZZ7SPGCPYJEJT")
+        // Campagne `og` (« Chimp OG ») depuis le 2026-11-16 : c'est là que le terminal enregistre aussi.
+        #expect(config.contracts.nfcNft == "CAHOJMBLANFG7YQGCY4BRWSQ5N5Q5FVM5D3WA4S5ZON3QSNP2OJDRJPT")
         #expect(config.contracts.factory == "CDWPHF7DRJ37GLFZGQDSO6RTX4QR75WTNKJUMFJRETQLIOAHFBU6RGYR")
         #expect(config.contracts.collection == "CDGFNWFN7ZKU4XDPNXOGDQ4JZ7SZCMXLL3PYFESOCCA2L5DM3ZBCPEKC")
         #expect(config.contracts.router == "CAOL3K7VQTDZELQMKTAJB3WUQGL5JLXJKZ2Y44F77NH4CZNLW5I755XI")
