@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SwiftUI
 import Testing
 @testable import ChimpDAO
 
@@ -95,6 +96,54 @@ struct CardArtTests {
         #expect(CardArtGateway.isCardShaped(width: 1000, height: 650))
     }
 
+    // MARK: Couleur de fond
+
+    /// Un dessin fabriqué : un fond uni, et un personnage qui mange le milieu. Les bords ne voient que le fond.
+    private func drawing(background: UIColor, subject: UIColor) -> UIImage {
+        let size = CGSize(width: 200, height: 126)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            background.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            subject.setFill()
+            context.fill(CGRect(x: 40, y: 25, width: 120, height: 76))
+        }
+    }
+
+    @Test("Le fond du dessin est relevé sur ses bords, pas sur le personnage au milieu")
+    func backgroundColor() throws {
+        // Le brun des cartes OG, à peu près.
+        let taupe = UIColor(red: 0.42, green: 0.37, blue: 0.31, alpha: 1)
+        let found = try #require(CardArtGateway.backgroundColor(of: drawing(background: taupe, subject: .black)))
+        var (r, g, b, a) = (CGFloat(0), CGFloat(0), CGFloat(0), CGFloat(0))
+        found.getRed(&r, green: &g, blue: &b, alpha: &a)
+        #expect(abs(r - 0.42) < 0.02 && abs(g - 0.37) < 0.02 && abs(b - 0.31) < 0.02)
+    }
+
+    @Test("Des traits de motif sur le fond ne changent pas la couleur relevée")
+    func backgroundIgnoresPattern() throws {
+        let taupe = UIColor(red: 0.42, green: 0.37, blue: 0.31, alpha: 1)
+        let size = CGSize(width: 200, height: 126)
+        let patterned = UIGraphicsImageRenderer(size: size).image { context in
+            taupe.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            // Quelques traits plus sombres, comme le motif imprimé sur une vraie carte.
+            UIColor.black.withAlphaComponent(0.5).setFill()
+            for x in stride(from: 0, to: 200, by: 24) {
+                context.fill(CGRect(x: x, y: 0, width: 3, height: 126))
+            }
+        }
+        let found = try #require(CardArtGateway.backgroundColor(of: patterned))
+        var (r, g, b, a) = (CGFloat(0), CGFloat(0), CGFloat(0), CGFloat(0))
+        found.getRed(&r, green: &g, blue: &b, alpha: &a)
+        #expect(abs(r - 0.42) < 0.06 && abs(g - 0.37) < 0.06 && abs(b - 0.31) < 0.06,
+                "Le fond l'emporte : les traits sont minoritaires")
+    }
+
+    @Test("Image trop petite pour être échantillonnée : pas de couleur, le bandeau garde celle de la carte")
+    func backgroundRefuses() {
+        #expect(CardArtGateway.backgroundColor(of: drawing(background: .brown, subject: .black), side: 2) == nil)
+    }
+
     // MARK: Lecture complète
 
     /// Une fausse passerelle : chaque adresse rend ce qu'on lui a donné.
@@ -104,6 +153,25 @@ struct CardArtTests {
             guard let found = files[url.absoluteString] else { throw StellarError.rpc("404") }
             return found
         }
+    }
+
+    @Test("Le bandeau d'un tiroir : le fond du dessin quand il est affiché, la couleur de la carte sinon")
+    @MainActor
+    func bannerFollowsTheDesign() {
+        let taupe = Color(uiColor: UIColor(red: 0.42, green: 0.37, blue: 0.31, alpha: 1))
+        let art = CardArt(image: UIImage(), design: "Hamac", background: taupe)
+        let reader: (String) -> CardArt? = { $0 == "04ab" ? art : nil }
+
+        // Le dessin est affiché (la clé n'est passée que dans ce cas) : son fond.
+        let withDesign = ChimpDrawerScene.card(name: "Jungle", color: .pink, number: "0011", key: "04ab")
+        #expect(withDesign.banner(art: reader) == taupe)
+        // Une couleur choisie : rien ne change.
+        let withColour = ChimpDrawerScene.card(name: "Jungle", color: .pink, number: "0011")
+        #expect(withColour.banner(art: reader) == ChimpCardColor.pink.sceneBanner)
+        // Dessin pas encore arrivé : la couleur, en attendant.
+        let pending = ChimpDrawerScene.card(name: "Jungle", color: .pink, number: "0011", key: "04ff")
+        #expect(pending.banner(art: reader) == ChimpCardColor.pink.sceneBanner)
+        #expect(ChimpDrawerScene.main.banner(art: reader) == Color(.chimpCardLeaf))
     }
 
     @Test("Le magasin ne demande qu'une fois par carte, et une carte sans dessin reste de sa couleur")

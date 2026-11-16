@@ -67,6 +67,29 @@ struct CatalogWalletPartsPage: View {
                     }
                     .clipShape(RoundedRectangle(cornerRadius: ChimpRadius.control))
                 }
+                // Une carte qui affiche le dessin de son NFT : le bandeau reprend le fond du dessin, sans sticker.
+                VStack(spacing: 0) {
+                    ChimpDrawerBanner(
+                        scene: .card(name: "Jungle", color: .pink, number: "0011", key: "art"),
+                        title: Text(verbatim: "Jungle card")
+                    ) {}
+                    ChimpSplitPanel(
+                        kind: "N°0011 · ONLY THIS CARD SIGNS", total: "$5.51", ready: "$5.51", growing: nil,
+                        readyWeight: 1, growingWeight: 0
+                    )
+                    .padding(.horizontal, ChimpSpacing.m)
+                    .padding(.top, -ChimpDrawerBanner.panelOverlap)
+                    .padding(.bottom, ChimpSpacing.l)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: ChimpRadius.control))
+                .environment(\.chimpCardArt) { key in
+                    guard key == "art", let image = UIImage(named: "CardArtSample") else { return nil }
+                    return CardArt(
+                        image: image, design: "Hamac",
+                        background: CardArtGateway.backgroundColor(of: image).map(Color.init(uiColor:))
+                    )
+                }
+
                 Text("Empty drawer").chimpFont(.captionS).foregroundStyle(.chimpTextSecondary)
                 ChimpSplitPanel(kind: "MAIN · SHARED", total: "$0.00", ready: "$0", growing: nil, readyWeight: 0, growingWeight: 0)
                 ChimpDrawerListTitle(title: "Ready to spend", amount: "$820.00")

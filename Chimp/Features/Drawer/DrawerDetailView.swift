@@ -18,6 +18,7 @@ struct DrawerDetailView: View {
     var grow: GrowModel?
 
     @Environment(\.locale) private var locale
+    @Environment(\.chimpCardArt) private var cardArt
 
     @State private var renameModel: SettingsModel?
     /// G5 : le compte n'a qu'une carte (dernière lecture) ; retirer ou déclarer perdue est refusé avant tout tap.
@@ -43,7 +44,7 @@ struct DrawerDetailView: View {
                 _ = await (wallet, vault)
             }
             .background(alignment: .top) {
-                ChimpPullBackground(pull: pull, color: scene.banner, patternOpacity: 0.14)
+                ChimpPullBackground(pull: pull, color: scene.banner { cardArt($0) }, patternOpacity: 0.14)
             }
             .ignoresSafeArea(edges: .top)
         }

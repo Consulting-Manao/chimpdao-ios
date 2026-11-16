@@ -7,6 +7,9 @@ struct CardArt: Equatable, Sendable {
     let image: UIImage
     /// « Hamac » : le nom du dessin, pour VoiceOver.
     let design: String?
+    /// La couleur qui domine sur les bords du dessin : le fond de la carte, repris par le bandeau de sa page.
+    /// `nil` si elle n'a pas pu être relevée — le bandeau garde alors la couleur choisie pour la carte.
+    var background: Color?
 }
 
 /// D'où viennent les dessins : la chaîne et Filebase dans l'app, un faux dans le catalogue et les tests.
@@ -35,7 +38,10 @@ struct ChainCardArtReader: CardArtReading {
         // Décision de Barth du 2026-11-16 : seuls les dessins en forme de carte deviennent la face ; un portrait carré
         // (campagnes de collection) laisse la carte de sa couleur.
         guard CardArtGateway.isCardShaped(width: drawing.size.width, height: drawing.size.height) else { return nil }
-        return CardArt(image: drawing, design: metadata.design)
+        return CardArt(
+            image: drawing, design: metadata.design,
+            background: CardArtGateway.backgroundColor(of: drawing).map(Color.init(uiColor:))
+        )
     }
 }
 
@@ -90,7 +96,7 @@ struct MockCardArtReader: CardArtReading {
     func art(forCard publicKey: ChipPublicKey) async throws -> CardArt? {
         try await Task.sleep(for: delay)
         guard withArt.contains(publicKey.hex), let image = UIImage(named: "CardArtSample") else { return nil }
-        return CardArt(image: image, design: design)
+        return CardArt(image: image, design: design, background: CardArtGateway.backgroundColor(of: image).map(Color.init(uiColor:)))
     }
 }
 

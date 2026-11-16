@@ -17,6 +17,17 @@ enum ChimpDrawerScene: Equatable {
         case .blank: Color(.chimpHeader)
         }
     }
+
+    /// La clé de la carte quand c'est son **dessin** qui est affiché (l'appelant ne la met que dans ce cas).
+    var designKey: String? {
+        if case .card(_, _, _, let key) = self { key } else { nil }
+    }
+
+    /// Fond du bandeau en tenant compte du dessin : quand la carte en affiche un, le bandeau reprend **le fond du
+    /// dessin lui-même** (demande de Barth du 2026-11-16), motif compris. Avec une couleur, rien ne change.
+    func banner(art: (String) -> CardArt?) -> Color {
+        designKey.flatMap { art($0) }?.background ?? banner
+    }
 }
 
 extension ChimpCardColor {
@@ -56,6 +67,10 @@ struct ChimpDrawerBanner: View {
     static let panelOverlap: CGFloat = 56
 
     @Environment(\.chimpScreenInsets) private var screenInsets
+    @Environment(\.chimpCardArt) private var cardArt
+
+    /// Le dessin affiché sur la carte de la scène, s'il y en a un.
+    private var design: CardArt? { scene.designKey.flatMap { cardArt($0) } }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -79,7 +94,7 @@ struct ChimpDrawerBanner: View {
         .frame(height: screenInsets.top + Self.height)
         .frame(maxWidth: .infinity)
         .background {
-            scene.banner.overlay { ChimpPattern(opacity: 0.14) }
+            scene.banner { cardArt($0) }.overlay { ChimpPattern(opacity: 0.14) }
         }
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color(.chimpOutline)).frame(height: ChimpBorder.regular)
@@ -109,13 +124,16 @@ struct ChimpDrawerBanner: View {
             }
         case .card(let name, let color, let number, let key):
             ZStack(alignment: .topLeading) {
-                Image(color.sceneSticker)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 190)
-                    .frame(maxWidth: .infinity, alignment: .topTrailing)
-                    .padding(.trailing, 6)
-                    .offset(y: 34)
+                // Le dessin se suffit : pas de sticker par-dessus son fond (demande de Barth du 2026-11-16).
+                if design == nil {
+                    Image(color.sceneSticker)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 190)
+                        .frame(maxWidth: .infinity, alignment: .topTrailing)
+                        .padding(.trailing, 6)
+                        .offset(y: 34)
+                }
                 ChimpCard(name: name, color: color, number: number, cardKey: key)
                     .frame(width: 200)
                     .rotationEffect(.degrees(-8))
