@@ -95,6 +95,38 @@ struct SettingsTests {
         #expect(store.wallet.account?.cards.count == 2)
     }
 
+    @Test("Choisir le dessin du NFT : enregistré sur le téléphone, la couleur est gardée dessous")
+    func chooseCardDesign() throws {
+        let (session, store) = session(namedWallet)
+        let model = SettingsModel(session: session, walletCards: [])
+        model.edit(model.cards[0])
+        #expect(!model.editedUsesDesign, "Une carte s'affiche de sa couleur tant qu'on n'a rien choisi")
+        model.editedUsesDesign = true
+        #expect(model.canSaveCard, "Changer d'allure suffit, même sans toucher au nom")
+        #expect(model.saveCard())
+        let saved = try #require(store.wallet.account?.cards.first)
+        #expect(saved.usesDesign == true)
+        #expect(saved.color == "banana", "La couleur reste choisie dessous : elle revient telle quelle")
+
+        // Et on peut revenir à la couleur.
+        model.edit(try #require(model.cards.first))
+        #expect(model.editedUsesDesign)
+        model.editedUsesDesign = false
+        #expect(model.canSaveCard)
+        #expect(model.saveCard())
+        #expect(store.wallet.account?.cards.first?.usesDesign == nil, "Rien de choisi : rien d'écrit")
+    }
+
+    @Test("Un téléphone qui a enregistré ses cartes avant ce choix les relit : elles gardent leur couleur")
+    func oldFileHasNoDesign() throws {
+        let old = Data(#"{"publicKey":"\#(k1)","chip":"infineon2Go","tokenID":7,"name":"Jungle","color":"jungle"}"#.utf8)
+        let card = try JSONDecoder().decode(SavedCard.self, from: old)
+        #expect(card.usesDesign == nil)
+        let (session, _) = session(namedWallet)
+        let model = SettingsModel(session: session, walletCards: [])
+        #expect(!model.cards[0].usesDesign)
+    }
+
     @Test("Nom vide ou trop long : refusé")
     func invalidNames() {
         let (session, _) = session(namedWallet)

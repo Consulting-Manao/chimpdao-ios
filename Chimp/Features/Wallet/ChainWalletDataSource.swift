@@ -145,6 +145,7 @@ struct ChainWalletDataSource: WalletDataSource {
             number: tokenID.map { String(format: "%04u", $0) } ?? "····",
             name: saved?.name ?? String(localized: "Card"),
             color: saved?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? .jungle,
+            usesDesign: saved?.usesDesign == true,
             assets: assets,
             pocket: pocket,
             tokenID: tokenID,

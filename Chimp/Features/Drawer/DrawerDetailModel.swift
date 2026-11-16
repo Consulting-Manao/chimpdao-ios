@@ -100,6 +100,12 @@ final class DrawerDetailModel {
         return savedCard(key)?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? card?.color ?? .jungle
     }
 
+    /// La carte s'affiche avec le dessin de son NFT (choix local, « Rename & colour »).
+    var cardUsesDesign: Bool {
+        guard case .card(let key) = selection else { return false }
+        return savedCard(key)?.usesDesign == true
+    }
+
     /// Nombre de cartes du compte à la dernière lecture.
     var cardCount: Int { wallet.snapshot?.cards.count ?? 0 }
 

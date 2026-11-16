@@ -18,9 +18,9 @@ struct ChimpCard: View {
     var subtitle: LocalizedStringKey?
     /// `true` : `number` est un libellé affiché tel quel, sans « N° » (visite guidée : « CHIMP CARD »).
     var numberIsLabel = false
-    /// Clé publique de la carte : si son NFT a un dessin en forme de carte, il **remplace** la face (décision de Barth
-    /// du 2026-11-16 : dessin seul, le nom et le numéro ne sont plus écrits dessus). Sans clé, ou sans dessin, la carte
-    /// garde sa couleur.
+    /// Clé publique de la carte, **seulement quand son propriétaire a choisi d'afficher le dessin de son NFT**
+    /// (« Rename & colour »). Le dessin remplace alors toute la face : dessin seul, sans le nom ni le numéro par-dessus
+    /// (décision de Barth du 2026-11-16). Sans clé, ou si le dessin n'est pas encore arrivé, la carte garde sa couleur.
     var cardKey: String?
 
     @Environment(\.chimpCardArt) private var cardArt

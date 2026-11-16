@@ -16,6 +16,8 @@ struct WalletContent: Equatable {
         let name: String
         let color: ChimpCardColor
         let amount: String
+        /// La carte s'affiche avec le dessin de son NFT (choix local, « Rename & colour »).
+        var usesDesign = false
     }
 
     var total: String
@@ -131,7 +133,7 @@ final class WalletViewModel {
         masked.mainReady = content.mainReady.map { _ in hiddenAmount }
         masked.mainGrowing = content.mainGrowing.map { _ in hiddenAmount }
         masked.cards = content.cards.map { card in
-            WalletContent.Card(id: card.id, number: card.number, name: card.name, color: card.color, amount: hiddenAmount)
+            WalletContent.Card(id: card.id, number: card.number, name: card.name, color: card.color, amount: hiddenAmount, usesDesign: card.usesDesign)
         }
         return masked
     }
@@ -251,7 +253,7 @@ final class WalletViewModel {
             mainReady: hasSavings ? (money.value(main.assets).map { money.text($0, style: .upToDigits) } ?? assetText(main.assets)) : nil,
             mainGrowing: hasSavings ? growingValue.map { money.text($0, style: .upToDigits) } : nil,
             cards: snapshot.cards.map { card in
-                WalletContent.Card(id: card.id, number: card.number, name: card.name, color: card.color, amount: amount(card.assets))
+                WalletContent.Card(id: card.id, number: card.number, name: card.name, color: card.color, amount: amount(card.assets), usesDesign: card.usesDesign)
             },
             isZeroBalance: isZero,
             isShowingAssetAmounts: total == nil || growingValue == nil,

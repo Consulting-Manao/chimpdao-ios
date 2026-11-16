@@ -649,6 +649,10 @@ struct CurrencySheet: View {
 struct CardRenameView: View {
     @Bindable var model: SettingsModel
     @FocusState private var isFocused: Bool
+    @Environment(\.chimpCardArt) private var cardArt
+
+    /// Le dessin du NFT de cette carte, s'il en a un en forme de carte : sans lui, l'écran ne propose que les couleurs.
+    private var design: CardArt? { model.editingCard.flatMap { cardArt($0.id) } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -658,11 +662,13 @@ struct CardRenameView: View {
                     ChimpCard(
                         name: model.trimmedName.isEmpty ? String(localized: "Jungle") : model.trimmedName,
                         color: model.editedColor,
-                        number: model.editingCard?.number ?? "····"
+                        number: model.editingCard?.number ?? "····",
+                        cardKey: model.editedUsesDesign ? model.editingCard?.id : nil
                     )
                     .frame(width: 250)
                     .frame(maxWidth: .infinity)
                     .animation(.easeInOut(duration: 0.2), value: model.editedColor)
+                    .animation(.easeInOut(duration: 0.2), value: model.editedUsesDesign)
 
                     Text("Name")
                         .chimpFont(.label)
@@ -682,13 +688,16 @@ struct CardRenameView: View {
                             .padding(.top, ChimpSpacing.s)
                     }
 
-                    Text("Colour")
+                    Text(design == nil ? "Colour" : "Colour & design")
                         .chimpFont(.label)
                         .textCase(.uppercase)
                         .foregroundStyle(.chimpTextSecondary)
                         .padding(.top, ChimpSpacing.xl)
-                    ChimpColorSwatchPicker(selection: $model.editedColor)
-                        .padding(.top, ChimpSpacing.xs)
+                    ChimpColorSwatchPicker(
+                        selection: $model.editedColor, design: design,
+                        designSelection: design == nil ? nil : $model.editedUsesDesign
+                    )
+                    .padding(.top, ChimpSpacing.xs)
 
                     Text("You'll see this name every time the app asks for a card, so you always know which one to grab. It stays on this phone.")
                         .chimpFont(.bodyM)

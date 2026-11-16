@@ -9,6 +9,8 @@ struct SettingsCard: Hashable, Identifiable {
     let number: String
     let name: String?
     let color: ChimpCardColor
+    /// La carte s'affiche avec le dessin de son NFT au lieu de sa couleur.
+    var usesDesign = false
     /// De quoi enregistrer la carte si ce téléphone ne la connaissait pas encore.
     let chip: ChipKind?
     let tokenID: UInt32?
@@ -30,6 +32,9 @@ final class SettingsModel {
     private(set) var editingCard: SettingsCard?
     var editedName = ""
     var editedColor: ChimpCardColor = .jungle
+    /// « Rename & colour » : le dessin du NFT est choisi à la place de la couleur. La couleur reste choisie en dessous,
+    /// et revient telle quelle si on repasse sur une couleur.
+    var editedUsesDesign = false
 
     var isEditingFirstName = false
     var editedFirstName = ""
@@ -68,6 +73,7 @@ final class SettingsModel {
                 number: card.number,
                 name: local?.name,
                 color: local?.color.flatMap(ChimpCardColor.init(rawValue:)) ?? .jungle,
+                usesDesign: local?.usesDesign == true,
                 chip: card.chip ?? local.flatMap { ChipKind(rawValue: $0.chip) },
                 tokenID: card.tokenID ?? local?.tokenID,
                 pocket: card.pocket ?? local?.pocket
@@ -79,6 +85,7 @@ final class SettingsModel {
                 number: local.tokenID.map { String(format: "%04u", $0) } ?? "····",
                 name: local.name,
                 color: local.color.flatMap(ChimpCardColor.init(rawValue:)) ?? .jungle,
+                usesDesign: local.usesDesign == true,
                 chip: ChipKind(rawValue: local.chip),
                 tokenID: local.tokenID,
                 pocket: local.pocket
@@ -101,6 +108,7 @@ final class SettingsModel {
         editingCard = card
         editedName = card.name ?? ""
         editedColor = card.color
+        editedUsesDesign = card.usesDesign
         saveError = nil
     }
 
@@ -116,6 +124,7 @@ final class SettingsModel {
         guard let editingCard else { return false }
         guard !trimmedName.isEmpty, trimmedName.count <= Self.maximumCardNameLength else { return false }
         return trimmedName != editingCard.name || editedColor != editingCard.color
+            || editedUsesDesign != editingCard.usesDesign
     }
 
     /// Enregistre le nom et la couleur sur le téléphone. Renvoie vrai si c'est fait.
@@ -126,7 +135,7 @@ final class SettingsModel {
         // suppose une Infineon (le PIN sera demandé ; la carte dira au tap si elle en a vraiment un).
         let saved = SavedCard(
             publicKey: card.id, chip: (card.chip ?? .infineon2Go).rawValue, tokenID: card.tokenID, pocket: card.pocket,
-            name: trimmedName, color: editedColor.rawValue
+            name: trimmedName, color: editedColor.rawValue, usesDesign: editedUsesDesign ? true : nil
         )
         do {
             try session.renameCard(saved)

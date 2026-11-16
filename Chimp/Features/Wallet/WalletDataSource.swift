@@ -49,6 +49,8 @@ struct CardBalance: Equatable, Identifiable, Codable {
     /// Nom et couleur choisis par l'utilisateur (données locales).
     var name: String
     var color: ChimpCardColor
+    /// La carte s'affiche avec le dessin de son NFT (choix local, « Rename & colour »).
+    var usesDesign = false
     var assets: [AssetAmount]
     /// Adresse C du wallet de la carte (sa Pocket), `nil` si elle n'en a pas (ou dans les données factices).
     var pocket: String? = nil

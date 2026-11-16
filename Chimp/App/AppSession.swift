@@ -261,6 +261,7 @@ final class AppSession {
         if let index = account.cards.firstIndex(where: { $0.publicKey == card.publicKey }) {
             account.cards[index].name = card.name
             account.cards[index].color = card.color
+            account.cards[index].usesDesign = card.usesDesign
         } else {
             account.cards.append(card)
         }

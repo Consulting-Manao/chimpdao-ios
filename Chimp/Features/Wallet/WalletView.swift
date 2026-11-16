@@ -203,7 +203,7 @@ struct WalletView: View {
                         if model.content != nil { onOpenDrawer(.card(card.id)) }
                     } label: {
                         // Montants par actif (« 12.5 XLM · 100 USDC ») : « on card » laisse la place au montant.
-                        ChimpCard(name: card.name, color: card.color, number: card.number, amount: card.amount, subtitle: perAsset ? nil : "on card", cardKey: card.id)
+                        ChimpCard(name: card.name, color: card.color, number: card.number, amount: card.amount, subtitle: perAsset ? nil : "on card", cardKey: card.usesDesign ? card.id : nil)
                     }
                     .buttonStyle(ChimpBouncyPressStyle())
                     .chimpCascadeAppear(index: index + 1)

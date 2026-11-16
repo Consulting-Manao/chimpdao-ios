@@ -142,6 +142,10 @@ struct SavedCard: Codable, Equatable, Identifiable {
     /// Nom et couleur choisis à l'onboarding (A5) ; `nil` pour une carte retrouvée sur un nouveau téléphone.
     var name: String?
     var color: String?
+    /// La carte s'affiche avec le dessin de son NFT au lieu de sa couleur (« Rename & colour », demande de Barth du
+    /// 2026-11-16). Choix **local et purement visuel**, exactement comme la couleur : il ne change rien sur la chaîne.
+    /// Optionnel : un fichier écrit avant ce champ reste lisible, et la carte garde sa couleur.
+    var usesDesign: Bool?
 
     var id: String { publicKey }
 }
